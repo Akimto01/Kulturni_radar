@@ -1,0 +1,4 @@
+# nic citlivého sem nepatří – klíče žijí ve Script Properties
+*.log
+.DS_Store
+Thumbs.db

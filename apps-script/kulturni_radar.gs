@@ -1,0 +1,1222 @@
+/**
+ * KULTURNÍ RADAR – automatizace (Apps Script)
+ * ============================================
+ * Verze: 2.8 (1. 8. 2026)
+ *
+ * Co skript dělá:
+ *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
+ *    Po zaškrtnutí spustí hledání přes Anthropic API (web search), zapíše
+ *    výsledky do AKCE, přidá řádek do KONTROL, vyplní B12, odškrtne B11
+ *    a pošle notifikaci (ntfy + volitelně e-mail).
+ *  - Denní kontrola: časový trigger (~8:00) provede totéž v denním režimu
+ *    a navíc označí skončené akce jako "proběhlo".
+ *  - Menu "Kulturní radar" v tabulce pro ruční spuštění.
+ *
+ * Zásady (dle dohodnutých pravidel tabulky):
+ *  - Zapisuje se POUZE do sloupců A:V a Y listu AKCE. W:X (vzorce) se nedotýká.
+ *  - Deduplikace: profil + datum od + název + místo (normalizovaně) + ID.
+ *  - Akce jiných profilů se nemění. Akce se nemažou (jen stav proběhlo/zrušeno).
+ *  - Každý běh se zaloguje do KONTROL vč. sloupce "Vykonavatel".
+ *
+ * NASTAVENÍ (jednorázově):
+ *  1. Rozšíření → Apps Script → vložit tento soubor.
+ *  2. Project Settings → Script Properties → přidat:
+ *       ANTHROPIC_API_KEY  = sk-ant-...          (povinné)
+ *       NTFY_TOPIC         = nazev-kanalu        (volitelné, push přes ntfy.sh)
+ *       NOTIFY_EMAIL       = adresa@example.com  (volitelné, e-mail navíc)
+ *  3. Spustit funkci setupTriggers() (a autorizovat oprávnění).
+ */
+
+// ---------------------------------------------------------------------------
+// KONSTANTY
+// ---------------------------------------------------------------------------
+
+const SHEET = {
+  KRITERIA: 'KRITÉRIA',
+  LOKALITY: 'LOKALITY',
+  AKCE: 'AKCE',
+  ZDROJE: 'ZDROJE',
+  KONTROLY: 'KONTROLY',
+  MISTA: 'MÍSTA',
+};
+
+const KRIT = {           // adresy v listu KRITÉRIA
+  PROFIL: 'B2',
+  DOJEZD: 'B3',
+  HORIZONT: 'B4',
+  KATEGORIE: 'B5',
+  MALE_AKCE: 'B6',
+  DETSKE: 'B7',
+  ZEME: 'B8',
+  JAZYK: 'B9',
+  CHECKBOX: 'B11',       // Spustit mimořádnou kontrolu
+  POSLEDNI: 'B12',       // Poslední mimořádná kontrola
+};
+
+const AKCE_COLS = 25;    // A..Y
+const AKCE_WRITE_AV = 22; // A..V
+const COL_Y = 25;        // Profil lokality
+
+const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const MAX_WEB_SEARCHES = 5;
+
+/** Nástroj, kterým model odevzdává výsledky – API garantuje validní strukturu. */
+const REPORT_TOOL = {
+  name: 'report_events',
+  description: 'Odevzdání finálního seznamu nalezených kulturních akcí. Zavolej PRÁVĚ JEDNOU na konci hledání s kompletním seznamem (events = []; pokud nic nenalezeno).',
+  input_schema: {
+    type: 'object',
+    properties: {
+      events: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' }, datum_od: { type: 'string' }, datum_do: { type: 'string' },
+            cas: { type: 'string' }, nazev: { type: 'string' }, misto: { type: 'string' },
+            obec: { type: 'string' }, dojezd: { type: 'string' }, kategorie: { type: 'string' },
+            podkategorie: { type: 'string' }, cena: { type: 'string' }, popis: { type: 'string' },
+            skore: { type: 'number' }, stav: { type: 'string' }, primarni_zdroj: { type: 'string' },
+            url: { type: 'string' }, dalsi_zdroj: { type: 'string' }, poznamka: { type: 'string' },
+          },
+          required: ['id', 'datum_od', 'nazev', 'misto', 'obec', 'kategorie', 'stav'],
+        },
+      },
+    },
+    required: ['events'],
+  },
+};
+
+/** Nástroj pro odevzdání stálých míst (zoo, science centra, hrady…). */
+const REPORT_PLACES_TOOL = {
+  name: 'report_places',
+  description: 'Odevzdání seznamu stálých atrakcí. Zavolej PRÁVĚ JEDNOU na konci hledání s kompletním seznamem (places = []; pokud nic).',
+  input_schema: {
+    type: 'object',
+    properties: {
+      places: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' }, nazev: { type: 'string' }, typ: { type: 'string' },
+            obec: { type: 'string' }, dojezd: { type: 'string' }, oteviraci_doba: { type: 'string' },
+            sezonni_poznamka: { type: 'string' }, vstupne: { type: 'string' }, deti: { type: 'string' },
+            skore: { type: 'number' }, stav: { type: 'string' }, url: { type: 'string' },
+            poznamka: { type: 'string' },
+          },
+          required: ['id', 'nazev', 'typ', 'obec', 'stav'],
+        },
+      },
+    },
+    required: ['places'],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// MENU + TRIGGERY
+// ---------------------------------------------------------------------------
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('Kulturní radar')
+    .addItem('Spustit kontrolu teď', 'menuRunNow')
+    .addItem('Označit proběhlé akce', 'markPastEvents')
+    .addItem('Odstranit duplicity', 'cleanupDuplicates')
+    .addItem('Test notifikací', 'testNtfy')
+    .addSeparator()
+    .addItem('Týdenní přehled teď', 'weeklyDigest')
+    .addItem('Víkendové tipy teď', 'weekendDigest')
+    .addItem('Aktualizovat stálá místa', 'updateMista')
+    .addToUi();
+}
+
+function menuRunNow() {
+  runCheck_('mimořádná kontrola (menu)');
+}
+
+/** Otestuje doručení notifikací (ntfy + e-mail) bez spouštění kontroly. */
+function testNtfy() {
+  sendNotification_('Test notifikací – ěščřž',
+    'Testovací zpráva z Apps Scriptu (' + formatDate_(new Date()) + '). Pokud ji vidíš, doručování funguje.');
+}
+
+/** Spustit JEDNOU ručně z editoru – vytvoří triggery. */
+function setupTriggers() {
+  // úklid starých triggerů tohoto projektu
+  ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ScriptApp.newTrigger('onEditInstallable')
+    .forSpreadsheet(ss)
+    .onEdit()
+    .create();
+
+  ScriptApp.newTrigger('dailyCheck')
+    .timeBased()
+    .atHour(8)          // ~8:00 místního času projektu
+    .everyDays(1)
+    .create();
+
+  ScriptApp.newTrigger('weeklyDigest')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.MONDAY)
+    .atHour(7)
+    .create();
+
+  ScriptApp.newTrigger('weekendDigest')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.THURSDAY)
+    .atHour(16)
+    .create();
+
+  ScriptApp.newTrigger('updateMista')
+    .timeBased()
+    .onMonthDay(1)
+    .atHour(6)
+    .create();
+
+  Logger.log('Triggery vytvořeny: onEdit + denní 8:00 + pondělní přehled 7:00 + čtvrteční víkendové tipy 16:00 + měsíční aktualizace míst.');
+}
+
+/** Instalovatelný onEdit – reaguje jen na zaškrtnutí KRITÉRIA!B11. */
+function onEditInstallable(e) {
+  try {
+    if (!e || !e.range) return;
+    const sh = e.range.getSheet();
+    if (sh.getName() !== SHEET.KRITERIA) return;
+    if (e.range.getA1Notation() !== KRIT.CHECKBOX) return;
+    if (e.range.getValue() !== true) return;   // zajímá nás jen TRUE
+    runCheck_('mimořádná kontrola');
+  } catch (err) {
+    notifyFail_('Mimořádná kontrola selhala', err);
+    throw err;
+  }
+}
+
+/** Denní běh (časový trigger). */
+function dailyCheck() {
+  try {
+    markPastEvents();
+    runCheck_('denní kontrola');
+  } catch (err) {
+    notifyFail_('Denní kontrola selhala', err);
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HLAVNÍ BĚH
+// ---------------------------------------------------------------------------
+
+function runCheck_(typKontroly) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) {
+    Logger.log('Jiný běh právě probíhá – končím.');
+    return;
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const krit = ss.getSheetByName(SHEET.KRITERIA);
+  const isMimoradna = typKontroly.indexOf('mimořádná') === 0;
+
+  try {
+    // U mimořádné kontroly ověř, že checkbox stále platí (ochrana proti dvojkliku)
+    if (isMimoradna && typKontroly === 'mimořádná kontrola' &&
+        krit.getRange(KRIT.CHECKBOX).getValue() !== true) {
+      return;
+    }
+
+    const cfg = readCriteria_(krit);
+    const zdroje = readSources_(ss, cfg.profil);
+    if (zdroje.length === 0) {
+      throw new Error('Pro profil "' + cfg.profil + '" nejsou v ZDROJÍCH žádné zdroje (ani VŠECHNY).');
+    }
+
+    const events = callAnthropic_(cfg, zdroje, typKontroly);
+    const stats = upsertEvents_(ss, cfg, events);
+
+    logKontrola_(ss, typKontroly, cfg, stats, zdroje.length);
+    updateLokalita_(ss, cfg.profil, new Date());
+
+    const now = new Date();
+    if (isMimoradna) {
+      krit.getRange(KRIT.POSLEDNI).setValue(formatDate_(now));
+      krit.getRange(KRIT.CHECKBOX).setValue(false);
+    }
+
+    notifyOk_(typKontroly, cfg, stats, now);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ČTENÍ KRITÉRIÍ A ZDROJŮ
+// ---------------------------------------------------------------------------
+
+function readCriteria_(krit) {
+  const val = a1 => String(krit.getRange(a1).getDisplayValue()).trim();
+
+  const horizontTxt = val(KRIT.HORIZONT);          // např. "2 týdny"
+  const weeks = parseInt(horizontTxt, 10) || 2;
+  const from = new Date();
+  const to = new Date(from.getTime() + weeks * 7 * 24 * 3600 * 1000);
+
+  return {
+    profil: val(KRIT.PROFIL),
+    dojezd: val(KRIT.DOJEZD),                      // např. "90 min"
+    horizont: horizontTxt,
+    kategorie: val(KRIT.KATEGORIE),
+    maleAkce: val(KRIT.MALE_AKCE),
+    detske: val(KRIT.DETSKE),
+    zeme: val(KRIT.ZEME),
+    jazyk: val(KRIT.JAZYK) || 'čeština',
+    from: from,
+    to: to,
+    rozsah: formatDateOnly_(from) + '–' + formatDateOnly_(to),
+  };
+}
+
+function readSources_(ss, profil) {
+  const sh = ss.getSheetByName(SHEET.ZDROJE);
+  const data = sh.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  const header = data[0].map(h => String(h).toLowerCase());
+  const idx = name => header.findIndex(h => h.indexOf(name) !== -1);
+  const iNazev = 0;                                // 1. sloupec = název zdroje
+  const iUrl = idx('url');
+  const iProfil = idx('profil');
+  const iPrio = idx('priorita');
+
+  const out = [];
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const p = String(row[iProfil] || '').trim();
+    if (!p) continue;
+    if (p === profil || p.toUpperCase() === 'VŠECHNY') {
+      out.push({
+        nazev: String(row[iNazev] || '').trim(),
+        url: String(row[iUrl] || '').trim(),
+        priorita: iPrio >= 0 ? String(row[iPrio] || '').trim() : '',
+      });
+    }
+  }
+  return out.filter(z => z.url);
+}
+
+// ---------------------------------------------------------------------------
+// ANTHROPIC API
+// ---------------------------------------------------------------------------
+
+function callAnthropic_(cfg, zdroje, typKontroly) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('Chybí Script Property ANTHROPIC_API_KEY.');
+
+  const sourcesList = zdroje
+    .map(z => '- ' + z.nazev + (z.priorita ? ' [' + z.priorita + ']' : '') + ': ' + z.url)
+    .join('\n');
+
+  const system = [
+    'Jsi Kulturní radar – asistent, který vyhledává kulturní akce v ČR.',
+    'Výsledky NIKDY nevypisuj jako text – po dokončení hledání je odevzdej',
+    'PRÁVĚ JEDNÍM zavoláním nástroje report_events (parametr events = seznam akcí).',
+    'Formáty hodnot: id = RRRR-MM-DD-slug-nazvu; datum_od/datum_do = "D. M. RRRR" (datum_do může být "");',
+    'dojezd = text (např. "cca 30–40 min"); kategorie = středníkem oddělené; skore = číslo 1–10;',
+    'stav = "potvrzeno". Piš česky.',
+    'Uváděj jen akce ověřené na uvedených nebo jiných OFICIÁLNÍCH zdrojích',
+    '(města, pořadatelé, instituce); agregátory jen jako doplňkové ověření.',
+  ].join('\n');
+
+  const userMsg = [
+    'Vyhledej kulturní akce podle těchto kritérií:',
+    '- Profil lokality (střed hledání): ' + cfg.profil,
+    '- Období: ' + cfg.rozsah,
+    '- Maximální dojezd autem (1 cesta): ' + cfg.dojezd + ' z města ' + cfg.profil,
+    '- Kategorie: ' + cfg.kategorie,
+    '- Malé lokální akce: ' + cfg.maleAkce,
+    '- Dětské akce: ' + cfg.detske,
+    '- Typ běhu: ' + typKontroly,
+    '',
+    'Výběrový režim: koncerty/festivaly/jarmarky/slavnosti jednotlivě;',
+    'výstavy jednou za celé období; divadlo hlavně mimořádné/venkovní/festivalové;',
+    'hrady a zámky jen slavnosti, noční prohlídky a tematické programy;',
+    'vinařské/gastro jen s výrazným kulturním programem.',
+    'Vícedenní a probíhající akce uváděj JEDNOU jako celek (datum_od až datum_do),',
+    'nikdy po jednotlivých dnech ani jako dílčí podprogramy; dílčí body shrň v popisu.',
+    '',
+    'Prioritní zdroje ke kontrole:',
+    sourcesList,
+    '',
+    'Odevzdej max 15 nejrelevantnějších akcí zavoláním nástroje report_events.',
+    'Uváděj pouze KONKRÉTNÍ pojmenované akce; nikdy obecné souhrny typu',
+    '"letní kulturní akce města" nebo "víkendový program" bez vlastního názvu.',
+    'Pole "popis" drž STRUČNÉ – maximálně 1–2 krátké věty. Pokud nic, odevzdej prázdný seznam.',
+  ].join('\n');
+
+  const basePayload = {
+    model: ANTHROPIC_MODEL,
+    max_tokens: 16000,
+    system: system,
+    tools: [
+      { type: 'web_search_20250305', name: 'web_search', max_uses: MAX_WEB_SEARCHES },
+      REPORT_TOOL,
+    ],
+  };
+
+  // Smyčka kvůli stop_reason 'pause_turn' s časovým rozpočtem (pojistka proti 6min limitu)
+  const t0 = Date.now();
+  let msgs = [{ role: 'user', content: userMsg }];
+  let text = '';
+  let lastText = '';
+  let data = null;
+  for (let pokus = 0; pokus < 5; pokus++) {
+    const payload = Object.assign({}, basePayload, { messages: msgs });
+    const resp = UrlFetchApp.fetch(ANTHROPIC_URL, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+
+    const code = resp.getResponseCode();
+    if (code !== 200) {
+      throw new Error('Anthropic API vrátilo ' + code + ': ' + resp.getContentText().slice(0, 500));
+    }
+
+    data = JSON.parse(resp.getContentText());
+    lastText = (data.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('\n');
+    text += lastText;
+
+    // Model odevzdal výsledky nástrojem → struktura je garantovaně validní.
+    const toolBlock = (data.content || []).find(b => b.type === 'tool_use' && b.name === 'report_events');
+    if (toolBlock && toolBlock.input && Array.isArray(toolBlock.input.events)) {
+      Logger.log('Výsledky převzaty z nástroje report_events: ' + toolBlock.input.events.length + ' akcí.');
+      return toolBlock.input.events;
+    }
+
+    if (data.stop_reason === 'pause_turn' && (Date.now() - t0) < 180000) {
+      Logger.log('pause_turn – pokračuji v běhu (' + (pokus + 1) + ').');
+      msgs = msgs.concat([{ role: 'assistant', content: data.content }]);
+      continue;
+    }
+
+    if (data.stop_reason === 'end_turn' && (Date.now() - t0) < 180000) {
+      // Model skončil textem bez zavolání nástroje → vyžádat odevzdání.
+      Logger.log('Model nezavolal nástroj – vyžaduji report_events (' + (pokus + 1) + ').');
+      msgs = msgs.concat([
+        { role: 'assistant', content: data.content },
+        { role: 'user', content: 'Nyní odevzdej nalezené akce PRÁVĚ JEDNÍM zavoláním nástroje report_events.' },
+      ]);
+      continue;
+    }
+    break;
+  }
+
+  if (data && data.stop_reason === 'max_tokens') {
+    Logger.log('POZOR: odpověď byla uříznuta limitem tokenů – pokusím se zachránit kompletní záznamy.');
+  }
+
+  // Primárně text POSLEDNÍ odpovědi (tam bývá finální pole), pak celý poskládaný text.
+  let events = parseEvents_(lastText) || parseEvents_(text);
+  if (!events) {
+    // Druhá fáze: model komentoval nebo nedokončil pole → jedno dovolání BEZ web searche,
+    // které z textu sestaví čisté JSON pole.
+    Logger.log('JSON se nepodařilo naparsovat napřímo – zkouším formátovací dovolání.');
+    const fixResp = UrlFetchApp.fetch(ANTHROPIC_URL, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      payload: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 16000,
+        system: 'Vrať VÝHRADNĚ platné JSON pole. Žádný jiný text.',
+        messages: [{ role: 'user', content:
+          'Z následujícího textu sestav kompletní platné JSON pole kulturních akcí ' +
+          'se stejnými klíči, jaké text obsahuje (id, datum_od, datum_do, cas, nazev, misto, obec, ' +
+          'dojezd, kategorie, podkategorie, cena, popis, skore, stav, primarni_zdroj, url, dalsi_zdroj, poznamka). ' +
+          'Neúplné poslední záznamy vynech. Pokud žádné akce nejsou, vrať [].\n\n' + text.slice(0, 60000) }],
+      }),
+      muteHttpExceptions: true,
+    });
+    Logger.log('Formátovací dovolání: HTTP ' + fixResp.getResponseCode());
+    if (fixResp.getResponseCode() === 200) {
+      const fixData = JSON.parse(fixResp.getContentText());
+      const fixText = (fixData.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+      events = parseEvents_(fixText);
+    }
+  }
+  if (!events) {
+    throw new Error('Odpověď API se nepodařilo naparsovat jako JSON: ' + text.slice(0, 300));
+  }
+  return events;
+}
+
+/**
+ * Pokusí se z textu vyparsovat JSON pole akcí; vrací pole nebo null.
+ * Zkouší více kandidátních výřezů – model při pokračování (pause_turn) občas
+ * začne pole vypisovat celé znovu, takže finální validní pole bývá až u POSLEDNÍHO '['.
+ */
+function parseEvents_(text) {
+  const t = String(text || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+  const first = t.indexOf('[');
+  if (first < 0) return null;
+  const last = t.lastIndexOf('[');
+  const end = t.lastIndexOf(']');
+
+  const candidates = [];
+  if (last > first) candidates.push(end > last ? t.slice(last, end + 1) : t.slice(last));
+  candidates.push(end > first ? t.slice(first, end + 1) : t.slice(first));
+
+  for (let i = 0; i < candidates.length; i++) {
+    // Sanitizace: modely občas dají do textových hodnot skutečné konce řádků
+    // (JSON je uvnitř řetězců zakazuje) nebo čárku před ]/}; obojí opravíme.
+    const cand = candidates[i]
+      .replace(/[\r\n\t]+/g, ' ')
+      .replace(/,\s*([\]}])/g, '$1');
+    try {
+      const ev = JSON.parse(cand);
+      if (Array.isArray(ev)) return ev;
+    } catch (e) { /* zkusit záchranu */ }
+    const cut = cand.lastIndexOf('}');
+    if (cut > 0) {
+      try {
+        const ev = JSON.parse(cand.slice(0, cut + 1) + ']');
+        if (Array.isArray(ev)) {
+          Logger.log('Odpověď byla neúplná; zachráněno ' + ev.length + ' kompletních záznamů.');
+          return ev;
+        }
+      } catch (e2) { /* další kandidát */ }
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// ZÁPIS DO AKCE (upsert, jen A:V a Y)
+// ---------------------------------------------------------------------------
+
+function upsertEvents_(ss, cfg, events) {
+  const sh = ss.getSheetByName(SHEET.AKCE);
+  const lastRow = sh.getLastRow();
+  const existing = lastRow > 1
+    ? sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues()
+    : [];
+
+  // Indexy: podle ID, podle přesného klíče a podle profil+datum pro fuzzy shodu názvů
+  const byId = {};
+  const byKey = {};
+  const byProfilDatum = {};
+  existing.forEach((row, i) => {
+    const id = norm_(row[0]);
+    if (id) byId[id] = i;
+    byKey[dedupKey_(row[24], row[1], row[4], row[5])] = i;
+    const pd = norm_(row[24]) + '|' + dateKey_(row[1]);
+    (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: i, tokens: nazevTokens_(row[4]) });
+  });
+
+  const today = formatDateOnly_(new Date());
+  const stats = {
+    total: events.length, nove: 0, zmenene: 0, zrusene: 0, bezZmeny: 0,
+    noveNazvy: [], zmeneneNazvy: [], zruseneNazvy: [], bezZmenyNazvy: [],
+  };
+  const polozka = ev => ({
+    d: dateKey_(ev.datum_od),
+    kat: String(ev.kategorie || '').split(';')[0].trim() || 'ostatní',
+    t: String(ev.nazev || '') + ' (' + String(ev.datum_od || '') + ')',
+  });
+
+  events.forEach(ev => {
+    const rowVals = eventToRow_(ev, today);
+    const key = dedupKey_(cfg.profil, ev.datum_od, ev.nazev, ev.misto);
+    const pd = norm_(cfg.profil) + '|' + dateKey_(ev.datum_od);
+    const evTokens = nazevTokens_(ev.nazev);
+    let idx = byId[norm_(ev.id)];
+    if (idx === undefined) idx = byKey[key];
+    if (idx === undefined) {
+      // Fuzzy: stejný profil + stejné datum + dostatečný překryv názvů
+      const hit = (byProfilDatum[pd] || []).find(c => isSameName_(c.tokens, evTokens));
+      if (hit) idx = hit.i;
+    }
+
+    if (idx === undefined) {
+      // NOVÁ akce → append: A:V + Y (W:X nechat vzorcům)
+      const r = sh.getLastRow() + 1;
+      rowVals[14] = 'ANO';                       // Novinka
+      rowVals[16] = today;                       // První nález
+      sh.getRange(r, 1, 1, AKCE_WRITE_AV).setValues([rowVals.slice(0, AKCE_WRITE_AV)]);
+      sh.getRange(r, COL_Y).setValue(cfg.profil);
+      // registrovat i do indexů, aby se duplicitní položky TÉHOŽ běhu spojily
+      const ni = existing.length;
+      existing.push(rowVals.concat(['', '', cfg.profil]));
+      if (norm_(ev.id)) byId[norm_(ev.id)] = ni;
+      byKey[key] = ni;
+      (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: ni, tokens: evTokens });
+      stats.noveNazvy.push(polozka(ev));
+      stats.nove++;
+    } else {
+      // EXISTUJÍCÍ akce → porovnat klíčová pole, aktualizovat
+      const r = idx + 2;
+      const old = existing[idx];
+      if (norm_(old[24]) !== norm_(cfg.profil)) return;  // cizí profil neměnit
+
+      // Změna = jen posun termínu nebo změna stavu (zrušení apod.);
+      // přeformulace textů (čas/cena/popis) mezi běhy se nepočítá.
+      const changed =
+        dateKey_(old[1]) !== dateKey_(ev.datum_od) ||
+        dateKey_(old[2]) !== dateKey_(ev.datum_do) ||
+        norm_(old[13]) !== norm_(ev.stav);
+
+      if (changed) {
+        rowVals[0] = old[0];                     // ID zachovat
+        rowVals[14] = old[14];                   // Novinka zachovat
+        rowVals[15] = 'ANO';                     // Změna
+        rowVals[16] = old[16];                   // První nález zachovat
+        sh.getRange(r, 1, 1, AKCE_WRITE_AV).setValues([rowVals.slice(0, AKCE_WRITE_AV)]);
+        if (norm_(ev.stav) === 'zrušeno') { stats.zrusene++; stats.zruseneNazvy.push(polozka(ev)); }
+        else { stats.zmenene++; stats.zmeneneNazvy.push(polozka(ev)); }
+      } else {
+        sh.getRange(r, 18).setValue(today);      // jen Poslední kontrola
+        stats.bezZmenyNazvy.push(polozka(ev));
+        stats.bezZmeny++;
+      }
+    }
+  });
+
+  return stats;
+}
+
+function eventToRow_(ev, today) {
+  return [
+    ev.id || '',            // A ID
+    ev.datum_od || '',      // B
+    ev.datum_do || '',      // C
+    ev.cas || '',           // D
+    ev.nazev || '',         // E
+    ev.misto || '',         // F
+    ev.obec || '',          // G
+    ev.dojezd || '',        // H
+    ev.kategorie || '',     // I
+    ev.podkategorie || '',  // J
+    ev.cena || '',          // K
+    ev.popis || '',         // L
+    ev.skore || '',         // M
+    ev.stav || 'potvrzeno', // N
+    'NE',                   // O Novinka (přepíše se u nové)
+    'NE',                   // P Změna
+    today,                  // Q První nález (přepíše se u existující)
+    today,                  // R Poslední kontrola
+    ev.primarni_zdroj || '',// S
+    ev.url || '',           // T
+    ev.dalsi_zdroj || '',   // U
+    ev.poznamka || '',      // V
+  ];
+}
+
+/**
+ * Jednorázový úklid: najde v AKCE duplicitní záznamy (stejný profil + datum
+ * + překrývající se název), ponechá STARŠÍ řádek, u něj aktualizuje Poslední
+ * kontrolu, a novější duplicitní řádky smaže. Zaloguje do KONTROL.
+ */
+function cleanupDuplicates() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(SHEET.AKCE);
+  const lastRow = sh.getLastRow();
+  if (lastRow < 3) return;
+
+  const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
+  const groups = {};
+  const toDelete = [];
+
+  data.forEach((row, i) => {
+    if (!norm_(row[4])) return;                       // bez názvu ignorovat
+    const gk = norm_(row[24]) + '|' + dateKey_(row[1]);
+    const tokens = nazevTokens_(row[4]);
+    const g = (groups[gk] = groups[gk] || []);
+    const dup = g.find(c => isSameName_(c.tokens, tokens));
+    if (dup) {
+      toDelete.push({ rowNum: i + 2, nazev: String(row[4]), keptRow: dup.rowNum });
+    } else {
+      g.push({ rowNum: i + 2, tokens: tokens });
+    }
+  });
+
+  if (toDelete.length === 0) {
+    Logger.log('Žádné duplicity nenalezeny.');
+    try { ss.toast('Žádné duplicity nenalezeny.', 'Kulturní radar'); } catch (e) {}
+    return;
+  }
+
+  const today = formatDateOnly_(new Date());
+  // u ponechaných řádků aktualizovat Poslední kontrolu
+  toDelete.forEach(d => sh.getRange(d.keptRow, 18).setValue(today));
+  // mazat odspodu, aby se neposunula čísla řádků
+  toDelete.sort((a, b) => b.rowNum - a.rowNum).forEach(d => sh.deleteRow(d.rowNum));
+
+  const detail = toDelete.map(d => d.nazev + ' (ř. ' + d.rowNum + ' → ponechán ř. ' + d.keptRow + ')').join('; ');
+  const ksh = ss.getSheetByName(SHEET.KONTROLY);
+  ksh.appendRow([
+    formatDate_(new Date()), 'úklid duplicit', 'AKCE – celý list',
+    toDelete.length, 0, 0, 0, 0, 0, 0,
+    'Odstraněny duplicitní řádky: ' + detail,
+    'Apps Script automatizace',
+  ]);
+  Logger.log('Odstraněno duplicit: ' + toDelete.length + ' — ' + detail);
+  try { ss.toast('Odstraněno duplicit: ' + toDelete.length, 'Kulturní radar'); } catch (e) {}
+}
+
+/** Označí akce s "Datum do" (příp. "Datum od") v minulosti jako proběhlé. */
+function markPastEvents() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(SHEET.AKCE);
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return;
+
+  const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  data.forEach((row, i) => {
+    const stav = norm_(row[13]);
+    if (stav === 'proběhlo' || stav === 'zrušeno') return;
+    const end = parseCzDate_(row[2]) || parseCzDate_(row[1]);
+    if (end && end < today) {
+      sh.getRange(i + 2, 14).setValue('proběhlo');
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// STÁLÁ MÍSTA (zoo, science centra, hrady, jeskyně…)
+// ---------------------------------------------------------------------------
+
+const MISTA_HLAVICKA = ['ID', 'Název', 'Typ', 'Obec', 'Dojezd', 'Otevírací doba',
+  'Sezónní poznámka', 'Vstupné', 'Vhodné pro děti', 'Skóre', 'Stav', 'URL',
+  'Poznámka', 'Poslední aktualizace', 'Profil lokality'];
+
+/** Založí list MÍSTA s hlavičkou, pokud neexistuje. Vrací list. */
+function ensureMistaSheet_(ss) {
+  let sh = ss.getSheetByName(SHEET.MISTA);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET.MISTA);
+    sh.getRange(1, 1, 1, MISTA_HLAVICKA.length).setValues([MISTA_HLAVICKA])
+      .setFontWeight('bold').setBackground('#0b5345').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/** Aktualizace stálých míst pro aktivní profil (menu / měsíční trigger). */
+function updateMista() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const cfg = readCriteria_(ss);
+    ensureMistaSheet_(ss);
+    const places = callAnthropicPlaces_(cfg);
+    const stats = upsertMista_(ss, cfg, places);
+    updateLokalita_(ss, cfg.profil, new Date());
+    const body = [
+      cfg.profil + ' · do ' + cfg.dojezd,
+      'Nalezeno míst: ' + places.length + ' | Nová: ' + stats.nove + ' | Aktualizovaná: ' + stats.aktualizovane,
+      'Kompletní seznam: ' + ss.getUrl(),
+    ].join('\n');
+    sendNotification_('Stálá místa aktualizována', body);
+    try {
+      ss.getSheetByName(SHEET.KONTROLY).appendRow([
+        formatDate_(new Date()), 'aktualizace stálých míst',
+        cfg.profil + '; do ' + cfg.dojezd, places.length, stats.nove,
+        stats.aktualizovane, 0, 0, 0, places.length,
+        'Automatický běh přes Anthropic API (' + ANTHROPIC_MODEL + ').',
+        'Apps Script automatizace']);
+    } catch (e) { Logger.log('Log do KONTROL selhal: ' + e); }
+  } catch (err) {
+    notifyFail_('Aktualizace stálých míst selhala', err);
+    throw err;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Hledání stálých míst přes Anthropic API (tool use, web search). */
+function callAnthropicPlaces_(cfg) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('Chybí ANTHROPIC_API_KEY ve Script Properties.');
+
+  const system = [
+    'Jsi Kulturní radar – asistent, který mapuje STÁLÉ atrakce v ČR.',
+    'Výsledky NIKDY nevypisuj jako text – po dokončení hledání je odevzdej',
+    'PRÁVĚ JEDNÍM zavoláním nástroje report_places (parametr places).',
+    'Formáty: id = slug-nazvu; typ = jedna z: zoo; botanická zahrada; science centrum;',
+    'hvězdárna/planetárium; hrad/zámek; jeskyně; skanzen; technická památka; aquapark;',
+    'rozhledna; zábavní park; muzeum; jiné. skore = číslo 1–10 (atraktivita pro rodinu).',
+    'stav = "aktivní" / "sezónně zavřeno" / "zavřeno". Piš česky.',
+    'Otevírací dobu uváděj AKTUÁLNÍ pro toto roční období a ověřenou na OFICIÁLNÍM webu místa.',
+  ].join('\n');
+
+  const userMsg = [
+    'Najdi stálé atrakce vhodné pro rodinné výlety v okolí lokality: ' + cfg.profil + '.',
+    'Maximální dojezd: ' + cfg.dojezd + ' (1 cesta autem).',
+    'Zaměř se na: zoo, botanické zahrady, science centra, hvězdárny/planetária,',
+    'významné hrady a zámky, jeskyně, skanzeny, technické památky, aquaparky,',
+    'rozhledny a zábavní parky. U každého místa ověř AKTUÁLNÍ otevírací dobu.',
+    'Odevzdej max 12 nejzajímavějších míst zavoláním nástroje report_places.',
+    'Uváděj pouze KONKRÉTNÍ existující místa; žádné obecné položky.',
+  ].join('\n');
+
+  const basePayload = {
+    model: ANTHROPIC_MODEL,
+    max_tokens: 16000,
+    system: system,
+    tools: [
+      { type: 'web_search_20250305', name: 'web_search', max_uses: MAX_WEB_SEARCHES },
+      REPORT_PLACES_TOOL,
+    ],
+  };
+
+  const t0 = Date.now();
+  let msgs = [{ role: 'user', content: userMsg }];
+  let data = null;
+  for (let pokus = 0; pokus < 5; pokus++) {
+    const resp = UrlFetchApp.fetch(ANTHROPIC_URL, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      payload: JSON.stringify(Object.assign({}, basePayload, { messages: msgs })),
+      muteHttpExceptions: true,
+    });
+    const code = resp.getResponseCode();
+    if (code !== 200) {
+      throw new Error('Anthropic API vrátilo ' + code + ': ' + resp.getContentText().slice(0, 500));
+    }
+    data = JSON.parse(resp.getContentText());
+
+    const toolBlock = (data.content || []).find(b => b.type === 'tool_use' && b.name === 'report_places');
+    if (toolBlock && toolBlock.input && Array.isArray(toolBlock.input.places)) {
+      Logger.log('Výsledky převzaty z nástroje report_places: ' + toolBlock.input.places.length + ' míst.');
+      return toolBlock.input.places;
+    }
+    if (data.stop_reason === 'pause_turn' && (Date.now() - t0) < 180000) {
+      msgs = msgs.concat([{ role: 'assistant', content: data.content }]);
+      continue;
+    }
+    if (data.stop_reason === 'end_turn' && (Date.now() - t0) < 180000) {
+      msgs = msgs.concat([
+        { role: 'assistant', content: data.content },
+        { role: 'user', content: 'Nyní odevzdej nalezená místa PRÁVĚ JEDNÍM zavoláním nástroje report_places.' },
+      ]);
+      continue;
+    }
+    break;
+  }
+  throw new Error('Model neodevzdal stálá místa nástrojem report_places.');
+}
+
+/** Upsert stálých míst: klíč ID, jinak název+obec. Vrací statistiky. */
+function upsertMista_(ss, cfg, places) {
+  const sh = ensureMistaSheet_(ss);
+  const stats = { nove: 0, aktualizovane: 0 };
+  const lastRow = sh.getLastRow();
+  const existing = lastRow > 1 ? sh.getRange(2, 1, lastRow - 1, 15).getValues() : [];
+  const byId = {}, byKey = {};
+  existing.forEach((row, i) => {
+    if (norm_(row[14]) !== norm_(cfg.profil)) return;
+    if (row[0]) byId[norm_(row[0])] = i;
+    byKey[norm_(row[1]) + '|' + norm_(row[3])] = i;
+  });
+
+  const today = formatDate_(new Date());
+  places.forEach(p => {
+    const rowVals = [
+      String(p.id || ''), String(p.nazev || ''), String(p.typ || ''), String(p.obec || ''),
+      String(p.dojezd || ''), String(p.oteviraci_doba || ''), String(p.sezonni_poznamka || ''),
+      String(p.vstupne || ''), String(p.deti || ''), (typeof p.skore === 'number' ? p.skore : ''),
+      String(p.stav || 'aktivní'), String(p.url || ''), String(p.poznamka || ''), today, cfg.profil,
+    ];
+    let idx = byId[norm_(p.id)];
+    if (idx === undefined) idx = byKey[norm_(p.nazev) + '|' + norm_(p.obec)];
+    if (idx === undefined) {
+      const r = sh.getLastRow() + 1;
+      sh.getRange(r, 1, 1, 15).setValues([rowVals]);
+      const ni = existing.length;
+      existing.push(rowVals);
+      if (p.id) byId[norm_(p.id)] = ni;
+      byKey[norm_(p.nazev) + '|' + norm_(p.obec)] = ni;
+      stats.nove++;
+    } else {
+      sh.getRange(idx + 2, 1, 1, 15).setValues([rowVals]);
+      stats.aktualizovane++;
+    }
+  });
+  return stats;
+}
+
+// ---------------------------------------------------------------------------
+// PŘEHLEDY (týdenní / víkendový) S POČASÍM
+// ---------------------------------------------------------------------------
+
+/** Pondělní přehled: akce z databáze na nejbližších 7 dní. */
+function weeklyDigest() {
+  try {
+    const from = new Date(); from.setHours(0, 0, 0, 0);
+    const to = new Date(from.getTime() + 6 * 24 * 3600 * 1000);
+    digestRange_('Týdenní přehled', from, to);
+  } catch (err) {
+    notifyFail_('Týdenní přehled selhal', err);
+    throw err;
+  }
+}
+
+/** Čtvrteční tipy: akce nadcházejícího víkendu (pátek–neděle). */
+function weekendDigest() {
+  try {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const toFri = ((5 - now.getDay()) + 7) % 7;   // dní do nejbližšího pátku
+    const from = new Date(now.getTime() + toFri * 24 * 3600 * 1000);
+    const to = new Date(from.getTime() + 2 * 24 * 3600 * 1000);
+    digestRange_('Víkendové tipy', from, to);
+  } catch (err) {
+    notifyFail_('Víkendové tipy selhaly', err);
+    throw err;
+  }
+}
+
+/** Sestaví a odešle přehled akcí aktivního profilu v daném okně, s počasím. */
+function digestRange_(title, from, to) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const profil = String(ss.getSheetByName(SHEET.KRITERIA).getRange(KRIT.PROFIL).getDisplayValue()).trim();
+  const evs = readEventsInRange_(ss, profil, from, to);
+
+  const lines = [profil + ' · ' + formatDateOnly_(from) + '–' + formatDateOnly_(to)];
+  if (evs.length === 0) {
+    lines.push('Na toto období nejsou v databázi žádné akce.');
+  } else {
+    const cache = {};
+    const skupiny = {};
+    evs.forEach(ev => {
+      const k = ev.kat || 'ostatní';
+      (skupiny[k] = skupiny[k] || []).push(ev);
+    });
+    Object.keys(skupiny).sort((a, b) => a.localeCompare(b, 'cs')).forEach(k => {
+      lines.push('');
+      lines.push(k.charAt(0).toUpperCase() + k.slice(1));
+      skupiny[k].forEach(ev => {
+        let line = '• ' + formatDateOnly_(ev.den) + ' — ' + ev.nazev;
+        if (ev.probihaOd) line += ' (probíhá od ' + formatDateOnly_(ev.probihaOd) + ')';
+        if (ev.cas) line += '\n   čas: ' + ev.cas;
+        const w = weatherFor_(ev.obec, ev.den, cache);
+        if (w) line += '\n   počasí (' + (ev.obec || profil) + '): ' + w;
+        lines.push(line);
+      });
+    });
+  }
+  // Stálá místa (zoo, science centra, hrady…) – top 5 podle skóre, počasí na sobotu v okně
+  const mista = readMista_(ss, profil);
+  if (mista.length) {
+    let denPocasi = from;
+    for (let d = new Date(from.getTime()); d <= to; d = new Date(d.getTime() + 86400000)) {
+      if (d.getDay() === 6) { denPocasi = d; break; }
+    }
+    const cacheM = {};
+    lines.push('');
+    lines.push('Stálá místa (' + formatDateOnly_(denPocasi) + '):');
+    mista.slice(0, 5).forEach(m => {
+      let line = '• ' + m.nazev + (m.typ ? ' (' + m.typ + ')' : '');
+      if (m.doba) line += '\n   otevřeno: ' + m.doba;
+      const w = weatherFor_(m.obec, denPocasi, cacheM);
+      if (w) line += '\n   počasí (' + m.obec + '): ' + w;
+      lines.push(line);
+    });
+  }
+  lines.push('Kompletní přehled: ' + ss.getUrl());
+  sendNotification_(title, lines.join('\n'));
+}
+
+/** Načte aktivní stálá místa profilu, seřazená podle skóre sestupně. */
+function readMista_(ss, profil) {
+  const sh = ss.getSheetByName(SHEET.MISTA);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const data = sh.getRange(2, 1, sh.getLastRow() - 1, 15).getValues();
+  const out = [];
+  data.forEach(row => {
+    if (norm_(row[14]) !== norm_(profil)) return;
+    if (norm_(row[10]).indexOf('aktiv') !== 0) return;
+    out.push({
+      nazev: String(row[1] || '').trim(),
+      typ: String(row[2] || '').split(';')[0].trim(),
+      obec: String(row[3] || '').trim(),
+      doba: String(row[5] || '').trim(),
+      skore: Number(row[9]) || 0,
+    });
+  });
+  out.sort((a, b) => b.skore - a.skore);
+  return out;
+}
+
+/** Načte akce profilu zasahující do okna, seřazené podle dne v okně. */
+function readEventsInRange_(ss, profil, from, to) {
+  const sh = ss.getSheetByName(SHEET.AKCE);
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return [];
+  const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
+
+  const out = [];
+  data.forEach(row => {
+    if (norm_(row[24]) !== norm_(profil)) return;
+    const stav = norm_(row[13]);
+    if (stav === 'zrušeno' || stav === 'proběhlo') return;
+    const od = parseCzDate_(row[1]);
+    if (!od) return;
+    const doD = parseCzDate_(row[2]) || od;
+    if (doD < from || od > to) return;
+    out.push({
+      nazev: String(row[4] || '').trim(),
+      den: od < from ? from : od,                 // pro vícedenní akce první den v okně
+      probihaOd: od < from ? od : null,
+      cas: String(row[3] || '').trim(),
+      obec: String(row[6] || '').trim(),
+      kat: String(row[8] || '').split(';')[0].trim(),
+    });
+  });
+  out.sort((a, b) => a.den - b.den);
+  return out;
+}
+
+/** Předpověď pro obec a den přes Open-Meteo (zdarma, bez klíče); '' při neúspěchu. */
+function weatherFor_(obec, den, cache) {
+  try {
+    if (!obec) return '';
+    const key = norm_(obec);
+    if (!(key in cache)) {
+      const g = UrlFetchApp.fetch(
+        'https://geocoding-api.open-meteo.com/v1/search?count=1&language=cs&name=' + encodeURIComponent(obec),
+        { muteHttpExceptions: true });
+      if (g.getResponseCode() !== 200) { cache[key] = null; return ''; }
+      const gd = JSON.parse(g.getContentText());
+      if (!gd.results || !gd.results.length) { cache[key] = null; return ''; }
+      const loc = gd.results[0];
+      const f = UrlFetchApp.fetch(
+        'https://api.open-meteo.com/v1/forecast?daily=weather_code,temperature_2m_max,precipitation_probability_max' +
+        '&timezone=Europe%2FPrague&forecast_days=16&latitude=' + loc.latitude + '&longitude=' + loc.longitude,
+        { muteHttpExceptions: true });
+      cache[key] = f.getResponseCode() === 200 ? JSON.parse(f.getContentText()).daily : null;
+    }
+    const d = cache[key];
+    if (!d || !d.time) return '';
+    const iso = Utilities.formatDate(den, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    const i = d.time.indexOf(iso);
+    if (i < 0) return '';
+    let w = weatherText_(d.weather_code[i]) + ', max ' + Math.round(d.temperature_2m_max[i]) + ' °C';
+    if (d.precipitation_probability_max && d.precipitation_probability_max[i] != null) {
+      w += ', srážky ' + d.precipitation_probability_max[i] + ' %';
+    }
+    return w;
+  } catch (e) {
+    return '';
+  }
+}
+
+/** Převod WMO kódu počasí na český popis. */
+function weatherText_(code) {
+  if (code === 0) return 'jasno';
+  if (code <= 2) return 'polojasno';
+  if (code === 3) return 'zataženo';
+  if (code === 45 || code === 48) return 'mlha';
+  if (code <= 57) return 'mrholení';
+  if (code <= 67) return 'déšť';
+  if (code <= 77) return 'sněžení';
+  if (code <= 82) return 'přeháňky';
+  if (code <= 86) return 'sněhové přeháňky';
+  return 'bouřky';
+}
+
+// ---------------------------------------------------------------------------
+// KONTROLY + NOTIFIKACE
+// ---------------------------------------------------------------------------
+
+/** Zapíše čas kontroly profilu do LOKALITY (sloupec H) a případně posune stav mapy (G). */
+function updateLokalita_(ss, profil, when) {
+  try {
+    const sh = ss.getSheetByName(SHEET.LOKALITY);
+    if (!sh) return;
+    const lastRow = sh.getLastRow();
+    if (lastRow < 2) return;
+    const profily = sh.getRange(1, 2, lastRow, 1).getValues();   // sloupec B
+    for (let i = 0; i < profily.length; i++) {
+      if (norm_(profily[i][0]) === norm_(profil)) {
+        const row = i + 1;
+        sh.getRange(row, 8).setValue(formatDate_(when));         // H: Poslední kontrola profilu
+        const stav = norm_(sh.getRange(row, 7).getValue());      // G: Stav zdrojové mapy
+        if (stav.indexOf('čeká') === 0) {
+          sh.getRange(row, 7).setValue('základ naplněn');
+        }
+        return;
+      }
+    }
+  } catch (e) { Logger.log('Aktualizace LOKALIT selhala: ' + e); }
+}
+
+function logKontrola_(ss, typ, cfg, stats, pocetZdroju) {
+  const sh = ss.getSheetByName(SHEET.KONTROLY);
+
+  // zajistit sloupec "Vykonavatel" (L)
+  if (norm_(sh.getRange(1, 12).getValue()) !== 'vykonavatel') {
+    sh.getRange(1, 12).setValue('Vykonavatel');
+  }
+
+  sh.appendRow([
+    formatDate_(new Date()),
+    typ,
+    cfg.profil + '; ' + cfg.rozsah + '; do ' + cfg.dojezd + '; ' + cfg.horizont,
+    stats.total,
+    stats.nove,
+    stats.zmenene,
+    stats.zrusene,
+    0,
+    stats.bezZmeny,
+    pocetZdroju,
+    'Automatický běh přes Anthropic API (' + ANTHROPIC_MODEL + ').',
+    'Apps Script automatizace',
+  ]);
+}
+
+function notifyOk_(typ, cfg, stats, when) {
+  const title = (typ.indexOf('mimořádná') === 0 ? 'Mimořádná kontrola dokončena' :
+                 typ.indexOf('denní') === 0 ? 'Denní kontrola dokončena' :
+                 'Kontrola dokončena');
+  const seznam = arr => {
+    const vybrane = arr.slice()
+      .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0))
+      .slice(0, 20);
+    const map = {};
+    vybrane.forEach(x => { const k = x.kat || 'ostatní'; (map[k] = map[k] || []).push(x); });
+    const out = [];
+    Object.keys(map).sort((a, b) => a.localeCompare(b, 'cs')).forEach(k => {
+      out.push(k.charAt(0).toUpperCase() + k.slice(1));
+      map[k].forEach(x => out.push('• ' + x.t));
+    });
+    if (arr.length > 20) out.push('… a dalších ' + (arr.length - 20));
+    return out.join('\n');
+  };
+  const lines = [
+    cfg.profil + ' · ' + cfg.rozsah + ' · do ' + cfg.dojezd,
+    'Dokončeno: ' + formatDate_(when),
+  ];
+  if (stats.nove) lines.push('Nové (' + stats.nove + '):\n' + seznam(stats.noveNazvy));
+  if (stats.zmenene) lines.push('Změněné (' + stats.zmenene + '):\n' + seznam(stats.zmeneneNazvy));
+  if (stats.zrusene) lines.push('Zrušené (' + stats.zrusene + '):\n' + seznam(stats.zruseneNazvy));
+  if (!stats.nove && !stats.zmenene && !stats.zrusene) lines.push('Žádné novinky.');
+  if (stats.bezZmeny) lines.push('Beze změny (' + stats.bezZmeny + '):\n' + seznam(stats.bezZmenyNazvy));
+  else lines.push('Beze změny: 0');
+  try {
+    lines.push('Kompletní přehled: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl());
+  } catch (e) { /* odkaz je jen bonus */ }
+  sendNotification_(title, lines.join('\n'));
+}
+
+function notifyFail_(title, err) {
+  sendNotification_(title, 'Chyba: ' + (err && err.message ? err.message : err));
+}
+
+function sendNotification_(title, body) {
+  const props = PropertiesService.getScriptProperties();
+  const topic = props.getProperty('NTFY_TOPIC');
+  const email = props.getProperty('NOTIFY_EMAIL');
+
+  if (topic) {
+    // ntfy.sh omezuje HTTP publikování podle IP odesílatele a sdílené IP Google
+    // serverů mají kvótu trvale vyčerpanou (429). E-mailová brána ntfy-<topic>@ntfy.sh
+    // jde přes Gmail infrastrukturu a limitům nepodléhá. Předmět = titulek, tělo = zpráva.
+    // POZOR: těla delší než ~4 kB brána mění na přílohu .txt → dlouhé zprávy zkrátit.
+    try {
+      let ntfyBody = body;
+      const LIMIT = 3500;  // bajtů (UTF-8), s rezervou pod 4kB limitem brány
+      if (Utilities.newBlob(ntfyBody, 'text/plain').getBytes().length > LIMIT) {
+        const radky = body.split('\n');
+        const ponechane = [];
+        let velikost = 0;
+        for (let i = 0; i < radky.length; i++) {
+          const b = Utilities.newBlob(radky[i] + '\n', 'text/plain').getBytes().length;
+          if (velikost + b > LIMIT) break;
+          ponechane.push(radky[i]);
+          velikost += b;
+        }
+        ponechane.push('… zkráceno; kompletní verze je v e-mailu a v tabulce.');
+        ntfyBody = ponechane.join('\n');
+      }
+      MailApp.sendEmail('ntfy-' + topic + '@ntfy.sh', title, ntfyBody);
+      Logger.log('ntfy: odesláno přes e-mailovou bránu.');
+    } catch (e) { Logger.log('ntfy e-mailová brána selhala: ' + e); }
+  }
+  if (email) {
+    try {
+      MailApp.sendEmail(email, '[Kulturní radar] ' + title, body);
+    } catch (e) { Logger.log('e-mail selhal: ' + e); }
+  }
+  Logger.log(title + '\n' + body);
+}
+
+// ---------------------------------------------------------------------------
+// POMOCNÉ FUNKCE
+// ---------------------------------------------------------------------------
+
+function norm_(v) {
+  return String(v == null ? '' : v).trim().toLowerCase();
+}
+
+function dedupKey_(profil, datumOd, nazev, misto) {
+  return [norm_(profil), dateKey_(datumOd), normNazev_(nazev), normNazev_(misto)].join('|');
+}
+
+/** Datum (Date objekt i český text) → klíč "yyyy-mm-dd"; jinak normalizovaný text. */
+function dateKey_(v) {
+  const d = parseCzDate_(v);
+  if (!d) return norm_(v);
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+/** Normalizace názvu: malá písmena, bez diakritiky, číslic a interpunkce. */
+function normNazev_(v) {
+  return norm_(v)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[0-9]+/g, ' ')
+    .replace(/[^a-z ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Množina významových tokenů názvu (slova o 3+ znacích). */
+function nazevTokens_(v) {
+  const out = {};
+  normNazev_(v).split(' ').forEach(w => { if (w.length >= 3) out[w] = true; });
+  return out;
+}
+
+/** Dva názvy = tatáž akce, pokud je menší množina podmnožinou větší, nebo mají 3+ společných slov. */
+function isSameName_(tokA, tokB) {
+  const a = Object.keys(tokA), b = Object.keys(tokB);
+  if (!a.length || !b.length) return false;
+  const inter = a.filter(w => tokB[w]).length;
+  return inter >= 2 && (inter === Math.min(a.length, b.length) || inter >= 3);
+}
+
+function parseCzDate_(v) {
+  if (v instanceof Date) return v;
+  const m = String(v || '').match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/);
+  if (!m) return null;
+  return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+}
+
+function formatDate_(d) {
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'd. M. yyyy H:mm');
+}
+
+function formatDateOnly_(d) {
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'd. M. yyyy');
+}
