@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 2.8 (1. 8. 2026)
+ * Verze: 2.9 (1. 8. 2026)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -38,6 +38,7 @@ const SHEET = {
   ZDROJE: 'ZDROJE',
   KONTROLY: 'KONTROLY',
   MISTA: 'MÍSTA',
+  PREHLED: 'PŘEHLED',
 };
 
 const KRIT = {           // adresy v listu KRITÉRIA
@@ -129,6 +130,8 @@ function onOpen() {
     .addItem('Týdenní přehled teď', 'weeklyDigest')
     .addItem('Víkendové tipy teď', 'weekendDigest')
     .addItem('Aktualizovat stálá místa', 'updateMista')
+    .addSeparator()
+    .addItem('Samotest', 'runSelfTest')
     .addToUi();
 }
 
@@ -177,7 +180,19 @@ function setupTriggers() {
     .atHour(6)
     .create();
 
-  Logger.log('Triggery vytvořeny: onEdit + denní 8:00 + pondělní přehled 7:00 + čtvrteční víkendové tipy 16:00 + měsíční aktualizace míst.');
+  ScriptApp.newTrigger('runSelfTest')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .atHour(18)
+    .create();
+
+  ScriptApp.newTrigger('watchdogDailyCheck')
+    .timeBased()
+    .atHour(20)
+    .everyDays(1)
+    .create();
+
+  Logger.log('Triggery vytvořeny: onEdit + denní 8:00 + pondělní přehled 7:00 + čtvrteční tipy 16:00 + měsíční místa + nedělní samotest 18:00 + denní watchdog 20:00.');
 }
 
 /** Instalovatelný onEdit – reaguje jen na zaškrtnutí KRITÉRIA!B11. */
@@ -631,21 +646,7 @@ function cleanupDuplicates() {
   if (lastRow < 3) return;
 
   const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
-  const groups = {};
-  const toDelete = [];
-
-  data.forEach((row, i) => {
-    if (!norm_(row[4])) return;                       // bez názvu ignorovat
-    const gk = norm_(row[24]) + '|' + dateKey_(row[1]);
-    const tokens = nazevTokens_(row[4]);
-    const g = (groups[gk] = groups[gk] || []);
-    const dup = g.find(c => isSameName_(c.tokens, tokens));
-    if (dup) {
-      toDelete.push({ rowNum: i + 2, nazev: String(row[4]), keptRow: dup.rowNum });
-    } else {
-      g.push({ rowNum: i + 2, tokens: tokens });
-    }
-  });
+  const toDelete = najdiDuplicity_(data);
 
   if (toDelete.length === 0) {
     Logger.log('Žádné duplicity nenalezeny.');
@@ -717,7 +718,7 @@ function updateMista() {
   if (!lock.tryLock(5000)) return;
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const cfg = readCriteria_(ss);
+    const cfg = readCriteria_(ss.getSheetByName(SHEET.KRITERIA));
     ensureMistaSheet_(ss);
     const places = callAnthropicPlaces_(cfg);
     const stats = upsertMista_(ss, cfg, places);
@@ -855,6 +856,130 @@ function upsertMista_(ss, cfg, places) {
     }
   });
   return stats;
+}
+
+// ---------------------------------------------------------------------------
+// SAMOTEST + WATCHDOG + DATOVÁ HYGIENA
+// ---------------------------------------------------------------------------
+
+/** Najde duplicitní řádky AKCÍ (stejná logika jako úklid, bez mazání). */
+function najdiDuplicity_(data) {
+  const groups = {};
+  const toDelete = [];
+  data.forEach((row, i) => {
+    if (!norm_(row[4])) return;                       // bez názvu ignorovat
+    const gk = norm_(row[24]) + '|' + dateKey_(row[1]);
+    const tokens = nazevTokens_(row[4]);
+    const g = (groups[gk] = groups[gk] || []);
+    const dup = g.find(c => isSameName_(c.tokens, tokens));
+    if (dup) {
+      toDelete.push({ rowNum: i + 2, nazev: String(row[4]), keptRow: dup.rowNum });
+    } else {
+      g.push({ rowNum: i + 2, tokens: tokens });
+    }
+  });
+  return toDelete;
+}
+
+/** Vycpávkový (obecný) název akce bez vlastního jména – model je má zakázané. */
+function jeVycpavka_(nazev) {
+  const n = norm_(nazev);
+  if (!n) return false;
+  return /(kulturní akce|víkendová akce|víkendové akce|víkendový program|vícedenní akce|letní akce)/.test(n);
+}
+
+/** Datová hygiena AKCÍ: duplicity (suchý běh), vycpávky, budoucí akce bez URL. */
+function auditDat_(ss) {
+  const out = { duplicity: [], vycpavky: [], bezUrl: 0 };
+  const sh = ss.getSheetByName(SHEET.AKCE);
+  if (!sh || sh.getLastRow() < 2) return out;
+  const data = sh.getRange(2, 1, sh.getLastRow() - 1, AKCE_COLS).getValues();
+
+  najdiDuplicity_(data).forEach(d => out.duplicity.push(d.nazev));
+
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  data.forEach(row => {
+    const stav = norm_(row[13]);
+    if (stav === 'proběhlo' || stav === 'zrušeno') return;
+    if (jeVycpavka_(row[4])) out.vycpavky.push(String(row[4]));
+    const od = parseCzDate_(row[1]);
+    if (od && od >= dnes && !String(row[19] || '').trim()) out.bezUrl++;
+  });
+  return out;
+}
+
+/** Týdenní samotest prostředí + hygiena dat; výsledek jde notifikací. */
+function runSelfTest() {
+  const problemy = [];
+  let prosle = 0;
+  const ok = () => prosle++;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  [SHEET.KRITERIA, SHEET.LOKALITY, SHEET.AKCE, SHEET.ZDROJE, SHEET.KONTROLY, SHEET.MISTA]
+    .forEach(n => { if (ss.getSheetByName(n)) ok(); else problemy.push('chybí list ' + n); });
+
+  let cfg = null;
+  try {
+    cfg = readCriteria_(ss.getSheetByName(SHEET.KRITERIA));
+    if (cfg.profil) ok(); else problemy.push('KRITÉRIA!B2: prázdný profil');
+  } catch (e) { problemy.push('KRITÉRIA nečitelná: ' + e); }
+
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('ANTHROPIC_API_KEY')) ok(); else problemy.push('chybí ANTHROPIC_API_KEY');
+  if (props.getProperty('NTFY_TOPIC') || props.getProperty('NOTIFY_EMAIL')) ok();
+  else problemy.push('není nastaven žádný notifikační kanál');
+
+  const potrebne = ['onEditInstallable', 'dailyCheck', 'weeklyDigest', 'weekendDigest',
+    'updateMista', 'runSelfTest', 'watchdogDailyCheck'];
+  const mame = ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction());
+  potrebne.forEach(f => { if (mame.indexOf(f) >= 0) ok(); else problemy.push('chybí trigger ' + f); });
+
+  try {
+    const p = ss.getSheetByName(SHEET.PREHLED);
+    if (p) {
+      p.getRange('E4:E7').getDisplayValues().forEach((r, i) => {
+        if (String(r[0]).charAt(0) === '#') problemy.push('PŘEHLED!E' + (4 + i) + ' = ' + r[0]);
+        else ok();
+      });
+    }
+  } catch (e) { problemy.push('kontrola PŘEHLEDU selhala: ' + e); }
+
+  try {
+    const w = weatherFor_((cfg && cfg.profil) || 'Brno', new Date(Date.now() + 86400000), {});
+    if (w) ok(); else problemy.push('Open-Meteo nevrátilo předpověď');
+  } catch (e) { problemy.push('počasí selhalo: ' + e); }
+
+  const audit = auditDat_(ss);
+  const vypis = arr => arr.slice(0, 3).join('; ') + (arr.length > 3 ? ' …' : '');
+  if (audit.duplicity.length) problemy.push('duplicity v AKCÍCH (' + audit.duplicity.length + '): ' + vypis(audit.duplicity));
+  else ok();
+  if (audit.vycpavky.length) problemy.push('vycpávkové názvy (' + audit.vycpavky.length + '): ' + vypis(audit.vycpavky));
+  else ok();
+  if (audit.bezUrl) problemy.push('budoucí akce bez URL: ' + audit.bezUrl);
+
+  const title = problemy.length ? 'Samotest: ' + problemy.length + ' problémů' : 'Samotest: OK';
+  const body = problemy.length
+    ? 'Nalezené problémy:\n' + problemy.map(p => '• ' + p).join('\n')
+    : 'Všech ' + prosle + ' kontrol prošlo. Systém je zdravý.';
+  sendNotification_(title, body);
+}
+
+/** Denní hlídač (~20:00): ohlásí, pokud dnes neproběhla denní kontrola. */
+function watchdogDailyCheck() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sh = ss.getSheetByName(SHEET.KONTROLY);
+    if (!sh || sh.getLastRow() < 2) return;
+    const data = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+    const dnes = dateKey_(new Date());
+    const probehla = data.some(r => dateKey_(r[0]) === dnes && norm_(r[1]).indexOf('denní') === 0);
+    if (!probehla) {
+      sendNotification_('Watchdog: denní kontrola dnes neproběhla',
+        'V KONTROLÁCH chybí dnešní záznam denní kontroly.\n' +
+        'Zkontroluj Spuštění v Apps Scriptu (tiché selhání nebo nevystřelený trigger).\n' +
+        'Kompletní přehled: ' + ss.getUrl());
+    }
+  } catch (e) { Logger.log('Watchdog selhal: ' + e); }
 }
 
 // ---------------------------------------------------------------------------

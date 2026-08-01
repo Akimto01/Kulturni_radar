@@ -3,6 +3,17 @@
 Kompletní historie verzí včetně produkčních bugů a jejich řešení —
 zároveň případová studie testování a ladění AI-integrovaného systému.
 
+## v2.9 (1. 8. 2026)
+- **Samotest** (`runSelfTest`, menu + nedělní trigger 18:00): listy a hlavičky,
+  kritéria, properties, všech 7 triggerů, vzorce PŘEHLEDU, Open-Meteo,
+  datová hygiena (duplicity suchým během, vycpávkové názvy, akce bez URL).
+- **Watchdog** (denně ~20:00): poplach, pokud dnes neproběhla denní kontrola —
+  chytá tichá selhání a nevystřelené triggery.
+- Refaktor: detekce duplicit vytažena do `najdiDuplicity_` (sdílí ji úklid
+  i audit); nový čistý detektor `jeVycpavka_` (pokrytý jednotkovými testy).
+- **Fix latentního bugu:** `updateMista` předávala `readCriteria_` celý
+  spreadsheet místo listu KRITÉRIA — fungovalo jen díky pořadí listů.
+
 ## v2.8 (1. 8. 2026)
 - Všechny notifikace seskupené podle kategorií (Festivaly / Koncerty / Výstavy…);
   u kontrol uvnitř sekcí Nové/Změněné/Zrušené, u přehledů jako hlavní nadpisy.
