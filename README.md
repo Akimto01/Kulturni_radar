@@ -34,9 +34,9 @@ notifikace pro celou rodinu.
                                                         →  [Open-Meteo] (počasí, zdarma)
 ```
 
-Detailně viz `docs/ARCHITEKTURA.md`; zprovoznění a řešení potíží
-viz `docs/PROVOZ.md`; historie verzí a lekce z produkčních bugů
-viz `docs/CHANGELOG.md`.
+Detailně viz `Docs/ARCHITEKTURA.md`; zprovoznění a řešení potíží
+viz `Docs/PROVOZ.md`; historie verzí a lekce z produkčních bugů
+viz `Docs/CHANGELOG.md`.
 
 ## Rychlé zprovoznění
 
