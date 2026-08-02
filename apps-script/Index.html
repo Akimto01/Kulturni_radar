@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.2 – label profilu: kraj -->
+<!-- Kulturní radar Index.html v3.3 – sekce „Probíhá / dlouhodobé“ pro akce s minulým začátkem -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -422,14 +422,28 @@
       return;
     }
 
-    // Skupinovat po dnech
+    // Skupinovat po dnech; akce začínající v minulosti (dlouhodobé /
+    // opakované) nepatří pod dávno minulou denní hlavičku, ale do
+    // sekce „Probíhá / dlouhodobé“ na začátku seznamu (v3.3).
+    const dnes = new Date();
+    dnes.setHours(0, 0, 0, 0);
+    const probiha = [];
     const dnove = {};
     filtrovane.forEach(a => {
       const den = a.datumOd || '—';
+      const d = parseCeskeDatum(den);
+      if (d && d < dnes) { probiha.push(a); return; }
       (dnove[den] = dnove[den] || []).push(a);
     });
 
     const fragment = document.createDocumentFragment();
+    if (probiha.length) {
+      const h = document.createElement('div');
+      h.className = 'den-hlavicka';
+      h.textContent = 'Probíhá / dlouhodobé';
+      fragment.appendChild(h);
+      probiha.forEach(a => fragment.appendChild(vytvorKartu(a, true)));
+    }
     Object.entries(dnove).forEach(([den, akce]) => {
       const h = document.createElement('div');
       h.className = 'den-hlavicka';
@@ -441,7 +455,14 @@
     main.prepend(fragment);
   }
 
-  function vytvorKartu(a) {
+  // „d. M. yyyy" → Date (půlnoc), jinak null. Toleruje mezery kolem teček.
+  function parseCeskeDatum(s) {
+    const m = /^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/.exec((s || '').trim());
+    if (!m) return null;
+    return new Date(+m[3], +m[2] - 1, +m[1]);
+  }
+
+  function vytvorKartu(a, probiha) {
     const el = document.createElement('div');
     el.className = 'karta' + (a.stav === 'zrušeno' ? ' zruseno' : '');
     const kat0 = (a.kategorie[0] || '').toLowerCase();
@@ -461,6 +482,7 @@
 
     const meta = document.createElement('div');
     meta.className = 'meta';
+    if (probiha && a.datumOd) { const s = document.createElement('span'); s.textContent = '📅 od ' + a.datumOd; meta.appendChild(s); }
     if (a.misto) { const s = document.createElement('span'); s.textContent = '📍 ' + a.misto; meta.appendChild(s); }
     if (a.cas)   { const s = document.createElement('span'); s.textContent = '🕐 ' + a.cas;  meta.appendChild(s); }
     if (a.cena)  { const s = document.createElement('span'); s.textContent = '🎟 ' + a.cena; meta.appendChild(s); }

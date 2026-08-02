@@ -1,5 +1,14 @@
 # Changelog
 
+## Index.html v3.3 — 2. 8. 2026 (backend beze změny, 3.4)
+### Přidáno
+- Frontend: sekce „Probíhá / dlouhodobé" na začátku seznamu — akce s datem začátku v minulosti (celoléto běžící série apod.) už nedrží dávno minulou denní hlavičku nad aktuálními akcemi; na kartě se zobrazuje původní začátek („od 14. 5. 2026").
+- `frontend.robot`: nový regresní test „Dlouhodobé akce nevytvářejí hlavičky s minulým datem" (žádná datumová hlavička < dnešek; sekce Probíhá vždy první) — sada má nyní 14 testů.
+### Změněno
+- Test hlaviček dnů toleruje nedatumový label sekce (case-insensitive, label v proměnné `${PROBIHA_LABEL}`).
+### Ověřeno
+- Nasazeno (Nová verze), RF 14/14 PASS proti produkci (2. 8. 2026).
+
 ## v3.4 — 2. 8. 2026
 ### Opraveno
 - Frontend: volání backendu převedeno z `fetch` na `google.script.run` (iframe sandbox Apps Scriptu blokoval fetch na vlastní /exec).

@@ -16,6 +16,7 @@ Suite Teardown    Close Browser
 ${BASE_URL}       %{RADAR_URL=https://example.com/exec}
 ${FRAME}          id=sandboxFrame >>> id=userHtmlFrame >>>
 ${DATUM_RE}       ^\\d{1,2}\\.\\s?\\d{1,2}\\.\\s?\\d{4}$
+${PROBIHA_LABEL}    Probíhá / dlouhodobé
 
 *** Test Cases ***
 Hlavička a základní prvky jsou na místě
@@ -34,14 +35,40 @@ Chipy kategorií se vykreslily
 Karty akcí se načetly a hlavičky dnů jsou česká data
     [Documentation]    Regresní test bugu v3.2–3.3 přímo v UI:
     ...                den-hlavicka nesmí být „46156“ ani „FRI AUG 07…“.
+    ...                Od v3.3 frontendu je povolena i jediná nedatumová
+    ...                hlavička: sekce „Probíhá / dlouhodobé“.
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=15s
     ${karty}=    Get Element Count    ${FRAME} .karta
     Should Be True    ${karty} >= 1
     ${hlavicky}=    Get Elements    ${FRAME} .den-hlavicka
     FOR    ${h}    IN    @{hlavicky}
         ${text}=    Get Text    ${h}
+        # Get Text vrací text po CSS text-transform (uppercase) → srovnávat necitlivě
+        IF    $text.upper().strip() == $PROBIHA_LABEL.upper()
+            CONTINUE
+        END
         Should Match Regexp    ${text}    ${DATUM_RE}
         ...    msg=Hlavička dne „${text}“ není české datum
+    END
+
+Dlouhodobé akce nevytvářejí hlavičky s minulým datem
+    [Documentation]    Regrese v3.3 frontendu: akce začínající v minulosti
+    ...                (např. celoléto běžící série) se řadí do sekce
+    ...                „Probíhá / dlouhodobé“, která je vždy úplně první —
+    ...                žádná datumová hlavička nesmí být starší než dnešek.
+    ${hlavicky}=    Get Elements    ${FRAME} .den-hlavicka
+    ${i}=    Set Variable    ${0}
+    FOR    ${h}    IN    @{hlavicky}
+        ${text}=    Get Text    ${h}
+        IF    $text.upper().strip() == $PROBIHA_LABEL.upper()
+            Should Be Equal As Integers    ${i}    0
+            ...    msg=Sekce „Probíhá / dlouhodobé“ musí být první hlavička
+        ELSE
+            Should Be True
+            ...    datetime.datetime.strptime($text.replace(' ', ''), '%d.%m.%Y').date() >= datetime.date.today()
+            ...    msg=Denní hlavička „${text}“ je v minulosti
+        END
+        ${i}=    Evaluate    ${i} + 1
     END
 
 Filtr kategorie omezí karty a Vše je vrátí
