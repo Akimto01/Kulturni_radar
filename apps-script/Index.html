@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.1 – google.script.run -->
+<!-- Kulturní radar Index.html v3.2 – label profilu: kraj -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -350,7 +350,7 @@
       (meta.profily || []).forEach(p => {
         const opt = document.createElement('option');
         opt.value = p.profil;
-        opt.textContent = p.profil + (p.dojezd ? ' · do ' + p.dojezd : '');
+        opt.textContent = p.profil + (p.kraj ? ' · ' + p.kraj : '');
         if (p.profil === aktivniProfil) opt.selected = true;
         sel.appendChild(opt);
       });

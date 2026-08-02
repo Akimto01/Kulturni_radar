@@ -67,8 +67,14 @@ bez věrohodného orákula. Hlídá se lidsky: občasný pohled na notifikaci
 - [ ] **`cellText_` jednotkové testy** (v3.3): tři reprezentace datumu z buněk
   — Date objekt, string „d. M. yyyy", sériové číslo (46156 → 14. 5. 2026);
   čas jako datum r. 1899 → „H:mm". Vzniklo při ladění frontendu 2. 8. 2026.
-- [ ] **API kontrakt testy** (RF RequestsLibrary): `apiMeta/apiEvents/apiPlaces`
-  přes google.script.run nelze volat zvenčí — testovat přes doGet JSON endpointy
-  (`?api=...`), případně wrapper funkce v Node harnessu se stub Spreadsheetem.
-- [ ] **RF + Browser Library E2E** na frontend (karty, filtry, FAB) — až se
-  ustálí vzhled; ntfy polling assert na notifikaci po Spustit kontrolu.
+- [x] **API kontrakt testy** (RF RequestsLibrary) ✅ `tests/robot/api.robot` —
+  6 testů: meta/events/places kontrakt, regex českých datumů (regrese v3.2–3.3),
+  filtr profilu, neznámý endpoint, zamítnutí neplatného tokenu.
+- [x] **RF + Browser Library E2E** ✅ `tests/robot/frontend.robot` — 7 testů:
+  hlavička, profily, chipy, karty + hlavičky dnů (regrese v UI), filtr
+  kategorie tam a zpět, stálá místa, token dialog. Klíčový trik: Apps Script
+  balí HTML do dvou iframe → Selector Prefix `id=sandboxFrame >>>
+  id=userHtmlFrame >>>`. CI: `.github/workflows/rf-tests.yml`
+  (workflow_dispatch + neděle 19:00; vyžaduje GitHub secret **RADAR_URL**).
+- [ ] ntfy polling assert na notifikaci po „Spustit kontrolu" (vyžaduje
+  bezpečné zacházení s WEB_TOKEN v CI — promyslet).

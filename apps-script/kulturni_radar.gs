@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.3 (2. 8. 2026) – cellText_ umí i sériová čísla datumů
+ * Verze: 3.4 (2. 8. 2026) – GET ?api=run, sdílené jádro spouštění, meta: kraj
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -147,6 +147,7 @@ function doGet(e) {
     if (api === 'events') data = readEventsApi_(ss, profil);
     else if (api === 'places') data = readPlacesApi_(ss, profil);
     else if (api === 'meta') data = readMetaApi_(ss);
+    else if (api === 'run') data = spustKontroluCore_((e.parameter && e.parameter.token) || '');
     else data = { ok: false, error: 'Neznámý endpoint: ' + api };
   } catch (err) {
     data = { ok: false, error: String(err) };
@@ -166,35 +167,13 @@ function doPost(e) {
   let body;
   try { body = JSON.parse(e.postData.contents); } catch (_) { body = {}; }
 
-  const token = PropertiesService.getScriptProperties().getProperty('WEB_TOKEN');
-  if (!token || body.token !== token) {
-    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Neplatný token.' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
   if (body.akce !== 'run') {
     return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Neznámá akce.' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Cooldown: max 1 spuštění za WEB_COOLDOWN_MS
-  const props = PropertiesService.getScriptProperties();
-  const posledni = Number(props.getProperty('WEB_LAST_RUN') || 0);
-  if (Date.now() - posledni < WEB_COOLDOWN_MS) {
-    return ContentService.createTextOutput(
-      JSON.stringify({ ok: false, error: 'Kontrola právě proběhla, zkus za chvíli.' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  props.setProperty('WEB_LAST_RUN', String(Date.now()));
-
-  // Asynchronní start přes jednorázový trigger (doPost nesmí blokovat)
-  ScriptApp.newTrigger('menuRunNow')
-    .timeBased()
-    .after(1000)
-    .create();
-
   return ContentService
-    .createTextOutput(JSON.stringify({ ok: true, zprava: 'Kontrola spuštěna. Výsledek přijde notifikací.' }))
+    .createTextOutput(JSON.stringify(spustKontroluCore_(body.token)))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -277,7 +256,7 @@ function readMetaApi_(ss) {
   if (lok && lok.getLastRow() > 1) {
     lok.getRange(2, 2, lok.getLastRow() - 1, 7).getValues().forEach(row => {
       const p = String(row[0] || '').trim();
-      if (p) profily.push({ profil: p, dojezd: String(row[1] || ''), posledniKontrola: String(row[6] || '') });
+      if (p) profily.push({ profil: p, kraj: String(row[1] || ''), posledniKontrola: cellText_(row[6]) });
     });
   }
 
@@ -295,7 +274,7 @@ function readMetaApi_(ss) {
     posledniKontrola = formatDate_(lastVal instanceof Date ? lastVal : new Date(lastVal));
   }
 
-  return { ok: true, aktivniProfil, profily, kategorie, posledniKontrola, verze: '3.3' };
+  return { ok: true, aktivniProfil, profily, kategorie, posledniKontrola, verze: '3.4' };
 }
 
 // ---------------------------------------------------------------------------
@@ -305,7 +284,10 @@ function readMetaApi_(ss) {
 function apiMeta()              { return readMetaApi_(SpreadsheetApp.getActiveSpreadsheet()); }
 function apiEvents(profil)      { return readEventsApi_(SpreadsheetApp.getActiveSpreadsheet(), profil || ''); }
 function apiPlaces(profil)      { return readPlacesApi_(SpreadsheetApp.getActiveSpreadsheet(), profil || ''); }
-function apiSpustKontrolu(tok)  {
+function apiSpustKontrolu(tok)  { return spustKontroluCore_(tok); }
+
+/** Sdílené jádro spouštění z webu: token → cooldown → asynchronní trigger. */
+function spustKontroluCore_(tok) {
   const props = PropertiesService.getScriptProperties();
   const token = props.getProperty('WEB_TOKEN');
   if (!token || tok !== token) return { ok: false, error: 'Neplatný token.' };

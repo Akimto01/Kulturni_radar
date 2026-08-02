@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.4 — 2. 8. 2026
+### Opraveno
+- Frontend: volání backendu převedeno z `fetch` na `google.script.run` (iframe sandbox Apps Scriptu blokoval fetch na vlastní /exec).
+- `cellText_`: sjednocené čtení buněk — Date objekt, string i sériové číslo (46156), časy s datem r. 1899; konec chybných datumů v kartách.
+- Opravené indexy sloupců při čtení akcí.
+- `?api=meta`: u profilů se vrací kraj místo dojezdu.
+### Přidáno
+- Robot Framework sada `tests/robot/`: api.robot (6 testů — kontrakt endpointů, regrese datumů, odmítnutí neplatného tokenu) a frontend.robot (7 E2E testů, piercing dvojitého iframe sandboxu).
+- Workflow `rf-tests.yml`: ruční dispatch + neděle 19:00, vyžaduje secret `RADAR_URL`.
+### Ověřeno
+- Nasazení: backend 3.4 + Index.html 3.2, `?api=meta` vrací verzi 3.4 a 30 profilů s kraji.
+- RF testy proti produkční /exec URL: 13/13 PASS (2. 8. 2026).
+
 Kompletní historie verzí včetně produkčních bugů a jejich řešení —
 zároveň případová studie testování a ladění AI-integrovaného systému.
 

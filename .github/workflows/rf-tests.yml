@@ -1,0 +1,36 @@
+name: RF testy (API + frontend)
+
+on:
+  workflow_dispatch:        # ruční spuštění z GitHubu
+  schedule:
+    - cron: '0 19 * * 0'    # neděle 19:00 UTC – po samotestu radaru
+
+jobs:
+  rf-testy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalace závislostí
+        run: |
+          pip install -r tests/robot/requirements.txt
+          rfbrowser init chromium
+
+      - name: API kontrakt
+        run: robot --variable BASE_URL:${{ secrets.RADAR_URL }} --outputdir vysledky/api tests/robot/api.robot
+
+      - name: Frontend E2E
+        if: always()
+        run: robot --variable BASE_URL:${{ secrets.RADAR_URL }} --outputdir vysledky/frontend tests/robot/frontend.robot
+
+      - name: Uložit reporty
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rf-reporty
+          path: vysledky/
+          retention-days: 14
