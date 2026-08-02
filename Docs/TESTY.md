@@ -61,3 +61,14 @@ bez věrohodného orákula. Hlídá se lidsky: občasný pohled na notifikaci
 | 1 | Vrstva 1 v CI | ✅ |
 | 2 | v2.9: runSelfTest + watchdog + hygiena | 🔜 |
 | 3 | (volitelně) clasp: verzování .gs přímo z repa | nápad |
+
+## Backlog testů
+
+- [ ] **`cellText_` jednotkové testy** (v3.3): tři reprezentace datumu z buněk
+  — Date objekt, string „d. M. yyyy", sériové číslo (46156 → 14. 5. 2026);
+  čas jako datum r. 1899 → „H:mm". Vzniklo při ladění frontendu 2. 8. 2026.
+- [ ] **API kontrakt testy** (RF RequestsLibrary): `apiMeta/apiEvents/apiPlaces`
+  přes google.script.run nelze volat zvenčí — testovat přes doGet JSON endpointy
+  (`?api=...`), případně wrapper funkce v Node harnessu se stub Spreadsheetem.
+- [ ] **RF + Browser Library E2E** na frontend (karty, filtry, FAB) — až se
+  ustálí vzhled; ntfy polling assert na notifikaci po Spustit kontrolu.

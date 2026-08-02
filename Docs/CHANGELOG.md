@@ -3,6 +3,24 @@
 Kompletní historie verzí včetně produkčních bugů a jejich řešení —
 zároveň případová studie testování a ladění AI-integrovaného systému.
 
+## v3.0–3.3 (2. 8. 2026) – FRONTEND (webová aplikace)
+- **v3.0**: `doGet`/`doPost` + `Index.html` — Apps Script web app servíruje
+  HTML aplikaci (karty akcí po dnech, filtry kategorií, přepínač profilů,
+  stálá místa, FAB „Spustit kontrolu" s tokenem WEB_TOKEN, cooldown 10 min,
+  asynchronní start přes jednorázový trigger).
+- **v3.1**: **Bug:** `fetch()` z web appky na vlastní URL nefunguje — Apps
+  Script servíruje HTML ze sandboxovaného iframe na `googleusercontent.com`,
+  fetch dostal HTML místo JSON. **Fix:** `google.script.run` (nativní bridge)
+  + wrapper funkce `apiMeta/apiEvents/apiPlaces/apiSpustKontrolu`; oprava
+  posunutých indexů sloupců (cena/popis/skóre).
+- **v3.2–3.3**: **Bug:** datumy z buněk přicházely ve 3 podobách — Date objekt
+  (→ „FRI AUG 07…"), string, i holé sériové číslo („46156"); časy jako datum
+  r. 1899. **Fix:** `cellText_` normalizuje všechny tři reprezentace
+  (sériové číslo → datum; rok < 1930 → čas H:mm). Lekce: Sheets jako datový
+  zdroj vyžaduje obranné programování — jeden sloupec, tři typy.
+- Nasazování: každá změna kódu vyžaduje „Spravovat implementace → Nová
+  verze" — implementace jsou zmrazené snapshoty!
+
 ## v2.9 (1. 8. 2026)
 - **Samotest** (`runSelfTest`, menu + nedělní trigger 18:00): listy a hlavičky,
   kritéria, properties, všech 7 triggerů, vzorce PŘEHLEDU, Open-Meteo,

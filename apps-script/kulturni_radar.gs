@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 2.9 (1. 8. 2026)
+ * Verze: 3.3 (2. 8. 2026) – cellText_ umí i sériová čísla datumů
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -60,6 +60,7 @@ const COL_Y = 25;        // Profil lokality
 
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
 const MAX_WEB_SEARCHES = 5;
 
 /** Nástroj, kterým model odevzdává výsledky – API garantuje validní strukturu. */
@@ -118,6 +119,202 @@ const REPORT_PLACES_TOOL = {
 // ---------------------------------------------------------------------------
 // MENU + TRIGGERY
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// WEB APP – doGet / doPost
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /exec              → HTML aplikace
+ * GET /exec?api=events   → JSON akce
+ * GET /exec?api=places   → JSON stálá místa
+ * GET /exec?api=meta     → profily, kategorie, poslední kontroly
+ */
+function doGet(e) {
+  const api = (e && e.parameter && e.parameter.api) || '';
+  const profil = (e && e.parameter && e.parameter.profil) || '';
+
+  if (!api) {
+    return HtmlService
+      .createHtmlOutputFromFile('Index')
+      .setTitle('Kulturní radar')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
+  let data;
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (api === 'events') data = readEventsApi_(ss, profil);
+    else if (api === 'places') data = readPlacesApi_(ss, profil);
+    else if (api === 'meta') data = readMetaApi_(ss);
+    else data = { ok: false, error: 'Neznámý endpoint: ' + api };
+  } catch (err) {
+    data = { ok: false, error: String(err) };
+  }
+
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * POST /exec {token, akce:'run'} → spustí mimořádnou kontrolu asynchronně.
+ * Nespouští přímo (timeout), ale zakládá jednorázový trigger after(1s).
+ * Token chrání endpoint před neoprávněným spouštěním.
+ */
+function doPost(e) {
+  let body;
+  try { body = JSON.parse(e.postData.contents); } catch (_) { body = {}; }
+
+  const token = PropertiesService.getScriptProperties().getProperty('WEB_TOKEN');
+  if (!token || body.token !== token) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Neplatný token.' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (body.akce !== 'run') {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Neznámá akce.' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Cooldown: max 1 spuštění za WEB_COOLDOWN_MS
+  const props = PropertiesService.getScriptProperties();
+  const posledni = Number(props.getProperty('WEB_LAST_RUN') || 0);
+  if (Date.now() - posledni < WEB_COOLDOWN_MS) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ ok: false, error: 'Kontrola právě proběhla, zkus za chvíli.' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  props.setProperty('WEB_LAST_RUN', String(Date.now()));
+
+  // Asynchronní start přes jednorázový trigger (doPost nesmí blokovat)
+  ScriptApp.newTrigger('menuRunNow')
+    .timeBased()
+    .after(1000)
+    .create();
+
+  return ContentService
+    .createTextOutput(JSON.stringify({ ok: true, zprava: 'Kontrola spuštěna. Výsledek přijde notifikací.' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/** Převod hodnoty buňky na text: Date → 'd. M. yyyy'; čas (rok 1899) → 'H:mm'. */
+function cellText_(v) {
+  if (typeof v === 'number' && v > 30000 && v < 80000) {
+    // Sériové číslo data (dny od 30. 12. 1899) – buňka bez datumového formátu
+    const d = new Date(1899, 11, 30);
+    d.setDate(d.getDate() + Math.floor(v));
+    return formatDateOnly_(d);
+  }
+  if (v instanceof Date) {
+    if (v.getFullYear() < 1930) {  // Sheets ukládá samotný čas jako datum r. 1899
+      return Utilities.formatDate(v, Session.getScriptTimeZone(), 'H:mm');
+    }
+    return formatDateOnly_(v);
+  }
+  return String(v == null ? '' : v).trim();
+}
+
+/** API: akce profilu v databázi (neprobíhající, přijde). */
+function readEventsApi_(ss, profilParam) {
+  const krit = ss.getSheetByName(SHEET.KRITERIA);
+  const aktivniProfil = krit ? String(krit.getRange(KRIT.PROFIL).getValue()).trim() : '';
+  const profil = profilParam || aktivniProfil;
+
+  const sh = ss.getSheetByName(SHEET.AKCE);
+  const lastRow = sh ? sh.getLastRow() : 1;
+  if (lastRow < 2) return { ok: true, profil, akce: [] };
+
+  const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const akce = [];
+
+  data.forEach(row => {
+    if (norm_(row[24]) !== norm_(profil)) return;
+    const stav = norm_(row[13]);
+    if (stav === 'proběhlo') return;
+    const datumOd = parseCzDate_(row[1]);
+    if (datumOd && datumOd < dnes && stav !== 'zrušeno') return;
+    akce.push({
+      id: String(row[0] || ''),
+      nazev: String(row[4] || ''),
+      datumOd: cellText_(row[1]),
+      datumDo: cellText_(row[2]),
+      cas: cellText_(row[3]),
+      misto: String(row[5] || ''),
+      obec: String(row[6] || ''),
+      kategorie: String(row[8] || '').split(';').map(k => k.trim()).filter(Boolean),
+      cena: String(row[10] || ''),
+      popis: String(row[11] || ''),
+      skore: Number(row[12]) || 0,
+      stav: String(row[13] || ''),
+      dojezd: String(row[7] || ''),
+      url: String(row[19] || ''),
+    });
+  });
+
+  akce.sort((a, b) => {
+    const ka = dateKey_(a.datumOd), kb = dateKey_(b.datumOd);
+    return ka < kb ? -1 : ka > kb ? 1 : b.skore - a.skore;
+  });
+  return { ok: true, generovano: formatDate_(new Date()), profil, akce };
+}
+
+/** API: stálá místa profilu. */
+function readPlacesApi_(ss, profilParam) {
+  const krit = ss.getSheetByName(SHEET.KRITERIA);
+  const aktivniProfil = krit ? String(krit.getRange(KRIT.PROFIL).getValue()).trim() : '';
+  const profil = profilParam || aktivniProfil;
+  const mista = readMista_(ss, profil);
+  return { ok: true, profil, mista };
+}
+
+/** API: metadata (profily, kategorie z KRITÉRIÍ, poslední kontroly, verze). */
+function readMetaApi_(ss) {
+  // Profily z LOKALIT
+  const lok = ss.getSheetByName(SHEET.LOKALITY);
+  const profily = [];
+  if (lok && lok.getLastRow() > 1) {
+    lok.getRange(2, 2, lok.getLastRow() - 1, 7).getValues().forEach(row => {
+      const p = String(row[0] || '').trim();
+      if (p) profily.push({ profil: p, dojezd: String(row[1] || ''), posledniKontrola: String(row[6] || '') });
+    });
+  }
+
+  // Aktivní profil + kategorie z KRITÉRIÍ
+  const krit = ss.getSheetByName(SHEET.KRITERIA);
+  const aktivniProfil = krit ? String(krit.getRange(KRIT.PROFIL).getValue()).trim() : '';
+  const katString = krit ? String(krit.getRange(KRIT.KATEGORIE).getValue()) : '';
+  const kategorie = katString.split(';').map(k => k.trim()).filter(Boolean);
+
+  // Poslední kontrola z KONTROL
+  let posledniKontrola = '';
+  const kon = ss.getSheetByName(SHEET.KONTROLY);
+  if (kon && kon.getLastRow() > 1) {
+    const lastVal = kon.getRange(kon.getLastRow(), 1).getValue();
+    posledniKontrola = formatDate_(lastVal instanceof Date ? lastVal : new Date(lastVal));
+  }
+
+  return { ok: true, aktivniProfil, profily, kategorie, posledniKontrola, verze: '3.3' };
+}
+
+// ---------------------------------------------------------------------------
+// WRAPPER FUNKCE pro google.script.run (volané z Index.html)
+// ---------------------------------------------------------------------------
+
+function apiMeta()              { return readMetaApi_(SpreadsheetApp.getActiveSpreadsheet()); }
+function apiEvents(profil)      { return readEventsApi_(SpreadsheetApp.getActiveSpreadsheet(), profil || ''); }
+function apiPlaces(profil)      { return readPlacesApi_(SpreadsheetApp.getActiveSpreadsheet(), profil || ''); }
+function apiSpustKontrolu(tok)  {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty('WEB_TOKEN');
+  if (!token || tok !== token) return { ok: false, error: 'Neplatný token.' };
+  const posledni = Number(props.getProperty('WEB_LAST_RUN') || 0);
+  if (Date.now() - posledni < WEB_COOLDOWN_MS) return { ok: false, error: 'Kontrola právě proběhla, zkus za chvíli.' };
+  props.setProperty('WEB_LAST_RUN', String(Date.now()));
+  ScriptApp.newTrigger('menuRunNow').timeBased().after(1000).create();
+  return { ok: true, zprava: 'Kontrola spuštěna. Výsledek přijde notifikací.' };
+}
 
 function onOpen() {
   SpreadsheetApp.getUi()

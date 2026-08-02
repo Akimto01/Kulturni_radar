@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<!-- Kulturní radar Index.html v3.1 – google.script.run -->
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kulturní radar</title>
+<style>
+  /* ── Tokeny ─────────────────────────────────────────────── */
+  :root {
+    --ink:      #1a1a2e;
+    --ink-2:    #4a4a6a;
+    --ink-3:    #8888aa;
+    --paper:    #f7f6f2;
+    --card:     #ffffff;
+    --accent:   #c0392b;   /* červená jako divadelní opona */
+    --accent-2: #e8d5b0;   /* pergamen – pro chipy kategorií */
+    --radius:   10px;
+    --mono:     'JetBrains Mono', 'Courier New', monospace;
+    --sans:     'Inter', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* ── Hlavička ────────────────────────────────────────────── */
+  header {
+    background: var(--ink);
+    color: #fff;
+    padding: 16px 20px 14px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  #meta-info {
+    font-size: .75rem;
+    color: var(--ink-3);
+    font-family: var(--mono);
+    margin-left: auto;
+  }
+
+  /* ── Filtry a profil ─────────────────────────────────────── */
+  #controls {
+    padding: 12px 20px 10px;
+    background: var(--card);
+    border-bottom: 1px solid #e0ddd6;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  #profil-select {
+    font-family: var(--sans);
+    font-size: .85rem;
+    border: 1px solid #d0cdc6;
+    border-radius: 6px;
+    padding: 5px 10px;
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-size: .78rem;
+    padding: 4px 11px;
+    border-radius: 20px;
+    border: 1.5px solid var(--accent-2);
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+    font-family: var(--sans);
+  }
+  .chip.active, .chip:hover {
+    background: var(--accent-2);
+    border-color: #c8a870;
+    color: var(--ink);
+  }
+
+  /* ── Akce: skupiny po dnech ──────────────────────────────── */
+  main { padding: 16px 16px 80px; max-width: 700px; margin: 0 auto; }
+
+  .den-hlavicka {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 24px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e0ddd6;
+  }
+  .den-hlavicka:first-child { margin-top: 8px; }
+
+  .karta {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 14px 16px 12px;
+    margin-bottom: 8px;
+    border-left: 3px solid transparent;
+    transition: border-color .15s, box-shadow .15s;
+    position: relative;
+  }
+  .karta:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+  .karta.zruseno { opacity: .5; border-left-color: var(--ink-3) !important; }
+  .karta.zruseno .nazev { text-decoration: line-through; }
+
+  /* Barvy kategorií */
+  .karta[data-kat="koncerty"]            { border-left-color: #9b59b6; }
+  .karta[data-kat="festivaly"]           { border-left-color: #e67e22; }
+  .karta[data-kat="výstavy"]             { border-left-color: #27ae60; }
+  .karta[data-kat="divadlo"]             { border-left-color: var(--accent); }
+  .karta[data-kat="historické slavnosti"]{ border-left-color: #8b6914; }
+  .karta[data-kat="folklor"]             { border-left-color: #16a085; }
+
+  .karta-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .nazev { font-size: .95rem; font-weight: 600; line-height: 1.35; }
+  .skore {
+    font-family: var(--mono);
+    font-size: .7rem;
+    background: var(--paper);
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: var(--ink-2);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .meta {
+    margin-top: 5px;
+    font-size: .78rem;
+    color: var(--ink-2);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .meta span::before { content: ''; }
+  .kat-badge {
+    font-size: .68rem;
+    background: var(--accent-2);
+    color: #7a5c2e;
+    padding: 1px 7px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .popis {
+    margin-top: 6px;
+    font-size: .8rem;
+    color: var(--ink-2);
+    line-height: 1.5;
+  }
+  .karta-akce {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .btn-url {
+    font-size: .75rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #d0cdc6;
+    background: var(--paper);
+    color: var(--ink-2);
+    text-decoration: none;
+    font-family: var(--sans);
+  }
+  .btn-url:hover { background: var(--accent-2); color: var(--ink); }
+
+  /* ── Stálá místa ─────────────────────────────────────────── */
+  #mista-sekce { margin-top: 8px; }
+  .misto-karta {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .misto-nazev { font-weight: 600; font-size: .9rem; }
+  .misto-meta { font-size: .75rem; color: var(--ink-2); margin-top: 3px; }
+  .misto-skore {
+    font-family: var(--mono);
+    font-size: .7rem;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+
+  /* ── Stavové zprávy ──────────────────────────────────────── */
+  #status {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--ink-3);
+    font-size: .9rem;
+  }
+
+  /* ── Tlačítko spustit ────────────────────────────────────── */
+  #fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 28px;
+    padding: 12px 22px;
+    font-size: .85rem;
+    font-weight: 600;
+    font-family: var(--sans);
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(192,57,43,.35);
+    transition: transform .1s, box-shadow .1s;
+    z-index: 100;
+  }
+  #fab:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(192,57,43,.4); }
+  #fab:disabled { background: var(--ink-3); box-shadow: none; transform: none; cursor: default; }
+
+  /* ── Sekce záhlaví ───────────────────────────────────────── */
+  .sekce-label {
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--ink-2);
+    margin: 28px 0 10px;
+  }
+
+  /* ── Token dialog ────────────────────────────────────────── */
+  #token-dialog {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(26,26,46,.6);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  #token-dialog.open { display: flex; }
+  #token-box {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    width: min(340px, 90vw);
+  }
+  #token-box h2 { font-size: 1rem; margin-bottom: 12px; }
+  #token-box p { font-size: .82rem; color: var(--ink-2); margin-bottom: 14px; }
+  #token-input {
+    width: 100%; padding: 9px 12px;
+    border: 1.5px solid #d0cdc6; border-radius: 6px;
+    font-family: var(--mono); font-size: .85rem;
+    margin-bottom: 12px;
+  }
+  .dialog-btns { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-cancel {
+    padding: 8px 16px; border: 1px solid #d0cdc6; border-radius: 6px;
+    background: transparent; cursor: pointer; font-family: var(--sans); font-size: .82rem;
+  }
+  .btn-ok {
+    padding: 8px 16px; border: none; border-radius: 6px;
+    background: var(--accent); color: #fff; cursor: pointer;
+    font-family: var(--sans); font-size: .82rem; font-weight: 600;
+  }
+
+  @media (max-width: 480px) {
+    header { padding: 12px 14px; }
+    main { padding: 12px 10px 80px; }
+    #controls { padding: 10px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎭 Kulturní radar</h1>
+  <span id="meta-info">načítám…</span>
+</header>
+
+<div id="controls">
+  <select id="profil-select" title="Aktivní profil"></select>
+  <div class="chips" id="kat-chips"></div>
+</div>
+
+<main id="main">
+  <div id="status">Načítám akce…</div>
+</main>
+
+<button id="fab" title="Spustit vyhledávání nových akcí">Spustit kontrolu</button>
+
+<!-- Token dialog -->
+<div id="token-dialog" role="dialog" aria-modal="true" aria-label="Zadej přístupový token">
+  <div id="token-box">
+    <h2>Přístupový token</h2>
+    <p>Token nastavuje správce v Apps Script → Script Properties → WEB_TOKEN.</p>
+    <input id="token-input" type="password" placeholder="vložit token…" autocomplete="off">
+    <div class="dialog-btns">
+      <button class="btn-cancel" id="token-cancel">Zrušit</button>
+      <button class="btn-ok" id="token-ok">Spustit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Stav ──────────────────────────────────────────────────
+  let vsechnaAkce = [];
+  let aktKategorie = new Set();
+  let aktivniProfil = '';
+  let token = localStorage.getItem('radar_token') || '';
+
+  // ── Načtení dat přes google.script.run ───────────────────
+  // Apps Script web app neumožňuje fetch() na sebe sama (loop přes login).
+  // google.script.run je nativní bridge – volá serverové funkce přímo.
+  function gsr(fn, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        [fn](...args);
+    });
+  }
+
+  async function api(endpoint, param = '') {
+    const profil = param.replace('profil=', '');
+    if (endpoint === 'meta')   return gsr('apiMeta');
+    if (endpoint === 'events') return gsr('apiEvents', profil);
+    if (endpoint === 'places') return gsr('apiPlaces', profil);
+    throw new Error('Neznámý endpoint: ' + endpoint);
+  }
+
+  async function init() {
+    try {
+      const meta = await api('meta');
+      aktivniProfil = meta.aktivniProfil || '';
+
+      // Profily do selectu
+      const sel = document.getElementById('profil-select');
+      (meta.profily || []).forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.profil;
+        opt.textContent = p.profil + (p.dojezd ? ' · do ' + p.dojezd : '');
+        if (p.profil === aktivniProfil) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener('change', () => nactiAkce(sel.value));
+
+      // Kategorie chipy
+      const chips = document.getElementById('kat-chips');
+      const vseChip = vytvorChip('Vše', true);
+      vseChip.addEventListener('click', () => { aktKategorie.clear(); renderAkce(); syncChipy(); });
+      chips.appendChild(vseChip);
+      (meta.kategorie || []).forEach(k => {
+        const ch = vytvorChip(k, false);
+        ch.addEventListener('click', () => toggleKat(k));
+        chips.appendChild(ch);
+      });
+
+      // Meta info
+      document.getElementById('meta-info').textContent =
+        meta.posledniKontrola ? 'poslední kontrola: ' + meta.posledniKontrola : 'v' + (meta.verze || '');
+
+      await nactiAkce(aktivniProfil);
+      await nactiMista(aktivniProfil);
+    } catch (e) {
+      document.getElementById('status').textContent = 'Chyba načítání: ' + e.message;
+    }
+  }
+
+  async function nactiAkce(profil) {
+    document.getElementById('status').textContent = 'Načítám…';
+    try {
+      const data = await api('events', profil ? 'profil=' + encodeURIComponent(profil) : '');
+      vsechnaAkce = data.akce || [];
+      renderAkce();
+      if (data.generovano) {
+        document.getElementById('meta-info').textContent = 'načteno: ' + data.generovano;
+      }
+    } catch (e) {
+      document.getElementById('status').textContent = 'Chyba: ' + e.message;
+    }
+  }
+
+  async function nactiMista(profil) {
+    try {
+      const data = await api('places', profil ? 'profil=' + encodeURIComponent(profil) : '');
+      renderMista(data.mista || []);
+    } catch (_) { /* místa jsou bonus, selhání nekritické */ }
+  }
+
+  // ── Render akcí ───────────────────────────────────────────
+  function renderAkce() {
+    const main = document.getElementById('main');
+    // Zachovat sekci míst
+    const mistaEl = document.getElementById('mista-sekce');
+
+    const filtrovane = aktKategorie.size === 0
+      ? vsechnaAkce
+      : vsechnaAkce.filter(a => a.kategorie.some(k => aktKategorie.has(k)));
+
+    // Odstranit staré akce (ne místa)
+    [...main.children].forEach(ch => {
+      if (ch.id !== 'mista-sekce') ch.remove();
+    });
+
+    if (filtrovane.length === 0) {
+      const el = document.createElement('div');
+      el.id = 'status';
+      el.textContent = 'Žádné akce pro vybraný filtr.';
+      main.prepend(el);
+      return;
+    }
+
+    // Skupinovat po dnech
+    const dnove = {};
+    filtrovane.forEach(a => {
+      const den = a.datumOd || '—';
+      (dnove[den] = dnove[den] || []).push(a);
+    });
+
+    const fragment = document.createDocumentFragment();
+    Object.entries(dnove).forEach(([den, akce]) => {
+      const h = document.createElement('div');
+      h.className = 'den-hlavicka';
+      h.textContent = den;
+      fragment.appendChild(h);
+      akce.forEach(a => fragment.appendChild(vytvorKartu(a)));
+    });
+
+    main.prepend(fragment);
+  }
+
+  function vytvorKartu(a) {
+    const el = document.createElement('div');
+    el.className = 'karta' + (a.stav === 'zrušeno' ? ' zruseno' : '');
+    const kat0 = (a.kategorie[0] || '').toLowerCase();
+    el.dataset.kat = kat0;
+
+    const top = document.createElement('div');
+    top.className = 'karta-top';
+    const nazev = document.createElement('div');
+    nazev.className = 'nazev';
+    nazev.textContent = a.nazev;
+    const skore = document.createElement('div');
+    skore.className = 'skore';
+    skore.textContent = '★ ' + (a.skore || '—');
+    top.appendChild(nazev);
+    top.appendChild(skore);
+    el.appendChild(top);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    if (a.misto) { const s = document.createElement('span'); s.textContent = '📍 ' + a.misto; meta.appendChild(s); }
+    if (a.cas)   { const s = document.createElement('span'); s.textContent = '🕐 ' + a.cas;  meta.appendChild(s); }
+    if (a.cena)  { const s = document.createElement('span'); s.textContent = '🎟 ' + a.cena; meta.appendChild(s); }
+    if (a.dojezd){ const s = document.createElement('span'); s.textContent = '🚗 ' + a.dojezd; meta.appendChild(s); }
+    el.appendChild(meta);
+
+    if (a.kategorie.length) {
+      const badgeWrap = document.createElement('div');
+      badgeWrap.style.cssText = 'margin-top:5px;display:flex;gap:4px;flex-wrap:wrap';
+      a.kategorie.forEach(k => {
+        const b = document.createElement('span');
+        b.className = 'kat-badge';
+        b.textContent = k;
+        badgeWrap.appendChild(b);
+      });
+      el.appendChild(badgeWrap);
+    }
+
+    if (a.popis) {
+      const p = document.createElement('div');
+      p.className = 'popis';
+      p.textContent = a.popis;
+      el.appendChild(p);
+    }
+
+    if (a.url) {
+      const akceDiv = document.createElement('div');
+      akceDiv.className = 'karta-akce';
+      const link = document.createElement('a');
+      link.href = a.url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.className = 'btn-url';
+      link.textContent = 'Více info →';
+      akceDiv.appendChild(link);
+      el.appendChild(akceDiv);
+    }
+
+    return el;
+  }
+
+  // ── Render stálých míst ───────────────────────────────────
+  function renderMista(mista) {
+    const main = document.getElementById('main');
+    let sekce = document.getElementById('mista-sekce');
+    if (!sekce) {
+      sekce = document.createElement('div');
+      sekce.id = 'mista-sekce';
+      main.appendChild(sekce);
+    }
+    sekce.innerHTML = '';
+    if (!mista.length) return;
+
+    const label = document.createElement('div');
+    label.className = 'sekce-label';
+    label.textContent = 'Stálá místa';
+    sekce.appendChild(label);
+
+    mista.forEach(m => {
+      const el = document.createElement('div');
+      el.className = 'misto-karta';
+      const info = document.createElement('div');
+      const n = document.createElement('div');
+      n.className = 'misto-nazev';
+      n.textContent = m.nazev;
+      const mm = document.createElement('div');
+      mm.className = 'misto-meta';
+      mm.textContent = [m.typ, m.obec, m.doba].filter(Boolean).join(' · ');
+      info.appendChild(n);
+      info.appendChild(mm);
+      const sk = document.createElement('div');
+      sk.className = 'misto-skore';
+      sk.textContent = '★ ' + (m.skore || '—');
+      el.appendChild(info);
+      el.appendChild(sk);
+      sekce.appendChild(el);
+    });
+  }
+
+  // ── Kategorie chipy ───────────────────────────────────────
+  function vytvorChip(text, aktivni) {
+    const b = document.createElement('button');
+    b.className = 'chip' + (aktivni ? ' active' : '');
+    b.textContent = text;
+    b.dataset.kat = text;
+    return b;
+  }
+
+  function toggleKat(k) {
+    if (aktKategorie.has(k)) aktKategorie.delete(k);
+    else aktKategorie.add(k);
+    renderAkce();
+    syncChipy();
+  }
+
+  function syncChipy() {
+    document.querySelectorAll('.chip').forEach(ch => {
+      const k = ch.dataset.kat;
+      ch.classList.toggle('active', k === 'Vše' ? aktKategorie.size === 0 : aktKategorie.has(k));
+    });
+  }
+
+  // ── FAB: Spustit kontrolu ─────────────────────────────────
+  document.getElementById('fab').addEventListener('click', () => {
+    if (!token) {
+      document.getElementById('token-dialog').classList.add('open');
+    } else {
+      spustKontrolu(token);
+    }
+  });
+
+  document.getElementById('token-cancel').addEventListener('click', () => {
+    document.getElementById('token-dialog').classList.remove('open');
+  });
+
+  document.getElementById('token-ok').addEventListener('click', () => {
+    const t = document.getElementById('token-input').value.trim();
+    if (!t) return;
+    token = t;
+    localStorage.setItem('radar_token', t);
+    document.getElementById('token-dialog').classList.remove('open');
+    spustKontrolu(t);
+  });
+
+  async function spustKontrolu(tok) {
+    const fab = document.getElementById('fab');
+    fab.disabled = true;
+    fab.textContent = 'Spouštím…';
+    try {
+      const d = await gsr('apiSpustKontrolu', tok);
+      if (d && d.ok) {
+        fab.textContent = 'Spuštěno ✓';
+        setTimeout(() => { fab.disabled = false; fab.textContent = 'Spustit kontrolu'; }, 15000);
+      } else {
+        alert((d && d.error) || 'Neznámá chyba');
+        fab.disabled = false;
+        fab.textContent = 'Spustit kontrolu';
+        if (d && d.error && d.error.includes('token')) {
+          localStorage.removeItem('radar_token');
+          token = '';
+        }
+      }
+    } catch (e) {
+      alert('Chyba: ' + e.message);
+      fab.disabled = false;
+      fab.textContent = 'Spustit kontrolu';
+    }
+  }
+
+  // ── Start ─────────────────────────────────────────────────
+  init();
+</script>
+</body>
+</html>
