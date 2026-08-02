@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.5 — 2. 8. 2026
+### Přidáno
+- `sklonuj_` — správné české skloňování v samotestu („1 problém", ne „1 problémů").
+- `fetchJson_` s jedním retry po 1,5 s; `weatherFor_` přes něj volá geokódování i předpověď.
+- `weatherApiDostupne_` + samotest rozlišuje varování (externí výpadek Open-Meteo, titulek zůstává OK) od problému (naše chyba).
+- `const VERZE` — jediný zdroj pravdy pro číslo verze v `?api=meta` (regrese: meta hlásila 3.4 u kódu 3.5).
+- Node testy: 20 → 31 (cellText_ vč. sériového 46156 → „14. 5. 2026", sklonuj_, retry počasí, konzistence VERZE); harness umí stub UrlFetchApp a Utilities.sleep.
+### Změněno
+- `rf-tests.yml`: checkout@v5, setup-python@v6, upload-artifact@v6 (Node 24, konec deprecation varování).
+### Ověřeno
+- Node 31/31; nasazení potvrzeno přes `?api=meta` → 3.5.
+
 ## Index.html v3.3 — 2. 8. 2026 (backend beze změny, 3.4)
 ### Přidáno
 - Frontend: sekce „Probíhá / dlouhodobé" na začátku seznamu — akce s datem začátku v minulosti (celoléto běžící série apod.) už nedrží dávno minulou denní hlavičku nad aktuálními akcemi; na kartě se zobrazuje původní začátek („od 14. 5. 2026").

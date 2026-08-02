@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.4 (2. 8. 2026) – GET ?api=run, sdílené jádro spouštění, meta: kraj
+ * Verze: 3.5 (2. 8. 2026) – sklonuj_, weatherFor_ s retry, samotest: varování vs. problémy
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -58,6 +58,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
+const VERZE = '3.5';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -274,7 +275,7 @@ function readMetaApi_(ss) {
     posledniKontrola = formatDate_(lastVal instanceof Date ? lastVal : new Date(lastVal));
   }
 
-  return { ok: true, aktivniProfil, profily, kategorie, posledniKontrola, verze: '3.4' };
+  return { ok: true, aktivniProfil, profily, kategorie, posledniKontrola, verze: VERZE };
 }
 
 // ---------------------------------------------------------------------------
@@ -1090,6 +1091,7 @@ function auditDat_(ss) {
 /** Týdenní samotest prostředí + hygiena dat; výsledek jde notifikací. */
 function runSelfTest() {
   const problemy = [];
+  const varovani = [];   // externí, neblokující nálezy (např. výpadek cizí služby)
   let prosle = 0;
   const ok = () => prosle++;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1125,7 +1127,9 @@ function runSelfTest() {
 
   try {
     const w = weatherFor_((cfg && cfg.profil) || 'Brno', new Date(Date.now() + 86400000), {});
-    if (w) ok(); else problemy.push('Open-Meteo nevrátilo předpověď');
+    if (w) ok();
+    else if (weatherApiDostupne_()) problemy.push('Open-Meteo dostupné, ale předpověď pro profil se nezískala');
+    else varovani.push('Open-Meteo nedostupné (externí výpadek) – počasí v digestech dočasně chybí');
   } catch (e) { problemy.push('počasí selhalo: ' + e); }
 
   const audit = auditDat_(ss);
@@ -1136,10 +1140,15 @@ function runSelfTest() {
   else ok();
   if (audit.bezUrl) problemy.push('budoucí akce bez URL: ' + audit.bezUrl);
 
-  const title = problemy.length ? 'Samotest: ' + problemy.length + ' problémů' : 'Samotest: OK';
-  const body = problemy.length
+  const title = problemy.length
+    ? 'Samotest: ' + problemy.length + ' ' + sklonuj_(problemy.length, 'problém', 'problémy', 'problémů')
+    : (varovani.length ? 'Samotest: OK (' + varovani.length + ' varování)' : 'Samotest: OK');
+  let body = problemy.length
     ? 'Nalezené problémy:\n' + problemy.map(p => '• ' + p).join('\n')
     : 'Všech ' + prosle + ' kontrol prošlo. Systém je zdravý.';
+  if (varovani.length) {
+    body += '\n\nVarování (externí, neblokující):\n' + varovani.map(p => '• ' + p).join('\n');
+  }
   sendNotification_(title, body);
 }
 
@@ -1292,24 +1301,41 @@ function readEventsInRange_(ss, profil, from, to) {
   return out;
 }
 
+/** GET s jedním opakováním po pauze (přechodné výpadky); parsovaný JSON, nebo null. */
+function fetchJson_(url) {
+  for (let pokus = 0; pokus < 2; pokus++) {
+    try {
+      const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      if (r.getResponseCode() === 200) return JSON.parse(r.getContentText());
+    } catch (e) { /* síťová chyba – zkusit ještě jednou */ }
+    if (pokus === 0) Utilities.sleep(1500);
+  }
+  return null;
+}
+
+/** Sonda dostupnosti Open-Meteo (fixní souřadnice Brna) – rozliší v samotestu
+ *  externí výpadek (varování) od chyby na naší straně (problém). */
+function weatherApiDostupne_() {
+  const d = fetchJson_(
+    'https://api.open-meteo.com/v1/forecast?daily=weather_code&timezone=Europe%2FPrague' +
+    '&forecast_days=1&latitude=49.19&longitude=16.61');
+  return !!(d && d.daily && d.daily.time && d.daily.time.length);
+}
+
 /** Předpověď pro obec a den přes Open-Meteo (zdarma, bez klíče); '' při neúspěchu. */
 function weatherFor_(obec, den, cache) {
   try {
     if (!obec) return '';
     const key = norm_(obec);
     if (!(key in cache)) {
-      const g = UrlFetchApp.fetch(
-        'https://geocoding-api.open-meteo.com/v1/search?count=1&language=cs&name=' + encodeURIComponent(obec),
-        { muteHttpExceptions: true });
-      if (g.getResponseCode() !== 200) { cache[key] = null; return ''; }
-      const gd = JSON.parse(g.getContentText());
-      if (!gd.results || !gd.results.length) { cache[key] = null; return ''; }
+      const gd = fetchJson_(
+        'https://geocoding-api.open-meteo.com/v1/search?count=1&language=cs&name=' + encodeURIComponent(obec));
+      if (!gd || !gd.results || !gd.results.length) { cache[key] = null; return ''; }
       const loc = gd.results[0];
-      const f = UrlFetchApp.fetch(
+      const fd = fetchJson_(
         'https://api.open-meteo.com/v1/forecast?daily=weather_code,temperature_2m_max,precipitation_probability_max' +
-        '&timezone=Europe%2FPrague&forecast_days=16&latitude=' + loc.latitude + '&longitude=' + loc.longitude,
-        { muteHttpExceptions: true });
-      cache[key] = f.getResponseCode() === 200 ? JSON.parse(f.getContentText()).daily : null;
+        '&timezone=Europe%2FPrague&forecast_days=16&latitude=' + loc.latitude + '&longitude=' + loc.longitude);
+      cache[key] = fd ? fd.daily : null;
     }
     const d = cache[key];
     if (!d || !d.time) return '';
@@ -1519,6 +1545,13 @@ function parseCzDate_(v) {
 
 function formatDate_(d) {
   return Utilities.formatDate(d, Session.getScriptTimeZone(), 'd. M. yyyy H:mm');
+}
+
+/** České skloňování počítaných výrazů: sklonuj_(n, 'problém', 'problémy', 'problémů'). */
+function sklonuj_(n, jeden, dvaAzCtyri, petAVic) {
+  if (n === 1) return jeden;
+  if (n >= 2 && n <= 4) return dvaAzCtyri;
+  return petAVic;
 }
 
 function formatDateOnly_(d) {

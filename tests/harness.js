@@ -18,6 +18,7 @@ function formatujDatum(d, vzor) {
     case 'yyyy-MM-dd': return `${yyyy}-${pad(mm)}-${pad(dd)}`;
     case 'd. M. yyyy': return `${dd}. ${mm}. ${yyyy}`;
     case 'd. M. yyyy H:mm': return `${dd}. ${mm}. ${yyyy} ${H}:${pad(M)}`;
+    case 'H:mm': return `${H}:${pad(M)}`;
     default: throw new Error('Nepodporovaný vzor data ve stubu: ' + vzor);
   }
 }
@@ -32,6 +33,7 @@ function zakazano(nazev) {
 function nactiRadar(volby = {}) {
   const props = Object.assign({}, volby.properties || {});
   const odeslane = [];   // zachycené MailApp.sendEmail volání
+  const ctxSleepMs = []; // zachycené Utilities.sleep (retry pauzy)
 
   const ctx = {
     console,
@@ -40,6 +42,7 @@ function nactiRadar(volby = {}) {
     Utilities: {
       formatDate: (d, tz, vzor) => formatujDatum(d, vzor),
       newBlob: (s) => ({ getBytes: () => Buffer.from(String(s), 'utf8') }),
+      sleep: (ms) => { ctxSleepMs.push(ms); },   // testy nečekají, jen evidují
     },
     PropertiesService: {
       getScriptProperties: () => ({
@@ -52,7 +55,7 @@ function nactiRadar(volby = {}) {
     SpreadsheetApp: {
       getActiveSpreadsheet: () => ({ getUrl: () => 'https://sheet.example/test' }),
     },
-    UrlFetchApp: zakazano('UrlFetchApp'),
+    UrlFetchApp: volby.urlFetch ? { fetch: volby.urlFetch } : zakazano('UrlFetchApp'),
     ScriptApp: zakazano('ScriptApp'),
     LockService: zakazano('LockService'),
   };
@@ -63,6 +66,7 @@ function nactiRadar(volby = {}) {
   vm.runInContext(kod, ctx, { filename: 'kulturni_radar.gs' });
 
   ctx.__odeslaneEmaily = odeslane;
+  ctx.__sleepMs = ctxSleepMs;
   // Konstruktor Date ze sandboxu – `instanceof Date` napříč realmy nefunguje,
   // takže testy musí Date vytvářet uvnitř stejného realmu jako skript.
   ctx.__Date = vm.runInContext('Date', ctx);

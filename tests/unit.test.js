@@ -184,3 +184,111 @@ test('jeVycpavka_: skutečné akce → false', () => {
   assert.equal(r.jeVycpavka_('Hradozámecká noc – hrad Veveří 2026'), false);
   assert.equal(r.jeVycpavka_(''), false);
 });
+
+// ---------------------------------------------------------------------------
+// v3.5: cellText_ – tři podoby buňky (regrese bugů z 2. 8. 2026)
+// ---------------------------------------------------------------------------
+
+test('cellText_: Date objekt → "d. M. yyyy"', () => {
+  assert.equal(r.cellText_(new r.__Date(2026, 7, 2)), '2. 8. 2026');
+});
+
+test('BUG v3.2: sériové číslo 46156 → "14. 5. 2026", ne surové číslo', () => {
+  assert.equal(r.cellText_(46156), '14. 5. 2026');
+});
+
+test('BUG v3.2: čas uložený jako datum r. 1899 → "H:mm"', () => {
+  assert.equal(r.cellText_(new r.__Date(1899, 11, 30, 18, 30)), '18:30');
+});
+
+test('cellText_: string projde beze změny (oříznutý)', () => {
+  assert.equal(r.cellText_('  3. 8. 2026 '), '3. 8. 2026');
+  assert.equal(r.cellText_('čtvrtky a soboty 18:00–22:00'), 'čtvrtky a soboty 18:00–22:00');
+});
+
+test('cellText_: null/undefined → prázdný řetězec; malé číslo zůstane textem', () => {
+  assert.equal(r.cellText_(null), '');
+  assert.equal(r.cellText_(undefined), '');
+  assert.equal(r.cellText_(7), '7');
+});
+
+// ---------------------------------------------------------------------------
+// v3.5: sklonuj_ – konec „Samotest: 1 problémů"
+// ---------------------------------------------------------------------------
+
+test('sklonuj_: 1 problém / 2–4 problémy / 0 a 5+ problémů', () => {
+  const s = n => n + ' ' + r.sklonuj_(n, 'problém', 'problémy', 'problémů');
+  assert.equal(s(1), '1 problém');
+  assert.equal(s(2), '2 problémy');
+  assert.equal(s(4), '4 problémy');
+  assert.equal(s(5), '5 problémů');
+  assert.equal(s(11), '11 problémů');
+  assert.equal(s(0), '0 problémů');
+});
+
+// ---------------------------------------------------------------------------
+// v3.5: fetchJson_ / weatherFor_ – odolnost vůči výpadku Open-Meteo
+// ---------------------------------------------------------------------------
+
+/** Stub UrlFetchApp.fetch: odbavuje frontu odpovědí; 'throw' simuluje síťovou chybu. */
+function frontaFetchu(fronta, volane = []) {
+  return (url) => {
+    volane.push(url);
+    const dalsi = fronta.shift();
+    if (dalsi === undefined) throw new Error('Stub: fronta odpovědí je prázdná');
+    if (dalsi === 'throw') throw new Error('síť spadla');
+    return { getResponseCode: () => dalsi.code, getContentText: () => JSON.stringify(dalsi.body) };
+  };
+}
+
+const GEO_BRNO = { code: 200, body: { results: [{ latitude: 49.19, longitude: 16.61 }] } };
+const FORECAST = {
+  code: 200,
+  body: { daily: { time: ['2026-08-03'], weather_code: [1], temperature_2m_max: [27.4], precipitation_probability_max: [10] } },
+};
+
+test('v3.5: weatherFor_ přežije jeden výpadek předpovědi (retry)', () => {
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([GEO_BRNO, { code: 500, body: {} }, FORECAST]) });
+  const w = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 3), {});
+  assert.equal(w, 'polojasno, max 27 °C, srážky 10 %');
+  assert.equal(ctx.__sleepMs.length, 1, 'mezi pokusy je právě jedna pauza');
+});
+
+test('v3.5: weatherFor_ přežije síťovou výjimku při geokódování (retry)', () => {
+  const ctx = nactiRadar({ urlFetch: frontaFetchu(['throw', GEO_BRNO, FORECAST]) });
+  const w = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 3), {});
+  assert.equal(w, 'polojasno, max 27 °C, srážky 10 %');
+});
+
+test('v3.5: úplný výpadek → prázdný řetězec, žádný pád, výsledek se cachuje', () => {
+  const volane = [];
+  const ctx = nactiRadar({ urlFetch: frontaFetchu(['throw', 'throw'], volane) });
+  const cache = {};
+  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 3), cache), '');
+  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 3), cache), '', 'druhé volání jde z cache');
+  assert.equal(volane.length, 2, 'jen 2 pokusy geokódování, cache brání dalším');
+});
+
+test('v3.5: weatherApiDostupne_ – true při 200, false při výpadku', () => {
+  const ok = nactiRadar({ urlFetch: frontaFetchu([FORECAST]) });
+  assert.equal(ok.weatherApiDostupne_(), true);
+  const down = nactiRadar({ urlFetch: frontaFetchu([{ code: 503, body: {} }, 'throw']) });
+  assert.equal(down.weatherApiDostupne_(), false);
+});
+
+// ---------------------------------------------------------------------------
+// v3.5: číslo verze má jediný zdroj pravdy (regrese: meta hlásila 3.4 u kódu 3.5)
+// ---------------------------------------------------------------------------
+
+test('BUG v3.5: konstanta VERZE souhlasí s hlavičkou souboru a meta ji používá', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const zdroj = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'kulturni_radar.gs'), 'utf8');
+  const hlavicka = zdroj.match(/\* Verze: (\d+\.\d+)/);
+  const konstanta = zdroj.match(/const VERZE = '([^']+)'/);
+  assert.ok(hlavicka, 'hlavička obsahuje číslo verze');
+  assert.ok(konstanta, 'existuje const VERZE');
+  assert.equal(konstanta[1], hlavicka[1], 'const VERZE == verze v hlavičce');
+  assert.ok(zdroj.includes('verze: VERZE'), 'meta API bere verzi z konstanty, ne z literálu');
+  assert.ok(!/verze:\s*'\d/.test(zdroj), 'žádný natvrdo zapsaný literál verze v API');
+});
