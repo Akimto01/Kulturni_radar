@@ -14,6 +14,7 @@ Library           String
 ${BASE_URL}       %{RADAR_URL=https://example.com/exec}
 # Regex českého data „d. M. yyyy“ – regresní pojistka na bug v3.2/3.3
 # (sériová čísla 46156 a Date objekty „FRI AUG 07…“ v API výstupu)
+${NTFY_TOPIC}      %{NTFY_TOPIC=}
 ${DATUM_RE}       ^\\d{1,2}\\. \\d{1,2}\\. \\d{4}$
 
 *** Test Cases ***
@@ -73,3 +74,25 @@ Spuštění kontroly s neplatným tokenem je odmítnuto
     ${j}=    Set Variable    ${r.json()}
     Should Not Be True    ${j}[ok]
     Should Contain    ${j}[error]    token
+
+Notifikační kanál ntfy je živý
+    [Documentation]    Monitorovací assert (backlog): radar posílá notifikaci
+    ...                minimálně 1× denně (ranní kontrola 8:00), takže pokud
+    ...                za posledních 48 h na ntfy nedorazilo NIC, kanál je
+    ...                nejspíš mrtvý (špatný topic, tichá chyba sendNotification_,
+    ...                změna ntfy API) – a nikdo si toho jinak nevšimne,
+    ...                protože mrtvý kanál nemá jak křičet.
+    ...                Topic je soukromý → bez ${NTFY_TOPIC} se test přeskočí.
+    Skip If    '${NTFY_TOPIC}' == ''    NTFY_TOPIC nenastaven – test přeskočen
+    ${r}=    GET    https://ntfy.sh/${NTFY_TOPIC}/json    params=poll=1&since=48h
+    Status Should Be    200    ${r}
+    ${radky}=    Split To Lines    ${r.text}
+    ${zprav}=    Set Variable    ${0}
+    FOR    ${radek}    IN    @{radky}
+        ${j}=    Evaluate    json.loads($radek)    modules=json
+        IF    '${j}[event]' == 'message'
+            ${zprav}=    Evaluate    ${zprav} + 1
+        END
+    END
+    Should Be True    ${zprav} >= 1
+    ...    Za 48 h nepřišla na ntfy žádná zpráva – notifikační kanál je nejspíš mrtvý

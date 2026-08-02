@@ -21,7 +21,7 @@ jobs:
           rfbrowser init chromium
 
       - name: API kontrakt
-        run: robot --variable BASE_URL:${{ secrets.RADAR_URL }} --outputdir vysledky/api tests/robot/api.robot
+        run: robot --variable BASE_URL:${{ secrets.RADAR_URL }} --variable NTFY_TOPIC:${{ secrets.NTFY_TOPIC }} --outputdir vysledky/api tests/robot/api.robot
 
       - name: Frontend E2E
         if: always()
