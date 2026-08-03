@@ -342,3 +342,17 @@ test('v3.6: sendNotification_ s HTML – e-mail dostane htmlBody, ntfy čistý t
   assert.ok(ntfy && !ntfy.options, 'ntfy brána bez HTML');
   assert.ok(mail && mail.options && mail.options.htmlBody === '<b>telo</b>');
 });
+
+// ---------------------------------------------------------------------------
+// v3.7: cellTextCas_ – meta „poslední kontrola" nesmí ztratit čas
+// ---------------------------------------------------------------------------
+
+test('BUG v3.7: cellTextCas_ zachová čas u Date, ostatní typy jako cellText_', () => {
+  const d = new r.__Date(2026, 7, 3, 18, 30);
+  assert.equal(r.cellTextCas_(d), '3. 8. 2026 18:30');
+  assert.equal(r.cellText_(d), '3. 8. 2026', 'cellText_ beze změny – čas záměrně ignoruje');
+  assert.equal(r.cellTextCas_(new r.__Date(2026, 7, 3, 0, 0, 0)), '3. 8. 2026', 'půlnoc bez času');
+  assert.equal(r.cellTextCas_(46156), '14. 5. 2026');
+  assert.equal(r.cellTextCas_(null), '');
+  assert.equal(r.cellTextCas_('  3. 8. 2026 '), '3. 8. 2026');
+});

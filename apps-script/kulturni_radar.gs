@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.6 (3. 8. 2026) – HTML digesty, stálá místa dle typu, MAX_WEB_SEARCHES 3
+ * Verze: 3.7 (3. 8. 2026) – meta: poslední kontrola profilu i s časem (cellTextCas_)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -58,7 +58,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.6';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.7';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -257,7 +257,7 @@ function readMetaApi_(ss) {
   if (lok && lok.getLastRow() > 1) {
     lok.getRange(2, 2, lok.getLastRow() - 1, 7).getValues().forEach(row => {
       const p = String(row[0] || '').trim();
-      if (p) profily.push({ profil: p, kraj: String(row[1] || ''), posledniKontrola: cellText_(row[6]) });
+      if (p) profily.push({ profil: p, kraj: String(row[1] || ''), posledniKontrola: cellTextCas_(row[6]) });
     });
   }
 
@@ -1607,6 +1607,15 @@ function parseCzDate_(v) {
 
 function formatDate_(d) {
   return Utilities.formatDate(d, Session.getScriptTimeZone(), 'd. M. yyyy H:mm');
+}
+
+/** Jako cellText_, ale u Date s nenulovým časem zachová i čas (pro „poslední
+ *  kontrola" – Sheets řetězec s časem autokonvertuje na Date a čas by se ztratil). */
+function cellTextCas_(v) {
+  if (v instanceof Date && (v.getHours() || v.getMinutes() || v.getSeconds())) {
+    return formatDate_(v);
+  }
+  return cellText_(v);
 }
 
 /** České skloňování počítaných výrazů: sklonuj_(n, 'problém', 'problémy', 'problémů'). */
