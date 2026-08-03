@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.5 – 📅 Do kalendáře, chipy typů stálých míst -->
+<!-- Kulturní radar Index.html v3.6 – filtrovatNavstivenaPodleObdobi_ vytažen a otestován zvlášť -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -813,15 +813,7 @@
         .sort((a, b) => dateKeyBezpecne_(a.datumOd) - dateKeyBezpecne_(b.datumOd));
       renderSpecialni(seznam, 'Zatím nemáte žádné oblíbené akce. Klikněte na ☆ u karty.');
     } else if (rezimZobrazeni === 'navstivene') {
-      let seznam = vsechnaAkce.filter(a => a.navstivenoDne);
-      if (obdobiNavstivene !== 'vse') {
-        const cutoff = new Date(Date.now() - Number(obdobiNavstivene) * 86400000);
-        seznam = seznam.filter(a => {
-          const d = parseCeskeDatum(a.navstivenoDne);
-          return d && d >= cutoff;
-        });
-      }
-      seznam.sort((a, b) => dateKeyBezpecne_(b.navstivenoDne) - dateKeyBezpecne_(a.navstivenoDne));
+      const seznam = filtrovatNavstivenaPodleObdobi_(vsechnaAkce, obdobiNavstivene, new Date());
       renderSpecialni(seznam, 'V tomto období nemáte žádné navštívené akce.');
     } else {
       renderAkce();
@@ -832,6 +824,22 @@
   function dateKeyBezpecne_(s) {
     const d = parseCeskeDatum(s);
     return d ? d.getTime() : Number.MAX_SAFE_INTEGER;
+  }
+
+  /** PURE: akce navštívené v posledních N dnech (nebo „vse“), seřazené od
+   *  nejnovější návštěvy. `ted` je injektované (ne Date.now() přímo), aby šlo
+   *  otestovat hranice období bez závislosti na skutečném aktuálním čase. */
+  function filtrovatNavstivenaPodleObdobi_(seznamAkci, obdobi, ted) {
+    let seznam = seznamAkci.filter(a => a.navstivenoDne);
+    if (obdobi !== 'vse') {
+      const cutoff = new Date(ted.getTime() - Number(obdobi) * 86400000);
+      seznam = seznam.filter(a => {
+        const d = parseCeskeDatum(a.navstivenoDne);
+        return d && d >= cutoff;
+      });
+    }
+    seznam.sort((a, b) => dateKeyBezpecne_(b.navstivenoDne) - dateKeyBezpecne_(a.navstivenoDne));
+    return seznam;
   }
 
   // ── ★ Oblíbené / ✓ Navštívené ──────────────────────────────

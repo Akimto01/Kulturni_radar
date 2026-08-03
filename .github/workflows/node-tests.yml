@@ -16,4 +16,4 @@ jobs:
           node-version: '22'
 
       - name: Spustit testy
-        run: node --test tests/unit.test.js
+        run: node --test tests/unit.test.js tests/frontend.test.js

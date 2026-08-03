@@ -97,6 +97,31 @@ Karta má odkaz Do kalendáře
     ${text}=    Get Text    ${FRAME} .karta >> nth=0 >> .karta-akce
     Should Contain    ${text}    Do kalendáře
 
+Chip typu stálého místa zúží seznam (pokud profil má 2+ typů)
+    [Documentation]    v3.10: chipy typů se vykreslí jen když má profil 2+
+    ...    různé typy míst (viz Index.html renderMista – chip „Vše" + 1 typ by
+    ...    byl k ničemu). Test je proto podmíněný na DATECH profilu, ne na
+    ...    stavu aplikace – to není „Skip" ve smyslu, kterému jsme se dřív
+    ...    vyhýbali (skrývání nejistoty o kódu), ale korektní chování podle
+    ...    množství typů míst, které se den ze dne mění. Klik na chip je čistě
+    ...    klientský filtr, bez zápisu – bezpečné pro CI.
+    ${pocet_chipu}=    Get Element Count    ${FRAME} \#mista-sekce .chip
+    IF    ${pocet_chipu} >= 2
+        ${vsech}=    Get Element Count    ${FRAME} .misto-karta
+        Click    ${FRAME} \#mista-sekce .chip >> nth=1
+        Sleep    300ms
+        ${filtrovanych}=    Get Element Count    ${FRAME} .misto-karta
+        Should Be True    ${filtrovanych} <= ${vsech}
+        Should Be True    ${filtrovanych} >= 1
+        ...    msg=Vybraný typ místa by měl mít aspoň jedno místo (jinak by se chip nevykreslil)
+        Click    ${FRAME} \#mista-sekce .chip >> text=Vše
+        Sleep    300ms
+        ${zpet}=    Get Element Count    ${FRAME} .misto-karta
+        Should Be Equal As Integers    ${zpet}    ${vsech}
+    ELSE
+        Log    Profil má aktuálně jen ${pocet_chipu} chip(y) typů míst (0 nebo 1 typ celkem) – chipy filtru se korektně nevykreslují, test nemá co ověřit v tomto běhu.    level=WARN
+    END
+
 Karty mají ikony pro Oblíbené a Navštívené
     [Documentation]    v3.9: jen existence prvků – NEKLIKÁME na ikony (☆/○), protože
     ...                klik zapisuje do produkčního listu OZNAČENÍ. Bezpečné pro
@@ -121,6 +146,44 @@ Chip Oblíbené filtruje bez zápisu do tabulky
     ${zpet}=    Get Element Count    ${FRAME} .karta
     Should Be Equal As Integers    ${zpet}    ${vsech}
     ...    msg=Opětovný klik na chip vrátí plný seznam
+
+Označení ★ se skutečně promítne do filtru „★ Oblíbené" (integrace, ne jen zápis)
+    [Documentation]    Rozdíl oproti „★ Oblíbené: lze označit i odznačit": tam
+    ...    jsme ověřovali jen že SE ZAPÍŠE (ikona + reload). Tady ověřujeme, že
+    ...    dvě samostatně postavené funkce (toggle a chip-filtr) spolu SKUTEČNĚ
+    ...    spolupracují – konkrétní akce po označení musí být vidět přesně ve
+    ...    filtrovaném seznamu, ne jen mít správnou ikonu.
+    ...    PÍŠE do produkčního OZNAČENÍ – [Teardown] vrací původní stav.
+    [Teardown]    Run Keyword And Ignore Error
+    ...    Nastavit ikonu první karty na    hvezda    ${puvodni}
+    ${id_karty}=    Get Attribute    ${FRAME} .karta >> nth=0    data-id
+    ${puvodni}=    Zjistit je-li ikona první karty aktivní    hvezda
+    ${ocekavano}=    Evaluate    not ${puvodni}
+
+    Click    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.hvezda
+    Wait For Elements State
+    ...    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.hvezda:not(.ukladani)
+    ...    visible    timeout=10s
+
+    Click    ${FRAME} \#chip-oblibene
+    Sleep    300ms
+    ${pritomna}=    Get Element Count    ${FRAME} .karta[data-id="${id_karty}"]
+    IF    ${ocekavano}
+        Should Be True    ${pritomna} >= 1
+        ...    msg=Po označení by karta měla být vidět ve filtru „★ Oblíbené"
+    ELSE
+        Should Be Equal As Integers    ${pritomna}    0
+        ...    msg=Po odznačení by karta NEMĚLA být ve filtru „★ Oblíbené"
+    END
+
+    Click    ${FRAME} \#chip-oblibene
+    Sleep    300ms
+    Click    ${FRAME} .karta[data-id="${id_karty}"] >> .ikona-oznaceni.hvezda
+    Wait For Elements State
+    ...    ${FRAME} .karta[data-id="${id_karty}"] >> .ikona-oznaceni.hvezda:not(.ukladani)
+    ...    visible    timeout=10s
+    Ikona první karty má být    hvezda    ${puvodni}
+    ...    msg=Po návratu na „Vše" a druhém přepnutí se nepodržel původní stav
 
 ★ Oblíbené: lze označit i odznačit (obojí ověřeno reloadem)
     [Documentation]    Plný cyklus pro ikonu ★/☆ – viz sdílený keyword níže.
