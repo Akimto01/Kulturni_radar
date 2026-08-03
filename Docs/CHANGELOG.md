@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.6 — 3. 8. 2026
+### Přidáno
+- Digesty se posílají e-mailem jako HTML (předsazené odrážky — konec „utržených" řádků na mobilu); prostý text zůstává pro ntfy a jako záloha. Nové renderery renderDigestText_/renderDigestHtml_ nad společným datovým modelem, esc_ proti rozbití HTML názvy akcí.
+- „Probíhá od" přesunuto z titulku akce na vlastní odsazený řádek k času.
+- Stálá místa v digestu seskupená podle typu (· Zoo, · Jeskyně, …).
+- Node testy 31 → 35 (oba renderery, escapování, HTML jen do e-mailu).
+### Změněno
+- MAX_WEB_SEARCHES 5 → 3 (optimalizace API kreditů).
+### Diagnostikováno
+- Ranní výpadky počasí: Open-Meteo je ze sdílených IP Google serverů dostupné přerušovaně (ráno kvóta, večer OK); kód v pořádku, řeší retry + klasifikace varování ze v3.5. Trvalé řešení (met.no fallback, cache souřadnic) v backlogu.
+
 ## v3.5 — 2. 8. 2026
 ### Přidáno
 - `sklonuj_` — správné české skloňování v samotestu („1 problém", ne „1 problémů").

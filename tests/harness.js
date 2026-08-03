@@ -50,7 +50,7 @@ function nactiRadar(volby = {}) {
       }),
     },
     MailApp: {
-      sendEmail: (komu, predmet, telo) => { odeslane.push({ komu, predmet, telo }); },
+      sendEmail: (komu, predmet, telo, options) => { odeslane.push({ komu, predmet, telo, options }); },
     },
     SpreadsheetApp: {
       getActiveSpreadsheet: () => ({ getUrl: () => 'https://sheet.example/test' }),

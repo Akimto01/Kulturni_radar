@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.5 (2. 8. 2026) – sklonuj_, weatherFor_ s retry, samotest: varování vs. problémy
+ * Verze: 3.6 (3. 8. 2026) – HTML digesty, stálá místa dle typu, MAX_WEB_SEARCHES 3
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -58,11 +58,11 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.5';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.6';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
-const MAX_WEB_SEARCHES = 5;
+const MAX_WEB_SEARCHES = 3;  // v3.6: úspora kreditů (bývalo 5)
 
 /** Nástroj, kterým model odevzdává výsledky – API garantuje validní strukturu. */
 const REPORT_TOOL = {
@@ -1200,15 +1200,18 @@ function weekendDigest() {
   }
 }
 
-/** Sestaví a odešle přehled akcí aktivního profilu v daném okně, s počasím. */
+/** Sestaví a odešle přehled akcí aktivního profilu v daném okně, s počasím.
+ *  v3.6: staví datový model bloků a renderuje ho dvakrát – prostý text
+ *  (ntfy, záloha) a HTML s předsazenými odrážkami (e-mail, mobil). */
 function digestRange_(title, from, to) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const profil = String(ss.getSheetByName(SHEET.KRITERIA).getRange(KRIT.PROFIL).getDisplayValue()).trim();
   const evs = readEventsInRange_(ss, profil, from, to);
 
-  const lines = [profil + ' · ' + formatDateOnly_(from) + '–' + formatDateOnly_(to)];
+  const hlavicka = profil + ' \u00b7 ' + formatDateOnly_(from) + '\u2013' + formatDateOnly_(to);
+  const bloky = [];
   if (evs.length === 0) {
-    lines.push('Na toto období nejsou v databázi žádné akce.');
+    bloky.push({ nadpis: 'Na toto období nejsou v databázi žádné akce.', polozky: [] });
   } else {
     const cache = {};
     const skupiny = {};
@@ -1217,19 +1220,19 @@ function digestRange_(title, from, to) {
       (skupiny[k] = skupiny[k] || []).push(ev);
     });
     Object.keys(skupiny).sort((a, b) => a.localeCompare(b, 'cs')).forEach(k => {
-      lines.push('');
-      lines.push(k.charAt(0).toUpperCase() + k.slice(1));
+      const blok = { nadpis: k.charAt(0).toUpperCase() + k.slice(1), polozky: [] };
       skupiny[k].forEach(ev => {
-        let line = '• ' + formatDateOnly_(ev.den) + ' — ' + ev.nazev;
-        if (ev.probihaOd) line += ' (probíhá od ' + formatDateOnly_(ev.probihaOd) + ')';
-        if (ev.cas) line += '\n   čas: ' + ev.cas;
+        const detaily = [];
+        if (ev.probihaOd) detaily.push('probíhá od ' + formatDateOnly_(ev.probihaOd));
+        if (ev.cas) detaily.push('čas: ' + ev.cas);
         const w = weatherFor_(ev.obec, ev.den, cache);
-        if (w) line += '\n   počasí (' + (ev.obec || profil) + '): ' + w;
-        lines.push(line);
+        if (w) detaily.push('počasí (' + (ev.obec || profil) + '): ' + w);
+        blok.polozky.push({ titulek: formatDateOnly_(ev.den) + ' \u2014 ' + ev.nazev, detaily });
       });
+      bloky.push(blok);
     });
   }
-  // Stálá místa (zoo, science centra, hrady…) – top 5 podle skóre, počasí na sobotu v okně
+  // Stálá místa – top 5 dle skóre, seskupená podle typu, počasí na sobotu v okně
   const mista = readMista_(ss, profil);
   if (mista.length) {
     let denPocasi = from;
@@ -1237,18 +1240,73 @@ function digestRange_(title, from, to) {
       if (d.getDay() === 6) { denPocasi = d; break; }
     }
     const cacheM = {};
-    lines.push('');
-    lines.push('Stálá místa (' + formatDateOnly_(denPocasi) + '):');
+    bloky.push({ nadpis: 'Stálá místa (' + formatDateOnly_(denPocasi) + ')', polozky: [] });
+    const dleTypu = {};
     mista.slice(0, 5).forEach(m => {
-      let line = '• ' + m.nazev + (m.typ ? ' (' + m.typ + ')' : '');
-      if (m.doba) line += '\n   otevřeno: ' + m.doba;
-      const w = weatherFor_(m.obec, denPocasi, cacheM);
-      if (w) line += '\n   počasí (' + m.obec + '): ' + w;
-      lines.push(line);
+      const t = m.typ || 'ostatní';
+      (dleTypu[t] = dleTypu[t] || []).push(m);
+    });
+    Object.keys(dleTypu).sort((a, b) => a.localeCompare(b, 'cs')).forEach(t => {
+      const blok = { nadpis: '\u00b7 ' + t.charAt(0).toUpperCase() + t.slice(1), polozky: [] };
+      dleTypu[t].forEach(m => {
+        const detaily = [];
+        if (m.doba) detaily.push('otevřeno: ' + m.doba);
+        const w = weatherFor_(m.obec, denPocasi, cacheM);
+        if (w) detaily.push('počasí (' + m.obec + '): ' + w);
+        blok.polozky.push({ titulek: m.nazev, detaily });
+      });
+      bloky.push(blok);
     });
   }
-  lines.push('Kompletní přehled: ' + ss.getUrl());
-  sendNotification_(title, lines.join('\n'));
+  sendNotification_(title,
+    renderDigestText_(hlavicka, bloky, ss.getUrl()),
+    renderDigestHtml_(hlavicka, bloky, ss.getUrl()));
+}
+
+/** Prostý text digestu (ntfy + záloha pro e-mailové klienty bez HTML). */
+function renderDigestText_(hlavicka, bloky, url) {
+  const lines = [hlavicka];
+  bloky.forEach(b => {
+    lines.push('');
+    lines.push(b.nadpis + (b.polozky.length ? ':' : ''));
+    b.polozky.forEach(p => {
+      let line = '\u2022 ' + p.titulek;
+      p.detaily.forEach(d => { line += '\n   ' + d; });
+      lines.push(line);
+    });
+  });
+  lines.push('');
+  lines.push('Kompletní přehled: ' + url);
+  return lines.join('\n');
+}
+
+/** HTML digestu – odrážky s předsazením, detaily menším písmem pod titulkem. */
+function renderDigestHtml_(hlavicka, bloky, url) {
+  let h = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1a1a2e">';
+  h += '<p style="margin:0 0 10px 0"><strong>' + esc_(hlavicka) + '</strong></p>';
+  bloky.forEach(b => {
+    h += '<p style="margin:12px 0 4px 0"><strong>' + esc_(b.nadpis) + '</strong></p>';
+    if (b.polozky.length) {
+      h += '<ul style="margin:0;padding-left:20px">';
+      b.polozky.forEach(p => {
+        h += '<li style="margin:0 0 6px 0">' + esc_(p.titulek);
+        p.detaily.forEach(d => {
+          h += '<br><span style="color:#4a4a6a;font-size:13px">' + esc_(d) + '</span>';
+        });
+        h += '</li>';
+      });
+      h += '</ul>';
+    }
+  });
+  h += '<p style="margin:14px 0 0 0"><a href="' + esc_(url) + '">Kompletní přehled v tabulce</a></p>';
+  h += '</div>';
+  return h;
+}
+
+/** Escapování textu do HTML. */
+function esc_(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /** Načte aktivní stálá místa profilu, seřazená podle skóre sestupně. */
@@ -1454,7 +1512,7 @@ function notifyFail_(title, err) {
   sendNotification_(title, 'Chyba: ' + (err && err.message ? err.message : err));
 }
 
-function sendNotification_(title, body) {
+function sendNotification_(title, body, htmlBody) {
   const props = PropertiesService.getScriptProperties();
   const topic = props.getProperty('NTFY_TOPIC');
   const email = props.getProperty('NOTIFY_EMAIL');
@@ -1486,7 +1544,11 @@ function sendNotification_(title, body) {
   }
   if (email) {
     try {
-      MailApp.sendEmail(email, '[Kulturní radar] ' + title, body);
+      if (htmlBody) {
+        MailApp.sendEmail(email, '[Kulturní radar] ' + title, body, { htmlBody: htmlBody });
+      } else {
+        MailApp.sendEmail(email, '[Kulturní radar] ' + title, body);
+      }
     } catch (e) { Logger.log('e-mail selhal: ' + e); }
   }
   Logger.log(title + '\n' + body);

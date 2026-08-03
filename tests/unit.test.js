@@ -292,3 +292,53 @@ test('BUG v3.5: konstanta VERZE souhlasí s hlavičkou souboru a meta ji použí
   assert.ok(zdroj.includes('verze: VERZE'), 'meta API bere verzi z konstanty, ne z literálu');
   assert.ok(!/verze:\s*'\d/.test(zdroj), 'žádný natvrdo zapsaný literál verze v API');
 });
+
+// ---------------------------------------------------------------------------
+// v3.6: renderery digestu – text (ntfy) a HTML (e-mail)
+// ---------------------------------------------------------------------------
+
+const BLOKY = [
+  { nadpis: 'Divadlo', polozky: [
+    { titulek: '3. 8. 2026 — Léto s operou 2026 – Špilberk', detaily: ['probíhá od 31. 7. 2026', 'čas: průběžně'] },
+  ]},
+  { nadpis: 'Stálá místa (8. 8. 2026)', polozky: [] },
+  { nadpis: '· Zoo', polozky: [
+    { titulek: 'Zoo Brno', detaily: ['otevřeno: 9:00–18:00', 'počasí (Brno): polojasno, max 27 °C'] },
+  ]},
+];
+
+test('v3.6: renderDigestText_ – probíhá od má vlastní odsazený řádek', () => {
+  const t = r.renderDigestText_('Brno · 3. 8.–9. 8.', BLOKY, 'https://tab.example');
+  assert.ok(t.includes('• 3. 8. 2026 — Léto s operou 2026 – Špilberk\n   probíhá od 31. 7. 2026\n   čas: průběžně'));
+  assert.ok(t.includes('Stálá místa (8. 8. 2026)\n'), 'hlavička míst bez dvojtečky, vlastní řádek');
+  assert.ok(t.includes('· Zoo:'), 'typová podskupina míst');
+  assert.ok(t.endsWith('Kompletní přehled: https://tab.example'));
+});
+
+test('v3.6: renderDigestHtml_ – odrážky s předsazením, detaily pod titulkem', () => {
+  const h = r.renderDigestHtml_('Brno · 3. 8.–9. 8.', BLOKY, 'https://tab.example');
+  assert.ok(h.includes('<ul style="margin:0;padding-left:20px">'));
+  assert.ok(h.includes('<li style="margin:0 0 6px 0">3. 8. 2026 — Léto s operou 2026 – Špilberk<br>'));
+  assert.ok(h.includes('>probíhá od 31. 7. 2026</span>'));
+  assert.ok(h.includes('<strong>· Zoo</strong>'));
+  assert.ok(h.includes('href="https://tab.example"'));
+  assert.ok(!h.includes('undefined'));
+});
+
+test('v3.6: esc_ – HTML se v datech neinterpretuje', () => {
+  assert.equal(r.esc_('Kino <Art> & "Scala"'), 'Kino &lt;Art&gt; &amp; &quot;Scala&quot;');
+  assert.equal(r.esc_(null), '');
+  const h = r.renderDigestHtml_('X', [{ nadpis: 'A<b>', polozky: [{ titulek: '1 < 2', detaily: [] }] }], 'u');
+  assert.ok(h.includes('A&lt;b&gt;') && h.includes('1 &lt; 2'));
+});
+
+test('v3.6: sendNotification_ s HTML – e-mail dostane htmlBody, ntfy čistý text', () => {
+  const ctx = nactiRadar({ properties: { NTFY_TOPIC: 'kanal', NOTIFY_EMAIL: 'ja@example.com' } });
+  ctx.sendNotification_('Test', 'telo', '<b>telo</b>');
+  const maily = ctx.__odeslaneEmaily;
+  assert.equal(maily.length, 2);
+  const ntfy = maily.find(m => m.komu.indexOf("ntfy-") === 0);
+  const mail = maily.find(m => m.komu === "ja@example.com");
+  assert.ok(ntfy && !ntfy.options, 'ntfy brána bez HTML');
+  assert.ok(mail && mail.options && mail.options.htmlBody === '<b>telo</b>');
+});
