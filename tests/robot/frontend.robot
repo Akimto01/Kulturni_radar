@@ -72,13 +72,16 @@ Dlouhodobé akce nevytvářejí hlavičky s minulým datem
     END
 
 Filtr kategorie omezí karty a Vše je vrátí
+    [Documentation]    v3.10: selektor zúžen na \#kat-chips – od chipů typů
+    ...    stálých míst (které mají vlastní tlačítko „Vše") jinak nastává
+    ...    strict-mode kolize (dva prvky s textem „Vše" na stránce).
     ${vsech}=    Get Element Count    ${FRAME} .karta
-    Click    ${FRAME} .chip >> text=koncerty
+    Click    ${FRAME} \#kat-chips .chip >> text=koncerty
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
     ${filtrovanych}=    Get Element Count    ${FRAME} .karta
     Should Be True    ${filtrovanych} <= ${vsech}
     Should Be True    ${filtrovanych} >= 1    Koncerty v Brně vždycky nějaké jsou
-    Click    ${FRAME} .chip >> text=Vše
+    Click    ${FRAME} \#kat-chips .chip >> text=Vše
     ${zpet}=    Get Element Count    ${FRAME} .karta
     Should Be Equal As Integers    ${zpet}    ${vsech}
 
@@ -86,6 +89,13 @@ Sekce stálých míst existuje
     Wait For Elements State    ${FRAME} \#mista-sekce .misto-karta >> nth=0    visible    timeout=15s
     ${mist}=    Get Element Count    ${FRAME} .misto-karta
     Should Be True    ${mist} >= 1
+
+Karta má odkaz Do kalendáře
+    [Documentation]    v3.10: 📅 Do kalendáře je čistě klientský odkaz (Google
+    ...    Calendar šablonová URL) – žádné volání serveru, bezpečné otevřít i
+    ...    kliknout by bylo bezpečné, ale stačí ověřit existenci a text odkazu.
+    ${text}=    Get Text    ${FRAME} .karta >> nth=0 >> .karta-akce
+    Should Contain    ${text}    Do kalendáře
 
 Karty mají ikony pro Oblíbené a Navštívené
     [Documentation]    v3.9: jen existence prvků – NEKLIKÁME na ikony (☆/○), protože
@@ -179,6 +189,12 @@ Ověřit plný cyklus označení (přidat i odebrat) s reloadem
     ...       ověřené OBĚ operace: označit i odznačit).
     ...    Na konci je stav vždy shodný s tím, co bylo na začátku. Vrací původní
     ...    stav, aby ho volající test mohl předat [Teardown] jako pojistku.
+    ...
+    ...    v3.10 DŮLEŽITÉ: mezi kliknutím a Reloadem se čeká na vymizení třídy
+    ...    „ukladani" (server round-trip dokončen) – NE jen na optimistický DOM
+    ...    flip. Bez tohoto kroku Reload mohl proběhnout dřív, než apiToggle
+    ...    reálně zapsal do listu OZNAČENÍ, a test by nedeterministicky padal
+    ...    (přesně to se stalo 3. 8. 2026 u ikony hvezda – False != True).
     ${puvodni}=    Zjistit je-li ikona první karty aktivní    ${trida_ikony}
     ${opak}=    Evaluate    not ${puvodni}
 
@@ -186,6 +202,9 @@ Ověřit plný cyklus označení (přidat i odebrat) s reloadem
     Wait Until Keyword Succeeds    10s    500ms
     ...    Ikona první karty má být    ${trida_ikony}    ${opak}
     ...    msg=Krok 1 (přepnutí na opak): optimistická odezva se neprojevila – ${trida_ikony}
+    Wait For Elements State
+    ...    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.${trida_ikony}:not(.ukladani)
+    ...    visible    timeout=10s
     Reload
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
@@ -196,6 +215,9 @@ Ověřit plný cyklus označení (přidat i odebrat) s reloadem
     Wait Until Keyword Succeeds    10s    500ms
     ...    Ikona první karty má být    ${trida_ikony}    ${puvodni}
     ...    msg=Krok 2 (návrat na původní): optimistická odezva se neprojevila – ${trida_ikony}
+    Wait For Elements State
+    ...    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.${trida_ikony}:not(.ukladani)
+    ...    visible    timeout=10s
     Reload
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s

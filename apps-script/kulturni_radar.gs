@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.9 (3. 8. 2026) – Oblíbené + Navštívené (list OZNAČENÍ, apiToggle)
+ * Verze: 3.11 (3. 8. 2026) – zahrnoutAkciDoVysledku_ vytažen a otestován zvlášť
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -59,7 +59,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.9';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.11';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -196,6 +196,18 @@ function cellText_(v) {
   return String(v == null ? '' : v).trim();
 }
 
+/** PURE: rozhodne, zda akce patří do výsledku apiEvents. Normální okno = ne
+ *  proběhlé, ne staré (mimo „zrušeno", které se ukazuje vždy jako info).
+ *  Označené akce (oblibene/navstiveno) smí projít i mimo toto okno, ale JEN
+ *  když volající o to výslovně požádal (zahrnoutOznacene) – jinak zůstávají
+ *  skryté jako neoznačené staré akce (v3.9 filtr, v3.10 vytažen do funkce). */
+function zahrnoutAkciDoVysledku_(stav, datumOd, dnes, zahrnoutOznacene, jeOznaceno) {
+  const smiVyjimku = !!zahrnoutOznacene && !!jeOznaceno;
+  if (stav === 'proběhlo' && !smiVyjimku) return false;
+  if (datumOd && datumOd < dnes && stav !== 'zrušeno' && !smiVyjimku) return false;
+  return true;
+}
+
 /** API: akce profilu v databázi (neprobíhající, přijde – nebo označené, viz zahrnoutOznacene). */
 function readEventsApi_(ss, profilParam, zahrnoutOznacene) {
   const krit = ss.getSheetByName(SHEET.KRITERIA);
@@ -216,11 +228,9 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene) {
     const id = String(row[0] || '');
     const oznaceni = oznaceniMapa.get(id) || { oblibene: false, navstivenoDne: null };
     const jeOznaceno = oznaceni.oblibene || !!oznaceni.navstivenoDne;
-    const smiVyjimku = !!zahrnoutOznacene && jeOznaceno;   // označené akce projdou i mimo běžné okno
     const stav = norm_(row[13]);
-    if (stav === 'proběhlo' && !smiVyjimku) return;
     const datumOd = parseCzDate_(row[1]);
-    if (datumOd && datumOd < dnes && stav !== 'zrušeno' && !smiVyjimku) return;
+    if (!zahrnoutAkciDoVysledku_(stav, datumOd, dnes, zahrnoutOznacene, jeOznaceno)) return;
     akce.push({
       id,
       nazev: String(row[4] || ''),
@@ -1481,10 +1491,12 @@ function readEventsInRange_(ss, profil, from, to) {
 }
 
 /** GET s jedním opakováním po pauze (přechodné výpadky); parsovaný JSON, nebo null. */
-function fetchJson_(url) {
+function fetchJson_(url, headers) {
+  const volby = { muteHttpExceptions: true };
+  if (headers) volby.headers = headers;
   for (let pokus = 0; pokus < 2; pokus++) {
     try {
-      const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      const r = UrlFetchApp.fetch(url, volby);
       if (r.getResponseCode() === 200) return JSON.parse(r.getContentText());
     } catch (e) { /* síťová chyba – zkusit ještě jednou */ }
     if (pokus === 0) Utilities.sleep(1500);
@@ -1501,7 +1513,11 @@ function weatherApiDostupne_() {
   return !!(d && d.daily && d.daily.time && d.daily.time.length);
 }
 
-/** Předpověď pro obec a den přes Open-Meteo (zdarma, bez klíče); '' při neúspěchu. */
+/** met.no vyžaduje identifikační User-Agent (jinak blokuje) – oficiální zásada MET Norway. */
+const METNO_USER_AGENT = 'KulturniRadar/' + VERZE + ' (+https://github.com/Akimto01/Kulturni_radar)';
+
+/** Předpověď pro obec a den; primárně Open-Meteo, při výpadku/chybějícím dni
+ *  záložně met.no (v3.10). '' při neúspěchu obou zdrojů. */
 function weatherFor_(obec, den, cache) {
   try {
     if (!obec) return '';
@@ -1514,21 +1530,86 @@ function weatherFor_(obec, den, cache) {
       const fd = fetchJson_(
         'https://api.open-meteo.com/v1/forecast?daily=weather_code,temperature_2m_max,precipitation_probability_max' +
         '&timezone=Europe%2FPrague&forecast_days=16&latitude=' + loc.latitude + '&longitude=' + loc.longitude);
-      cache[key] = fd ? fd.daily : null;
+      cache[key] = { lat: loc.latitude, lon: loc.longitude, openMeteo: fd ? fd.daily : null, metNo: null };
     }
-    const d = cache[key];
-    if (!d || !d.time) return '';
+    const zaznam = cache[key];
+    if (!zaznam) return '';
     const iso = Utilities.formatDate(den, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-    const i = d.time.indexOf(iso);
-    if (i < 0) return '';
-    let w = weatherText_(d.weather_code[i]) + ', max ' + Math.round(d.temperature_2m_max[i]) + ' °C';
-    if (d.precipitation_probability_max && d.precipitation_probability_max[i] != null) {
-      w += ', srážky ' + d.precipitation_probability_max[i] + ' %';
+
+    // 1) primární zdroj: Open-Meteo
+    const d = zaznam.openMeteo;
+    if (d && d.time) {
+      const i = d.time.indexOf(iso);
+      if (i >= 0) {
+        let w = weatherText_(d.weather_code[i]) + ', max ' + Math.round(d.temperature_2m_max[i]) + ' °C';
+        if (d.precipitation_probability_max && d.precipitation_probability_max[i] != null) {
+          w += ', srážky ' + d.precipitation_probability_max[i] + ' %';
+        }
+        return w;
+      }
     }
-    return w;
+
+    // 2) záložní zdroj: met.no – jen když Open-Meteo pro tento den nic nemá.
+    //    Fetch proběhne nejvýš jednou na obec (cache), sentinel `false` = "zkusili jsme, nevyšlo".
+    if (zaznam.metNo === null) {
+      zaznam.metNo = fetchJson_(
+        'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + zaznam.lat + '&lon=' + zaznam.lon,
+        { 'User-Agent': METNO_USER_AGENT }) || false;
+    }
+    if (zaznam.metNo && zaznam.metNo.properties && zaznam.metNo.properties.timeseries) {
+      const denMetNo = agregovatMetNoDen_(zaznam.metNo.properties.timeseries, iso);
+      if (denMetNo) return metNoTextFor_(denMetNo.symbolCode) + ', max ' + Math.round(denMetNo.maxTeplota) + ' °C';
+    }
+    return '';
   } catch (e) {
     return '';
   }
+}
+
+/** PURE: z met.no timeseries vybere záznamy pro daný den (YYYY-MM-DD) a vrátí
+ *  { maxTeplota, symbolCode } – teplota jako maximum, symbol z okamžiku
+ *  nejblíž poledni (nejreprezentativnější pro celý den). null, když pro
+ *  daný den nejsou žádné záznamy. */
+function agregovatMetNoDen_(timeseries, isoDatum) {
+  const zaznamyDne = timeseries.filter(t => String(t.time || '').slice(0, 10) === isoDatum);
+  if (!zaznamyDne.length) return null;
+  let maxTeplota = null;
+  let symbolCode = null;
+  let nejblizeKPoledni = Infinity;
+  zaznamyDne.forEach(t => {
+    const teplota = t.data && t.data.instant && t.data.instant.details
+      ? t.data.instant.details.air_temperature : null;
+    if (teplota != null && (maxTeplota === null || teplota > maxTeplota)) maxTeplota = teplota;
+    const hodina = Number(String(t.time).slice(11, 13));
+    const vzdalenost = Math.abs(hodina - 12);
+    const shrnuti = (t.data && t.data.next_1_hours && t.data.next_1_hours.summary)
+      || (t.data && t.data.next_6_hours && t.data.next_6_hours.summary);
+    if (shrnuti && shrnuti.symbol_code && vzdalenost < nejblizeKPoledni) {
+      nejblizeKPoledni = vzdalenost;
+      symbolCode = shrnuti.symbol_code;
+    }
+  });
+  if (maxTeplota === null) return null;
+  return { maxTeplota, symbolCode };
+}
+
+/** Převod met.no symbol_code (např. 'partlycloudy_day') na český popis – hrubší
+ *  než weatherText_ (ten čte přesný číselný WMO kód z Open-Meteo). */
+function metNoTextFor_(symbolCode) {
+  const s = String(symbolCode || '');
+  if (!s) return 'proměnlivo';
+  // substring, ne jen prefix – met.no má i složené kódy jako
+  // 'heavyrainandthunder', kde 'thunder' není na začátku řetězce.
+  if (s.indexOf('thunder') !== -1) return 'bouřky';
+  if (s.indexOf('sleet') !== -1) return 'přeháňky';
+  if (s.indexOf('snow') !== -1) return 'sněžení';
+  if (s.indexOf('rain') !== -1) return 'déšť';
+  if (s.indexOf('fog') !== -1) return 'mlha';
+  if (s.indexOf('partlycloudy') !== -1) return 'polojasno';   // před 'cloudy' – je jeho podřetězcem
+  if (s.indexOf('cloudy') !== -1) return 'zataženo';
+  if (s.indexOf('fair') !== -1) return 'skoro jasno';
+  if (s.indexOf('clearsky') !== -1) return 'jasno';
+  return 'proměnlivo';
 }
 
 /** Převod WMO kódu počasí na český popis. */

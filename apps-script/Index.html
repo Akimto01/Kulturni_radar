@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.4 – ⭐ Oblíbené + ✓ Navštívené (apiToggle) -->
+<!-- Kulturní radar Index.html v3.5 – 📅 Do kalendáře, chipy typů stálých míst -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -176,6 +176,7 @@
   .ikona-oznaceni:hover { color: var(--ink-2); }
   .ikona-oznaceni.aktivni.hvezda { color: #d4a017; }
   .ikona-oznaceni.aktivni.fajfka { color: #27ae60; }
+  .ikona-oznaceni.ukladani { opacity: .35; pointer-events: none; }
   .navstiveno-info { color: #27ae60 !important; }
   .meta {
     margin-top: 5px;
@@ -583,14 +584,18 @@
     skore.textContent = '★ ' + (a.skore || '—');
 
     const btnOblibene = document.createElement('button');
-    btnOblibene.className = 'ikona-oznaceni hvezda' + (a.oblibene ? ' aktivni' : '');
+    btnOblibene.className = 'ikona-oznaceni hvezda'
+      + (a.oblibene ? ' aktivni' : '')
+      + (probihaUkladani.has(a.id + ':oblibene') ? ' ukladani' : '');
     btnOblibene.type = 'button';
     btnOblibene.title = a.oblibene ? 'Odebrat z oblíbených' : 'Přidat mezi oblíbené';
     btnOblibene.textContent = a.oblibene ? '★' : '☆';
     btnOblibene.addEventListener('click', () => prepniOznaceni(a.id, 'oblibene'));
 
     const btnNavstiveno = document.createElement('button');
-    btnNavstiveno.className = 'ikona-oznaceni fajfka' + (a.navstivenoDne ? ' aktivni' : '');
+    btnNavstiveno.className = 'ikona-oznaceni fajfka'
+      + (a.navstivenoDne ? ' aktivni' : '')
+      + (probihaUkladani.has(a.id + ':navstiveno') ? ' ukladani' : '');
     btnNavstiveno.type = 'button';
     btnNavstiveno.title = a.navstivenoDne ? 'Zrušit navštíveno' : 'Označit jako navštíveno';
     btnNavstiveno.textContent = a.navstivenoDne ? '✓' : '○';
@@ -638,24 +643,66 @@
       el.appendChild(p);
     }
 
-    if (a.url) {
+    const gcal = gcalUrl_(a);
+    if (a.url || gcal) {
       const akceDiv = document.createElement('div');
       akceDiv.className = 'karta-akce';
-      const link = document.createElement('a');
-      link.href = a.url;
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.className = 'btn-url';
-      link.textContent = 'Více info →';
-      akceDiv.appendChild(link);
+      if (a.url) {
+        const link = document.createElement('a');
+        link.href = a.url;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.className = 'btn-url';
+        link.textContent = 'Více info →';
+        akceDiv.appendChild(link);
+      }
+      if (gcal) {
+        const link = document.createElement('a');
+        link.href = gcal;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.className = 'btn-url';
+        link.textContent = '📅 Do kalendáře';
+        akceDiv.appendChild(link);
+      }
       el.appendChild(akceDiv);
     }
 
     return el;
   }
 
+  /** Sestaví odkaz na Google Kalendář (celodenní událost – strukturované časy
+   *  chybí, viz backlog cas_od/cas_do). null, když datumOd nejde rozparsovat. */
+  function gcalUrl_(a) {
+    const od = parseCeskeDatum(a.datumOd);
+    if (!od) return null;
+    const doD = parseCeskeDatum(a.datumDo) || od;
+    const konecExkluzivni = new Date(doD.getTime() + 86400000);   // GCal: end je exkluzivní
+    const fmt = (d) => String(d.getFullYear()) + pad2_(d.getMonth() + 1) + pad2_(d.getDate());
+    const detaily = [a.popis, a.url].filter(Boolean).join('\n');
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: a.nazev || '',
+      dates: fmt(od) + '/' + fmt(konecExkluzivni),
+      location: a.misto || '',
+      details: detaily,
+    });
+    return 'https://calendar.google.com/calendar/render?' + params.toString();
+  }
+
+  function pad2_(n) { return String(n).padStart(2, '0'); }
+
   // ── Render stálých míst ───────────────────────────────────
+  let vsechnaMista = [];
+  let aktMistoTyp = null;   // null = „Vše“, jinak konkrétní typ (zoo, jeskyně, …)
+
   function renderMista(mista) {
+    vsechnaMista = mista;
+    aktMistoTyp = null;
+    prekreslitMista();
+  }
+
+  function prekreslitMista() {
     const main = document.getElementById('main');
     let sekce = document.getElementById('mista-sekce');
     if (!sekce) {
@@ -664,31 +711,66 @@
       main.appendChild(sekce);
     }
     sekce.innerHTML = '';
-    if (!mista.length) return;
+    if (!vsechnaMista.length) return;
 
     const label = document.createElement('div');
     label.className = 'sekce-label';
     label.textContent = 'Stálá místa';
     sekce.appendChild(label);
 
-    mista.forEach(m => {
-      const el = document.createElement('div');
-      el.className = 'misto-karta';
-      const info = document.createElement('div');
-      const n = document.createElement('div');
-      n.className = 'misto-nazev';
-      n.textContent = m.nazev;
-      const mm = document.createElement('div');
-      mm.className = 'misto-meta';
-      mm.textContent = [m.typ, m.obec, m.doba].filter(Boolean).join(' · ');
-      info.appendChild(n);
-      info.appendChild(mm);
-      const sk = document.createElement('div');
-      sk.className = 'misto-skore';
-      sk.textContent = '★ ' + (m.skore || '—');
-      el.appendChild(info);
-      el.appendChild(sk);
-      sekce.appendChild(el);
+    // Chipy typů se vykreslí, jen když má smysl filtrovat (2+ různých typů)
+    const typy = [...new Set(vsechnaMista.map(m => m.typ).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'cs'));
+    const zobrazitChipy = typy.length > 1;
+    if (zobrazitChipy) {
+      const chipsWrap = document.createElement('div');
+      chipsWrap.className = 'chips';
+      chipsWrap.style.marginBottom = '10px';
+      const vseChip = document.createElement('button');
+      vseChip.className = 'chip' + (aktMistoTyp === null ? ' active' : '');
+      vseChip.textContent = 'Vše';
+      vseChip.addEventListener('click', () => { aktMistoTyp = null; prekreslitMista(); });
+      chipsWrap.appendChild(vseChip);
+      typy.forEach(t => {
+        const ch = document.createElement('button');
+        ch.className = 'chip' + (aktMistoTyp === t ? ' active' : '');
+        ch.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+        ch.addEventListener('click', () => { aktMistoTyp = t; prekreslitMista(); });
+        chipsWrap.appendChild(ch);
+      });
+      sekce.appendChild(chipsWrap);
+    }
+
+    const filtrovana = aktMistoTyp ? vsechnaMista.filter(m => m.typ === aktMistoTyp) : vsechnaMista;
+    const skupiny = {};
+    filtrovana.forEach(m => { (skupiny[m.typ || 'ostatní'] = skupiny[m.typ || 'ostatní'] || []).push(m); });
+
+    Object.keys(skupiny).sort((a, b) => a.localeCompare(b, 'cs')).forEach(typ => {
+      if (zobrazitChipy) {
+        const h = document.createElement('div');
+        h.className = 'den-hlavicka';
+        h.textContent = typ.charAt(0).toUpperCase() + typ.slice(1);
+        sekce.appendChild(h);
+      }
+      skupiny[typ].forEach(m => {
+        const el = document.createElement('div');
+        el.className = 'misto-karta';
+        const info = document.createElement('div');
+        const n = document.createElement('div');
+        n.className = 'misto-nazev';
+        n.textContent = m.nazev;
+        const mm = document.createElement('div');
+        mm.className = 'misto-meta';
+        // typ je vidět buď v hlavičce skupiny (chipy zapnuté), nebo tady – nikdy obojí
+        mm.textContent = [zobrazitChipy ? null : m.typ, m.obec, m.doba].filter(Boolean).join(' · ');
+        info.appendChild(n);
+        info.appendChild(mm);
+        const sk = document.createElement('div');
+        sk.className = 'misto-skore';
+        sk.textContent = '★ ' + (m.skore || '—');
+        el.appendChild(info);
+        el.appendChild(sk);
+        sekce.appendChild(el);
+      });
     });
   }
 
@@ -753,6 +835,8 @@
   }
 
   // ── ★ Oblíbené / ✓ Navštívené ──────────────────────────────
+  const probihaUkladani = new Set();   // klíč id:typ – po dobu round-tripu na server
+
   async function prepniOznaceni(id, typ) {
     const a = vsechnaAkce.find(x => x.id === id);
     if (!a) return;
@@ -760,6 +844,7 @@
     const puvodni = { oblibene: a.oblibene, navstivenoDne: a.navstivenoDne };
     if (typ === 'oblibene') a.oblibene = !a.oblibene;
     else a.navstivenoDne = a.navstivenoDne ? '' : 'právě teď';
+    probihaUkladani.add(id + ':' + typ);
     prekreslit();
     try {
       const res = await gsr('apiToggle', id, typ);
@@ -775,8 +860,10 @@
       a.oblibene = puvodni.oblibene;
       a.navstivenoDne = puvodni.navstivenoDne;
       alert('Chyba: ' + e.message);
+    } finally {
+      probihaUkladani.delete(id + ':' + typ);
+      prekreslit();
     }
-    prekreslit();
   }
 
   // ── FAB: Spustit kontrolu ─────────────────────────────────

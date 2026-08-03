@@ -446,3 +446,140 @@ test('v3.9: apiToggle_ typová validace – neplatný typ i neexistující ID vr
   assert.equal(vysledekTyp.ok, false);
   assert.match(vysledekTyp.error, /typ/);
 });
+
+// ---------------------------------------------------------------------------
+// v3.10: met.no jako záložní zdroj počasí (Open-Meteo je ze sdílených IP
+// přerušovaně nedostupné – viz diagnóza z 3. 8. 2026)
+// ---------------------------------------------------------------------------
+
+test('metNoTextFor_: mapování symbol_code na český popis, prázdné → proměnlivo', () => {
+  assert.equal(r.metNoTextFor_('clearsky_day'), 'jasno');
+  assert.equal(r.metNoTextFor_('fair_night'), 'skoro jasno');
+  assert.equal(r.metNoTextFor_('partlycloudy_day'), 'polojasno');
+  assert.equal(r.metNoTextFor_('cloudy'), 'zataženo');
+  assert.equal(r.metNoTextFor_('rainshowers_day'), 'déšť');
+  assert.equal(r.metNoTextFor_('heavyrainandthunder'), 'bouřky');
+  assert.equal(r.metNoTextFor_('sleetshowers_day'), 'přeháňky');
+  assert.equal(r.metNoTextFor_('snow'), 'sněžení');
+  assert.equal(r.metNoTextFor_('fog'), 'mlha');
+  assert.equal(r.metNoTextFor_(''), 'proměnlivo');
+  assert.equal(r.metNoTextFor_(null), 'proměnlivo');
+  assert.equal(r.metNoTextFor_('neznamy_kod'), 'proměnlivo');
+});
+
+const METNO_TIMESERIES = [
+  { time: '2026-08-08T06:00:00Z', data: { instant: { details: { air_temperature: 18.2 } },
+    next_1_hours: { summary: { symbol_code: 'fair_day' } } } },
+  { time: '2026-08-08T12:00:00Z', data: { instant: { details: { air_temperature: 27.4 } },
+    next_1_hours: { summary: { symbol_code: 'partlycloudy_day' } } } },
+  { time: '2026-08-08T18:00:00Z', data: { instant: { details: { air_temperature: 23.0 } },
+    next_6_hours: { summary: { symbol_code: 'cloudy' } } } },
+  { time: '2026-08-09T06:00:00Z', data: { instant: { details: { air_temperature: 15.0 } },
+    next_1_hours: { summary: { symbol_code: 'rain' } } } },
+];
+
+test('agregovatMetNoDen_: max teplota dne + symbol z okamžiku nejblíž poledni', () => {
+  const den = r.agregovatMetNoDen_(METNO_TIMESERIES, '2026-08-08');
+  assert.equal(den.maxTeplota, 27.4);          // ne 18.2 ani 23.0
+  assert.equal(den.symbolCode, 'partlycloudy_day');  // 12:00 je nejblíž poledni, ne 06:00/18:00
+});
+
+test('agregovatMetNoDen_: jiný den ve stejné timeseries se nesmíchá', () => {
+  const den = r.agregovatMetNoDen_(METNO_TIMESERIES, '2026-08-09');
+  assert.equal(den.maxTeplota, 15.0);
+  assert.equal(den.symbolCode, 'rain');
+});
+
+test('agregovatMetNoDen_: den mimo rozsah timeseries → null', () => {
+  assert.equal(r.agregovatMetNoDen_(METNO_TIMESERIES, '2026-08-20'), null);
+});
+
+const METNO_FIXTURE = { code: 200, body: { properties: { timeseries: METNO_TIMESERIES } } };
+
+test('v3.10: Open-Meteo selže úplně → weatherFor_ použije met.no jako fallback', () => {
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([GEO_BRNO, 'throw', 'throw', METNO_FIXTURE]) });
+  const w = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), {});
+  assert.equal(w, 'polojasno, max 27 °C');   // met.no formát nemá „srážky %“
+});
+
+test('v3.10: Open-Meteo odpoví, ale bez dat pro konkrétní den → fallback na met.no', () => {
+  const FORECAST_JINY_DEN = {
+    code: 200,
+    body: { daily: { time: ['2099-01-01'], weather_code: [1], temperature_2m_max: [10], precipitation_probability_max: [5] } },
+  };
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([GEO_BRNO, FORECAST_JINY_DEN, METNO_FIXTURE]) });
+  const w = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), {});
+  assert.equal(w, 'polojasno, max 27 °C');
+});
+
+test('v3.10: Open-Meteo funguje → met.no se vůbec nevolá (fronta by jinak spadla na prázdno)', () => {
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([GEO_BRNO, FORECAST]) });  // jen 2 položky, žádný met.no
+  const w = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 3), {});
+  assert.equal(w, 'polojasno, max 27 °C, srážky 10 %');  // formát Open-Meteo, se srážkami
+});
+
+test('v3.10: oba zdroje selžou → prázdný řetězec, žádný pád', () => {
+  const ctx = nactiRadar({ urlFetch: frontaFetchu(['throw', 'throw', 'throw', 'throw', 'throw']) });
+  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), {}), '');
+});
+
+test('v3.10: met.no fallback se cachuje – druhé volání pro stejnou obec nic dalšího nestahuje', () => {
+  const volane = [];
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([GEO_BRNO, 'throw', 'throw', METNO_FIXTURE], volane) });
+  const cache = {};
+  const prvni = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), cache);
+  const druhy = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 9), cache);   // jiný den, stejná obec
+  assert.equal(prvni, 'polojasno, max 27 °C');
+  assert.equal(druhy, 'déšť, max 15 °C');
+  assert.equal(volane.length, 4, 'geocode + 2× Open-Meteo retry + 1× met.no – a víc nic, i pro druhé volání');
+});
+
+// ---------------------------------------------------------------------------
+// v3.10: zahrnoutAkciDoVysledku_ – filtr apiEvents vytažen z readEventsApi_
+// (dřív testováno jen nepřímo přes RF proti produkci; teď přímo, všechny
+// kombinace stav × datum × zahrnoutOznacene × jeOznaceno)
+// ---------------------------------------------------------------------------
+
+test('proběhlá + neoznačená → skrytá, ať už zahrnoutOznacene je cokoli', () => {
+  const dnes = new r.__Date(2026, 7, 3);
+  assert.equal(r.zahrnoutAkciDoVysledku_('proběhlo', null, dnes, false, false), false);
+  assert.equal(r.zahrnoutAkciDoVysledku_('proběhlo', null, dnes, true, false), false,
+    'BUG-past-guard: zahrnoutOznacene samo o sobě nestačí – akce musí být SKUTEČNĚ označená');
+});
+
+test('proběhlá + označená: zobrazí se JEN když volající výslovně požádal (zahrnoutOznacene)', () => {
+  const dnes = new r.__Date(2026, 7, 3);
+  assert.equal(r.zahrnoutAkciDoVysledku_('proběhlo', null, dnes, true, true), true);
+  assert.equal(r.zahrnoutAkciDoVysledku_('proběhlo', null, dnes, false, true), false,
+    'bez zahrnoutOznacene zůstává proběhlá akce skrytá i když je označená (běžný web ji nechce)');
+});
+
+test('stará (datumOd < dnes), aktivní stav, neoznačená → skrytá', () => {
+  const dnes = new r.__Date(2026, 7, 3);
+  const stare = new r.__Date(2026, 6, 1);
+  assert.equal(r.zahrnoutAkciDoVysledku_('', stare, dnes, false, false), false);
+});
+
+test('stará + označená + zahrnoutOznacene → zobrazí se jako inspirace', () => {
+  const dnes = new r.__Date(2026, 7, 3);
+  const stare = new r.__Date(2026, 6, 1);
+  assert.equal(r.zahrnoutAkciDoVysledku_('', stare, dnes, true, true), true);
+});
+
+test('stará + stav „zrušeno" → zobrazí se VŽDY, i bez označení (info pro uživatele)', () => {
+  const dnes = new r.__Date(2026, 7, 3);
+  const stare = new r.__Date(2026, 6, 1);
+  assert.equal(r.zahrnoutAkciDoVysledku_('zrušeno', stare, dnes, false, false), true);
+});
+
+test('budoucí nebo dnešní datum + aktivní stav → vždy zobrazí, bez ohledu na označení', () => {
+  const dnes = new r.__Date(2026, 7, 3);
+  const budouci = new r.__Date(2026, 7, 10);
+  assert.equal(r.zahrnoutAkciDoVysledku_('', budouci, dnes, false, false), true);
+  assert.equal(r.zahrnoutAkciDoVysledku_('', dnes, dnes, false, false), true, 'dnešek se počítá jako "ne starý"');
+});
+
+test('nerozparsovatelné datum (null) + aktivní stav → zobrazí se (chová se jako "ne staré")', () => {
+  const dnes = new r.__Date(2026, 7, 3);
+  assert.equal(r.zahrnoutAkciDoVysledku_('', null, dnes, false, false), true);
+});
