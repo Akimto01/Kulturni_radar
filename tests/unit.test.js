@@ -583,3 +583,115 @@ test('nerozparsovatelné datum (null) + aktivní stav → zobrazí se (chová se
   const dnes = new r.__Date(2026, 7, 3);
   assert.equal(r.zahrnoutAkciDoVysledku_('', null, dnes, false, false), true);
 });
+
+// ---------------------------------------------------------------------------
+// jeVycpavka_ / normNazev_ / nazevTokens_ / isSameName_ / najdiDuplicity_
+// (jádro dedupikace a hygieny dat – existující čisté funkce, dosud bez testů)
+// ---------------------------------------------------------------------------
+
+test('jeVycpavka_: rozpozná obecné „vycpávkové" názvy bez vlastního jména', () => {
+  assert.equal(r.jeVycpavka_('Kulturní akce'), true);
+  assert.equal(r.jeVycpavka_('Víkendová akce'), true);
+  assert.equal(r.jeVycpavka_('Letní akce'), true);
+  assert.equal(r.jeVycpavka_('Vícedenní akce'), true);
+});
+
+test('jeVycpavka_: konkrétní název akce (má vlastní jméno) není vycpávka', () => {
+  assert.equal(r.jeVycpavka_('Balkan Night: Fanfare Ciocărlia'), false);
+  assert.equal(r.jeVycpavka_('35. Mezinárodní kytarový festival Brno'), false);
+});
+
+test('jeVycpavka_: prázdný/null název → false, nepadá', () => {
+  assert.equal(r.jeVycpavka_(''), false);
+  assert.equal(r.jeVycpavka_(null), false);
+  assert.equal(r.jeVycpavka_(undefined), false);
+});
+
+test('normNazev_: odstraní diakritiku, čísla i interpunkci, sjednotí mezery', () => {
+  assert.equal(r.normNazev_('35. Mezinárodní kytarový festival!'), 'mezinarodni kytarovy festival');
+  assert.equal(r.normNazev_('Šlechta na cestách'), 'slechta na cestach');
+  assert.equal(r.normNazev_('  Hodně   mezer  '), 'hodne mezer');
+});
+
+test('nazevTokens_: jen slova od 3 znaků, jako množina (klíče objektu)', () => {
+  const t = r.nazevTokens_('Já a Ty na Hradě');
+  assert.deepEqual(Object.keys(t), ['hrade']);   // „já/a/ty/na“ mají všechna < 3 znaky
+});
+
+test('isSameName_: podmnožina tokenů = stejná akce (zkrácený název)', () => {
+  const a = r.nazevTokens_('Balkan Night Maraton hudby');
+  const b = r.nazevTokens_('Balkan Night');
+  assert.equal(r.isSameName_(a, b), true);
+});
+
+test('isSameName_: 3+ společných slov = stejná akce, i když žádná není podmnožinou druhé', () => {
+  const a = r.nazevTokens_('Letní shakespearovské slavnosti Špilberk Brno');
+  const b = r.nazevTokens_('Shakespearovské slavnosti Špilberk zahradní verze');
+  assert.equal(r.isSameName_(a, b), true);
+});
+
+test('isSameName_: jen 1 společné slovo (a není podmnožina) = různé akce', () => {
+  const a = r.nazevTokens_('Festival Uprostřed léto');
+  const b = r.nazevTokens_('Festival planet Brno');
+  assert.equal(r.isSameName_(a, b), false);
+});
+
+test('isSameName_: prázdné tokeny (žádné slovo 3+ znaky) nikdy neshodují', () => {
+  assert.equal(r.isSameName_({}, r.nazevTokens_('Cokoli')), false);
+});
+
+/** Minimální řádek AKCE pro najdiDuplicity_: jen sloupce, které funkce čte. */
+function akceRadek({ nazev = '', profil = 'Brno', datumOd = '3. 8. 2026' } = {}) {
+  const row = new Array(25).fill('');
+  row[1] = datumOd; row[4] = nazev; row[24] = profil;
+  return row;
+}
+
+test('najdiDuplicity_: druhý výskyt téhož názvu (stejný profil+den) je duplicita', () => {
+  const data = [
+    akceRadek({ nazev: 'Balkan Night' }),
+    akceRadek({ nazev: 'Balkan Night' }),
+  ];
+  const dup = r.najdiDuplicity_(data);
+  assert.equal(dup.length, 1);
+  assert.equal(dup[0].keptRow, 2);   // první výskyt = řádek 2 (index 0 + 2)
+  assert.equal(dup[0].rowNum, 3);    // druhý výskyt = řádek 3
+});
+
+test('najdiDuplicity_: stejný název, ale jiný profil → NENÍ duplicita', () => {
+  const data = [
+    akceRadek({ nazev: 'Balkan Night', profil: 'Brno' }),
+    akceRadek({ nazev: 'Balkan Night', profil: 'Ostrava' }),
+  ];
+  assert.equal(r.najdiDuplicity_(data).length, 0);
+});
+
+test('najdiDuplicity_: stejný název, ale jiný den → NENÍ duplicita', () => {
+  const data = [
+    akceRadek({ nazev: 'Balkan Night', datumOd: '3. 8. 2026' }),
+    akceRadek({ nazev: 'Balkan Night', datumOd: '10. 8. 2026' }),
+  ];
+  assert.equal(r.najdiDuplicity_(data).length, 0);
+});
+
+test('najdiDuplicity_: mírně odlišné znění stejné akce se chytí (fuzzy shoda přes tokeny)', () => {
+  const data = [
+    akceRadek({ nazev: 'Balkan Night: Fanfare Ciocărlia + Džambo Aguševi Orchestra' }),
+    akceRadek({ nazev: 'Balkan Night na Špilberku – Fanfare Ciocărlia' }),
+  ];
+  assert.equal(r.najdiDuplicity_(data).length, 1);
+});
+
+test('najdiDuplicity_: řádek bez názvu se ignoruje (nepadá, není falešná duplicita)', () => {
+  const data = [akceRadek({ nazev: '' }), akceRadek({ nazev: '' })];
+  assert.equal(r.najdiDuplicity_(data).length, 0);
+});
+
+test('najdiDuplicity_: tři různé akce ve stejný den = žádná duplicita', () => {
+  const data = [
+    akceRadek({ nazev: 'Festival planet Brno' }),
+    akceRadek({ nazev: 'Léto na Zelňáku' }),
+    akceRadek({ nazev: 'Výstava Fotografie' }),
+  ];
+  assert.equal(r.najdiDuplicity_(data).length, 0);
+});
