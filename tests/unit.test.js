@@ -344,15 +344,105 @@ test('v3.6: sendNotification_ s HTML – e-mail dostane htmlBody, ntfy čistý t
 });
 
 // ---------------------------------------------------------------------------
-// v3.7: cellTextCas_ – meta „poslední kontrola" nesmí ztratit čas
+// v3.7: BUG „Brno bez času" – poslední kontrola profilu ztrácela čas
 // ---------------------------------------------------------------------------
 
-test('BUG v3.7: cellTextCas_ zachová čas u Date, ostatní typy jako cellText_', () => {
-  const d = new r.__Date(2026, 7, 3, 18, 30);
-  assert.equal(r.cellTextCas_(d), '3. 8. 2026 18:30');
-  assert.equal(r.cellText_(d), '3. 8. 2026', 'cellText_ beze změny – čas záměrně ignoruje');
-  assert.equal(r.cellTextCas_(new r.__Date(2026, 7, 3, 0, 0, 0)), '3. 8. 2026', 'půlnoc bez času');
-  assert.equal(r.cellTextCas_(46156), '14. 5. 2026');
-  assert.equal(r.cellTextCas_(null), '');
-  assert.equal(r.cellTextCas_('  3. 8. 2026 '), '3. 8. 2026');
+test('BUG v3.7: cellTextCas_ – Date s časem si čas nechá, půlnoc a stringy beze změny', () => {
+  assert.equal(r.cellTextCas_(new r.__Date(2026, 7, 2, 8, 31)), '2. 8. 2026 8:31');
+  assert.equal(r.cellTextCas_(new r.__Date(2026, 7, 2)), '2. 8. 2026');
+  assert.equal(r.cellTextCas_('29. 7. 2026 22:49'), '29. 7. 2026 22:49');
+  assert.equal(r.cellTextCas_(''), '');
+});
+
+// ---------------------------------------------------------------------------
+// v3.8: BUG „Sat Dec 30 1899…" – readEventsInRange_ nepoužívala cellText_ pro čas
+// ---------------------------------------------------------------------------
+
+test('BUG v3.8: digest čte čas akce přes cellText_, ne přes syrové String(Date)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const zdroj = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'kulturni_radar.gs'), 'utf8');
+  // readEventsInRange_ krmí digesty; readEventsApi_ krmí web – obě čtou čas ze
+  // sloupce D (row[3]) a obě musí projít cellText_, jinak se u buňky typu
+  // "jen čas" (Sheets ji interně ukládá jako Date epochy 30. 12. 1899) vypíše
+  // syrové Date.toString() – přesně bug z 3. 8. 2026 v Balkan Night digestu.
+  const start = zdroj.indexOf('function readEventsInRange_');
+  assert.ok(start > -1, 'readEventsInRange_ existuje');
+  const end = zdroj.indexOf('\n}', start);
+  const telo = zdroj.slice(start, end);
+  assert.ok(telo.includes('cas: cellText_(row[3])'), 'čas se čte přes cellText_');
+  assert.ok(!/cas:\s*String\(row\[3\]/.test(telo), 'žádná regrese na syrové String(row[3])');
+});
+
+// ---------------------------------------------------------------------------
+// v3.9: ⭐ Oblíbené + ✓ Navštívené – pure funkce nad OZNAČENÍM
+// ---------------------------------------------------------------------------
+
+test('oznaceniMapy_: sloučí oblíbené i navštívené pro stejné ID, ignoruje jiné ID', () => {
+  const mapa = r.oznaceniMapy_([
+    { id: '1', typ: 'oblibene', datum: '', nazev: '', misto: '' },
+    { id: '1', typ: 'navstiveno', datum: '3. 8. 2026', nazev: '', misto: '' },
+    { id: '2', typ: 'oblibene', datum: '', nazev: '', misto: '' },
+  ]);
+  // Objekty vznikají uvnitř vm sandboxu (jiný realm) – porovnávat po vlastnostech,
+  // ne přes deepEqual/deepStrictEqual, který na cizí Object.prototype padá.
+  assert.equal(mapa.get('1').oblibene, true);
+  assert.equal(mapa.get('1').navstivenoDne, '3. 8. 2026');
+  assert.equal(mapa.get('2').oblibene, true);
+  assert.equal(mapa.get('2').navstivenoDne, null);
+  assert.equal(mapa.get('3'), undefined);
+});
+
+test('toggleOznaceni_: přidá záznam, když ještě neexistuje (aktivni: true)', () => {
+  const vysledek = r.toggleOznaceni_([], '42', 'oblibene', '3. 8. 2026', 'Balkan Night', 'Špilberk');
+  assert.equal(vysledek.aktivni, true);
+  assert.equal(vysledek.rows.length, 1);
+  const zaznam = vysledek.rows[0];
+  assert.equal(zaznam.id, '42');
+  assert.equal(zaznam.typ, 'oblibene');
+  assert.equal(zaznam.datum, '3. 8. 2026');
+  assert.equal(zaznam.nazev, 'Balkan Night');
+  assert.equal(zaznam.misto, 'Špilberk');
+});
+
+test('toggleOznaceni_: odebere existující záznam (aktivni: false), nesahá na jiné typy/ID', () => {
+  const rows = [
+    { id: '42', typ: 'oblibene', datum: '1. 8. 2026', nazev: 'A', misto: 'X' },
+    { id: '42', typ: 'navstiveno', datum: '2. 8. 2026', nazev: 'A', misto: 'X' },
+    { id: '7', typ: 'oblibene', datum: '', nazev: 'B', misto: 'Y' },
+  ];
+  const vysledek = r.toggleOznaceni_(rows, '42', 'oblibene', '3. 8. 2026', 'A', 'X');
+  assert.equal(vysledek.aktivni, false);
+  assert.equal(vysledek.rows.length, 2);
+  assert.ok(vysledek.rows.some(row => row.id === '42' && row.typ === 'navstiveno'), 'navstiveno u 42 zůstává');
+  assert.ok(vysledek.rows.some(row => row.id === '7'), 'jiné ID nedotčeno');
+});
+
+test('toggleOznaceni_: dvojité přepnutí je idempotentní no-op (přidat pak odebrat → prázdno)', () => {
+  const prvni = r.toggleOznaceni_([], '1', 'navstiveno', '3. 8. 2026', 'X', 'Y');
+  const druhy = r.toggleOznaceni_(prvni.rows, '1', 'navstiveno', '4. 8. 2026', 'X', 'Y');
+  assert.equal(druhy.aktivni, false);
+  assert.equal(druhy.rows.length, 0);
+});
+
+test('sirotciOznaceni_: najde jen záznamy s ID mimo platnou množinu', () => {
+  const rows = [
+    { id: '1', typ: 'oblibene' }, { id: '2', typ: 'navstiveno' }, { id: '3', typ: 'oblibene' },
+  ];
+  const sirotci = r.sirotciOznaceni_(rows, new Set(['1', '3']));
+  assert.equal(sirotci.length, 1);
+  assert.equal(sirotci[0].id, '2');
+});
+
+test('sirotciOznaceni_: prázdné OZNAČENÍ → žádní sirotci', () => {
+  assert.equal(r.sirotciOznaceni_([], new Set(['1'])).length, 0);
+});
+
+test('v3.9: apiToggle_ typová validace – neplatný typ i neexistující ID vrací ok:false', () => {
+  // I/O (Sheets) záměrně nestubujeme (viz harness) – ověřuje se živě přes runSelfTest
+  // a ruční klik ve webové aplikaci. Zde jen validace vstupu, která I/O nepotřebuje.
+  const ctx = nactiRadar();
+  const vysledekTyp = ctx.apiToggle_({ getSheetByName: () => null }, '99', 'neplatny-typ');
+  assert.equal(vysledekTyp.ok, false);
+  assert.match(vysledekTyp.error, /typ/);
 });

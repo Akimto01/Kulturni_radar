@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.7 (3. 8. 2026) – meta: poslední kontrola profilu i s časem (cellTextCas_)
+ * Verze: 3.9 (3. 8. 2026) – Oblíbené + Navštívené (list OZNAČENÍ, apiToggle)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -39,6 +39,7 @@ const SHEET = {
   KONTROLY: 'KONTROLY',
   MISTA: 'MÍSTA',
   PREHLED: 'PŘEHLED',
+  OZNACENI: 'OZNAČENÍ',
 };
 
 const KRIT = {           // adresy v listu KRITÉRIA
@@ -58,7 +59,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.7';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.9';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -145,7 +146,7 @@ function doGet(e) {
   let data;
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (api === 'events') data = readEventsApi_(ss, profil);
+    if (api === 'events') data = readEventsApi_(ss, profil, (e.parameter && e.parameter.oznacene) === '1');
     else if (api === 'places') data = readPlacesApi_(ss, profil);
     else if (api === 'meta') data = readMetaApi_(ss);
     else if (api === 'run') data = spustKontroluCore_((e.parameter && e.parameter.token) || '');
@@ -195,8 +196,8 @@ function cellText_(v) {
   return String(v == null ? '' : v).trim();
 }
 
-/** API: akce profilu v databázi (neprobíhající, přijde). */
-function readEventsApi_(ss, profilParam) {
+/** API: akce profilu v databázi (neprobíhající, přijde – nebo označené, viz zahrnoutOznacene). */
+function readEventsApi_(ss, profilParam, zahrnoutOznacene) {
   const krit = ss.getSheetByName(SHEET.KRITERIA);
   const aktivniProfil = krit ? String(krit.getRange(KRIT.PROFIL).getValue()).trim() : '';
   const profil = profilParam || aktivniProfil;
@@ -207,16 +208,21 @@ function readEventsApi_(ss, profilParam) {
 
   const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
   const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const oznaceniMapa = oznaceniMapy_(readOznaceni_(ss));
   const akce = [];
 
   data.forEach(row => {
     if (norm_(row[24]) !== norm_(profil)) return;
+    const id = String(row[0] || '');
+    const oznaceni = oznaceniMapa.get(id) || { oblibene: false, navstivenoDne: null };
+    const jeOznaceno = oznaceni.oblibene || !!oznaceni.navstivenoDne;
+    const smiVyjimku = !!zahrnoutOznacene && jeOznaceno;   // označené akce projdou i mimo běžné okno
     const stav = norm_(row[13]);
-    if (stav === 'proběhlo') return;
+    if (stav === 'proběhlo' && !smiVyjimku) return;
     const datumOd = parseCzDate_(row[1]);
-    if (datumOd && datumOd < dnes && stav !== 'zrušeno') return;
+    if (datumOd && datumOd < dnes && stav !== 'zrušeno' && !smiVyjimku) return;
     akce.push({
-      id: String(row[0] || ''),
+      id,
       nazev: String(row[4] || ''),
       datumOd: cellText_(row[1]),
       datumDo: cellText_(row[2]),
@@ -230,6 +236,8 @@ function readEventsApi_(ss, profilParam) {
       stav: String(row[13] || ''),
       dojezd: String(row[7] || ''),
       url: String(row[19] || ''),
+      oblibene: oznaceni.oblibene,
+      navstivenoDne: oznaceni.navstivenoDne || '',
     });
   });
 
@@ -283,9 +291,13 @@ function readMetaApi_(ss) {
 // ---------------------------------------------------------------------------
 
 function apiMeta()              { return readMetaApi_(SpreadsheetApp.getActiveSpreadsheet()); }
-function apiEvents(profil)      { return readEventsApi_(SpreadsheetApp.getActiveSpreadsheet(), profil || ''); }
+function apiEvents(profil, zahrnoutOznacene) {
+  return readEventsApi_(SpreadsheetApp.getActiveSpreadsheet(), profil || '', !!zahrnoutOznacene);
+}
 function apiPlaces(profil)      { return readPlacesApi_(SpreadsheetApp.getActiveSpreadsheet(), profil || ''); }
 function apiSpustKontrolu(tok)  { return spustKontroluCore_(tok); }
+/** Přepne označení (oblíbené/navštíveno) u dané akce; vrací aktuální stav OBOU příznaků. */
+function apiToggle(id, typ)     { return apiToggle_(SpreadsheetApp.getActiveSpreadsheet(), id, typ); }
 
 /** Sdílené jádro spouštění z webu: token → cooldown → asynchronní trigger. */
 function spustKontroluCore_(tok) {
@@ -892,7 +904,100 @@ function ensureMistaSheet_(ss) {
   return sh;
 }
 
-/** Aktualizace stálých míst pro aktivní profil (menu / měsíční trigger). */
+const OZNACENI_HLAVICKA = ['ID akce', 'Typ', 'Datum označení', 'Název', 'Místo'];
+
+function ensureOznaceniSheet_(ss) {
+  let sh = ss.getSheetByName(SHEET.OZNACENI);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET.OZNACENI);
+    sh.getRange(1, 1, 1, OZNACENI_HLAVICKA.length).setValues([OZNACENI_HLAVICKA])
+      .setFontWeight('bold').setBackground('#7a5c2e').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/** Čte list OZNAČENÍ do prostých objektů. I/O – bez logiky, snadno nahraditelné ve testech. */
+function readOznaceni_(ss) {
+  const sh = ss.getSheetByName(SHEET.OZNACENI);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, OZNACENI_HLAVICKA.length).getValues()
+    .map(r => ({
+      id: String(r[0] || ''), typ: String(r[1] || ''), datum: String(r[2] || ''),
+      nazev: String(r[3] || ''), misto: String(r[4] || ''),
+    }))
+    .filter(r => r.id && r.typ);
+}
+
+/** Přepíše list OZNAČENÍ zadanými řádky (jednoduchý full-rewrite – dataset je malý). */
+function zapsatOznaceni_(ss, rows) {
+  const sh = ensureOznaceniSheet_(ss);
+  const posledni = sh.getLastRow();
+  if (posledni > 1) sh.getRange(2, 1, posledni - 1, OZNACENI_HLAVICKA.length).clearContent();
+  if (rows.length) {
+    sh.getRange(2, 1, rows.length, OZNACENI_HLAVICKA.length).setValues(
+      rows.map(r => [r.id, r.typ, r.datum, r.nazev, r.misto]));
+  }
+}
+
+/** PURE: pole řádků OZNAČENÍ → Map(id → {oblibene, navstivenoDne}). Bez Sheets I/O, testovatelné přímo. */
+function oznaceniMapy_(rows) {
+  const mapa = new Map();
+  rows.forEach(r => {
+    const zaznam = mapa.get(r.id) || { oblibene: false, navstivenoDne: null };
+    if (r.typ === 'oblibene') zaznam.oblibene = true;
+    else if (r.typ === 'navstiveno') zaznam.navstivenoDne = r.datum || zaznam.navstivenoDne;
+    mapa.set(r.id, zaznam);
+  });
+  return mapa;
+}
+
+/** PURE: přepne typ u dané akce v poli řádků OZNAČENÍ (přidá, nebo smaže existující řádek).
+ *  Vrací { rows: novéPole, aktivni: bool } – aktivni = stav PO přepnutí. */
+function toggleOznaceni_(rows, id, typ, kdyText, nazev, misto) {
+  const idx = rows.findIndex(r => r.id === id && r.typ === typ);
+  if (idx >= 0) {
+    return { rows: rows.slice(0, idx).concat(rows.slice(idx + 1)), aktivni: false };
+  }
+  const novy = { id, typ, datum: kdyText, nazev: nazev || '', misto: misto || '' };
+  return { rows: rows.concat([novy]), aktivni: true };
+}
+
+/** PURE: řádky OZNAČENÍ, jejichž ID už neexistuje mezi platnými ID akcí. */
+function sirotciOznaceni_(rows, platnaId) {
+  return rows.filter(r => !platnaId.has(r.id));
+}
+
+/** Najde v listu AKCE řádek se zadaným ID; vrací {nazev, misto} nebo null. */
+function najdiAkciPodleId_(ss, id) {
+  const sh = ss.getSheetByName(SHEET.AKCE);
+  const lastRow = sh ? sh.getLastRow() : 1;
+  if (lastRow < 2) return null;
+  const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0] || '') === id) {
+      return { nazev: String(data[i][4] || ''), misto: String(data[i][5] || '') };
+    }
+  }
+  return null;
+}
+
+/** Přepne označení (typ: 'oblibene' | 'navstiveno') u akce; vrací aktuální stav obou příznaků. */
+function apiToggle_(ss, id, typ) {
+  if (typ !== 'oblibene' && typ !== 'navstiveno') return { ok: false, error: 'neplatný typ označení' };
+  if (!id) return { ok: false, error: 'chybí ID akce' };
+  const akceInfo = najdiAkciPodleId_(ss, id);
+  if (!akceInfo) return { ok: false, error: 'akce s tímto ID nebyla nalezena' };
+
+  const rows = readOznaceni_(ss);
+  const vysledek = toggleOznaceni_(rows, id, typ, formatDateOnly_(new Date()), akceInfo.nazev, akceInfo.misto);
+  zapsatOznaceni_(ss, vysledek.rows);
+
+  const stavPoTom = oznaceniMapy_(vysledek.rows).get(id) || { oblibene: false, navstivenoDne: null };
+  return { ok: true, id, oblibene: stavPoTom.oblibene, navstivenoDne: stavPoTom.navstivenoDne || '' };
+}
+
+
 function updateMista() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) return;
@@ -1140,6 +1245,22 @@ function runSelfTest() {
   else ok();
   if (audit.bezUrl) problemy.push('budoucí akce bez URL: ' + audit.bezUrl);
 
+  try {
+    const oznaceni = readOznaceni_(ss);
+    if (oznaceni.length) {
+      const akceSheet = ss.getSheetByName(SHEET.AKCE);
+      const platnaId = new Set(
+        akceSheet && akceSheet.getLastRow() > 1
+          ? akceSheet.getRange(2, 1, akceSheet.getLastRow() - 1, 1).getValues().map(r => String(r[0] || ''))
+          : []);
+      const sirotci = sirotciOznaceni_(oznaceni, platnaId);
+      if (sirotci.length) {
+        problemy.push('OZNAČENÍ obsahuje ' + sirotci.length + ' záznamů k neexistujícím akcím: '
+          + vypis(sirotci.map(s => s.id)));
+      } else ok();
+    }
+  } catch (e) { problemy.push('kontrola OZNAČENÍ selhala: ' + e); }
+
   const title = problemy.length
     ? 'Samotest: ' + problemy.length + ' ' + sklonuj_(problemy.length, 'problém', 'problémy', 'problémů')
     : (varovani.length ? 'Samotest: OK (' + varovani.length + ' varování)' : 'Samotest: OK');
@@ -1350,7 +1471,7 @@ function readEventsInRange_(ss, profil, from, to) {
       nazev: String(row[4] || '').trim(),
       den: od < from ? from : od,                 // pro vícedenní akce první den v okně
       probihaOd: od < from ? od : null,
-      cas: String(row[3] || '').trim(),
+      cas: cellText_(row[3]),
       obec: String(row[6] || '').trim(),
       kat: String(row[8] || '').split(';')[0].trim(),
     });

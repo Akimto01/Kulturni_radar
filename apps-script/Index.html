@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.3 – sekce „Probíhá / dlouhodobé“ pro akce s minulým začátkem -->
+<!-- Kulturní radar Index.html v3.4 – ⭐ Oblíbené + ✓ Navštívené (apiToggle) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -73,6 +73,15 @@
     cursor: pointer;
   }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  #controls-oznaceni {
+    padding: 8px 20px 10px;
+    background: var(--card);
+    border-bottom: 1px solid #e0ddd6;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
   .chip {
     font-size: .78rem;
     padding: 4px 11px;
@@ -88,6 +97,21 @@
     background: var(--accent-2);
     border-color: #c8a870;
     color: var(--ink);
+  }
+  .chip-special.active {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+  }
+  #obdobi-select {
+    font-family: var(--sans);
+    font-size: .78rem;
+    border: 1.5px solid var(--accent-2);
+    border-radius: 20px;
+    padding: 3px 10px;
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
   }
 
   /* ── Akce: skupiny po dnech ──────────────────────────────── */
@@ -128,6 +152,7 @@
 
   .karta-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
   .nazev { font-size: .95rem; font-weight: 600; line-height: 1.35; }
+  .karta-top-vpravo { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .skore {
     font-family: var(--mono);
     font-size: .7rem;
@@ -138,6 +163,20 @@
     white-space: nowrap;
     flex-shrink: 0;
   }
+  .ikona-oznaceni {
+    font-size: 1.05rem;
+    line-height: 1;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 3px;
+    color: var(--ink-3);
+    font-family: var(--sans);
+  }
+  .ikona-oznaceni:hover { color: var(--ink-2); }
+  .ikona-oznaceni.aktivni.hvezda { color: #d4a017; }
+  .ikona-oznaceni.aktivni.fajfka { color: #27ae60; }
+  .navstiveno-info { color: #27ae60 !important; }
   .meta {
     margin-top: 5px;
     font-size: .78rem;
@@ -294,6 +333,20 @@
   <div class="chips" id="kat-chips"></div>
 </div>
 
+<div id="controls-oznaceni">
+  <div class="chips">
+    <button id="chip-oblibene" class="chip chip-special">★ Oblíbené</button>
+    <button id="chip-navstivene" class="chip chip-special">✓ Navštívené</button>
+  </div>
+  <select id="obdobi-select" style="display:none">
+    <option value="30">poslední měsíc</option>
+    <option value="90">poslední 3 měsíce</option>
+    <option value="180">posledních 6 měsíců</option>
+    <option value="365">poslední rok</option>
+    <option value="vse" selected>vše</option>
+  </select>
+</div>
+
 <main id="main">
   <div id="status">Načítám akce…</div>
 </main>
@@ -319,6 +372,8 @@
   let aktKategorie = new Set();
   let aktivniProfil = '';
   let token = localStorage.getItem('radar_token') || '';
+  let rezimZobrazeni = 'vse';       // 'vse' | 'oblibene' | 'navstivene'
+  let obdobiNavstivene = 'vse';     // '30' | '90' | '180' | '365' | 'vse'
 
   // ── Načtení dat přes google.script.run ───────────────────
   // Apps Script web app neumožňuje fetch() na sebe sama (loop přes login).
@@ -335,7 +390,7 @@
   async function api(endpoint, param = '') {
     const profil = param.replace('profil=', '');
     if (endpoint === 'meta')   return gsr('apiMeta');
-    if (endpoint === 'events') return gsr('apiEvents', profil);
+    if (endpoint === 'events') return gsr('apiEvents', profil, true);   // vždy i s označenými, filtrujeme v UI
     if (endpoint === 'places') return gsr('apiPlaces', profil);
     throw new Error('Neznámý endpoint: ' + endpoint);
   }
@@ -354,17 +409,35 @@
         if (p.profil === aktivniProfil) opt.selected = true;
         sel.appendChild(opt);
       });
-      sel.addEventListener('change', () => nactiAkce(sel.value));
+      sel.addEventListener('change', () => { rezimZobrazeni = 'vse'; nactiAkce(sel.value); });
 
       // Kategorie chipy
       const chips = document.getElementById('kat-chips');
       const vseChip = vytvorChip('Vše', true);
-      vseChip.addEventListener('click', () => { aktKategorie.clear(); renderAkce(); syncChipy(); });
+      vseChip.addEventListener('click', () => {
+        aktKategorie.clear();
+        rezimZobrazeni = 'vse';
+        prekreslit();
+      });
       chips.appendChild(vseChip);
       (meta.kategorie || []).forEach(k => {
         const ch = vytvorChip(k, false);
         ch.addEventListener('click', () => toggleKat(k));
         chips.appendChild(ch);
+      });
+
+      // ★ Oblíbené / ✓ Navštívené – speciální chipy
+      document.getElementById('chip-oblibene').addEventListener('click', () => {
+        rezimZobrazeni = rezimZobrazeni === 'oblibene' ? 'vse' : 'oblibene';
+        prekreslit();
+      });
+      document.getElementById('chip-navstivene').addEventListener('click', () => {
+        rezimZobrazeni = rezimZobrazeni === 'navstivene' ? 'vse' : 'navstivene';
+        prekreslit();
+      });
+      document.getElementById('obdobi-select').addEventListener('change', (e) => {
+        obdobiNavstivene = e.target.value;
+        prekreslit();
       });
 
       // Meta info
@@ -383,7 +456,7 @@
     try {
       const data = await api('events', profil ? 'profil=' + encodeURIComponent(profil) : '');
       vsechnaAkce = data.akce || [];
-      renderAkce();
+      prekreslit();
       if (data.generovano) {
         document.getElementById('meta-info').textContent = 'načteno: ' + data.generovano;
       }
@@ -402,12 +475,16 @@
   // ── Render akcí ───────────────────────────────────────────
   function renderAkce() {
     const main = document.getElementById('main');
-    // Zachovat sekci míst
+    // Zachovat sekci míst (a případně ji odkrýt, pokud byla skrytá speciálním pohledem)
     const mistaEl = document.getElementById('mista-sekce');
+    if (mistaEl) mistaEl.style.display = '';
 
+    // Proběhlé akce se v běžném pohledu neukazují – ty patří jen do „✓ Navštívené“
+    // (server je vrací navíc jen proto, aby tam mohly být zobrazeny jako inspirace).
+    const bezProbehlych = vsechnaAkce.filter(a => a.stav !== 'proběhlo');
     const filtrovane = aktKategorie.size === 0
-      ? vsechnaAkce
-      : vsechnaAkce.filter(a => a.kategorie.some(k => aktKategorie.has(k)));
+      ? bezProbehlych
+      : bezProbehlych.filter(a => a.kategorie.some(k => aktKategorie.has(k)));
 
     // Odstranit staré akce (ne místa)
     [...main.children].forEach(ch => {
@@ -462,31 +539,84 @@
     return new Date(+m[3], +m[2] - 1, +m[1]);
   }
 
-  function vytvorKartu(a, probiha) {
+  /** Plochý seznam bez denních hlaviček – pro ★ Oblíbené a ✓ Navštívené. */
+  function renderSpecialni(seznam, prazdnyText) {
+    const main = document.getElementById('main');
+    const mistaEl = document.getElementById('mista-sekce');
+    if (mistaEl) mistaEl.style.display = 'none';   // stálá místa sem nepatří
+
+    [...main.children].forEach(ch => { if (ch.id !== 'mista-sekce') ch.remove(); });
+
+    if (seznam.length === 0) {
+      const el = document.createElement('div');
+      el.id = 'status';
+      el.textContent = prazdnyText;
+      main.prepend(el);
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    seznam.forEach(a => fragment.appendChild(vytvorKartu(a, { datumLabel: a.datumOd })));
+    main.prepend(fragment);
+  }
+
+  function vytvorKartu(a, opts) {
     const el = document.createElement('div');
     el.className = 'karta' + (a.stav === 'zrušeno' ? ' zruseno' : '');
     const kat0 = (a.kategorie[0] || '').toLowerCase();
     el.dataset.kat = kat0;
+    el.dataset.id = a.id || '';
+
+    const jeProbiha = opts === true;                                  // legacy: sekce „Probíhá / dlouhodobé“
+    const datumLabel = (opts && typeof opts === 'object') ? opts.datumLabel : null;  // ★/✓ flat seznamy
 
     const top = document.createElement('div');
     top.className = 'karta-top';
     const nazev = document.createElement('div');
     nazev.className = 'nazev';
     nazev.textContent = a.nazev;
+
+    const vpravo = document.createElement('div');
+    vpravo.className = 'karta-top-vpravo';
     const skore = document.createElement('div');
     skore.className = 'skore';
     skore.textContent = '★ ' + (a.skore || '—');
+
+    const btnOblibene = document.createElement('button');
+    btnOblibene.className = 'ikona-oznaceni hvezda' + (a.oblibene ? ' aktivni' : '');
+    btnOblibene.type = 'button';
+    btnOblibene.title = a.oblibene ? 'Odebrat z oblíbených' : 'Přidat mezi oblíbené';
+    btnOblibene.textContent = a.oblibene ? '★' : '☆';
+    btnOblibene.addEventListener('click', () => prepniOznaceni(a.id, 'oblibene'));
+
+    const btnNavstiveno = document.createElement('button');
+    btnNavstiveno.className = 'ikona-oznaceni fajfka' + (a.navstivenoDne ? ' aktivni' : '');
+    btnNavstiveno.type = 'button';
+    btnNavstiveno.title = a.navstivenoDne ? 'Zrušit navštíveno' : 'Označit jako navštíveno';
+    btnNavstiveno.textContent = a.navstivenoDne ? '✓' : '○';
+    btnNavstiveno.addEventListener('click', () => prepniOznaceni(a.id, 'navstiveno'));
+
+    vpravo.appendChild(skore);
+    vpravo.appendChild(btnOblibene);
+    vpravo.appendChild(btnNavstiveno);
     top.appendChild(nazev);
-    top.appendChild(skore);
+    top.appendChild(vpravo);
     el.appendChild(top);
 
     const meta = document.createElement('div');
     meta.className = 'meta';
-    if (probiha && a.datumOd) { const s = document.createElement('span'); s.textContent = '📅 od ' + a.datumOd; meta.appendChild(s); }
+    if (jeProbiha && a.datumOd) { const s = document.createElement('span'); s.textContent = '📅 od ' + a.datumOd; meta.appendChild(s); }
+    else if (datumLabel) { const s = document.createElement('span'); s.textContent = '📅 ' + datumLabel; meta.appendChild(s); }
     if (a.misto) { const s = document.createElement('span'); s.textContent = '📍 ' + a.misto; meta.appendChild(s); }
     if (a.cas)   { const s = document.createElement('span'); s.textContent = '🕐 ' + a.cas;  meta.appendChild(s); }
     if (a.cena)  { const s = document.createElement('span'); s.textContent = '🎟 ' + a.cena; meta.appendChild(s); }
     if (a.dojezd){ const s = document.createElement('span'); s.textContent = '🚗 ' + a.dojezd; meta.appendChild(s); }
+    if (a.navstivenoDne) {
+      const s = document.createElement('span');
+      s.className = 'navstiveno-info';
+      s.textContent = '✓ navštíveno ' + a.navstivenoDne;
+      meta.appendChild(s);
+    }
     el.appendChild(meta);
 
     if (a.kategorie.length) {
@@ -574,15 +704,79 @@
   function toggleKat(k) {
     if (aktKategorie.has(k)) aktKategorie.delete(k);
     else aktKategorie.add(k);
-    renderAkce();
-    syncChipy();
+    rezimZobrazeni = 'vse';
+    prekreslit();
   }
 
   function syncChipy() {
-    document.querySelectorAll('.chip').forEach(ch => {
+    document.querySelectorAll('#kat-chips .chip').forEach(ch => {
       const k = ch.dataset.kat;
       ch.classList.toggle('active', k === 'Vše' ? aktKategorie.size === 0 : aktKategorie.has(k));
     });
+  }
+
+  function syncSpecialChipy() {
+    document.getElementById('chip-oblibene').classList.toggle('active', rezimZobrazeni === 'oblibene');
+    document.getElementById('chip-navstivene').classList.toggle('active', rezimZobrazeni === 'navstivene');
+    document.getElementById('obdobi-select').style.display = rezimZobrazeni === 'navstivene' ? '' : 'none';
+  }
+
+  /** Centrální překreslení podle aktuálního režimu (Vše / Oblíbené / Navštívené). */
+  function prekreslit() {
+    syncChipy();
+    syncSpecialChipy();
+    if (rezimZobrazeni === 'oblibene') {
+      const seznam = vsechnaAkce
+        .filter(a => a.oblibene)
+        .sort((a, b) => dateKeyBezpecne_(a.datumOd) - dateKeyBezpecne_(b.datumOd));
+      renderSpecialni(seznam, 'Zatím nemáte žádné oblíbené akce. Klikněte na ☆ u karty.');
+    } else if (rezimZobrazeni === 'navstivene') {
+      let seznam = vsechnaAkce.filter(a => a.navstivenoDne);
+      if (obdobiNavstivene !== 'vse') {
+        const cutoff = new Date(Date.now() - Number(obdobiNavstivene) * 86400000);
+        seznam = seznam.filter(a => {
+          const d = parseCeskeDatum(a.navstivenoDne);
+          return d && d >= cutoff;
+        });
+      }
+      seznam.sort((a, b) => dateKeyBezpecne_(b.navstivenoDne) - dateKeyBezpecne_(a.navstivenoDne));
+      renderSpecialni(seznam, 'V tomto období nemáte žádné navštívené akce.');
+    } else {
+      renderAkce();
+    }
+  }
+
+  /** Bezpečný časový klíč z českého data pro řazení; neparsovatelné jde na konec. */
+  function dateKeyBezpecne_(s) {
+    const d = parseCeskeDatum(s);
+    return d ? d.getTime() : Number.MAX_SAFE_INTEGER;
+  }
+
+  // ── ★ Oblíbené / ✓ Navštívené ──────────────────────────────
+  async function prepniOznaceni(id, typ) {
+    const a = vsechnaAkce.find(x => x.id === id);
+    if (!a) return;
+    // Optimistická odezva – přepnout hned, server potvrdí (nebo vrátí zpět).
+    const puvodni = { oblibene: a.oblibene, navstivenoDne: a.navstivenoDne };
+    if (typ === 'oblibene') a.oblibene = !a.oblibene;
+    else a.navstivenoDne = a.navstivenoDne ? '' : 'právě teď';
+    prekreslit();
+    try {
+      const res = await gsr('apiToggle', id, typ);
+      if (res && res.ok) {
+        a.oblibene = res.oblibene;
+        a.navstivenoDne = res.navstivenoDne || '';
+      } else {
+        a.oblibene = puvodni.oblibene;
+        a.navstivenoDne = puvodni.navstivenoDne;
+        alert((res && res.error) || 'Označení se nepodařilo uložit.');
+      }
+    } catch (e) {
+      a.oblibene = puvodni.oblibene;
+      a.navstivenoDne = puvodni.navstivenoDne;
+      alert('Chyba: ' + e.message);
+    }
+    prekreslit();
   }
 
   // ── FAB: Spustit kontrolu ─────────────────────────────────
