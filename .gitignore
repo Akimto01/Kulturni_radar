@@ -5,3 +5,7 @@ Thumbs.db
 
 # výstupy Robot Framework testů
 vysledky/
+
+/log.html
+/output.xml
+/report.html
