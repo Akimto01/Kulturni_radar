@@ -35,5 +35,29 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
   ⚠️ Nutno prověřit HNED na začátku: `google.script.run` funguje jen když Apps Script sám servíruje HTML; po přesunu na GitHub Pages bude nutné přejít na `fetch()` a ověřit CORS chování `/exec` endpointu.
 - Případná Android aplikace (výukový projekt) — cesta: PWA → Trusted Web Activity → Google Play. Podmíněno dokončením frontendového večera výše.
 
+## Dlouhodobá vize — multi-tenant platforma (jiný produkt, ne rozšíření)
+Nápad z 4. 8. 2026: plnohodnotné přihlašování s heslem + sdílení plánů mezi
+cizími rodinami (ne jen v rámci jedné domácnosti). Vyžaduje kategoricky
+jinou architekturu, ne přírůstek k dnešní appce:
+- Sheets → skutečná multi-tenant databáze (Firestore/Postgres)
+- Apps Script → hostovaný backend (Cloud Run / Firebase Functions)
+- „Token v URL" → skutečné přihlašování (doporučeno: Google Sign-In/Firebase Auth, ne vlastní hesla)
+- Nutná moderace veřejně sdíleného obsahu
+- GDPR vrstva: zásady ochrany osobních údajů, právo na výmaz, souhlas
+- Reálné provozní náklady a odpovědnost (dnes běží zdarma na Google infra)
+
+Přenositelné beze změny: AI vyhledávací logika (`callAnthropic_`,
+`report_events` schéma), UX vzorce (karty, chipy, Oblíbené/Navštívené),
+doména kulturniradar.cz, veškerá logika datové hygieny (deduplikace,
+parsování datumů, detekce vycpávek).
+
+Doporučený postupný krok (ne najednou):
+1. Osobní profily v rámci jedné rodiny (lehká varianta, dnešní architektura)
+2. Frontendový večer (GitHub Pages + doména) – nutný předstupeň
+3. Lehčí sdílení: veřejná stránka s plánem bez účtů pro čtenáře
+4. Plnohodnotný multi-tenant systém – dlouhodobý horizont, ne blízký plán
+
+Odhad rozsahu: řádově týdny soustředěné práce, ne jedna session.
+
 ## Trvalá pravidla (ne úkoly, ale konvence)
 - Při každém „Nová verze" v Apps Scriptu vyplnit pole Popis podle aktuální `VERZE`.
