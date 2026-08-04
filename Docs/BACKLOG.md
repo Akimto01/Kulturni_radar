@@ -17,13 +17,12 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 - Haiku vs. Sonnet na denní kontrole — týden sledovat kvalitu úlovků, pak rozhodnout.
 
 ## Testovací dluh
-- `parseEvents_`, `callAnthropic_`/`callAnthropicPlaces_` — jádro zpracování AI odpovědi, zaslouží si fixture s reálnými i pokaženými odpověďmi.
+- `parseEvents_` — jádro zpracování AI odpovědi, zaslouží si fixture s reálnými i pokaženými odpověďmi.
 
 ## Nové funkce (schváleno, čeká na zpětnou vazbu rodiny)
 - Sdílení jedné akce (tlačítko vedle „Do kalendáře", text pro WhatsApp/SMS).
 - Doporučení podle historie navštívených akcí.
 - Roční přehled/statistika navštívených akcí a typů.
-- Explicitní rubrika pro AI skóre akcí (1–10) v promptu `callAnthropic_` — dnes model hodnotí bez pevných kritérií.
 
 ## Počasí ve webu
 - `weatherFor_` dnes jen v digestech; šlo by vystavit přes API i na kartu/místa ve webové aplikaci.
