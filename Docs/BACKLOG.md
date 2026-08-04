@@ -16,9 +16,6 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 ## Probíhající měření
 - Haiku vs. Sonnet na denní kontrole — týden sledovat kvalitu úlovků, pak rozhodnout.
 
-## Testovací dluh
-- `parseEvents_` — jádro zpracování AI odpovědi, zaslouží si fixture s reálnými i pokaženými odpověďmi.
-
 ## Nové funkce (schváleno, čeká na zpětnou vazbu rodiny)
 - Sdílení jedné akce (tlačítko vedle „Do kalendáře", text pro WhatsApp/SMS).
 - Doporučení podle historie navštívených akcí.
