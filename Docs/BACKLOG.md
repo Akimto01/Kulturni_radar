@@ -35,6 +35,21 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
   ⚠️ Nutno prověřit HNED na začátku: `google.script.run` funguje jen když Apps Script sám servíruje HTML; po přesunu na GitHub Pages bude nutné přejít na `fetch()` a ověřit CORS chování `/exec` endpointu.
 - Případná Android aplikace (výukový projekt) — cesta: PWA → Trusted Web Activity → Google Play. Podmíněno dokončením frontendového večera výše.
 
+## Plán rozvoje — schváleno 4. 8. 2026, v tomto pořadí
+1. **Rodinné profily** (~3–5 h) — rozšíření OZNAČENÍ o „Kdo" (jméno vybrané
+   z výběru, uloženo v prohlížeči jako dnešní token). Bez hesla, bez
+   autentizace. Reálný limit souběžnosti: appka takhle unese rodinu i
+   přátelskou partu (desítky lidí); stovky+ už by narážely na limity
+   Sheets/Apps Scriptu — signál pro krok 5.
+2. **Frontendový večer** (~3–4 h, možná 2 sezení) — GitHub Pages + DNS
+   kulturniradar.cz. Riziko: CORS chování `/exec` z cizí domény nikdy
+   neověřeno, první hodina bude zjišťování.
+3. **Lehčí sdílení** (~2–3 h) — veřejný odkaz s vybranými akcemi v URL, bez
+   účtů pro čtenáře. Nezávislé na kroku 2, může jít kdykoli mezitím.
+4. **Android appka** (~3–4 h práce + dny čekání na schválení Play Store) —
+   vyžaduje krok 2 hotový (PWA potřebuje vlastní doménu).
+5. **Multi-tenant systém** — řádově týdny, viz vize níže.
+
 ## Dlouhodobá vize — multi-tenant platforma (jiný produkt, ne rozšíření)
 Nápad z 4. 8. 2026: plnohodnotné přihlašování s heslem + sdílení plánů mezi
 cizími rodinami (ne jen v rámci jedné domácnosti). Vyžaduje kategoricky
