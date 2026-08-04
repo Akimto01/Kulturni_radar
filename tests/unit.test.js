@@ -930,3 +930,113 @@ test('v3.15: prompt pro místa má taky rubriku skóre, ne jen "(atraktivita pro
   assert.ok(telo.includes('9–10'));
   assert.ok(telo.includes('1–2'));
 });
+
+// ---------------------------------------------------------------------------
+// callAnthropic_ – retry smyčka (pause_turn, end_turn, max_tokens), záchranné
+// dovolání, chybové stavy. Dosud netestováno (jediné skutečné síťové jádro),
+// teď otestovatelné díky stejnému UrlFetchApp stubu jako weatherFor_/Nominatim.
+// ---------------------------------------------------------------------------
+
+const CFG_TEST = { profil: 'Brno', rozsah: '3.–9. 8. 2026', dojezd: '90 min', kategorie: 'vše', maleAkce: 'ano', detske: 'ano' };
+const ZDROJE_TEST = [{ nazev: 'Web města', priorita: 'vysoká', url: 'https://brno.cz' }];
+
+function anthropicResp(data, code = 200) { return { code, body: data }; }
+
+const AKCE_REPORT = { id: 'x', datum_od: '6. 8. 2026', nazev: 'Test', misto: 'Sál', obec: 'Brno', kategorie: 'koncerty', stav: 'potvrzeno' };
+
+test('callAnthropic_: chybí ANTHROPIC_API_KEY → chyba hned, žádný síťový dotaz', () => {
+  const volane = [];
+  const ctx = nactiRadar({ properties: {}, urlFetch: frontaFetchu([], volane) });
+  assert.throws(() => ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola'), /ANTHROPIC_API_KEY/);
+  assert.equal(volane.length, 0);
+});
+
+test('callAnthropic_: model rovnou zavolá report_events → akce se vrátí přímo, 1 dotaz', () => {
+  const volane = [];
+  const resp = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [AKCE_REPORT] } }],
+  });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'test-key' }, urlFetch: frontaFetchu([resp], volane) });
+  const events = ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');
+  assert.equal(events.length, 1);
+  assert.equal(events[0].nazev, 'Test');
+  assert.equal(volane.length, 1);
+});
+
+test('callAnthropic_: pause_turn pokračuje druhým dotazem, report_events přijde až tam', () => {
+  const pauza = anthropicResp({ stop_reason: 'pause_turn', content: [{ type: 'text', text: 'hledám dál…' }] });
+  const finale = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [AKCE_REPORT] } }],
+  });
+  const volane = [];
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([pauza, finale], volane) });
+  const events = ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');
+  assert.equal(events.length, 1);
+  assert.equal(volane.length, 2, 'dva dotazy – pauza + pokračování');
+});
+
+test('callAnthropic_: end_turn bez nástroje vyžádá odevzdání, uspěje na druhý pokus', () => {
+  const bezNastroje = anthropicResp({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Tady jsou akce…' }] });
+  const finale = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [AKCE_REPORT] } }],
+  });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([bezNastroje, finale]) });
+  const events = ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');
+  assert.equal(events.length, 1);
+});
+
+test('callAnthropic_: max_tokens useknutí – bez nástroje, ale text obsahuje platné JSON pole → zachráněno parseEvents_', () => {
+  const utata = anthropicResp({
+    stop_reason: 'max_tokens',
+    content: [{ type: 'text', text: 'Nalezené akce:\n[' + JSON.stringify(AKCE_REPORT) + ']' }],
+  });
+  const volane = [];
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([utata], volane) });
+  const events = ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');
+  assert.equal(events.length, 1);
+  assert.equal(volane.length, 1, 'zachráněno z první odpovědi, žádné další dovolání netřeba');
+});
+
+test('callAnthropic_: nerozparsovatelný text → druhé (formátovací) dovolání zachrání JSON', () => {
+  const nesrozumitelne = anthropicResp({
+    stop_reason: 'stop_sequence',
+    content: [{ type: 'text', text: 'Omlouvám se, mám technické potíže s formátem odpovědi.' }],
+  });
+  const formatovaci = anthropicResp({
+    content: [{ type: 'text', text: '[' + JSON.stringify(AKCE_REPORT) + ']' }],
+  });
+  const volane = [];
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([nesrozumitelne, formatovaci], volane) });
+  const events = ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');
+  assert.equal(events.length, 1);
+  assert.equal(volane.length, 2, 'hlavní dotaz + formátovací záchrana');
+});
+
+test('callAnthropic_: selže i formátovací dovolání → vyhodí chybu, ne pád na undefined', () => {
+  const nesrozumitelne = anthropicResp({ stop_reason: 'stop_sequence', content: [{ type: 'text', text: 'nic použitelného' }] });
+  const formatovaciTakySelze = anthropicResp({ content: [{ type: 'text', text: 'pořád nic' }] });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([nesrozumitelne, formatovaciTakySelze]) });
+  assert.throws(() => ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola'), /nepodařilo naparsovat/);
+});
+
+test('callAnthropic_: HTTP chyba (ne 200) vyhodí čitelnou chybu hned, bez další smyčky', () => {
+  const chyba = anthropicResp({ error: { message: 'overloaded' } }, 529);
+  const volane = [];
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([chyba], volane) });
+  assert.throws(() => ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola'), /529/);
+  assert.equal(volane.length, 1, 'na HTTP chybu se nezkouší další pokus');
+});
+
+test('callAnthropic_: prázdný seznam akcí ([]) je platný výsledek, ne chyba', () => {
+  const prazdne = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [] } }],
+  });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([prazdne]) });
+  const events = ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');
+  assert.ok(Array.isArray(events));
+  assert.equal(events.length, 0);
+});
