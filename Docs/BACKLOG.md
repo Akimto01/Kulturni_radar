@@ -3,12 +3,15 @@
 Poslední aktualizace: 3. 8. 2026. Neplánované nápady a rozpracované položky —
 na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 
+## K ověření zítra (5. 8. 2026)
+- Dojezd v km u nově nalezených akcí (v3.12 prompt) — zkontrolovat řádek „Festival Milotice 2026" v listu AKCE, sloupec H (dojezd).
+- iPad: ověřit, jestli window.open() (v3.7 Index.html) vyřešil otevírání „Více info"/„Do kalendáře" v nové záložce — dcera se vrací s iPadem.
+
 ## Nejvyšší priorita
 - Poslat URL rodině, počkat na zpětnou vazbu — určí prioritu všeho níže.
 - Předat `Index.html` dceři k designu (CSS tokeny v `:root`).
 
 ## Ke kontrole
-- Auto-reload v konzoli Anthropic — ověřit, jestli je zapnutý (screenshot z 3. 8. ukazoval "off").
 
 ## Probíhající měření
 - Haiku vs. Sonnet na denní kontrole — týden sledovat kvalitu úlovků, pak rozhodnout.
