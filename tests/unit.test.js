@@ -695,3 +695,141 @@ test('najdiDuplicity_: tři různé akce ve stejný den = žádná duplicita', (
   ];
   assert.equal(r.najdiDuplicity_(data).length, 0);
 });
+
+// ---------------------------------------------------------------------------
+// v3.12: BUG „Tue Aug 04 2026 00:00:00 GMT…" – readOznaceni_ nepoužívala
+// cellText_ pro sloupec Datum označení (stejný vzorec jako bug v3.8)
+// ---------------------------------------------------------------------------
+
+test('BUG v3.12: readOznaceni_ čte datum přes cellText_, ne přes syrové String(Date)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const zdroj = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'kulturni_radar.gs'), 'utf8');
+  const start = zdroj.indexOf('function readOznaceni_');
+  const end = zdroj.indexOf('\n}', start);
+  const telo = zdroj.slice(start, end);
+  assert.ok(telo.includes('datum: cellText_(r[2])'), 'datum se čte přes cellText_');
+  assert.ok(!/datum:\s*String\(r\[2\]/.test(telo), 'žádná regrese na syrové String(r[2])');
+});
+
+// ---------------------------------------------------------------------------
+// parseEvents_ – záchranný parser textové odpovědi modelu (fallback, když
+// model navzdory instrukcím nezavolá nástroj report_events strukturovaně).
+// V provozu se spouští zřídka, ale právě proto je důležité mít ho testovaný –
+// je to jediné místo, které chytá skutečně pokažené/nedokončené odpovědi AI.
+// ---------------------------------------------------------------------------
+
+const AKCE_MINI = '{"id":"2026-08-06-test","datum_od":"6. 8. 2026","nazev":"Test akce","misto":"Sál","obec":"Brno","kategorie":"koncerty","stav":"potvrzeno"}';
+
+test('parseEvents_: čisté validní JSON pole se naparsuje přímo', () => {
+  const text = '[' + AKCE_MINI + ']';
+  const ev = r.parseEvents_(text);
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].nazev, 'Test akce');
+});
+
+test('parseEvents_: prázdné pole [] je platný výsledek (0 akcí), ne selhání', () => {
+  const ev = r.parseEvents_('[]');
+  assert.ok(Array.isArray(ev));
+  assert.equal(ev.length, 0);
+});
+
+test('parseEvents_: markdown ```json ohraničení se odstraní', () => {
+  const text = '```json\n[' + AKCE_MINI + ']\n```';
+  const ev = r.parseEvents_(text);
+  assert.equal(ev.length, 1);
+});
+
+test('parseEvents_: komentář modelu před i za polem se ignoruje', () => {
+  const text = 'Zde jsou nalezené akce:\n[' + AKCE_MINI + ']\nDoufám, že to pomůže!';
+  const ev = r.parseEvents_(text);
+  assert.equal(ev.length, 1);
+});
+
+test('parseEvents_: čárka navíc před ] nebo } se opraví (běžná chyba modelů)', () => {
+  const text = '[' + AKCE_MINI.slice(0, -1) + ',},]';   // čárka před } i před ]
+  const ev = r.parseEvents_(text);
+  assert.equal(ev.length, 1);
+});
+
+test('parseEvents_: syrové konce řádků uvnitř textové hodnoty se sanitizují', () => {
+  const rozbite = '[{"id":"x","datum_od":"6. 8. 2026","nazev":"Akce s\nnovým řádkem",' +
+    '"misto":"Sál","obec":"Brno","kategorie":"koncerty","stav":"potvrzeno"}]';
+  const ev = r.parseEvents_(rozbite);
+  assert.equal(ev.length, 1);
+  assert.ok(ev[0].nazev.includes('Akce s'));
+});
+
+test('parseEvents_: pause_turn restart – model vypíše pole dvakrát, vyhraje POSLEDNÍ kompletní', () => {
+  const nedokoncene = '[{"id":"stary","nazev":"Neúplný pokus","datum_od":"';   // uťaté uprostřed
+  const kompletni = '[' + AKCE_MINI + ']';
+  const text = nedokoncene + '\n\n' + kompletni;
+  const ev = r.parseEvents_(text);
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].nazev, 'Test akce');   // ne "Neúplný pokus"
+});
+
+test('parseEvents_: useknutá odpověď (max_tokens) – zachrání kompletní záznamy, zahodí rozbitý poslední', () => {
+  const druhaAkce = '{"id":"2026-08-07-x","datum_od":"7. 8. 2026","nazev":"Druhá akce",' +
+    '"misto":"Y","obec":"Brno","kategorie":"divadlo","stav":"potvrzeno"}';
+  const utata = '{"id":"2026-08-08-y","datum_od":"8. 8. 2026","nazev":"Uťatá tře';   // konec chybí
+  const text = '[' + AKCE_MINI + ',' + druhaAkce + ',' + utata;   // bez uzavírací ] i }
+  const ev = r.parseEvents_(text);
+  assert.equal(ev.length, 2, 'zachrání jen 2 kompletní záznamy, uťatý třetí zahodí');
+  assert.equal(ev[1].nazev, 'Druhá akce');
+});
+
+test('parseEvents_: žádná otevírací [ v textu → null (ne pád)', () => {
+  assert.equal(r.parseEvents_('Omlouvám se, nic jsem nenašel.'), null);
+});
+
+test('parseEvents_: prázdný/undefined vstup → null', () => {
+  assert.equal(r.parseEvents_(''), null);
+  assert.equal(r.parseEvents_(undefined), null);
+  assert.equal(r.parseEvents_(null), null);
+});
+
+test('parseEvents_: zcela nezáchranný text (jen otevírací [, nic rozumného za ní) → null', () => {
+  assert.equal(r.parseEvents_('text [ dalsi text bez zavorky nebo objektu'), null);
+});
+
+test('parseEvents_: víc akcí v poli se zachová v pořadí', () => {
+  const b = '{"id":"b","datum_od":"7. 8. 2026","nazev":"B","misto":"X","obec":"Brno","kategorie":"divadlo","stav":"potvrzeno"}';
+  const ev = r.parseEvents_('[' + AKCE_MINI + ',' + b + ']');
+  assert.equal(ev.length, 2);
+  assert.equal(ev[0].nazev, 'Test akce');
+  assert.equal(ev[1].nazev, 'B');
+});
+
+// ---------------------------------------------------------------------------
+// eventToRow_ – mapování akce z API na řádek tabulky AKCE (sloupce A–V)
+// ---------------------------------------------------------------------------
+
+test('eventToRow_: kompletní akce se namapuje na 22 sloupců ve správném pořadí', () => {
+  const ev = {
+    id: 'x', datum_od: '6. 8. 2026', datum_do: '', cas: '20:00', nazev: 'Test',
+    misto: 'Sál', obec: 'Brno', dojezd: '10 min', kategorie: 'koncerty',
+    podkategorie: '', cena: 'zdarma', popis: 'Popis', skore: 8, stav: 'potvrzeno',
+    primarni_zdroj: 'web', url: 'https://x.cz', dalsi_zdroj: '', poznamka: '',
+  };
+  const row = r.eventToRow_(ev, '4. 8. 2026');
+  assert.equal(row.length, 22);
+  assert.equal(row[0], 'x');
+  assert.equal(row[4], 'Test');
+  assert.equal(row[13], 'potvrzeno');
+  assert.equal(row[16], '4. 8. 2026');   // Q: První nález = injektované "today"
+  assert.equal(row[17], '4. 8. 2026');   // R: Poslední kontrola
+});
+
+test('eventToRow_: chybějící stav dostane výchozí "potvrzeno"; chybějící pole prázdný řetězec', () => {
+  const row = r.eventToRow_({ id: 'x', nazev: 'Test' }, '4. 8. 2026');
+  assert.equal(row[13], 'potvrzeno');
+  assert.equal(row[1], '');    // datum_od chybí → ''
+  assert.equal(row[7], '');    // dojezd chybí → ''
+});
+
+test('eventToRow_: nová akce vždy start "NE"/"NE" pro Novinka/Změna (upsert je pak přepíše)', () => {
+  const row = r.eventToRow_({ id: 'x' }, '4. 8. 2026');
+  assert.equal(row[14], 'NE');
+  assert.equal(row[15], 'NE');
+});
