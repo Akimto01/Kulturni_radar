@@ -97,6 +97,22 @@ Karta má odkaz Do kalendáře
     ${text}=    Get Text    ${FRAME} .karta >> nth=0 >> .karta-akce
     Should Contain    ${text}    Do kalendáře
 
+Karta má tlačítko Sdílet
+    [Documentation]    v3.13: existence tlačítka „📤 Sdílet". NEKLIKÁME –
+    ...    navigator.share/clipboard uvnitř sandboxovaného iframe se v headless
+    ...    testovacím prohlížeči chová nedeterministicky (může otevřít systémový
+    ...    dialog nebo tiše selhat na oprávněních); existence prvku je vše, co
+    ...    tady chceme spolehlivě ověřit.
+    ${text}=    Get Text    ${FRAME} .karta >> nth=0 >> .karta-akce
+    Should Contain    ${text}    Sdílet
+
+Karta má odkaz Mapa
+    [Documentation]    v3.13: 📍 Mapa je čistě klientský odkaz (Google Maps
+    ...    URL schéma, žádný API klíč) – existence a text stačí ověřit stejně
+    ...    jako u Do kalendáře.
+    ${text}=    Get Text    ${FRAME} .karta >> nth=0 >> .karta-akce
+    Should Contain    ${text}    Mapa
+
 Chip typu stálého místa zúží seznam (pokud profil má 2+ typů)
     [Documentation]    v3.10: chipy typů se vykreslí jen když má profil 2+
     ...    různé typy míst (viz Index.html renderMista – chip „Vše" + 1 typ by

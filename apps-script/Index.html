@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.7 – zpětná vazba rodiny 4.8.: window.open na iPadu, chipy vpravo, větší text -->
+<!-- Kulturní radar Index.html v3.10 – mapsUrl_ preferuje souřadnice (v3.14 backend), garantovaný pin -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -646,31 +646,46 @@
     }
 
     const gcal = gcalUrl_(a);
-    if (a.url || gcal) {
-      const akceDiv = document.createElement('div');
-      akceDiv.className = 'karta-akce';
-      if (a.url) {
-        const link = document.createElement('a');
-        link.href = a.url;
-        link.target = '_blank';
-        link.rel = 'noopener';
-        link.className = 'btn-url';
-        link.textContent = 'Více info →';
-        link.addEventListener('click', (e) => otevritVNoveOknem_(e, a.url));
-        akceDiv.appendChild(link);
-      }
-      if (gcal) {
-        const link = document.createElement('a');
-        link.href = gcal;
-        link.target = '_blank';
-        link.rel = 'noopener';
-        link.className = 'btn-url';
-        link.textContent = '📅 Do kalendáře';
-        link.addEventListener('click', (e) => otevritVNoveOknem_(e, gcal));
-        akceDiv.appendChild(link);
-      }
-      el.appendChild(akceDiv);
+    const akceDiv = document.createElement('div');
+    akceDiv.className = 'karta-akce';
+    if (a.url) {
+      const link = document.createElement('a');
+      link.href = a.url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.className = 'btn-url';
+      link.textContent = 'Více info →';
+      link.addEventListener('click', (e) => otevritVNoveOknem_(e, a.url));
+      akceDiv.appendChild(link);
     }
+    if (gcal) {
+      const link = document.createElement('a');
+      link.href = gcal;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.className = 'btn-url';
+      link.textContent = '📅 Do kalendáře';
+      link.addEventListener('click', (e) => otevritVNoveOknem_(e, gcal));
+      akceDiv.appendChild(link);
+    }
+    const btnSdilet = document.createElement('button');
+    btnSdilet.type = 'button';
+    btnSdilet.className = 'btn-url';
+    btnSdilet.textContent = '📤 Sdílet';
+    const mapa = mapsUrl_(a);
+    if (mapa) {
+      const link = document.createElement('a');
+      link.href = mapa;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.className = 'btn-url';
+      link.textContent = '📍 Mapa';
+      link.addEventListener('click', (e) => otevritVNoveOknem_(e, mapa));
+      akceDiv.appendChild(link);
+    }
+    btnSdilet.addEventListener('click', () => sdiletAkci_(a));
+    akceDiv.appendChild(btnSdilet);
+    el.appendChild(akceDiv);
 
     return el;
   }
@@ -695,6 +710,60 @@
   }
 
   function pad2_(n) { return String(n).padStart(2, '0'); }
+
+  /** PURE: sestaví text ke sdílení akce (název, datum, místo, odkaz) –
+   *  oddělené od samotného window.navigator volání, aby šlo testovat v Node. */
+  function sestavTextSdileni_(a) {
+    const radky = [a.nazev || ''];
+    const druhyRadek = [a.datumOd || '', a.misto || ''].filter(Boolean).join(' · ');
+    if (druhyRadek) radky.push(druhyRadek);
+    if (a.url) radky.push(a.url);
+    return radky.join('\n');
+  }
+
+  /** Sdílení akce – tři úrovně odstupňovaného fallbacku, protože chování
+   *  nativního Web Share API i schránky uvnitř sandboxovaného iframe Apps
+   *  Scriptu není zaručené (stejná nejistota jako u window.open, viz iPad):
+   *  1) navigator.share (mobil: nativní panel se seznamem aplikací – WhatsApp,
+   *     SMS, e-mail…), 2) zkopírování do schránky, 3) prompt() s textem k
+   *     ručnímu zkopírování jako poslední záchrana, když selže úplně vše. */
+  async function sdiletAkci_(a) {
+    const text = sestavTextSdileni_(a);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: a.nazev || 'Kulturní radar', text });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;   // uživatel sdílení sám zrušil
+        // jinak pokračovat na fallback níže
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('Text akce zkopírován do schránky – vlož ho, kam chceš poslat.');
+    } catch (e2) {
+      prompt('Zkopíruj text akce (Ctrl+C / podrž prst a Kopírovat):', text);
+    }
+  }
+
+  /** PURE: odkaz na Google Maps – oficiální dokumentované URL schéma
+   *  (ne JS API), takže žádný API klíč ani placení, jen deep-link. Na mobilu
+   *  otevře nativní appku Mapy, jinak web. null, když nemáme kam ukázat. */
+  /** PURE: odkaz na Google Maps – oficiální dokumentované URL schéma
+   *  (ne JS API), takže žádný API klíč ani placení, jen deep-link. Na mobilu
+   *  otevře nativní appku Mapy, jinak web. Když má akce souřadnice (v3.14 –
+   *  doplňují se na pozadí přes Nominatim), použije je → garantovaný pin bez
+   *  ohledu na to, jak nejednoznačně text popisuje místo. Bez souřadnic
+   *  (ještě negeokódováno, nebo Nominatim si s textem neporadil) spadne zpět
+   *  na textové vyhledávání jako dřív. null, když nemáme kam ukázat vůbec. */
+  function mapsUrl_(a) {
+    if (typeof a.lat === 'number' && typeof a.lng === 'number') {
+      return 'https://www.google.com/maps/search/?api=1&query=' + a.lat + ',' + a.lng;
+    }
+    const dotaz = [a.misto, a.obec].filter(Boolean).join(', ');
+    if (!dotaz) return null;
+    return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(dotaz);
+  }
 
   /** Otevře odkaz v novém okně/záložce explicitním window.open() místo spoléhání
    *  jen na atribut target="_blank" – na iPadu (Safari uvnitř vnořeného

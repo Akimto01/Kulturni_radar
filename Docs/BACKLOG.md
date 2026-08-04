@@ -20,7 +20,6 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 - `parseEvents_`, `callAnthropic_`/`callAnthropicPlaces_` — jádro zpracování AI odpovědi, zaslouží si fixture s reálnými i pokaženými odpověďmi.
 
 ## Nové funkce (schváleno, čeká na zpětnou vazbu rodiny)
-- Mapa akcí (Google Maps / places_map).
 - Sdílení jedné akce (tlačítko vedle „Do kalendáře", text pro WhatsApp/SMS).
 - Doporučení podle historie navštívených akcí.
 - Roční přehled/statistika navštívených akcí a typů.
@@ -30,6 +29,7 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 - `weatherFor_` dnes jen v digestech; šlo by vystavit přes API i na kartu/místa ve webové aplikaci.
 
 ## Větší témata
+- Plnohodnotná interaktivní mapa akcí (víc pinů najednou, places_map) — vědomě odložená budoucí varianta. Odkaz „📍 Mapa" na kartě (v3.10, garantovaný pin díky souřadnicím z Nominatim) pokrývá jednu akci najednou a je hotový.
 - Strukturované časy `cas_od`/`cas_do` — přesnější „Do kalendáře" (dnes celodenní), řazení akcí v rámci dne.
 - Frontendový večer: `Index.html` → GitHub Pages + DNS `kulturniradar.cz`.
   ⚠️ Nutno prověřit HNED na začátku: `google.script.run` funguje jen když Apps Script sám servíruje HTML; po přesunu na GitHub Pages bude nutné přejít na `fetch()` a ověřit CORS chování `/exec` endpointu.

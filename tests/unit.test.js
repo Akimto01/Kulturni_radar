@@ -833,3 +833,72 @@ test('eventToRow_: nová akce vždy start "NE"/"NE" pro Novinka/Změna (upsert j
   assert.equal(row[14], 'NE');
   assert.equal(row[15], 'NE');
 });
+
+// ---------------------------------------------------------------------------
+// v3.14: Souřadnice akcí (Nominatim) – cache + geokódování na pozadí
+// ---------------------------------------------------------------------------
+
+test('klicSouradnic_: stejné misto+obec dá stejný klíč bez ohledu na velikost písmen', () => {
+  assert.equal(r.klicSouradnic_('Zelný trh', 'Brno'), r.klicSouradnic_('zelný trh', 'BRNO'));
+});
+
+test('klicSouradnic_: různá místa dají různý klíč; klíč je vždy neprázdný řetězec', () => {
+  assert.notEqual(r.klicSouradnic_('Zelný trh', 'Brno'), r.klicSouradnic_('Špilberk', 'Brno'));
+  assert.equal(typeof r.klicSouradnic_('', ''), 'string');
+});
+
+test('sestavDotazGeokodovani_: misto+obec spojené čárkou, vždy s „Česko“', () => {
+  assert.equal(r.sestavDotazGeokodovani_('Zelný trh', 'Brno'), 'Zelný trh, Brno, Česko');
+});
+
+test('sestavDotazGeokodovani_: jen obec (misto chybí) funguje taky', () => {
+  assert.equal(r.sestavDotazGeokodovani_('', 'Brno'), 'Brno, Česko');
+});
+
+test('sestavDotazGeokodovani_: oboje prázdné → prázdný dotaz (nevolat Nominatim)', () => {
+  assert.equal(r.sestavDotazGeokodovani_('', ''), '');
+});
+
+test('souradniceMapy_: pole řádků → Map podle klíče', () => {
+  const mapa = r.souradniceMapy_([
+    { klic: 'brno|zelny trh', lat: 49.19, lng: 16.61 },
+    { klic: 'brno|spilberk', lat: 49.195, lng: 16.6 },
+  ]);
+  assert.equal(mapa.get('brno|zelny trh').lat, 49.19);
+  assert.equal(mapa.size, 2);
+});
+
+const NOMINATIM_HIT = { code: 200, body: [{ lat: '49.1925', lon: '16.6087', display_name: 'Zelný trh, Brno' }] };
+const NOMINATIM_PRAZDNO = { code: 200, body: [] };
+
+test('geocodovatNominatim_: úspěšná shoda vrátí {lat, lng} jako čísla', () => {
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([NOMINATIM_HIT]) });
+  const v = ctx.geocodovatNominatim_('Zelný trh, Brno, Česko');
+  assert.equal(v.lat, 49.1925);
+  assert.equal(v.lng, 16.6087);
+});
+
+test('geocodovatNominatim_: prázdný výsledek (nejednoznačný/nenalezený text) → null, ne pád', () => {
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([NOMINATIM_PRAZDNO]) });
+  assert.equal(ctx.geocodovatNominatim_('nesmysl xyz, Česko'), null);
+});
+
+test('geocodovatNominatim_: prázdný dotaz → null bez síťového volání', () => {
+  const volane = [];
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([], volane) });
+  assert.equal(ctx.geocodovatNominatim_(''), null);
+  assert.equal(volane.length, 0);
+});
+
+test('geocodovatNominatim_: výpadek Nominatim (retry z fetchJson_ vyčerpán) → null, ne pád', () => {
+  const ctx = nactiRadar({ urlFetch: frontaFetchu(['throw', 'throw']) });
+  assert.equal(ctx.geocodovatNominatim_('cokoli, Česko'), null);
+});
+
+test('geocodovatNominatim_: v URL je countrycodes=cz a dotaz je escapovaný', () => {
+  const volane = [];
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([NOMINATIM_HIT], volane) });
+  ctx.geocodovatNominatim_('Zelný trh, Brno, Česko');
+  assert.ok(volane[0].includes('countrycodes=cz'));
+  assert.ok(volane[0].includes(encodeURIComponent('Zelný trh, Brno, Česko')));
+});

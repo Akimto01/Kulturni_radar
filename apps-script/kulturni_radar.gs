@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.13 (4. 8. 2026) – BUG: navštíveno zobrazovalo syrové Date.toString()
+ * Verze: 3.14 (4. 8. 2026) – Souřadnice akcí (Nominatim) pro garantovaný pin na mapě
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -40,6 +40,7 @@ const SHEET = {
   MISTA: 'MÍSTA',
   PREHLED: 'PŘEHLED',
   OZNACENI: 'OZNAČENÍ',
+  SOURADNICE: 'SOUŘADNICE',
 };
 
 const KRIT = {           // adresy v listu KRITÉRIA
@@ -59,7 +60,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.13';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.14';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -221,6 +222,7 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene) {
   const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
   const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
   const oznaceniMapa = oznaceniMapy_(readOznaceni_(ss));
+  const souradniceMapa = souradniceMapy_(readSouradnice_(ss));
   const akce = [];
 
   data.forEach(row => {
@@ -231,6 +233,7 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene) {
     const stav = norm_(row[13]);
     const datumOd = parseCzDate_(row[1]);
     if (!zahrnoutAkciDoVysledku_(stav, datumOd, dnes, zahrnoutOznacene, jeOznaceno)) return;
+    const souradnice = souradniceMapa.get(klicSouradnic_(row[5], row[6])) || null;
     akce.push({
       id,
       nazev: String(row[4] || ''),
@@ -248,6 +251,8 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene) {
       url: String(row[19] || ''),
       oblibene: oznaceni.oblibene,
       navstivenoDne: oznaceni.navstivenoDne || '',
+      lat: souradnice ? souradnice.lat : null,
+      lng: souradnice ? souradnice.lng : null,
     });
   });
 
@@ -332,6 +337,7 @@ function onOpen() {
     .addItem('Týdenní přehled teď', 'weeklyDigest')
     .addItem('Víkendové tipy teď', 'weekendDigest')
     .addItem('Aktualizovat stálá místa', 'updateMista')
+    .addItem('Doplnit souřadnice (jednorázově)', 'doplnitSouradniceZpetne')
     .addSeparator()
     .addItem('Samotest', 'runSelfTest')
     .addToUi();
@@ -453,6 +459,7 @@ function runCheck_(typKontroly) {
 
     const events = callAnthropic_(cfg, zdroje, typKontroly);
     const stats = upsertEvents_(ss, cfg, events);
+    zajistitSouradniceProAkce_(ss, events);
 
     logKontrola_(ss, typKontroly, cfg, stats, zdroje.length);
     updateLokalita_(ss, cfg.profil, new Date());
@@ -1005,6 +1012,145 @@ function apiToggle_(ss, id, typ) {
 
   const stavPoTom = oznaceniMapy_(vysledek.rows).get(id) || { oblibene: false, navstivenoDne: null };
   return { ok: true, id, oblibene: stavPoTom.oblibene, navstivenoDne: stavPoTom.navstivenoDne || '' };
+}
+
+// ---------------------------------------------------------------------------
+// SOUŘADNICE – cache geokódovaných míst pro garantovaný pin na mapě (v3.14).
+// Zdroj: Nominatim (OpenStreetMap) – zdarma, bez klíče, vyžaduje identifikační
+// User-Agent a max 1 dotaz/s (zdvořilostní pravidla, stejný duch jako met.no).
+// ---------------------------------------------------------------------------
+
+const SOURADNICE_HLAVICKA = ['Klíč', 'Lat', 'Lng', 'Zdrojový text', 'Zjištěno'];
+const NOMINATIM_USER_AGENT = 'KulturniRadar/' + VERZE + ' (+https://github.com/Akimto01/Kulturni_radar)';
+
+function ensureSouradniceSheet_(ss) {
+  let sh = ss.getSheetByName(SHEET.SOURADNICE);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET.SOURADNICE);
+    sh.getRange(1, 1, 1, SOURADNICE_HLAVICKA.length).setValues([SOURADNICE_HLAVICKA])
+      .setFontWeight('bold').setBackground('#2e6e5e').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/** PURE: klíč do cache SOUŘADNIC – normalizované misto+obec (nezávislé na
+ *  velikosti písmen/diakritice, stejná lokalita = stejný klíč napříč akcemi). */
+function klicSouradnic_(misto, obec) {
+  return norm_(String(misto || '').trim() + '|' + String(obec || '').trim());
+}
+
+/** PURE: dotaz pro Nominatim – misto+obec (nebo jen obec), vždy s „Česko“
+ *  jako nápovědou země pro přesnější/rychlejší shodu. '' když není co hledat. */
+function sestavDotazGeokodovani_(misto, obec) {
+  const cast = [misto, obec].map(s => String(s || '').trim()).filter(Boolean);
+  if (!cast.length) return '';
+  return cast.join(', ') + ', Česko';
+}
+
+/** Čte list SOUŘADNICE do prostých objektů. I/O – bez logiky. */
+function readSouradnice_(ss) {
+  const sh = ss.getSheetByName(SHEET.SOURADNICE);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, SOURADNICE_HLAVICKA.length).getValues()
+    .map(r => ({ klic: String(r[0] || ''), lat: Number(r[1]), lng: Number(r[2]) }))
+    .filter(r => r.klic && !isNaN(r.lat) && !isNaN(r.lng));
+}
+
+/** PURE: pole řádků SOUŘADNIC → Map(klíč → {lat, lng}). */
+function souradniceMapy_(rows) {
+  const mapa = new Map();
+  rows.forEach(r => mapa.set(r.klic, { lat: r.lat, lng: r.lng }));
+  return mapa;
+}
+
+/** Připíše novou souřadnici do listu (jen přidání řádku – cache se nikdy
+ *  netoggluje ani nemaže, na rozdíl od OZNAČENÍ). */
+function pridatSouradnici_(ss, klic, lat, lng, zdrojText) {
+  const sh = ensureSouradniceSheet_(ss);
+  sh.appendRow([klic, lat, lng, zdrojText, formatDateOnly_(new Date())]);
+}
+
+/** Zavolá Nominatim pro daný dotaz; vrací {lat, lng} nebo null. Sama si
+ *  odpočká zdvořilostní pauzu (1,1 s) – volá se JEN při cache-miss, takže
+ *  jedna pauza na jednu skutečně novou lokalitu, ne na každý dotaz akce. */
+function geocodovatNominatim_(dotaz) {
+  if (!dotaz) return null;
+  Utilities.sleep(1100);
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cz&q=' + encodeURIComponent(dotaz);
+  const vysledky = fetchJson_(url, { 'User-Agent': NOMINATIM_USER_AGENT });
+  if (!vysledky || !vysledky.length) return null;
+  const lat = Number(vysledky[0].lat);
+  const lng = Number(vysledky[0].lon);
+  if (isNaN(lat) || isNaN(lng)) return null;
+  return { lat, lng };
+}
+
+/** Vrátí souřadnice pro misto+obec – z cache, nebo (při cache-miss) čerstvě
+ *  z Nominatim a rovnou zapíše do listu i do `cache` (aby se v rámci jednoho
+ *  běhu stejná lokalita negeokódovala dvakrát). null při neúspěchu (např.
+ *  nejednoznačný text „Kabinet MÚZ nebo open air lokace“ – to je v pořádku,
+ *  frontend pak spadne zpět na textové vyhledávání). */
+function zajistitSouradnice_(ss, misto, obec, cache) {
+  const klic = klicSouradnic_(misto, obec);
+  if (!klic) return null;
+  if (cache.has(klic)) return cache.get(klic);
+  const dotaz = sestavDotazGeokodovani_(misto, obec);
+  let vysledek = null;
+  try {
+    vysledek = geocodovatNominatim_(dotaz);
+  } catch (e) { Logger.log('geokódování selhalo pro "' + dotaz + '": ' + e); }
+  if (vysledek) {
+    pridatSouradnici_(ss, klic, vysledek.lat, vysledek.lng, dotaz);
+  }
+  cache.set(klic, vysledek);   // i null se cachuje – ať se nejednoznačný text nezkouší pořád dokola
+  return vysledek;
+}
+
+/** Po každém běhu kontroly proaktivně doplní souřadnice pro lokality nově
+ *  nalezených/aktualizovaných akcí – na POZADÍ (je to trigger, nikdo nečeká),
+ *  takže frontend při běžném načtení stránky čte jen hotovou cache, nikdy
+ *  negeokóduje synchronně za uživatele. Chyba tady nesmí shodit celou kontrolu. */
+function zajistitSouradniceProAkce_(ss, events) {
+  try {
+    const cache = souradniceMapy_(readSouradnice_(ss));
+    const zpracovano = new Set();
+    events.forEach(ev => {
+      const klic = klicSouradnic_(ev.misto, ev.obec);
+      if (!klic || zpracovano.has(klic)) return;
+      zpracovano.add(klic);
+      zajistitSouradnice_(ss, ev.misto, ev.obec, cache);
+    });
+  } catch (e) { Logger.log('zajistitSouradniceProAkce_ selhalo: ' + e); }
+}
+
+/** Jednorázové (ruční, z menu) doplnění souřadnic pro VŠECHNY existující akce
+ *  v AKCÍCH – pro lokality, které vznikly před nasazením v3.14. Respektuje
+ *  6min limit běhu Apps Scriptu: přestane včas, příští ruční spuštění
+ *  pokračuje tam, kde cache skončila (už hotové lokality se přeskočí). */
+function doplnitSouradniceZpetne() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(SHEET.AKCE);
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return;
+  const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
+  const cache = souradniceMapy_(readSouradnice_(ss));
+  const zpracovano = new Set();
+  const t0 = Date.now();
+  let doplneno = 0;
+  for (let i = 0; i < data.length; i++) {
+    if (Date.now() - t0 > 4.5 * 60 * 1000) {
+      Logger.log('doplnitSouradniceZpetne: přerušeno kvůli časovému limitu, doplněno ' + doplneno + '.');
+      break;
+    }
+    const misto = data[i][5], obec = data[i][6];
+    const klic = klicSouradnic_(misto, obec);
+    if (!klic || zpracovano.has(klic) || cache.has(klic)) continue;
+    zpracovano.add(klic);
+    const vysledek = zajistitSouradnice_(ss, misto, obec, cache);
+    if (vysledek) doplneno++;
+  }
+  Logger.log('doplnitSouradniceZpetne: hotovo, nově doplněno ' + doplneno + ' souřadnic.');
 }
 
 

@@ -43,6 +43,16 @@ Events vrací akce s validními českými datumy
         ...    msg=datumOd „${akce}[datumOd]“ u „${akce}[nazev]“ není české datum
     END
 
+Events obsahují pole lat/lng pro souřadnice (v3.14)
+    [Documentation]    Schema check – lat/lng musí být v odpovědi přítomné
+    ...    klíče (hodnota null, dokud se lokalita ještě negeokódovala na
+    ...    pozadí po dalším běhu kontroly). Chytí regresi, kdyby pole zmizelo.
+    ${r}=    GET    ${BASE_URL}    params=api=events
+    ${j}=    Set Variable    ${r.json()}
+    ${prvni}=    Set Variable    ${j}[akce][0]
+    Dictionary Should Contain Key    ${prvni}    lat
+    Dictionary Should Contain Key    ${prvni}    lng
+
 Events umí filtrovat podle profilu
     ${r}=    GET    ${BASE_URL}    params=api=events&profil=Ostrava
     Status Should Be    200    ${r}

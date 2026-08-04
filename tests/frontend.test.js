@@ -9,7 +9,7 @@ const { nactiFrontendFunkce } = require('./frontend-harness');
 
 const f = nactiFrontendFunkce([
   'parseCeskeDatum', 'dateKeyBezpecne_', 'pad2_', 'gcalUrl_',
-  'filtrovatNavstivenaPodleObdobi_',
+  'filtrovatNavstivenaPodleObdobi_', 'sestavTextSdileni_', 'mapsUrl_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -119,4 +119,67 @@ test('filtrovatNavstivenaPodleObdobi_: řadí od nejnovější návštěvy', () 
   const vysledek = f.filtrovatNavstivenaPodleObdobi_(
     [akce('1. 8. 2026'), akce('3. 8. 2026'), akce('2. 8. 2026')], 'vse', TED);
   assert.deepEqual(vysledek.map(a => a.navstivenoDne), ['3. 8. 2026', '2. 8. 2026', '1. 8. 2026']);
+});
+
+// ---------------------------------------------------------------------------
+// sestavTextSdileni_ – text pro sdílení akce (WhatsApp/SMS/e-mail)
+// ---------------------------------------------------------------------------
+
+test('sestavTextSdileni_: kompletní akce – název, datum+místo, odkaz na třech řádcích', () => {
+  const text = f.sestavTextSdileni_({
+    nazev: 'Balkan Night', datumOd: '7. 8. 2026', misto: 'Špilberk', url: 'https://example.com',
+  });
+  assert.equal(text, 'Balkan Night\n7. 8. 2026 · Špilberk\nhttps://example.com');
+});
+
+test('sestavTextSdileni_: chybějící misto – druhý řádek jen datum, bez osamocené odrážky', () => {
+  const text = f.sestavTextSdileni_({ nazev: 'X', datumOd: '7. 8. 2026', misto: '', url: '' });
+  assert.equal(text, 'X\n7. 8. 2026');
+});
+
+test('sestavTextSdileni_: chybějící datum i misto – jen název (žádný prázdný druhý řádek)', () => {
+  const text = f.sestavTextSdileni_({ nazev: 'X', datumOd: '', misto: '', url: '' });
+  assert.equal(text, 'X');
+});
+
+test('sestavTextSdileni_: bez url se poslední řádek s odkazem vynechá', () => {
+  const text = f.sestavTextSdileni_({ nazev: 'X', datumOd: '1. 1. 2026', misto: 'Y', url: '' });
+  assert.equal(text, 'X\n1. 1. 2026 · Y');
+});
+
+test('sestavTextSdileni_: chybějící nazev nepadá (prázdný první řádek)', () => {
+  const text = f.sestavTextSdileni_({ datumOd: '1. 1. 2026' });
+  assert.equal(text, '\n1. 1. 2026');
+});
+
+// ---------------------------------------------------------------------------
+// mapsUrl_ – odkaz „📍 Mapa“ (Google Maps URL schéma, bez API klíče)
+// ---------------------------------------------------------------------------
+
+test('mapsUrl_: se souřadnicemi (v3.14) vygeneruje odkaz přímo z lat,lng – garantovaný pin', () => {
+  const url = f.mapsUrl_({ misto: 'Zelný trh', obec: 'Brno', lat: 49.1925, lng: 16.6087 });
+  assert.equal(url, 'https://www.google.com/maps/search/?api=1&query=49.1925,16.6087');
+});
+
+test('mapsUrl_: bez souřadnic (ještě negeokódováno) spadá zpět na textové vyhledávání', () => {
+  const url = f.mapsUrl_({ misto: 'Zelný trh', obec: 'Brno', lat: null, lng: null });
+  assert.ok(url.includes(encodeURIComponent('Zelný trh, Brno')));
+  assert.ok(!url.includes('49.'));
+});
+
+test('mapsUrl_: misto i obec – spojené čárkou, escapované, žádný api klíč v URL', () => {
+  const url = f.mapsUrl_({ misto: 'Špilberk', obec: 'Brno' });
+  assert.ok(url.startsWith('https://www.google.com/maps/search/?api=1&query='));
+  assert.ok(url.includes(encodeURIComponent('Špilberk, Brno')));
+  assert.ok(!url.toLowerCase().includes('key='));
+});
+
+test('mapsUrl_: jen obec (misto chybí) – funguje i tak', () => {
+  const url = f.mapsUrl_({ misto: '', obec: 'Brno' });
+  assert.ok(url.includes(encodeURIComponent('Brno')));
+});
+
+test('mapsUrl_: chybí misto i obec → null (žádný odkaz)', () => {
+  assert.equal(f.mapsUrl_({ misto: '', obec: '' }), null);
+  assert.equal(f.mapsUrl_({}), null);
 });
