@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.14 (4. 8. 2026) – Souřadnice akcí (Nominatim) pro garantovaný pin na mapě
+ * Verze: 3.15 (4. 8. 2026) – explicitní rubrika pro AI skóre akcí i míst
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -60,7 +60,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.14';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.15';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -548,7 +548,12 @@ function callAnthropic_(cfg, zdroje, typKontroly) {
     'Výsledky NIKDY nevypisuj jako text – po dokončení hledání je odevzdej',
     'PRÁVĚ JEDNÍM zavoláním nástroje report_events (parametr events = seznam akcí).',
     'Formáty hodnot: id = RRRR-MM-DD-slug-nazvu; datum_od/datum_do = "D. M. RRRR" (datum_do může být "");',
-    'dojezd = text VŽDY s časem i vzdáleností (např. "cca 30–40 min, ~35 km"); kategorie = středníkem oddělené; skore = číslo 1–10;',
+    'dojezd = text VŽDY s časem i vzdáleností (např. "cca 30–40 min, ~35 km"); kategorie = středníkem oddělené;',
+    'skore = číslo 1–10, rodinná atraktivita podle této rubriky:',
+    '  9–10 = jedinečná/festivalová akce, kterou by škoda propásnout (výjimečný headliner, ojedinělý formát, silná lokální tradice);',
+    '  6–8 = solidní rodinný výlet, dobrý program, ale ne zcela ojedinělý;',
+    '  3–5 = průměrná akce, spíš doplňkový tip;',
+    '  1–2 = drobná/rutinní akce (pravidelná menší akce bez zvláštního lákadla).',
     'stav = "potvrzeno". Piš česky.',
     'Uváděj jen akce ověřené na uvedených nebo jiných OFICIÁLNÍCH zdrojích',
     '(města, pořadatelé, instituce); agregátory jen jako doplňkové ověření.',
@@ -1197,7 +1202,8 @@ function callAnthropicPlaces_(cfg) {
     'PRÁVĚ JEDNÍM zavoláním nástroje report_places (parametr places).',
     'Formáty: id = slug-nazvu; typ = jedna z: zoo; botanická zahrada; science centrum;',
     'hvězdárna/planetárium; hrad/zámek; jeskyně; skanzen; technická památka; aquapark;',
-    'rozhledna; zábavní park; muzeum; jiné. skore = číslo 1–10 (atraktivita pro rodinu).',
+    'rozhledna; zábavní park; muzeum; jiné. skore = číslo 1–10, rodinná atraktivita: 9–10 = celodenní',
+    'výlet hodný cesty odjinud, 6–8 = solidní půldenní výlet, 3–5 = pěkné doplnění programu, 1–2 = drobnost.',
     'stav = "aktivní" / "sezónně zavřeno" / "zavřeno". Piš česky.',
     'Otevírací dobu uváděj AKTUÁLNÍ pro toto roční období a ověřenou na OFICIÁLNÍM webu místa.',
   ].join('\n');

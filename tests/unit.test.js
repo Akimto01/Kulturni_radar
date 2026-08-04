@@ -902,3 +902,31 @@ test('geocodovatNominatim_: v URL je countrycodes=cz a dotaz je escapovaný', ()
   assert.ok(volane[0].includes('countrycodes=cz'));
   assert.ok(volane[0].includes(encodeURIComponent('Zelný trh, Brno, Česko')));
 });
+
+// ---------------------------------------------------------------------------
+// v3.15: explicitní rubrika pro AI skóre (dřív jen "číslo 1–10" bez kritérií –
+// viz zpětná vazba/rozhovor 4. 8. 2026 o významu čísla u hvězdičky)
+// ---------------------------------------------------------------------------
+
+test('BUG-vylepseni v3.15: prompt pro akce obsahuje konkrétní rubriku skóre, ne jen "číslo 1–10"', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const zdroj = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'kulturni_radar.gs'), 'utf8');
+  const start = zdroj.indexOf('function callAnthropic_');
+  const end = zdroj.indexOf('\nfunction ', start + 10);
+  const telo = zdroj.slice(start, end);
+  assert.ok(telo.includes('9–10'), 'rubrika definuje horní pásmo (9–10)');
+  assert.ok(telo.includes('1–2'), 'rubrika definuje dolní pásmo (1–2)');
+  assert.ok(!/skore = číslo 1–10;/.test(telo), 'starý holý popis bez rubriky už tam nesmí zůstat');
+});
+
+test('v3.15: prompt pro místa má taky rubriku skóre, ne jen "(atraktivita pro rodinu)"', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const zdroj = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'kulturni_radar.gs'), 'utf8');
+  const start = zdroj.indexOf('function callAnthropicPlaces_');
+  const end = zdroj.indexOf('\nfunction ', start + 10);
+  const telo = zdroj.slice(start, end);
+  assert.ok(telo.includes('9–10'));
+  assert.ok(telo.includes('1–2'));
+});
