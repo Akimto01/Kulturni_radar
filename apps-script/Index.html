@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.6 – filtrovatNavstivenaPodleObdobi_ vytažen a otestován zvlášť -->
+<!-- Kulturní radar Index.html v3.7 – zpětná vazba rodiny 4.8.: window.open na iPadu, chipy vpravo, větší text -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -24,6 +24,7 @@
 
   body {
     font-family: var(--sans);
+    font-size: 16px;   /* zpětná vazba 4. 8. 2026: text byl na Androidu malý – explicitní kotva */
     background: var(--paper);
     color: var(--ink);
     min-height: 100vh;
@@ -81,6 +82,7 @@
     gap: 10px;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;   /* zpětná vazba 4. 8. 2026: doprava, ne doleva */
   }
   .chip {
     font-size: .78rem;
@@ -151,7 +153,7 @@
   .karta[data-kat="folklor"]             { border-left-color: #16a085; }
 
   .karta-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  .nazev { font-size: .95rem; font-weight: 600; line-height: 1.35; }
+  .nazev { font-size: 1rem; font-weight: 600; line-height: 1.35; }
   .karta-top-vpravo { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .skore {
     font-family: var(--mono);
@@ -180,7 +182,7 @@
   .navstiveno-info { color: #27ae60 !important; }
   .meta {
     margin-top: 5px;
-    font-size: .78rem;
+    font-size: .85rem;
     color: var(--ink-2);
     display: flex;
     flex-wrap: wrap;
@@ -197,7 +199,7 @@
   }
   .popis {
     margin-top: 6px;
-    font-size: .8rem;
+    font-size: .88rem;
     color: var(--ink-2);
     line-height: 1.5;
   }
@@ -232,8 +234,8 @@
     align-items: flex-start;
     gap: 12px;
   }
-  .misto-nazev { font-weight: 600; font-size: .9rem; }
-  .misto-meta { font-size: .75rem; color: var(--ink-2); margin-top: 3px; }
+  .misto-nazev { font-weight: 600; font-size: .95rem; }
+  .misto-meta { font-size: .82rem; color: var(--ink-2); margin-top: 3px; }
   .misto-skore {
     font-family: var(--mono);
     font-size: .7rem;
@@ -654,6 +656,7 @@
         link.rel = 'noopener';
         link.className = 'btn-url';
         link.textContent = 'Více info →';
+        link.addEventListener('click', (e) => otevritVNoveOknem_(e, a.url));
         akceDiv.appendChild(link);
       }
       if (gcal) {
@@ -663,6 +666,7 @@
         link.rel = 'noopener';
         link.className = 'btn-url';
         link.textContent = '📅 Do kalendáře';
+        link.addEventListener('click', (e) => otevritVNoveOknem_(e, gcal));
         akceDiv.appendChild(link);
       }
       el.appendChild(akceDiv);
@@ -691,6 +695,20 @@
   }
 
   function pad2_(n) { return String(n).padStart(2, '0'); }
+
+  /** Otevře odkaz v novém okně/záložce explicitním window.open() místo spoléhání
+   *  jen na atribut target="_blank" – na iPadu (Safari uvnitř vnořeného
+   *  sandboxovaného iframe, kterým Apps Script balí naši aplikaci) se
+   *  target="_blank" podle zpětné vazby z 4. 8. 2026 ignoruje a otevře se
+   *  detail ve stejné stránce. window.open() volaný přímo z gesta uživatele
+   *  (klik) bývá spolehlivější, ale sandbox flags řídí Google, ne my – proto
+   *  je href/target zachovaný jako fallback (kdyby JS selhal úplně) a je
+   *  potřeba to ověřit na reálném iPadu, ne jen věřit teorii. */
+  function otevritVNoveOknem_(e, url) {
+    e.preventDefault();
+    const okno = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!okno) window.location.href = url;   // pop-up blokovaný → aspoň nová navigace
+  }
 
   // ── Render stálých míst ───────────────────────────────────
   let vsechnaMista = [];

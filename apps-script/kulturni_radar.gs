@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.11 (3. 8. 2026) – zahrnoutAkciDoVysledku_ vytažen a otestován zvlášť
+ * Verze: 3.13 (4. 8. 2026) – BUG: navštíveno zobrazovalo syrové Date.toString()
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -59,7 +59,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.11';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.13';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -541,7 +541,7 @@ function callAnthropic_(cfg, zdroje, typKontroly) {
     'Výsledky NIKDY nevypisuj jako text – po dokončení hledání je odevzdej',
     'PRÁVĚ JEDNÍM zavoláním nástroje report_events (parametr events = seznam akcí).',
     'Formáty hodnot: id = RRRR-MM-DD-slug-nazvu; datum_od/datum_do = "D. M. RRRR" (datum_do může být "");',
-    'dojezd = text (např. "cca 30–40 min"); kategorie = středníkem oddělené; skore = číslo 1–10;',
+    'dojezd = text VŽDY s časem i vzdáleností (např. "cca 30–40 min, ~35 km"); kategorie = středníkem oddělené; skore = číslo 1–10;',
     'stav = "potvrzeno". Piš česky.',
     'Uváděj jen akce ověřené na uvedených nebo jiných OFICIÁLNÍCH zdrojích',
     '(města, pořadatelé, instituce); agregátory jen jako doplňkové ověření.',
@@ -933,7 +933,7 @@ function readOznaceni_(ss) {
   if (!sh || sh.getLastRow() < 2) return [];
   return sh.getRange(2, 1, sh.getLastRow() - 1, OZNACENI_HLAVICKA.length).getValues()
     .map(r => ({
-      id: String(r[0] || ''), typ: String(r[1] || ''), datum: String(r[2] || ''),
+      id: String(r[0] || ''), typ: String(r[1] || ''), datum: cellText_(r[2]),
       nazev: String(r[3] || ''), misto: String(r[4] || ''),
     }))
     .filter(r => r.id && r.typ);
