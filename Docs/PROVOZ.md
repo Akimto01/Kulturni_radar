@@ -51,6 +51,19 @@ Aktualizovat stálá místa.
 | `#VALUE!` v PŘEHLEDU | viz CHANGELOG „Oprava mimo skript“; vzorce v E4:E7 už jsou opravené |
 | Nový profil města | přidat řádek v LOKALITY + zdroje v ZDROJE, přepnout KRITÉRIA!B2, spustit kontrolu a „Aktualizovat stálá místa“ |
 
+## Přidání nového sledovaného/domácího města
+Kromě přidání řádku do LOKALITY a (u sledovaných měst) do listu SLEDOVANÁ MĚSTA
+zkontroluj list AKCE, sloupec Y (Profil lokality) – mělo by na něm NEBÝT
+pravidlo ověření dat. Objevilo se tam kdysi samo-odkazující pravidlo
+(„Hodnota obsahuje jednu z rozsahu Y2:Y1986" – tedy porovnávalo nový zápis
+proti tomu, co už ve sloupci JE, ne proti seznamu měst v LOKALITY). To
+znamenalo, že úplně NOVÉ jméno města (nikdy dřív do Y nezapsané) appka
+nemohla zapsat – narazila na chybu ověření dat (5. 8. 2026, poprvé u Třince).
+Oprava: Data → Ověření dat na libovolné buňce sloupce Y → Odstranit vše.
+Appka do tohoto sloupce zapisuje výhradně sama a sama si hlídá platnost
+jmen měst (podle LOKALITY) – ruční ověřovací pravidlo na Y je tedy zbytečné
+a případná budoucí obnova by měla znovu skončit jeho odstraněním, ne opravou rozsahu.
+
 ## Diagnostika
 
 1. **Spuštění** (Apps Script) — stav, délka, po rozkliknutí Logger výstup.
