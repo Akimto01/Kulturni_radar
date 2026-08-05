@@ -21,10 +21,12 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 ### Chybí/neúplné (vysvětleno, není to bug)
 - Počasí ve webu — dnes jen v e-mailových přehledech (~1–2 h, ale s architektonickou pastí: nesmí se volat živě při načtení stránky, potřebuje cache jako souřadnice)
 - Dojezd v km a piny na mapě u starších akcí — čeká na doběhnutí zpětného geokódování/přegenerování dat, není potřeba nic opravovat
+- Rozdíl v počtu akcí mezi městy (Praha 7, Brno 30+, jiná 0) — dané tím, že automatika běží jen pro aktivní profil; ostatní mají data jen z jednorázových ručních kontrol, nebo žádná
 
 ### Nové funkce k prozkoumání
 - Kalendářní pohled s proklikem na akce v daném termínu (~4–6 h, odhad nejistý bez detailního rozvržení)
 - Filtr podle vystupujících/žánrů (taneční, hudební…) — pole `podkategorie` v datech existuje, ale nepoužívá se nikde ve frontendu; nejdřív ověřit, jestli in data reálně obsahuje užitečné hodnoty, než slibovat rozsah
+- UX: rozlišit „0 akcí, nikdy neprohledáno" od „0 akcí, prohledáno, nic nenalezeno" (jasnější stav pro neaktivní profily v dropdownu)
 
 ## Ke kontrole
 
