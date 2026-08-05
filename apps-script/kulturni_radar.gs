@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.15 (4. 8. 2026) – explicitní rubrika pro AI skóre akcí i míst
+ * Verze: 3.18 (5. 8. 2026) – BUG: zpracovatSledovanaMesta opakovaně řešilo stejná první města, teď přeskakuje dnes hotová
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -41,6 +41,7 @@ const SHEET = {
   PREHLED: 'PŘEHLED',
   OZNACENI: 'OZNAČENÍ',
   SOURADNICE: 'SOUŘADNICE',
+  SLEDOVANA_MESTA: 'SLEDOVANÁ MĚSTA',
 };
 
 const KRIT = {           // adresy v listu KRITÉRIA
@@ -60,7 +61,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.15';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.18';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -338,6 +339,7 @@ function onOpen() {
     .addItem('Víkendové tipy teď', 'weekendDigest')
     .addItem('Aktualizovat stálá místa', 'updateMista')
     .addItem('Doplnit souřadnice (jednorázově)', 'doplnitSouradniceZpetne')
+    .addItem('Sledovaná města teď', 'zpracovatSledovanaMesta')
     .addSeparator()
     .addItem('Samotest', 'runSelfTest')
     .addToUi();
@@ -400,7 +402,22 @@ function setupTriggers() {
     .everyDays(1)
     .create();
 
-  Logger.log('Triggery vytvořeny: onEdit + denní 8:00 + pondělní přehled 7:00 + čtvrteční tipy 16:00 + měsíční místa + nedělní samotest 18:00 + denní watchdog 20:00.');
+  // Sledovaná města (v3.16): tiché doplnění dat na pozadí, žádná notifikace.
+  // Neděle večer – ať jsou data hotová PŘED pondělním týdenním přehledem (7:00).
+  ScriptApp.newTrigger('zpracovatSledovanaMesta')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .atHour(20)
+    .create();
+
+  // Čtvrtek ráno – ať jsou data hotová PŘED víkendovými tipy (16:00).
+  ScriptApp.newTrigger('zpracovatSledovanaMesta')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.THURSDAY)
+    .atHour(10)
+    .create();
+
+  Logger.log('Triggery vytvořeny: onEdit + denní 8:00 + pondělní přehled 7:00 + čtvrteční tipy 16:00 + měsíční místa + nedělní samotest 18:00 + denní watchdog 20:00 + sledovaná města (neděle 20:00, čtvrtek 10:00).');
 }
 
 /** Instalovatelný onEdit – reaguje jen na zaškrtnutí KRITÉRIA!B11. */
@@ -1156,6 +1173,116 @@ function doplnitSouradniceZpetne() {
     if (vysledek) doplneno++;
   }
   Logger.log('doplnitSouradniceZpetne: hotovo, nově doplněno ' + doplneno + ' souřadnic.');
+}
+
+// ---------------------------------------------------------------------------
+// SLEDOVANÁ MĚSTA (v3.16) – tiché doplnění dat na pozadí pro města mimo
+// domácí profil. Žádná notifikace (potvrzeno) – jen se doplní AKCE/SOUŘADNICE,
+// uživatel je uvidí, až si dané město sám vybere v dropdownu.
+// ---------------------------------------------------------------------------
+
+const SLEDOVANA_MESTA_HLAVICKA = ['Profil (musí přesně sedět s LOKALITY, sloupec B)'];
+
+function ensureSledovanaMestaSheet_(ss) {
+  let sh = ss.getSheetByName(SHEET.SLEDOVANA_MESTA);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET.SLEDOVANA_MESTA);
+    sh.getRange(1, 1, 1, SLEDOVANA_MESTA_HLAVICKA.length).setValues([SLEDOVANA_MESTA_HLAVICKA])
+      .setFontWeight('bold').setBackground('#7a3e2e').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/** Čte seznam sledovaných měst (jen sloupec A, bez hlavičky). */
+function readSledovanaMesta_(ss) {
+  const sh = ensureSledovanaMestaSheet_(ss);
+  if (sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues()
+    .map(r => String(r[0] || '').trim())
+    .filter(Boolean);
+}
+
+/** PURE: cfg pro konkrétní sledované město – kritéria (dojezd, horizont,
+ *  kategorie…) beze změny z domácího profilu, jen profil přepsaný. Testovatelné
+ *  bez Sheets I/O. */
+function cfgProMesto_(zakladniCfg, mesto) {
+  const cfg = {};
+  Object.keys(zakladniCfg).forEach(k => { cfg[k] = zakladniCfg[k]; });
+  cfg.profil = mesto;
+  return cfg;
+}
+
+/** PURE: text poslední kontroly z LOKALITY → je to dnešek (>= půlnoc dneška)?
+ *  Používá se k tomu, aby opakované spuštění zpracovatSledovanaMesta ve
+ *  stejný den PŘESKOČILO už hotová města, místo aby začínalo pořád od
+ *  začátku seznamu (BUG nalezený 5. 8. 2026 – druhé ruční spuštění zpracovalo
+ *  znovu ta samá první 3 města a k dalším se vůbec nedostalo). */
+function jeDnesJizZpracovano_(posledniKontrolaText, dnes) {
+  const d = parseCzDate_(posledniKontrolaText);
+  if (!d) return false;
+  const pulnocDnes = new Date(dnes.getFullYear(), dnes.getMonth(), dnes.getDate());
+  return d >= pulnocDnes;
+}
+
+/** Čte poslední kontrolu všech profilů z LOKALITY (sloupec H) jako Map
+ *  normalizovaný-profil → syrový text data (needitovaný, na interpretaci
+ *  slouží jeDnesJizZpracovano_). */
+function readPosledniKontrolyLokalit_(ss) {
+  const sh = ss.getSheetByName(SHEET.LOKALITY);
+  const mapa = new Map();
+  if (!sh || sh.getLastRow() < 2) return mapa;
+  sh.getRange(2, 2, sh.getLastRow() - 1, 7).getValues().forEach(row => {
+    const profil = String(row[0] || '').trim();
+    if (profil) mapa.set(norm_(profil), cellText_(row[6]));
+  });
+  return mapa;
+}
+
+/** Hlavní běh: projde sledovaná města, pro každé (mimo domácí profil, mimo
+ *  ty už dnes zpracované) spustí hledání – stejná kritéria (dojezd/horizont/
+ *  kategorie) jako domácí profil, jen jiné město. Časově rozpočtováno
+ *  (~4,5 min) jako doplnitSouradniceZpetne; PŘESKAKUJE dnes už hotová města
+ *  (viz jeDnesJizZpracovano_), takže opakované ruční spuštění postupně
+ *  projde celý seznam, ne pořád jen jeho začátek. Bez notifikace. */
+function zpracovatSledovanaMesta() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) { Logger.log('zpracovatSledovanaMesta: jiný běh právě probíhá – končím.'); return; }
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  try {
+    const krit = ss.getSheetByName(SHEET.KRITERIA);
+    const zakladniCfg = readCriteria_(krit);
+    const mesta = readSledovanaMesta_(ss);
+    const kontroly = readPosledniKontrolyLokalit_(ss);
+    const dnes = new Date();
+    const t0 = Date.now();
+    let zpracovano = 0, preskocenoDnes = 0;
+    for (let i = 0; i < mesta.length; i++) {
+      if (Date.now() - t0 > 4.5 * 60 * 1000) {
+        Logger.log('zpracovatSledovanaMesta: přerušeno kvůli časovému limitu po ' + zpracovano + ' městech (zbývá ' + (mesta.length - i) + ').');
+        break;
+      }
+      const mesto = mesta[i];
+      if (norm_(mesto) === norm_(zakladniCfg.profil)) continue;   // domácí profil řeší dailyCheck
+      if (jeDnesJizZpracovano_(kontroly.get(norm_(mesto)), dnes)) { preskocenoDnes++; continue; }
+      try {
+        const cfg = cfgProMesto_(zakladniCfg, mesto);
+        const zdroje = readSources_(ss, mesto);
+        const events = callAnthropic_(cfg, zdroje, 'sledované město');
+        const stats = upsertEvents_(ss, cfg, events);
+        zajistitSouradniceProAkce_(ss, events);
+        logKontrola_(ss, 'sledované město', cfg, stats, zdroje.length);
+        updateLokalita_(ss, mesto, new Date());
+        zpracovano++;
+      } catch (e) {
+        Logger.log('Sledované město "' + mesto + '" selhalo: ' + e);
+      }
+    }
+    Logger.log('zpracovatSledovanaMesta: hotovo, zpracováno ' + zpracovano + ' z ' + mesta.length
+      + ' měst (přeskočeno jako dnes už hotové: ' + preskocenoDnes + ').');
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 

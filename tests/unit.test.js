@@ -1040,3 +1040,51 @@ test('callAnthropic_: prázdný seznam akcí ([]) je platný výsledek, ne chyba
   assert.ok(Array.isArray(events));
   assert.equal(events.length, 0);
 });
+
+// ---------------------------------------------------------------------------
+// v3.16: Sledovaná města – tiché doplnění dat pro města mimo domácí profil
+// ---------------------------------------------------------------------------
+
+test('cfgProMesto_: přepíše jen profil, ostatní kritéria (dojezd, horizont…) beze změny', () => {
+  const zaklad = { profil: 'Brno', dojezd: '90 min', horizont: '2 týdny', kategorie: 'vše', maleAkce: 'ano', detske: 'ano' };
+  const cfg = r.cfgProMesto_(zaklad, 'Znojmo');
+  assert.equal(cfg.profil, 'Znojmo');
+  assert.equal(cfg.dojezd, '90 min');
+  assert.equal(cfg.horizont, '2 týdny');
+  assert.equal(cfg.maleAkce, 'ano');
+});
+
+test('cfgProMesto_: nemutuje původní zakladniCfg objekt (nový objekt pokaždé)', () => {
+  const zaklad = { profil: 'Brno', dojezd: '90 min' };
+  const cfg1 = r.cfgProMesto_(zaklad, 'Praha');
+  const cfg2 = r.cfgProMesto_(zaklad, 'Plzeň');
+  assert.equal(zaklad.profil, 'Brno', 'původní objekt zůstal nedotčený');
+  assert.equal(cfg1.profil, 'Praha');
+  assert.equal(cfg2.profil, 'Plzeň');
+});
+
+// ---------------------------------------------------------------------------
+// v3.18: BUG oprava - zpracovatSledovanaMesta přeskakuje dnes už hotová města
+// (dřív začínalo pokaždé od začátku seznamu, druhé spuštění nikdy nepokročilo)
+// ---------------------------------------------------------------------------
+
+test('jeDnesJizZpracovano_: dnešní datum → true', () => {
+  const dnes = new r.__Date(2026, 7, 5, 14, 0);
+  assert.equal(r.jeDnesJizZpracovano_('5. 8. 2026 18:45', dnes), true);
+});
+
+test('jeDnesJizZpracovano_: včerejší datum → false (má se zpracovat)', () => {
+  const dnes = new r.__Date(2026, 7, 5, 14, 0);
+  assert.equal(r.jeDnesJizZpracovano_('4. 8. 2026 20:00', dnes), false);
+});
+
+test('jeDnesJizZpracovano_: prázdné/nerozparsovatelné → false (nikdy nezpracováno)', () => {
+  const dnes = new r.__Date(2026, 7, 5);
+  assert.equal(r.jeDnesJizZpracovano_('', dnes), false);
+  assert.equal(r.jeDnesJizZpracovano_(undefined, dnes), false);
+});
+
+test('jeDnesJizZpracovano_: přesně půlnoc dneška se počítá jako dnešek (>=, ne >)', () => {
+  const dnes = new r.__Date(2026, 7, 5, 23, 0);
+  assert.equal(r.jeDnesJizZpracovano_('5. 8. 2026 0:00', dnes), true);
+});
