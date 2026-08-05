@@ -11,6 +11,21 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 - Poslat URL rodině, počkat na zpětnou vazbu — určí prioritu všeho níže.
 - Předat `Index.html` dceři k designu (CSS tokeny v `:root`).
 
+## Zpětná vazba syna — 5. 8. 2026
+### Design/rozvržení (patří do dceřina designového večera, ne bodová oprava)
+- Příliš mnoho textu bez struktury — zvážit boční osnovu/navigaci stránky
+- Obsah zbytečně úzký uprostřed, nevyužitý prostor po stranách na širších obrazovkách
+- Chipy „★ Oblíbené"/„✓ Navštívené" vizuálně sjednotit s výškou filtrů vlevo
+- Barevné rozlišení mezi položkami/kategoriemi (budoucí potřeba, ne akutní)
+
+### Chybí/neúplné (vysvětleno, není to bug)
+- Počasí ve webu — dnes jen v e-mailových přehledech (~1–2 h, ale s architektonickou pastí: nesmí se volat živě při načtení stránky, potřebuje cache jako souřadnice)
+- Dojezd v km a piny na mapě u starších akcí — čeká na doběhnutí zpětného geokódování/přegenerování dat, není potřeba nic opravovat
+
+### Nové funkce k prozkoumání
+- Kalendářní pohled s proklikem na akce v daném termínu (~4–6 h, odhad nejistý bez detailního rozvržení)
+- Filtr podle vystupujících/žánrů (taneční, hudební…) — pole `podkategorie` v datech existuje, ale nepoužívá se nikde ve frontendu; nejdřív ověřit, jestli in data reálně obsahuje užitečné hodnoty, než slibovat rozsah
+
 ## Ke kontrole
 
 ## Probíhající měření
