@@ -72,3 +72,4 @@ Odhad rozsahu: řádově týdny soustředěné práce, ne jedna session.
 
 ## Trvalá pravidla (ne úkoly, ale konvence)
 - Při každém „Nová verze" v Apps Scriptu vyplnit pole Popis podle aktuální `VERZE`.
+- Formalizováno jako Claude skill kulturni-radar-workflow (4. 8. 2026) — viz Docs/kulturni-radar-workflow/.
