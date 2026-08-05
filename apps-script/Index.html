@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.10 – mapsUrl_ preferuje souřadnice (v3.14 backend), garantovaný pin -->
+<!-- Kulturní radar Index.html v3.11 – BUG opravy 5.8.: window.open s noopener nulovalo return (originál se přesměroval pryč), přepnutí profilu neaktualizovalo Stálá místa -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -412,7 +412,11 @@
         if (p.profil === aktivniProfil) opt.selected = true;
         sel.appendChild(opt);
       });
-      sel.addEventListener('change', () => { rezimZobrazeni = 'vse'; nactiAkce(sel.value); });
+      sel.addEventListener('change', () => {
+        rezimZobrazeni = 'vse';
+        nactiAkce(sel.value);
+        nactiMista(sel.value);   // BUG oprava 5. 8. 2026: dřív se neaktualizovala při přepnutí města
+      });
 
       // Kategorie chipy
       const chips = document.getElementById('kat-chips');
@@ -769,14 +773,24 @@
    *  jen na atribut target="_blank" – na iPadu (Safari uvnitř vnořeného
    *  sandboxovaného iframe, kterým Apps Script balí naši aplikaci) se
    *  target="_blank" podle zpětné vazby z 4. 8. 2026 ignoruje a otevře se
-   *  detail ve stejné stránce. window.open() volaný přímo z gesta uživatele
-   *  (klik) bývá spolehlivější, ale sandbox flags řídí Google, ne my – proto
-   *  je href/target zachovaný jako fallback (kdyby JS selhal úplně) a je
-   *  potřeba to ověřit na reálném iPadu, ne jen věřit teorii. */
+   *  detail ve stejné stránce.
+   *
+   *  BUG opravený 5. 8. 2026: window.open(url, '_blank', 'noopener') vrací
+   *  null VŽDY, i při úspěchu (specifikace – noopener záměrně nedává žádnou
+   *  vazbu zpět). Náš fallback (!okno → window.location.href = url) se tak
+   *  spouštěl i po úspěšném otevření a přesměroval PŮVODNÍ stránku pryč na
+   *  cizí web (uživatel to viděl jako „stránka spadla"). Bezpečnostní izolaci
+   *  (ekvivalent noopener) teď zajišťuje okno.opener = null AŽ PO úspěšném
+   *  otevření – tím window.open() vrací skutečnou referenci na úspěch a
+   *  fallback se spustí jen při doopravdy zablokovaném vyskakovacím okně. */
   function otevritVNoveOknem_(e, url) {
     e.preventDefault();
-    const okno = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!okno) window.location.href = url;   // pop-up blokovaný → aspoň nová navigace
+    const okno = window.open(url, '_blank');
+    if (okno) {
+      okno.opener = null;
+    } else {
+      window.location.href = url;   // opravdu zablokováno pop-up blockerem
+    }
   }
 
   // ── Render stálých míst ───────────────────────────────────
