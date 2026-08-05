@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.11 – BUG opravy 5.8.: window.open s noopener nulovalo return (originál se přesměroval pryč), přepnutí profilu neaktualizovalo Stálá místa -->
+<!-- Kulturní radar Index.html v3.12 – BUG opravy 5.8.: #status mizel z DOM a druhé přepnutí profilu tiše spadlo (fetch se vůbec nespustil), abecední řazení měst v dropdownu -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -403,9 +403,12 @@
       const meta = await api('meta');
       aktivniProfil = meta.aktivniProfil || '';
 
-      // Profily do selectu
+      // Profily do selectu – seřazené abecedně (zpětná vazba 5. 8. 2026:
+      // dřív v pořadí, jak je vrátil list LOKALITY, což se hůř hledá)
       const sel = document.getElementById('profil-select');
-      (meta.profily || []).forEach(p => {
+      const profilySerazene = [...(meta.profily || [])].sort((a, b) =>
+        String(a.profil).localeCompare(String(b.profil), 'cs'));
+      profilySerazene.forEach(p => {
         const opt = document.createElement('option');
         opt.value = p.profil;
         opt.textContent = p.profil + (p.kraj ? ' · ' + p.kraj : '');
@@ -454,12 +457,30 @@
       await nactiAkce(aktivniProfil);
       await nactiMista(aktivniProfil);
     } catch (e) {
-      document.getElementById('status').textContent = 'Chyba načítání: ' + e.message;
+      zobrazitStatus_('Chyba načítání: ' + e.message);
     }
   }
 
+  /** Zobrazí stavovou hlášku v #main. BUG opravený 5. 8. 2026: statický
+   *  #status z počátečního HTML smaže renderAkce() při prvním úspěšném
+   *  vykreslení (čistí #main od všeho kromě #mista-sekce) – každé DALŠÍ
+   *  volání nactiAkce (přepnutí profilu) tak narazilo na getElementById
+   *  vracející null a spadlo ještě před try blokem, TICHO (async funkce
+   *  bez awaitu na volající straně = odmítnutý Promise, ne viditelná
+   *  chyba). Appka pak na přepnutí města nereagovala vůbec. Řešení: prvek
+   *  vytvořit znovu, pokud chybí, místo spoléhat na jeho trvalou existenci. */
+  function zobrazitStatus_(text) {
+    let el = document.getElementById('status');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'status';
+      document.getElementById('main').prepend(el);
+    }
+    el.textContent = text;
+  }
+
   async function nactiAkce(profil) {
-    document.getElementById('status').textContent = 'Načítám…';
+    zobrazitStatus_('Načítám…');
     try {
       const data = await api('events', profil ? 'profil=' + encodeURIComponent(profil) : '');
       vsechnaAkce = data.akce || [];
@@ -468,7 +489,7 @@
         document.getElementById('meta-info').textContent = 'načteno: ' + data.generovano;
       }
     } catch (e) {
-      document.getElementById('status').textContent = 'Chyba: ' + e.message;
+      zobrazitStatus_('Chyba: ' + e.message);
     }
   }
 

@@ -28,6 +28,9 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 
 ## Ke kontrole
 
+## Testovací dluh
+- RF test na opakované přepnutí profilu v dropdownu — regresní pojistka na bug v3.12 (#status mizel z DOM).
+
 ## Probíhající měření
 - Haiku vs. Sonnet na denní kontrole — týden sledovat kvalitu úlovků, pak rozhodnout.
 
