@@ -10,6 +10,7 @@ const { nactiFrontendFunkce } = require('./frontend-harness');
 const f = nactiFrontendFunkce([
   'parseCeskeDatum', 'dateKeyBezpecne_', 'pad2_', 'gcalUrl_',
   'filtrovatNavstivenaPodleObdobi_', 'sestavTextSdileni_', 'mapsUrl_',
+  'sestavFiltry_', 'pinVypadaPlatne_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -182,4 +183,34 @@ test('mapsUrl_: jen obec (misto chybí) – funguje i tak', () => {
 test('mapsUrl_: chybí misto i obec → null (žádný odkaz)', () => {
   assert.equal(f.mapsUrl_({ misto: '', obec: '' }), null);
   assert.equal(f.mapsUrl_({}), null);
+});
+
+// ---------------------------------------------------------------------------
+// v3.13: Uživatelské profily – čisté funkce přihlášení a osobních filtrů
+// ---------------------------------------------------------------------------
+
+test('v3.13: sestavFiltry_ – vyplněné hodnoty se přenesou, mezery okolo se ořežou', () => {
+  const filtry = f.sestavFiltry_('  koncerty; festivaly ', ' 60 min ');
+  assert.equal(filtry.kategorie, 'koncerty; festivaly');
+  assert.equal(filtry.dojezd, '60 min');
+});
+
+test('v3.13: sestavFiltry_ – prázdné/null hodnoty se VYNECHAJÍ (= použije se výchozí z KRITÉRIÍ)', () => {
+  assert.equal(Object.keys(f.sestavFiltry_('', '')).length, 0);
+  assert.equal(Object.keys(f.sestavFiltry_(null, undefined)).length, 0);
+  const jenDojezd = f.sestavFiltry_('', '90 min');
+  assert.equal('kategorie' in jenDojezd, false, 'prázdná kategorie se do filtrů vůbec nezapíše');
+  assert.equal(jenDojezd.dojezd, '90 min');
+});
+
+test('v3.13: pinVypadaPlatne_ – 4–8 znaků bez mezer uvnitř, okolní mezery se ořežou', () => {
+  assert.equal(f.pinVypadaPlatne_('1234'), true);
+  assert.equal(f.pinVypadaPlatne_('12345678'), true);
+  assert.equal(f.pinVypadaPlatne_('abc4'), true, 'PIN nemusí být jen číslice');
+  assert.equal(f.pinVypadaPlatne_('123'), false, 'moc krátký');
+  assert.equal(f.pinVypadaPlatne_('123456789'), false, 'moc dlouhý');
+  assert.equal(f.pinVypadaPlatne_('12 34'), false, 'mezera uvnitř');
+  assert.equal(f.pinVypadaPlatne_(''), false);
+  assert.equal(f.pinVypadaPlatne_(null), false);
+  assert.equal(f.pinVypadaPlatne_('  1234  '), true, 'mezery okolo se před kontrolou ořežou');
 });

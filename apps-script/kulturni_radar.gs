@@ -1,7 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.19 (6. 8. 2026) – Víkendové tipy: volitelný druhý příjemce (NOTIFY_EMAIL_VIKEND)
+ * Verze: 3.20 (7. 8. 2026) – Uživatelské profily: osobní oblíbené/navštívené,
+ * osobní filtry hledání, přihlášení přes PIN (backend), list UŽIVATELÉ
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -43,6 +44,7 @@ const SHEET = {
   OZNACENI: 'OZNAČENÍ',
   SOURADNICE: 'SOUŘADNICE',
   SLEDOVANA_MESTA: 'SLEDOVANÁ MĚSTA',
+  UZIVATELE: 'UŽIVATELÉ',
 };
 
 const KRIT = {           // adresy v listu KRITÉRIA
@@ -62,7 +64,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.19';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.20';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -138,6 +140,7 @@ const REPORT_PLACES_TOOL = {
 function doGet(e) {
   const api = (e && e.parameter && e.parameter.api) || '';
   const profil = (e && e.parameter && e.parameter.profil) || '';
+  const uzivatelId = (e && e.parameter && e.parameter.uzivatel) || '';
 
   if (!api) {
     return HtmlService
@@ -149,7 +152,7 @@ function doGet(e) {
   let data;
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (api === 'events') data = readEventsApi_(ss, profil, (e.parameter && e.parameter.oznacene) === '1');
+    if (api === 'events') data = readEventsApi_(ss, profil, (e.parameter && e.parameter.oznacene) === '1', uzivatelId);
     else if (api === 'places') data = readPlacesApi_(ss, profil);
     else if (api === 'meta') data = readMetaApi_(ss);
     else if (api === 'run') data = spustKontroluCore_((e.parameter && e.parameter.token) || '');
@@ -211,8 +214,10 @@ function zahrnoutAkciDoVysledku_(stav, datumOd, dnes, zahrnoutOznacene, jeOznace
   return true;
 }
 
-/** API: akce profilu v databázi (neprobíhající, přijde – nebo označené, viz zahrnoutOznacene). */
-function readEventsApi_(ss, profilParam, zahrnoutOznacene) {
+/** API: akce profilu v databázi (neprobíhající, přijde – nebo označené, viz zahrnoutOznacene).
+ *  uzivatelId: ID přihlášeného uživatelského profilu – oblíbené/navštívené jsou
+ *  od v3.20 osobní, takže bez přihlášení (uzivatelId = '') vyjdou vždy false/''. */
+function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
   const krit = ss.getSheetByName(SHEET.KRITERIA);
   const aktivniProfil = krit ? String(krit.getRange(KRIT.PROFIL).getValue()).trim() : '';
   const profil = profilParam || aktivniProfil;
@@ -223,7 +228,8 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene) {
 
   const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
   const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
-  const oznaceniMapa = oznaceniMapy_(readOznaceni_(ss));
+  const rowsTohotoUzivatele = uzivatelId ? readOznaceni_(ss).filter(r => r.uzivatel === uzivatelId) : [];
+  const oznaceniMapa = oznaceniMapy_(rowsTohotoUzivatele);
   const souradniceMapa = souradniceMapy_(readSouradnice_(ss));
   const akce = [];
 
@@ -308,13 +314,33 @@ function readMetaApi_(ss) {
 // ---------------------------------------------------------------------------
 
 function apiMeta()              { return readMetaApi_(SpreadsheetApp.getActiveSpreadsheet()); }
-function apiEvents(profil, zahrnoutOznacene) {
-  return readEventsApi_(SpreadsheetApp.getActiveSpreadsheet(), profil || '', !!zahrnoutOznacene);
+function apiEvents(profil, zahrnoutOznacene, uzivatelId) {
+  return readEventsApi_(SpreadsheetApp.getActiveSpreadsheet(), profil || '', !!zahrnoutOznacene, uzivatelId || '');
 }
 function apiPlaces(profil)      { return readPlacesApi_(SpreadsheetApp.getActiveSpreadsheet(), profil || ''); }
 function apiSpustKontrolu(tok)  { return spustKontroluCore_(tok); }
-/** Přepne označení (oblíbené/navštíveno) u dané akce; vrací aktuální stav OBOU příznaků. */
-function apiToggle(id, typ)     { return apiToggle_(SpreadsheetApp.getActiveSpreadsheet(), id, typ); }
+/** Přepne označení (oblíbené/navštíveno) u dané akce PRO PŘIHLÁŠENÝ uživatelský
+ *  profil; vrací aktuální stav obou příznaků TOHOTO profilu. */
+function apiToggle(id, typ, uzivatelId) {
+  return apiToggle_(SpreadsheetApp.getActiveSpreadsheet(), id, typ, uzivatelId);
+}
+
+/** Přihlášení uživatelského profilu (ID + PIN) – volané z přihlašovací obrazovky. */
+function apiPrihlaseniUzivatele(uzivatelId, pin) {
+  return apiPrihlaseniUzivatele_(SpreadsheetApp.getActiveSpreadsheet(), uzivatelId, pin);
+}
+/** Seznam profilů (jen ID+jméno, bez PINů) pro dlaždice na přihlašovací obrazovce. */
+function apiSeznamUzivatelu() {
+  return apiSeznamUzivatelu_(SpreadsheetApp.getActiveSpreadsheet());
+}
+/** Uloží osobní filtry (kategorie/dojezd) přihlášeného uživatelského profilu. */
+function apiSetFiltry(uzivatelId, filtryObj) {
+  return apiSetFiltry_(SpreadsheetApp.getActiveSpreadsheet(), uzivatelId, filtryObj);
+}
+/** Spustí AI hledání s osobními kritérii uživatelského profilu (na vyžádání, token chrání). */
+function apiNajdiProUzivatele(uzivatelId, tok) {
+  return apiNajdiProUzivatele_(SpreadsheetApp.getActiveSpreadsheet(), uzivatelId, tok);
+}
 
 /** Sdílené jádro spouštění z webu: token → cooldown → asynchronní trigger. */
 function spustKontroluCore_(tok) {
@@ -343,7 +369,47 @@ function onOpen() {
     .addItem('Sledovaná města teď', 'zpracovatSledovanaMesta')
     .addSeparator()
     .addItem('Samotest', 'runSelfTest')
+    .addSeparator()
+    .addItem('Nastavit uživatelské profily (jednorázově)', 'migraceUzivatelskeProfily')
     .addToUi();
+}
+
+/** JEDNORÁZOVÁ migrace v3.20: vytvoří list UŽIVATELÉ (prázdné PINy k doplnění
+ *  ručně) a VYMAŽE dosavadní sdílený obsah OZNAČENÍ (rozhodnutí 7. 8. 2026 –
+ *  stará data byla bez majitele, nedala by se k nikomu spravedlivě přiřadit,
+ *  takže se historie oblíbených/navštívených pro všechny profily začíná od
+ *  nuly). Bezpečné spustit i opakovaně – UŽIVATELÉ se založí jen když chybí,
+ *  existující řádky v UŽIVATELÍCH se nepřepisují.
+ *  PIN se do sloupce PIN_hash zapisuje jako hash (viz hashPin_) – po založení
+ *  řádků je potřeba každému profilu nastavit PIN ručně přes apiSetFiltry
+ *  nebo přímo doplněním hashPin_('1234', Utilities.getUuid()) do buňky. */
+function migraceUzivatelskeProfily() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ensureUzivateleSheet_(ss);
+  if (sh.getLastRow() < 2) {
+    const vychozi = ['vojta', 'manzelka', 'dcera', 'profil4'];
+    sh.getRange(2, 1, vychozi.length, UZIVATELE_HLAVICKA.length).setValues(
+      vychozi.map(id => [id, '', '', '{}', formatDateOnly_(new Date())]));
+    SpreadsheetApp.getUi().alert(
+      'List UŽIVATELÉ založen se 4 prázdnými řádky. Doplň prosím ručně sloupce ' +
+      '"Jméno" a PIN – PIN se zapisuje jako hash, ne čitelný text (spusť v editoru ' +
+      'nastavPin_("vojta", "1234") pro každý profil, viz komentář u funkce).');
+  }
+  zapsatOznaceni_(ss, []);
+  SpreadsheetApp.getUi().alert('List OZNAČENÍ vymazán – oblíbené a navštívené jsou od teď osobní, historie začíná od nuly pro všechny profily.');
+}
+
+/** Pomocná funkce pro ruční nastavení/změnu PINu profilu z editoru Apps Scriptu
+ *  (Spustit → nastavPin_ se zadanými argumenty, nebo zavolat z konzole). */
+function nastavPin_(uzivatelId, novyPin) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ensureUzivateleSheet_(ss);
+  const data = readUzivatele_(ss);
+  const idx = data.findIndex(u => u.id === uzivatelId);
+  if (idx < 0) throw new Error('profil "' + uzivatelId + '" nenalezen v UŽIVATELÍCH');
+  const sul = Utilities.getUuid();
+  sh.getRange(idx + 2, 3).setValue(hashPin_(novyPin, sul));
+  Logger.log('PIN pro "' + uzivatelId + '" nastaven.');
 }
 
 function menuRunNow() {
@@ -944,7 +1010,9 @@ function ensureMistaSheet_(ss) {
   return sh;
 }
 
-const OZNACENI_HLAVICKA = ['ID akce', 'Typ', 'Datum označení', 'Název', 'Místo'];
+/** v3.20: přidán sloupec 'Uživatel' – oblíbené/navštívené jsou od v3.20 osobní
+ *  (per uživatelský profil), ne sdílené za celou domácnost jako dřív. */
+const OZNACENI_HLAVICKA = ['ID akce', 'Typ', 'Datum označení', 'Název', 'Místo', 'Uživatel'];
 
 function ensureOznaceniSheet_(ss) {
   let sh = ss.getSheetByName(SHEET.OZNACENI);
@@ -964,7 +1032,7 @@ function readOznaceni_(ss) {
   return sh.getRange(2, 1, sh.getLastRow() - 1, OZNACENI_HLAVICKA.length).getValues()
     .map(r => ({
       id: String(r[0] || ''), typ: String(r[1] || ''), datum: cellText_(r[2]),
-      nazev: String(r[3] || ''), misto: String(r[4] || ''),
+      nazev: String(r[3] || ''), misto: String(r[4] || ''), uzivatel: String(r[5] || ''),
     }))
     .filter(r => r.id && r.typ);
 }
@@ -976,11 +1044,12 @@ function zapsatOznaceni_(ss, rows) {
   if (posledni > 1) sh.getRange(2, 1, posledni - 1, OZNACENI_HLAVICKA.length).clearContent();
   if (rows.length) {
     sh.getRange(2, 1, rows.length, OZNACENI_HLAVICKA.length).setValues(
-      rows.map(r => [r.id, r.typ, r.datum, r.nazev, r.misto]));
+      rows.map(r => [r.id, r.typ, r.datum, r.nazev, r.misto, r.uzivatel || '']));
   }
 }
 
-/** PURE: pole řádků OZNAČENÍ → Map(id → {oblibene, navstivenoDne}). Bez Sheets I/O, testovatelné přímo. */
+/** PURE: pole řádků OZNAČENÍ (jednoho uživatele – volající musí předfiltrovat)
+ *  → Map(id → {oblibene, navstivenoDne}). Bez Sheets I/O, testovatelné přímo. */
 function oznaceniMapy_(rows) {
   const mapa = new Map();
   rows.forEach(r => {
@@ -992,14 +1061,14 @@ function oznaceniMapy_(rows) {
   return mapa;
 }
 
-/** PURE: přepne typ u dané akce v poli řádků OZNAČENÍ (přidá, nebo smaže existující řádek).
- *  Vrací { rows: novéPole, aktivni: bool } – aktivni = stav PO přepnutí. */
-function toggleOznaceni_(rows, id, typ, kdyText, nazev, misto) {
-  const idx = rows.findIndex(r => r.id === id && r.typ === typ);
+/** PURE: přepne typ u dané akce PRO DANÉHO UŽIVATELE v poli řádků OZNAČENÍ
+ *  (přidá, nebo smaže existující řádek). Vrací { rows: novéPole, aktivni: bool }. */
+function toggleOznaceni_(rows, id, typ, kdyText, nazev, misto, uzivatelId) {
+  const idx = rows.findIndex(r => r.id === id && r.typ === typ && r.uzivatel === uzivatelId);
   if (idx >= 0) {
     return { rows: rows.slice(0, idx).concat(rows.slice(idx + 1)), aktivni: false };
   }
-  const novy = { id, typ, datum: kdyText, nazev: nazev || '', misto: misto || '' };
+  const novy = { id, typ, datum: kdyText, nazev: nazev || '', misto: misto || '', uzivatel: uzivatelId };
   return { rows: rows.concat([novy]), aktivni: true };
 }
 
@@ -1022,19 +1091,135 @@ function najdiAkciPodleId_(ss, id) {
   return null;
 }
 
-/** Přepne označení (typ: 'oblibene' | 'navstiveno') u akce; vrací aktuální stav obou příznaků. */
-function apiToggle_(ss, id, typ) {
+/** Přepne označení (typ: 'oblibene' | 'navstiveno') u akce PRO KONKRÉTNÍHO
+ *  uživatelského profilu; vrací aktuální stav obou příznaků TOHOTO uživatele. */
+function apiToggle_(ss, id, typ, uzivatelId) {
   if (typ !== 'oblibene' && typ !== 'navstiveno') return { ok: false, error: 'neplatný typ označení' };
   if (!id) return { ok: false, error: 'chybí ID akce' };
+  if (!uzivatelId) return { ok: false, error: 'chybí uživatelský profil – přihlas se prosím znovu' };
   const akceInfo = najdiAkciPodleId_(ss, id);
   if (!akceInfo) return { ok: false, error: 'akce s tímto ID nebyla nalezena' };
 
   const rows = readOznaceni_(ss);
-  const vysledek = toggleOznaceni_(rows, id, typ, formatDateOnly_(new Date()), akceInfo.nazev, akceInfo.misto);
+  const vysledek = toggleOznaceni_(rows, id, typ, formatDateOnly_(new Date()), akceInfo.nazev, akceInfo.misto, uzivatelId);
   zapsatOznaceni_(ss, vysledek.rows);
 
-  const stavPoTom = oznaceniMapy_(vysledek.rows).get(id) || { oblibene: false, navstivenoDne: null };
+  const rowsTohotoUzivatele = vysledek.rows.filter(r => r.uzivatel === uzivatelId);
+  const stavPoTom = oznaceniMapy_(rowsTohotoUzivatele).get(id) || { oblibene: false, navstivenoDne: null };
   return { ok: true, id, oblibene: stavPoTom.oblibene, navstivenoDne: stavPoTom.navstivenoDne || '' };
+}
+
+// ---------------------------------------------------------------------------
+// UŽIVATELSKÉ PROFILY (v3.20) – osobní oblíbené/navštívené + osobní filtry
+// ---------------------------------------------------------------------------
+
+const UZIVATELE_HLAVICKA = ['ID', 'Jméno', 'PIN_hash', 'Filtry', 'Vytvořeno'];
+
+function ensureUzivateleSheet_(ss) {
+  let sh = ss.getSheetByName(SHEET.UZIVATELE);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET.UZIVATELE);
+    sh.getRange(1, 1, 1, UZIVATELE_HLAVICKA.length).setValues([UZIVATELE_HLAVICKA])
+      .setFontWeight('bold').setBackground('#4a235a').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/** Čte list UŽIVATELÉ do prostých objektů (bez PIN_hash navenek z apiMeta). */
+function readUzivatele_(ss) {
+  const sh = ss.getSheetByName(SHEET.UZIVATELE);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, UZIVATELE_HLAVICKA.length).getValues()
+    .map(r => ({
+      id: String(r[0] || ''), jmeno: String(r[1] || ''), pinHash: String(r[2] || ''),
+      filtry: String(r[3] || ''), vytvoreno: cellText_(r[4]),
+    }))
+    .filter(r => r.id);
+}
+
+/** PURE: SHA-256 hash PINu se solí (formát uložení: "sůl$hash"). Sůl brání
+ *  tomu, aby šlo dva stejné PINy poznat podle stejného hashe v tabulce. */
+function hashPin_(pin, sul) {
+  const vstup = sul + ':' + String(pin);
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, vstup, Utilities.Charset.UTF_8);
+  const hex = bytes.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
+  return sul + '$' + hex;
+}
+
+/** PURE: ověří PIN proti uloženému "sůl$hash". */
+function overitPin_(pin, ulozenyHash) {
+  if (!ulozenyHash || ulozenyHash.indexOf('$') < 0) return false;
+  const sul = ulozenyHash.split('$')[0];
+  return hashPin_(pin, sul) === ulozenyHash;
+}
+
+/** API: přihlášení uživatelského profilu jménem/ID + PIN. Nikdy nevrací hash. */
+function apiPrihlaseniUzivatele_(ss, uzivatelId, pin) {
+  if (!uzivatelId || !pin) return { ok: false, error: 'chybí profil nebo PIN' };
+  const uzivatel = readUzivatele_(ss).find(u => u.id === uzivatelId);
+  if (!uzivatel) return { ok: false, error: 'profil nenalezen' };
+  if (!overitPin_(pin, uzivatel.pinHash)) return { ok: false, error: 'nesprávný PIN' };
+  let filtry = {};
+  try { filtry = uzivatel.filtry ? JSON.parse(uzivatel.filtry) : {}; } catch (e) { filtry = {}; }
+  return { ok: true, id: uzivatel.id, jmeno: uzivatel.jmeno, filtry };
+}
+
+/** API: seznam profilů k výběru na přihlašovací obrazovce (jen ID + jméno, žádné PINy). */
+function apiSeznamUzivatelu_(ss) {
+  return readUzivatele_(ss).map(u => ({ id: u.id, jmeno: u.jmeno }));
+}
+
+/** API: uloží osobní filtry (kategorie, dojezd, ...) uživatelského profilu jako JSON. */
+function apiSetFiltry_(ss, uzivatelId, filtryObj) {
+  if (!uzivatelId) return { ok: false, error: 'chybí uživatelský profil' };
+  const sh = ensureUzivateleSheet_(ss);
+  const data = readUzivatele_(ss);
+  const idx = data.findIndex(u => u.id === uzivatelId);
+  if (idx < 0) return { ok: false, error: 'profil nenalezen' };
+  sh.getRange(idx + 2, 4).setValue(JSON.stringify(filtryObj || {}));
+  return { ok: true };
+}
+
+/** Spustí AI hledání akcí NA VYŽÁDÁNÍ s osobními kritérii uživatelského profilu
+ *  (kategorie/dojezd přepsané, zbytek – lokalita, horizont – z domácího profilu
+ *  v KRITÉRIÍCH). Náklad na API vzniká jen při explicitním kliknutí uživatele,
+ *  ne automaticky. Nalezené akce se zapíší do AKCE stejnou cestou jako běžná
+ *  kontrola (upsertEvents_), takže je uvidí i ostatní profily. */
+function apiNajdiProUzivatele_(ss, uzivatelId, tok) {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty('WEB_TOKEN');
+  if (!token || tok !== token) return { ok: false, error: 'Neplatný token.' };
+
+  const uzivatel = readUzivatele_(ss).find(u => u.id === uzivatelId);
+  if (!uzivatel) return { ok: false, error: 'profil nenalezen' };
+  let osobniFiltry = {};
+  try { osobniFiltry = uzivatel.filtry ? JSON.parse(uzivatel.filtry) : {}; } catch (e) { osobniFiltry = {}; }
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return { ok: false, error: 'Jiná kontrola právě probíhá, zkus to za chvíli.' };
+
+  try {
+    const krit = ss.getSheetByName(SHEET.KRITERIA);
+    const cfg = readCriteria_(krit);
+    if (osobniFiltry.kategorie) cfg.kategorie = osobniFiltry.kategorie;
+    if (osobniFiltry.dojezd) cfg.dojezd = osobniFiltry.dojezd;
+
+    const zdroje = readSources_(ss, cfg.profil);
+    if (zdroje.length === 0) {
+      return { ok: false, error: 'Pro profil "' + cfg.profil + '" nejsou v ZDROJÍCH žádné zdroje (ani VŠECHNY).' };
+    }
+
+    const typKontroly = 'osobní hledání (' + uzivatel.jmeno + ')';
+    const events = callAnthropic_(cfg, zdroje, typKontroly);
+    const stats = upsertEvents_(ss, cfg, events);
+    zajistitSouradniceProAkce_(ss, events);
+    logKontrola_(ss, typKontroly, cfg, stats, zdroje.length);
+
+    return { ok: true, jmeno: uzivatel.jmeno, nove: stats.nove || 0, aktualizovano: stats.aktualizovano || 0 };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1547,6 +1732,13 @@ function runSelfTest() {
       if (sirotci.length) {
         problemy.push('OZNAČENÍ obsahuje ' + sirotci.length + ' záznamů k neexistujícím akcím: '
           + vypis(sirotci.map(s => s.id)));
+      } else ok();
+
+      const platniUzivatele = new Set(readUzivatele_(ss).map(u => u.id));
+      const sirotciUzivatele = oznaceni.filter(r => r.uzivatel && !platniUzivatele.has(r.uzivatel));
+      if (sirotciUzivatele.length) {
+        problemy.push('OZNAČENÍ obsahuje ' + sirotciUzivatele.length + ' záznamů k neexistujícímu uživatelskému profilu: '
+          + vypis(sirotciUzivatele.map(s => s.id + '/' + s.uzivatel)));
       } else ok();
     }
   } catch (e) { problemy.push('kontrola OZNAČENÍ selhala: ' + e); }

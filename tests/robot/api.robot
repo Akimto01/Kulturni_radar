@@ -9,13 +9,10 @@ Documentation     API kontrakt Kulturního radaru (doGet JSON endpointy).
 Library           RequestsLibrary
 Library           Collections
 Library           String
+Resource          resources.robot
 
 *** Variables ***
-${BASE_URL}       %{RADAR_URL=https://example.com/exec}
-# Regex českého data „d. M. yyyy“ – regresní pojistka na bug v3.2/3.3
-# (sériová čísla 46156 a Date objekty „FRI AUG 07…“ v API výstupu)
 ${NTFY_TOPIC}      %{NTFY_TOPIC=}
-${DATUM_RE}       ^\\d{1,2}\\. \\d{1,2}\\. \\d{4}$
 
 *** Test Cases ***
 Meta vrací aktivní profil, profily a kategorie

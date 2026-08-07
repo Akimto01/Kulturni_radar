@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.12 – BUG opravy 5.8.: #status mizel z DOM a druhé přepnutí profilu tiše spadlo (fetch se vůbec nespustil), abecední řazení měst v dropdownu -->
+<!-- Kulturní radar Index.html v3.13 – Uživatelské profily: přihlášení PIN, osobní ★/✓, osobní filtry, hledání na vyžádání -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -317,6 +317,74 @@
     font-family: var(--sans); font-size: .82rem; font-weight: 600;
   }
 
+  /* ── v3.13: Přihlášení uživatelského profilu ─────────────── */
+  #login-overlay {
+    position: fixed; inset: 0;
+    background: var(--paper);
+    z-index: 300;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 18px; padding: 24px;
+  }
+  #login-overlay.skryto { display: none; }
+  #login-overlay h2 { font-size: 1.15rem; }
+  #login-overlay .login-pokyn { font-size: .85rem; color: var(--ink-2); }
+  #login-dlazdice {
+    display: flex; flex-wrap: wrap; gap: 12px;
+    justify-content: center; max-width: 420px;
+  }
+  .dlazdice-uzivatel {
+    padding: 18px 22px; min-width: 120px;
+    background: var(--card); border: 1.5px solid #d0cdc6;
+    border-radius: var(--radius); cursor: pointer;
+    font-family: var(--sans); font-size: 1rem; font-weight: 600;
+    color: var(--ink);
+  }
+  .dlazdice-uzivatel:hover, .dlazdice-uzivatel.vybrana {
+    border-color: var(--accent); color: var(--accent);
+  }
+  #login-pin-sekce { display: none; flex-direction: column; gap: 10px; align-items: center; }
+  #login-pin-sekce.zobrazit { display: flex; }
+  #login-pin {
+    width: 160px; padding: 10px 12px; text-align: center;
+    border: 1.5px solid #d0cdc6; border-radius: 6px;
+    font-family: var(--mono); font-size: 1.1rem; letter-spacing: .3em;
+  }
+  #login-chyba { color: var(--accent); font-size: .82rem; min-height: 1.2em; }
+
+  /* v3.13: badge přihlášeného uživatele v hlavičce */
+  #uzivatel-badge {
+    background: transparent; border: 1px solid rgba(255,255,255,.5);
+    border-radius: 999px; padding: 4px 12px;
+    color: inherit; font-family: var(--sans); font-size: .78rem;
+    cursor: pointer; white-space: nowrap;
+  }
+
+  /* v3.13: dialog osobních filtrů (sdílí vzhled s token dialogem) */
+  #filtry-dialog {
+    display: none; position: fixed; inset: 0;
+    background: rgba(26,26,46,.6); z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  #filtry-dialog.open { display: flex; }
+  #filtry-box {
+    background: var(--card); border-radius: var(--radius);
+    padding: 28px 24px; width: min(380px, 92vw);
+  }
+  #filtry-box h2 { font-size: 1rem; margin-bottom: 12px; }
+  #filtry-box label { display: block; font-size: .78rem; color: var(--ink-2); margin: 10px 0 4px; }
+  #filtry-box input {
+    width: 100%; padding: 9px 12px;
+    border: 1.5px solid #d0cdc6; border-radius: 6px;
+    font-family: var(--sans); font-size: .85rem;
+  }
+  #filtry-box .filtry-akce-radek { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .btn-hledat {
+    padding: 8px 16px; border: 1px solid var(--accent); border-radius: 6px;
+    background: transparent; color: var(--accent); cursor: pointer;
+    font-family: var(--sans); font-size: .82rem; font-weight: 600;
+  }
+
   @media (max-width: 480px) {
     header { padding: 12px 14px; }
     main { padding: 12px 10px 80px; }
@@ -329,6 +397,7 @@
 <header>
   <h1>🎭 Kulturní radar</h1>
   <span id="meta-info">načítám…</span>
+  <button id="uzivatel-badge" style="display:none" title="Profil – filtry, hledání, odhlášení">👤</button>
 </header>
 
 <div id="controls">
@@ -356,6 +425,39 @@
 
 <button id="fab" title="Spustit vyhledávání nových akcí">Spustit kontrolu</button>
 
+<!-- v3.13: Přihlášení uživatelského profilu (overlay přes celou app) -->
+<div id="login-overlay">
+  <h2>🎭 Kulturní radar</h2>
+  <span class="login-pokyn">Kdo se dívá? Vyber svůj profil.</span>
+  <div id="login-dlazdice"><span class="login-pokyn">Načítám profily…</span></div>
+  <div id="login-pin-sekce">
+    <input id="login-pin" type="password" inputmode="numeric" autocomplete="off"
+           placeholder="PIN" aria-label="PIN vybraného profilu">
+    <div id="login-chyba"></div>
+    <div class="dialog-btns">
+      <button class="btn-cancel" id="login-zpet">Zpět</button>
+      <button class="btn-ok" id="login-potvrdit">Přihlásit</button>
+    </div>
+  </div>
+</div>
+
+<!-- v3.13: Dialog osobních filtrů + hledání na vyžádání -->
+<div id="filtry-dialog" role="dialog" aria-modal="true" aria-label="Osobní filtry profilu">
+  <div id="filtry-box">
+    <h2 id="filtry-nadpis">Můj profil</h2>
+    <label for="filtry-kategorie">Kategorie (oddělené středníkem, prázdné = výchozí)</label>
+    <input id="filtry-kategorie" type="text" placeholder="např. koncerty; festivaly; dětské">
+    <label for="filtry-dojezd">Maximální dojezd (prázdné = výchozí)</label>
+    <input id="filtry-dojezd" type="text" placeholder="např. 60 min">
+    <div class="filtry-akce-radek">
+      <button class="btn-cancel" id="filtry-odhlasit">Odhlásit</button>
+      <button class="btn-cancel" id="filtry-zavrit">Zavřít</button>
+      <button class="btn-hledat" id="filtry-hledat" title="Spustí AI hledání s tvými filtry (vyžaduje token)">Najít akce pro mě</button>
+      <button class="btn-ok" id="filtry-ulozit">Uložit</button>
+    </div>
+  </div>
+</div>
+
 <!-- Token dialog -->
 <div id="token-dialog" role="dialog" aria-modal="true" aria-label="Zadej přístupový token">
   <div id="token-box">
@@ -377,6 +479,27 @@
   let token = localStorage.getItem('radar_token') || '';
   let rezimZobrazeni = 'vse';       // 'vse' | 'oblibene' | 'navstivene'
   let obdobiNavstivene = 'vse';     // '30' | '90' | '180' | '365' | 'vse'
+  // v3.13: přihlášený uživatelský profil – JEN v paměti (rozhodnutí 7. 8. 2026:
+  // PIN se zadává při každém vstupu na web, žádné localStorage přihlášení).
+  let prihlasenyUzivatel = null;    // { id, jmeno, filtry } | null
+
+  // ── v3.13: čisté funkce uživatelských profilů (testovatelné bez DOM) ──
+  /** Z textových polí formuláře sestaví objekt filtrů; prázdné hodnoty se
+   *  vynechají (= použije se výchozí z KRITÉRIÍ). */
+  function sestavFiltry_(kategorieText, dojezdText) {
+    const filtry = {};
+    const kat = String(kategorieText == null ? '' : kategorieText).trim();
+    const doj = String(dojezdText == null ? '' : dojezdText).trim();
+    if (kat) filtry.kategorie = kat;
+    if (doj) filtry.dojezd = doj;
+    return filtry;
+  }
+
+  /** Základní kontrola PINu před odesláním: 4–8 znaků bez mezer. */
+  function pinVypadaPlatne_(pin) {
+    const p = String(pin == null ? '' : pin).trim();
+    return p.length >= 4 && p.length <= 8 && !/\s/.test(p);
+  }
 
   // ── Načtení dat přes google.script.run ───────────────────
   // Apps Script web app neumožňuje fetch() na sebe sama (loop přes login).
@@ -393,10 +516,203 @@
   async function api(endpoint, param = '') {
     const profil = param.replace('profil=', '');
     if (endpoint === 'meta')   return gsr('apiMeta');
-    if (endpoint === 'events') return gsr('apiEvents', profil, true);   // vždy i s označenými, filtrujeme v UI
+    if (endpoint === 'events') return gsr('apiEvents', profil, true,
+      prihlasenyUzivatel ? prihlasenyUzivatel.id : '');   // vždy i s označenými, filtrujeme v UI; ★/✓ per profil
     if (endpoint === 'places') return gsr('apiPlaces', profil);
     throw new Error('Neznámý endpoint: ' + endpoint);
   }
+
+  // ── v3.13: Přihlášení uživatelského profilu ───────────────
+  let vybranyUzivatelId = '';
+
+  async function zobrazitLogin() {
+    const kontejner = document.getElementById('login-dlazdice');
+    try {
+      const seznam = await gsr('apiSeznamUzivatelu');
+      kontejner.innerHTML = '';
+      if (!seznam || !seznam.length) {
+        kontejner.innerHTML = '<span class="login-pokyn">Žádné profily – správce je musí založit v tabulce (menu Kulturní radar → Nastavit uživatelské profily).</span>';
+        return;
+      }
+      seznam.forEach(u => {
+        const d = document.createElement('button');
+        d.className = 'dlazdice-uzivatel';
+        d.dataset.uzivatelId = u.id;   // v3.13→doplněk: stabilní selektor pro RF testy (jméno se může měnit)
+        d.textContent = u.jmeno || u.id;
+        d.addEventListener('click', () => {
+          vybranyUzivatelId = u.id;
+          document.querySelectorAll('.dlazdice-uzivatel').forEach(x => x.classList.remove('vybrana'));
+          d.classList.add('vybrana');
+          document.getElementById('login-pin-sekce').classList.add('zobrazit');
+          document.getElementById('login-chyba').textContent = '';
+          document.getElementById('login-pin').value = '';
+          document.getElementById('login-pin').focus();
+        });
+        kontejner.appendChild(d);
+      });
+    } catch (e) {
+      kontejner.innerHTML = '<span class="login-pokyn">Profily se nepodařilo načíst: ' + e.message + '</span>';
+    }
+  }
+
+  async function prihlasit_() {
+    const pin = document.getElementById('login-pin').value;
+    const chyba = document.getElementById('login-chyba');
+    if (!vybranyUzivatelId) { chyba.textContent = 'Nejdřív vyber profil.'; return; }
+    if (!pinVypadaPlatne_(pin)) { chyba.textContent = 'PIN má mít 4–8 znaků bez mezer.'; return; }
+    const btn = document.getElementById('login-potvrdit');
+    btn.disabled = true; chyba.textContent = '';
+    try {
+      const res = await gsr('apiPrihlaseniUzivatele', vybranyUzivatelId, pin);
+      if (res && res.ok) {
+        prihlasenyUzivatel = { id: res.id, jmeno: res.jmeno, filtry: res.filtry || {} };
+        document.getElementById('login-overlay').classList.add('skryto');
+        const badge = document.getElementById('uzivatel-badge');
+        badge.textContent = '👤 ' + res.jmeno;
+        badge.style.display = '';
+        await init();
+      } else {
+        chyba.textContent = (res && res.error) || 'Přihlášení se nepodařilo.';
+      }
+    } catch (e) {
+      chyba.textContent = 'Chyba: ' + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('login-potvrdit').addEventListener('click', prihlasit_);
+  document.getElementById('login-pin').addEventListener('keydown', e => { if (e.key === 'Enter') prihlasit_(); });
+  document.getElementById('login-zpet').addEventListener('click', () => {
+    vybranyUzivatelId = '';
+    document.querySelectorAll('.dlazdice-uzivatel').forEach(x => x.classList.remove('vybrana'));
+    document.getElementById('login-pin-sekce').classList.remove('zobrazit');
+  });
+
+  function odhlasit_() {
+    // v3.13→oprava: location.reload() restartuje jen vnitřní sandboxovaný
+    // iframe Apps Scriptu (ne skutečnou /exec URL), takže po odhlášení
+    // zůstávala prázdná stránka až do ručního refreshe. Řešení: "měkké"
+    // odhlášení – vyčistit stav v paměti a znovu ukázat login obrazovku,
+    // žádný reload.
+    document.getElementById('filtry-dialog').classList.remove('open');
+    prihlasenyUzivatel = null;
+    vybranyUzivatelId = '';
+    vsechnaAkce = [];
+    rezimZobrazeni = 'vse';
+
+    const badge = document.getElementById('uzivatel-badge');
+    badge.style.display = 'none';
+    badge.textContent = '👤';
+
+    document.querySelectorAll('.dlazdice-uzivatel').forEach(x => x.classList.remove('vybrana'));
+    document.getElementById('login-pin-sekce').classList.remove('zobrazit');
+    document.getElementById('login-pin').value = '';
+    document.getElementById('login-chyba').textContent = '';
+    document.getElementById('login-overlay').classList.remove('skryto');
+
+    zobrazitLogin();
+  }
+
+  // ── v3.13: Dialog osobních filtrů + hledání na vyžádání ───
+  document.getElementById('uzivatel-badge').addEventListener('click', () => {
+    if (!prihlasenyUzivatel) return;
+    document.getElementById('filtry-nadpis').textContent = 'Profil: ' + prihlasenyUzivatel.jmeno;
+    document.getElementById('filtry-kategorie').value = prihlasenyUzivatel.filtry.kategorie || '';
+    document.getElementById('filtry-dojezd').value = prihlasenyUzivatel.filtry.dojezd || '';
+    document.getElementById('filtry-dialog').classList.add('open');
+  });
+  document.getElementById('filtry-zavrit').addEventListener('click', () => {
+    document.getElementById('filtry-dialog').classList.remove('open');
+  });
+  document.getElementById('filtry-odhlasit').addEventListener('click', odhlasit_);
+
+  document.getElementById('filtry-ulozit').addEventListener('click', async () => {
+    if (!prihlasenyUzivatel) return;
+    const filtry = sestavFiltry_(
+      document.getElementById('filtry-kategorie').value,
+      document.getElementById('filtry-dojezd').value);
+    const btn = document.getElementById('filtry-ulozit');
+    btn.disabled = true;
+    try {
+      const res = await gsr('apiSetFiltry', prihlasenyUzivatel.id, filtry);
+      if (res && res.ok) {
+        prihlasenyUzivatel.filtry = filtry;
+        document.getElementById('filtry-dialog').classList.remove('open');
+      } else {
+        alert((res && res.error) || 'Filtry se nepodařilo uložit.');
+      }
+    } catch (e) {
+      alert('Chyba: ' + e.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('filtry-hledat').addEventListener('click', async () => {
+    if (!prihlasenyUzivatel) return;
+    // v3.13→oprava: dřív se spustilo hledání s POSLEDNÍ ULOŽENOU hodnotou
+    // filtrů, ne s tím, co je právě napsané v poli (kdo nekliknul napřed na
+    // "Uložit", hledalo se s prázdnými/starými filtry beze změny – přesně
+    // tohle potkalo Vojtu 7. 8. s dojezdem). Řešení: před spuštěním hledání
+    // vždy nejdřív uložit aktuální obsah polí, ne jen spoléhat na dřívější uložení.
+    const filtry = sestavFiltry_(
+      document.getElementById('filtry-kategorie').value,
+      document.getElementById('filtry-dojezd').value);
+    try {
+      const ulozeno = await gsr('apiSetFiltry', prihlasenyUzivatel.id, filtry);
+      if (!ulozeno || !ulozeno.ok) {
+        alert((ulozeno && ulozeno.error) || 'Filtry se nepodařilo uložit, hledání se nespustilo.');
+        return;
+      }
+      prihlasenyUzivatel.filtry = filtry;
+    } catch (e) {
+      alert('Chyba při ukládání filtrů: ' + e.message);
+      return;
+    }
+
+    document.getElementById('filtry-dialog').classList.remove('open');
+    if (!token) {
+      // Stejný token dialog jako FAB – po zadání se ale spustí osobní hledání.
+      poTokenu = spustitOsobniHledani_;
+      document.getElementById('token-dialog').classList.add('open');
+    } else {
+      spustitOsobniHledani_(token);
+    }
+  });
+
+  async function spustitOsobniHledani_(tok) {
+    const fab = document.getElementById('fab');
+    fab.disabled = true;
+    fab.textContent = 'Hledám pro ' + prihlasenyUzivatel.jmeno + '…';
+    try {
+      const d = await gsr('apiNajdiProUzivatele', prihlasenyUzivatel.id, tok);
+      if (d && d.ok) {
+        fab.textContent = 'Nalezeno: ' + (d.nove || 0) + ' nových ✓';
+        await nactiAkce(document.getElementById('profil-select').value || aktivniProfil);
+        setTimeout(() => { fab.disabled = false; fab.textContent = 'Spustit kontrolu'; }, 8000);
+      } else {
+        alert((d && d.error) || 'Hledání se nepodařilo.');
+        fab.disabled = false;
+        fab.textContent = 'Spustit kontrolu';
+        if (d && d.error && d.error.includes('token')) {
+          localStorage.removeItem('radar_token');
+          token = '';
+        }
+      }
+    } catch (e) {
+      alert('Chyba: ' + e.message);
+      fab.disabled = false;
+      fab.textContent = 'Spustit kontrolu';
+    }
+  }
+
+  // v3.13→oprava: init() se teď volá vícekrát (jednou po každém přihlášení),
+  // ne jen jednou při načtení stránky jako dřív. Bez téhle pojistky by se
+  // listenery na statických prvcích (chip-oblibene, chip-navstivene,
+  // obdobi-select, profil-select) skládaly na sebe s každým dalším
+  // přihlášením – druhé by kliky spouštělo 2×, třetí 3× atd.
+  let posluchaceStatickychPrvkuNastaveny = false;
 
   async function init() {
     try {
@@ -406,6 +722,7 @@
       // Profily do selectu – seřazené abecedně (zpětná vazba 5. 8. 2026:
       // dřív v pořadí, jak je vrátil list LOKALITY, což se hůř hledá)
       const sel = document.getElementById('profil-select');
+      sel.innerHTML = '';   // v3.13→oprava: jinak se možnosti při druhém init() zdvojí
       const profilySerazene = [...(meta.profily || [])].sort((a, b) =>
         String(a.profil).localeCompare(String(b.profil), 'cs'));
       profilySerazene.forEach(p => {
@@ -415,14 +732,10 @@
         if (p.profil === aktivniProfil) opt.selected = true;
         sel.appendChild(opt);
       });
-      sel.addEventListener('change', () => {
-        rezimZobrazeni = 'vse';
-        nactiAkce(sel.value);
-        nactiMista(sel.value);   // BUG oprava 5. 8. 2026: dřív se neaktualizovala při přepnutí města
-      });
 
       // Kategorie chipy
       const chips = document.getElementById('kat-chips');
+      chips.innerHTML = '';   // v3.13→oprava: jinak se chipy při druhém init() zdvojí
       const vseChip = vytvorChip('Vše', true);
       vseChip.addEventListener('click', () => {
         aktKategorie.clear();
@@ -436,19 +749,28 @@
         chips.appendChild(ch);
       });
 
-      // ★ Oblíbené / ✓ Navštívené – speciální chipy
-      document.getElementById('chip-oblibene').addEventListener('click', () => {
-        rezimZobrazeni = rezimZobrazeni === 'oblibene' ? 'vse' : 'oblibene';
-        prekreslit();
-      });
-      document.getElementById('chip-navstivene').addEventListener('click', () => {
-        rezimZobrazeni = rezimZobrazeni === 'navstivene' ? 'vse' : 'navstivene';
-        prekreslit();
-      });
-      document.getElementById('obdobi-select').addEventListener('change', (e) => {
-        obdobiNavstivene = e.target.value;
-        prekreslit();
-      });
+      // Listenery na STATICKÝCH prvcích (existují jen jednou v DOM, nemažou
+      // se) – přidat jen při úplně prvním init() za život stránky.
+      if (!posluchaceStatickychPrvkuNastaveny) {
+        sel.addEventListener('change', () => {
+          rezimZobrazeni = 'vse';
+          nactiAkce(sel.value);
+          nactiMista(sel.value);   // BUG oprava 5. 8. 2026: dřív se neaktualizovala při přepnutí města
+        });
+        document.getElementById('chip-oblibene').addEventListener('click', () => {
+          rezimZobrazeni = rezimZobrazeni === 'oblibene' ? 'vse' : 'oblibene';
+          prekreslit();
+        });
+        document.getElementById('chip-navstivene').addEventListener('click', () => {
+          rezimZobrazeni = rezimZobrazeni === 'navstivene' ? 'vse' : 'navstivene';
+          prekreslit();
+        });
+        document.getElementById('obdobi-select').addEventListener('change', (e) => {
+          obdobiNavstivene = e.target.value;
+          prekreslit();
+        });
+        posluchaceStatickychPrvkuNastaveny = true;
+      }
 
       // Meta info
       document.getElementById('meta-info').textContent =
@@ -977,7 +1299,7 @@
     probihaUkladani.add(id + ':' + typ);
     prekreslit();
     try {
-      const res = await gsr('apiToggle', id, typ);
+      const res = await gsr('apiToggle', id, typ, prihlasenyUzivatel ? prihlasenyUzivatel.id : '');
       if (res && res.ok) {
         a.oblibene = res.oblibene;
         a.navstivenoDne = res.navstivenoDne || '';
@@ -997,8 +1319,13 @@
   }
 
   // ── FAB: Spustit kontrolu ─────────────────────────────────
+  // v3.13: token dialog je sdílený – FAB i osobní hledání; poTokenu určuje,
+  // co se po zadání tokenu spustí (výchozí je společná kontrola).
+  let poTokenu = spustKontrolu;
+
   document.getElementById('fab').addEventListener('click', () => {
     if (!token) {
+      poTokenu = spustKontrolu;
       document.getElementById('token-dialog').classList.add('open');
     } else {
       spustKontrolu(token);
@@ -1007,6 +1334,7 @@
 
   document.getElementById('token-cancel').addEventListener('click', () => {
     document.getElementById('token-dialog').classList.remove('open');
+    poTokenu = spustKontrolu;
   });
 
   document.getElementById('token-ok').addEventListener('click', () => {
@@ -1015,7 +1343,8 @@
     token = t;
     localStorage.setItem('radar_token', t);
     document.getElementById('token-dialog').classList.remove('open');
-    spustKontrolu(t);
+    const akce = poTokenu; poTokenu = spustKontrolu;
+    akce(t);
   });
 
   async function spustKontrolu(tok) {
@@ -1044,7 +1373,9 @@
   }
 
   // ── Start ─────────────────────────────────────────────────
-  init();
+  // v3.13: napřed přihlášení profilu (PIN při každém vstupu), init() se volá
+  // až po úspěšném přihlášení z prihlasit_().
+  zobrazitLogin();
 </script>
 </body>
 </html>

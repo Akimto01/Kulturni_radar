@@ -9,13 +9,12 @@ Documentation     E2E testy frontendu Kulturního radaru (Browser Library / Play
 ...               Selector Prefix s frame-piercing syntaxí „>>>“ zajistí,
 ...               že všechny selektory míří dovnitř aplikace.
 Library           Browser
+Resource          resources.robot
 Suite Setup       Otevřít radar
 Suite Teardown    Close Browser
 
 *** Variables ***
-${BASE_URL}       %{RADAR_URL=https://example.com/exec}
 ${FRAME}          id=sandboxFrame >>> id=userHtmlFrame >>>
-${DATUM_RE}       ^\\d{1,2}\\.\\s?\\d{1,2}\\.\\s?\\d{4}$
 ${PROBIHA_LABEL}    Probíhá / dlouhodobé
 
 *** Test Cases ***
@@ -23,6 +22,67 @@ Hlavička a základní prvky jsou na místě
     Get Text       ${FRAME} header h1        contains    KULTURNÍ RADAR
     Get Element    ${FRAME} \#profil-select
     Get Element    ${FRAME} \#fab
+
+Přihlašovací obrazovka nabízí dlaždice profilů k výběru
+    [Documentation]    v3.13: Suite Setup se už přihlásil na sdílené stránce,
+    ...    takže tenhle test si otevře VLASTNÍ nezávislou stránku, aby ověřil
+    ...    počáteční (nepřihlášený) stav bez ovlivnění zbytku suity.
+    New Page    ${BASE_URL}
+    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
+    ${pocet}=    Get Element Count    ${FRAME} \#login-dlazdice .dlazdice-uzivatel
+    Should Be True    ${pocet} >= 1    Má se nabídnout aspoň jeden uživatelský profil
+    ${existuje}=    Get Element Count    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id="${RF_TEST_USER_ID}"]
+    Should Be Equal As Integers    ${existuje}    1
+    ...    msg=Testovací profil RF_TEST_USER_ID se mezi dlaždicemi nenašel – je založený v UŽIVATELÍCH?
+    Close Page
+
+Špatný PIN zobrazí chybu a nepřihlásí (vlastní stránka)
+    [Documentation]    Vlastní nezávislá stránka – viz dokumentace testu výš.
+    ...    Záměrně syntakticky platný PIN (splňuje pinVypadaPlatne_, 4–8 znaků,
+    ...    bez mezer), jen espere nesprávný, ať se otestuje SERVEROVÁ validace,
+    ...    ne jen klientská.
+    New Page    ${BASE_URL}
+    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
+    Click    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id="${RF_TEST_USER_ID}"]
+    Wait For Elements State    ${FRAME} \#login-pin-sekce.zobrazit    visible    timeout=5s
+    Fill Text    ${FRAME} \#login-pin    0000000
+    Click    ${FRAME} \#login-potvrdit
+    Wait For Elements State    ${FRAME} \#login-chyba    visible    timeout=10s
+    ${chyba}=    Get Text    ${FRAME} \#login-chyba
+    Should Not Be Empty    ${chyba}
+    ${stale_prihlasovaci}=    Get Element Count    ${FRAME} \#login-overlay:not(.skryto)
+    Should Be Equal As Integers    ${stale_prihlasovaci}    1
+    ...    msg=Po špatném PINu appka NESMÍ přihlásit – overlay musí zůstat viditelný
+    Close Page
+
+Odhlášení vrátí na výběr profilů bez plné stránky (vlastní stránka)
+    [Documentation]    Regresní test bugu z 7. 8. 2026: location.reload() uvnitř
+    ...    sandboxovaného Apps Script iframu restartoval jen vnitřní iframe,
+    ...    ne skutečnou /exec URL → appka po odhlášení zůstala na prázdné
+    ...    stránce. Oprava: "měkké" odhlášení bez reloadu (viz odhlasit_).
+    ...    Vlastní nezávislá stránka, ať test nezruší přihlášení sdílené
+    ...    stránky, na které stojí zbytek suity.
+    New Page    ${BASE_URL}
+    Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
+    Click    ${FRAME} \#uzivatel-badge
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
+    Click    ${FRAME} \#filtry-odhlasit
+    Wait For Elements State    ${FRAME} \#login-overlay:not(.skryto)    visible    timeout=10s
+    ${pocet}=    Get Element Count    ${FRAME} \#login-dlazdice .dlazdice-uzivatel
+    Should Be True    ${pocet} >= 1    Po odhlášení má appka znovu nabídnout výběr profilu, ne prázdnou stránku
+    Close Page
+
+Profil: dialog obsahuje osobní filtry a tlačítko Najít akce pro mě (bez spuštění)
+    [Documentation]    Jen existence prvků a otevření/zavření dialogu – NEKLIKÁME
+    ...    na "Najít akce pro mě", protože by to spustilo skutečné (placené)
+    ...    AI hledání. Stejný princip jako u FABu níž.
+    Click    ${FRAME} \#uzivatel-badge
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
+    Get Element    ${FRAME} \#filtry-kategorie
+    Get Element    ${FRAME} \#filtry-dojezd
+    Get Element    ${FRAME} \#filtry-hledat
+    Click    ${FRAME} \#filtry-zavrit
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=5s
 
 Přepínač profilů je naplněn z meta API
     ${pocet}=    Get Element Count    ${FRAME} \#profil-select option
@@ -40,7 +100,11 @@ Karty akcí se načetly a hlavičky dnů jsou česká data
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=15s
     ${karty}=    Get Element Count    ${FRAME} .karta
     Should Be True    ${karty} >= 1
-    ${hlavicky}=    Get Elements    ${FRAME} .den-hlavicka
+    # v3.13→oprava: .den-hlavicka se používá i pro hlavičky TYPŮ stálých míst
+    # (renderMista, zobrazují se jen když má profil 2+ typů – proto test dlouho
+    # procházel a spadl až s příchodem druhého typu „aquapark" v Brně).
+    # :not() vyloučí hlavičky uvnitř #mista-sekce, zůstanou jen denní hlavičky akcí.
+    ${hlavicky}=    Get Elements    ${FRAME} .den-hlavicka:not(#mista-sekce .den-hlavicka)
     FOR    ${h}    IN    @{hlavicky}
         ${text}=    Get Text    ${h}
         # Get Text vrací text po CSS text-transform (uppercase) → srovnávat necitlivě
@@ -56,7 +120,8 @@ Dlouhodobé akce nevytvářejí hlavičky s minulým datem
     ...                (např. celoléto běžící série) se řadí do sekce
     ...                „Probíhá / dlouhodobé“, která je vždy úplně první —
     ...                žádná datumová hlavička nesmí být starší než dnešek.
-    ${hlavicky}=    Get Elements    ${FRAME} .den-hlavicka
+    # v3.13→oprava: vyloučit hlavičky typů stálých míst – viz test výš.
+    ${hlavicky}=    Get Elements    ${FRAME} .den-hlavicka:not(#mista-sekce .den-hlavicka)
     ${i}=    Set Variable    ${0}
     FOR    ${h}    IN    @{hlavicky}
         ${text}=    Get Text    ${h}
@@ -285,7 +350,12 @@ Ověřit plný cyklus označení (přidat i odebrat) s reloadem
     ...    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.${trida_ikony}:not(.ukladani)
     ...    visible    timeout=10s
     Reload
+    # v3.13→oprava: přihlášení žije jen v paměti (dle rozhodnutí 7. 8. 2026,
+    # žádné localStorage), takže Reload appku vrátí na dlaždice – bez
+    # opětovného přihlášení by .karta nikdy nepřišla A sdílená stránka by
+    # zůstala zaseknutá na login-overlay pro VŠECHNY další testy v pořadí.
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
     Ikona první karty má být    ${trida_ikony}    ${opak}
     ...    msg=Krok 1: po reloadu se přepnutí nepodrželo – zápis do OZNAČENÍ neproběhl (${trida_ikony})
@@ -299,6 +369,7 @@ Ověřit plný cyklus označení (přidat i odebrat) s reloadem
     ...    visible    timeout=10s
     Reload
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
     Ikona první karty má být    ${trida_ikony}    ${puvodni}
     ...    msg=Krok 2: po reloadu se návrat na původní stav nepodržel (${trida_ikony}) – produkční data mohou zůstat pozměněná!
@@ -306,13 +377,35 @@ Ověřit plný cyklus označení (přidat i odebrat) s reloadem
     RETURN    ${puvodni}
 
 Otevřít radar
+    [Documentation]    v3.13: appka teď za úvodní obrazovkou VYŽADUJE přihlášení
+    ...    uživatelského profilu, jinak se meta/events vůbec nenačtou (init()
+    ...    se volá až po úspěšném apiPrihlaseniUzivatele). Bez vyhrazeného
+    ...    testovacího profilu (RF_TEST_USER_ID/RF_TEST_PIN) celá suita nemá
+    ...    jak proběhnout – radši hlasitě Skip než nedeterministické pády
+    ...    na "element not found" o pár řádků níž.
+    Skip If    '${RF_TEST_USER_ID}' == '' or '${RF_TEST_PIN}' == ''
+    ...    RF_TEST_USER_ID/RF_TEST_PIN nenastaveny – frontend suita vyžaduje vyhrazený testovací profil (viz resources.robot)
     New Browser    chromium    headless=True
     New Context    viewport={'width': 1280, 'height': 900}
     New Page       ${BASE_URL}
-    # Apps Script shell → počkat na vnitřní aplikaci
+    # Apps Script shell → počkat na vnitřní aplikaci (header existuje v DOM
+    # hned, i pod přihlašovacím overlayem – ten ho jen vizuálně překrývá).
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
     # Data přicházejí asynchronně přes google.script.run → počkat na
     # první chip (meta hotová) a první kartu (events hotové), jinak
     # county v testech běží proti prázdnému UI (race condition).
     Wait For Elements State    ${FRAME} .chip >> nth=0     visible    timeout=20s
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
+
+Přihlásit se do radaru
+    [Arguments]    ${uzivatel_id}    ${pin}
+    [Documentation]    Očekává, že přihlašovací overlay je už viditelný
+    ...    (dlaždice profilů načtené) – volající zajistí čekání PŘED voláním,
+    ...    pokud jde o čerstvě otevřenou stránku (viz "Otevřít radar" výš).
+    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
+    Click    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id="${uzivatel_id}"]
+    Wait For Elements State    ${FRAME} \#login-pin-sekce.zobrazit    visible    timeout=5s
+    Fill Text    ${FRAME} \#login-pin    ${pin}
+    Click    ${FRAME} \#login-potvrdit
+    Wait For Elements State    ${FRAME} \#login-overlay    hidden    timeout=15s

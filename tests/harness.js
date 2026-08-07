@@ -43,6 +43,17 @@ function nactiRadar(volby = {}) {
       formatDate: (d, tz, vzor) => formatujDatum(d, vzor),
       newBlob: (s) => ({ getBytes: () => Buffer.from(String(s), 'utf8') }),
       sleep: (ms) => { ctxSleepMs.push(ms); },   // testy nečekají, jen evidují
+      // v3.20: hashování PINů. Vrací pole SIGNED bajtů (-128..127) stejně jako
+      // skutečný Apps Script computeDigest – hashPin_ v .gs proto dělá (b & 0xFF).
+      DigestAlgorithm: { SHA_256: 'SHA_256' },
+      Charset: { UTF_8: 'UTF_8' },
+      computeDigest: (alg, vstup) => {
+        if (alg !== 'SHA_256') throw new Error('Stub computeDigest umí jen SHA_256, dostal: ' + alg);
+        const hash = require('node:crypto').createHash('sha256').update(String(vstup), 'utf8').digest();
+        return Array.from(hash, b => (b > 127 ? b - 256 : b));  // unsigned → signed jako v Apps Scriptu
+      },
+      // v3.20: sůl pro nastavPin_ (v testech deterministická náhoda není potřeba)
+      getUuid: () => require('node:crypto').randomUUID(),
     },
     PropertiesService: {
       getScriptProperties: () => ({

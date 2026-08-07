@@ -394,7 +394,7 @@ test('oznaceniMapy_: sloučí oblíbené i navštívené pro stejné ID, ignoruj
 });
 
 test('toggleOznaceni_: přidá záznam, když ještě neexistuje (aktivni: true)', () => {
-  const vysledek = r.toggleOznaceni_([], '42', 'oblibene', '3. 8. 2026', 'Balkan Night', 'Špilberk');
+  const vysledek = r.toggleOznaceni_([], '42', 'oblibene', '3. 8. 2026', 'Balkan Night', 'Špilberk', 'vojta');
   assert.equal(vysledek.aktivni, true);
   assert.equal(vysledek.rows.length, 1);
   const zaznam = vysledek.rows[0];
@@ -403,15 +403,16 @@ test('toggleOznaceni_: přidá záznam, když ještě neexistuje (aktivni: true)
   assert.equal(zaznam.datum, '3. 8. 2026');
   assert.equal(zaznam.nazev, 'Balkan Night');
   assert.equal(zaznam.misto, 'Špilberk');
+  assert.equal(zaznam.uzivatel, 'vojta');
 });
 
 test('toggleOznaceni_: odebere existující záznam (aktivni: false), nesahá na jiné typy/ID', () => {
   const rows = [
-    { id: '42', typ: 'oblibene', datum: '1. 8. 2026', nazev: 'A', misto: 'X' },
-    { id: '42', typ: 'navstiveno', datum: '2. 8. 2026', nazev: 'A', misto: 'X' },
-    { id: '7', typ: 'oblibene', datum: '', nazev: 'B', misto: 'Y' },
+    { id: '42', typ: 'oblibene', datum: '1. 8. 2026', nazev: 'A', misto: 'X', uzivatel: 'vojta' },
+    { id: '42', typ: 'navstiveno', datum: '2. 8. 2026', nazev: 'A', misto: 'X', uzivatel: 'vojta' },
+    { id: '7', typ: 'oblibene', datum: '', nazev: 'B', misto: 'Y', uzivatel: 'vojta' },
   ];
-  const vysledek = r.toggleOznaceni_(rows, '42', 'oblibene', '3. 8. 2026', 'A', 'X');
+  const vysledek = r.toggleOznaceni_(rows, '42', 'oblibene', '3. 8. 2026', 'A', 'X', 'vojta');
   assert.equal(vysledek.aktivni, false);
   assert.equal(vysledek.rows.length, 2);
   assert.ok(vysledek.rows.some(row => row.id === '42' && row.typ === 'navstiveno'), 'navstiveno u 42 zůstává');
@@ -419,8 +420,8 @@ test('toggleOznaceni_: odebere existující záznam (aktivni: false), nesahá na
 });
 
 test('toggleOznaceni_: dvojité přepnutí je idempotentní no-op (přidat pak odebrat → prázdno)', () => {
-  const prvni = r.toggleOznaceni_([], '1', 'navstiveno', '3. 8. 2026', 'X', 'Y');
-  const druhy = r.toggleOznaceni_(prvni.rows, '1', 'navstiveno', '4. 8. 2026', 'X', 'Y');
+  const prvni = r.toggleOznaceni_([], '1', 'navstiveno', '3. 8. 2026', 'X', 'Y', 'vojta');
+  const druhy = r.toggleOznaceni_(prvni.rows, '1', 'navstiveno', '4. 8. 2026', 'X', 'Y', 'vojta');
   assert.equal(druhy.aktivni, false);
   assert.equal(druhy.rows.length, 0);
 });
@@ -1135,4 +1136,123 @@ test('v3.19: sendNotification_ beze extraEmail (jiné notifikace) se chová jako
   ctx.sendNotification_('Denní kontrola', 'telo');
   const mail = ctx.__odeslaneEmaily.find(m => m.komu === 'vojta@example.com');
   assert.ok(mail, 'bez extraEmail jde pořád jen na základní adresu');
+});
+
+// ---------------------------------------------------------------------------
+// v3.20: Uživatelské profily – osobní oblíbené/navštívené, PIN, osobní filtry
+// ---------------------------------------------------------------------------
+
+test('v3.20: toggleOznaceni_ – stejná akce+typ pro DVA uživatele = dva nezávislé záznamy', () => {
+  const prvni = r.toggleOznaceni_([], '42', 'oblibene', '7. 8. 2026', 'A', 'X', 'vojta');
+  const druhy = r.toggleOznaceni_(prvni.rows, '42', 'oblibene', '7. 8. 2026', 'A', 'X', 'monika');
+  assert.equal(druhy.aktivni, true, 'pro Moniku je to nový záznam, ne toggle Vojtova');
+  assert.equal(druhy.rows.length, 2);
+});
+
+test('v3.20: toggleOznaceni_ – odebrání jednoho uživatele nesmaže záznam druhého', () => {
+  const rows = [
+    { id: '42', typ: 'oblibene', datum: '1. 8. 2026', nazev: 'A', misto: 'X', uzivatel: 'vojta' },
+    { id: '42', typ: 'oblibene', datum: '2. 8. 2026', nazev: 'A', misto: 'X', uzivatel: 'monika' },
+  ];
+  const vysledek = r.toggleOznaceni_(rows, '42', 'oblibene', '7. 8. 2026', 'A', 'X', 'vojta');
+  assert.equal(vysledek.aktivni, false);
+  assert.equal(vysledek.rows.length, 1);
+  assert.equal(vysledek.rows[0].uzivatel, 'monika', 'Moničin záznam přežil Vojtovo odebrání');
+});
+
+test('v3.20: oznaceniMapy_ nad předfiltrovanými řádky jednoho uživatele', () => {
+  const vsechny = [
+    { id: '1', typ: 'oblibene', datum: '', nazev: '', misto: '', uzivatel: 'vojta' },
+    { id: '1', typ: 'navstiveno', datum: '5. 8. 2026', nazev: '', misto: '', uzivatel: 'monika' },
+  ];
+  const mapaVojta = r.oznaceniMapy_(vsechny.filter(x => x.uzivatel === 'vojta'));
+  assert.equal(mapaVojta.get('1').oblibene, true);
+  assert.equal(mapaVojta.get('1').navstivenoDne, null, 'Moničino navštíveno do Vojtovy mapy neprosákne');
+});
+
+test('v3.20: hashPin_ je deterministický pro stejnou sůl, různá sůl → různý hash', () => {
+  const a = r.hashPin_('1234', 'sul-a');
+  assert.equal(a, r.hashPin_('1234', 'sul-a'), 'stejný PIN + stejná sůl = stejný hash');
+  assert.notEqual(a, r.hashPin_('1234', 'sul-b'), 'jiná sůl = jiný hash (dva stejné PINy nejsou v tabulce poznat)');
+  assert.match(a, /^sul-a\$[0-9a-f]{64}$/, 'formát "sůl$sha256hex"');
+});
+
+test('v3.20: overitPin_ přijme správný PIN, odmítne špatný i poškozený hash', () => {
+  const ulozeny = r.hashPin_('1234', 'nahodna-sul');
+  assert.equal(r.overitPin_('1234', ulozeny), true);
+  assert.equal(r.overitPin_('9999', ulozeny), false);
+  assert.equal(r.overitPin_('1234', 'hash-bez-dolaru'), false, 'poškozený formát bez $ → false, ne výjimka');
+  assert.equal(r.overitPin_('1234', ''), false);
+  assert.equal(r.overitPin_('1234', null), false);
+});
+
+test('v3.20: apiToggle_ bez uzivatelId vrací ok:false (přihlášení je povinné)', () => {
+  const vysledek = r.apiToggle_({ getSheetByName: () => null }, '99', 'oblibene', '');
+  assert.equal(vysledek.ok, false);
+  assert.match(vysledek.error, /profil/);
+});
+
+test('v3.20: apiPrihlaseniUzivatele_ – správný PIN vrací jméno a filtry, nikdy pinHash', () => {
+  const ctx = nactiRadar();
+  const hash = ctx.hashPin_('1234', 'sul-x');
+  // Stub sheetu UŽIVATELÉ: getRange().getValues() vrací jeden řádek profilu.
+  const ss = { getSheetByName: (n) => n === 'UŽIVATELÉ' ? {
+    getLastRow: () => 2,
+    getRange: () => ({ getValues: () => [['vojta', 'Vojta', hash, '{"dojezd":"60 min"}', '7. 8. 2026']] }),
+  } : null };
+  const okVysledek = ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '1234');
+  assert.equal(okVysledek.ok, true);
+  assert.equal(okVysledek.jmeno, 'Vojta');
+  assert.equal(okVysledek.filtry.dojezd, '60 min');
+  assert.equal('pinHash' in okVysledek, false, 'hash se NIKDY neposílá na frontend');
+
+  const spatny = ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '0000');
+  assert.equal(spatny.ok, false);
+  assert.match(spatny.error, /PIN/);
+
+  const neznamy = ctx.apiPrihlaseniUzivatele_(ss, 'nikdo', '1234');
+  assert.equal(neznamy.ok, false);
+});
+
+test('v3.20: apiPrihlaseniUzivatele_ – rozbité JSON filtry nezpůsobí pád, vrátí {}', () => {
+  const ctx = nactiRadar();
+  const hash = ctx.hashPin_('1234', 's');
+  const ss = { getSheetByName: (n) => n === 'UŽIVATELÉ' ? {
+    getLastRow: () => 2,
+    getRange: () => ({ getValues: () => [['vojta', 'Vojta', hash, '{rozbite json', '']] }),
+  } : null };
+  const vysledek = ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '1234');
+  assert.equal(vysledek.ok, true);
+  assert.equal(Object.keys(vysledek.filtry).length, 0);
+});
+
+test('v3.20: apiSeznamUzivatelu_ vrací jen id+jméno, žádné PIN hashe', () => {
+  const ctx = nactiRadar();
+  const ss = { getSheetByName: (n) => n === 'UŽIVATELÉ' ? {
+    getLastRow: () => 3,
+    getRange: () => ({ getValues: () => [
+      ['vojta', 'Vojta', 'sul$hash1', '{}', ''],
+      ['monika', 'Monika', 'sul$hash2', '{}', ''],
+    ] }),
+  } : null };
+  const seznam = ctx.apiSeznamUzivatelu_(ss);
+  assert.equal(seznam.length, 2);
+  assert.equal(seznam[0].id, 'vojta');
+  assert.equal(seznam[0].jmeno, 'Vojta');
+  assert.equal('pinHash' in seznam[0], false);
+  assert.equal('filtry' in seznam[0], false, 'ani filtry se v přihlašovacím seznamu neexponují');
+});
+
+test('v3.20: sirotci s neexistujícím uživatelem – filtr nad řádky OZNAČENÍ', () => {
+  // Logika ze samotestu: záznam s uzivatel mimo platnou množinu je sirotek;
+  // prázdný uzivatel (historický formát) se za sirotka nepovažuje.
+  const rows = [
+    { id: '1', typ: 'oblibene', uzivatel: 'vojta' },
+    { id: '2', typ: 'oblibene', uzivatel: 'smazany-profil' },
+    { id: '3', typ: 'oblibene', uzivatel: '' },
+  ];
+  const platni = new Set(['vojta', 'monika']);
+  const sirotci = rows.filter(x => x.uzivatel && !platni.has(x.uzivatel));
+  assert.equal(sirotci.length, 1);
+  assert.equal(sirotci[0].id, '2');
 });
