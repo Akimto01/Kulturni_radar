@@ -152,6 +152,14 @@ session se ukázalo, že několik funkcí (`parseEvents_`, `najdiDuplicity_`,
 `jeVycpavka_`, `callAnthropic_`) vypadalo netestovaně, ale ve skutečnosti
 testy měly, jen chyběly v BACKLOG.md poznámce.
 
+## 4. Konec pracovní session
+
+Na konci každé pracovní session (rozloučení, „jdu spát", „končím na dnešek",
+„díky za dnešek" apod.) **automaticky nabídnout stručné shrnutí v bodech**,
+co se ten den udělalo — bez čekání, až o to Vojta výslovně požádá. Tohle je
+obecná preference uložená i v paměti Claude (napříč projekty), tady je jen
+zapsaná pro viditelnost v repu.
+
 ## Referenční vzorce pro psaní nových testů (harness)
 
 Backend (`tests/harness.js`, `nactiRadar(volby)`):
