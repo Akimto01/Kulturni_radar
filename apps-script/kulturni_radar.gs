@@ -1,7 +1,7 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.18 (5. 8. 2026) – BUG: zpracovatSledovanaMesta opakovaně řešilo stejná první města, teď přeskakuje dnes hotová
+ * Verze: 3.19 (6. 8. 2026) – Víkendové tipy: volitelný druhý příjemce (NOTIFY_EMAIL_VIKEND)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -24,6 +24,7 @@
  *       ANTHROPIC_API_KEY  = sk-ant-...          (povinné)
  *       NTFY_TOPIC         = nazev-kanalu        (volitelné, push přes ntfy.sh)
  *       NOTIFY_EMAIL       = adresa@example.com  (volitelné, e-mail navíc)
+ *       NOTIFY_EMAIL_VIKEND = dalsi@example.com  (volitelné, jen k Víkendovým tipům navíc)
  *  3. Spustit funkci setupTriggers() (a autorizovat oprávnění).
  */
 
@@ -61,7 +62,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.18';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.19';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -1596,14 +1597,17 @@ function weeklyDigest() {
   }
 }
 
-/** Čtvrteční tipy: akce nadcházejícího víkendu (pátek–neděle). */
+/** Čtvrteční tipy: akce nadcházejícího víkendu (pátek–neděle). Volitelný
+ *  druhý příjemce jen pro tenhle digest (Script Property NOTIFY_EMAIL_VIKEND,
+ *  žádný vliv na ostatní notifikace). */
 function weekendDigest() {
   try {
     const now = new Date(); now.setHours(0, 0, 0, 0);
     const toFri = ((5 - now.getDay()) + 7) % 7;   // dní do nejbližšího pátku
     const from = new Date(now.getTime() + toFri * 24 * 3600 * 1000);
     const to = new Date(from.getTime() + 2 * 24 * 3600 * 1000);
-    digestRange_('Víkendové tipy', from, to);
+    const extraEmail = PropertiesService.getScriptProperties().getProperty('NOTIFY_EMAIL_VIKEND');
+    digestRange_('Víkendové tipy', from, to, extraEmail);
   } catch (err) {
     notifyFail_('Víkendové tipy selhaly', err);
     throw err;
@@ -1613,7 +1617,7 @@ function weekendDigest() {
 /** Sestaví a odešle přehled akcí aktivního profilu v daném okně, s počasím.
  *  v3.6: staví datový model bloků a renderuje ho dvakrát – prostý text
  *  (ntfy, záloha) a HTML s předsazenými odrážkami (e-mail, mobil). */
-function digestRange_(title, from, to) {
+function digestRange_(title, from, to, extraEmail) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const profil = String(ss.getSheetByName(SHEET.KRITERIA).getRange(KRIT.PROFIL).getDisplayValue()).trim();
   const evs = readEventsInRange_(ss, profil, from, to);
@@ -1670,7 +1674,8 @@ function digestRange_(title, from, to) {
   }
   sendNotification_(title,
     renderDigestText_(hlavicka, bloky, ss.getUrl()),
-    renderDigestHtml_(hlavicka, bloky, ss.getUrl()));
+    renderDigestHtml_(hlavicka, bloky, ss.getUrl()),
+    extraEmail);
 }
 
 /** Prostý text digestu (ntfy + záloha pro e-mailové klienty bez HTML). */
@@ -1993,10 +1998,21 @@ function notifyFail_(title, err) {
   sendNotification_(title, 'Chyba: ' + (err && err.message ? err.message : err));
 }
 
-function sendNotification_(title, body, htmlBody) {
+/** PURE: spojí základního příjemce (NOTIFY_EMAIL) s volitelným extra
+ *  příjemcem (jen pro konkrétní digest) do jednoho řetězce pro MailApp –
+ *  ta bere adresy oddělené čárkou (ověřeno v dokumentaci). Prázdné/chybějící
+ *  hodnoty se vynechají, duplicity se nezdvojí. */
+function spojitPrijemce_(zakladni, extra) {
+  const adresy = [zakladni, extra]
+    .map(a => String(a || '').trim())
+    .filter(Boolean);
+  return [...new Set(adresy)].join(',');
+}
+
+function sendNotification_(title, body, htmlBody, extraEmail) {
   const props = PropertiesService.getScriptProperties();
   const topic = props.getProperty('NTFY_TOPIC');
-  const email = props.getProperty('NOTIFY_EMAIL');
+  const email = spojitPrijemce_(props.getProperty('NOTIFY_EMAIL'), extraEmail);
 
   if (topic) {
     // ntfy.sh omezuje HTTP publikování podle IP odesílatele a sdílené IP Google

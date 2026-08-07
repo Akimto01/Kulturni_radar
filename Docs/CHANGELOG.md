@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.19 — 7. 8. 2026
+### Přidáno
+- Víkendové tipy: volitelný druhý příjemce (`NOTIFY_EMAIL_VIKEND`) – posílá se v jednom e-mailu spolu se základním příjemcem (`MailApp.sendEmail` podporuje čárkou oddělené adresy). Ovlivňuje jen tenhle jeden typ notifikace, ostatní (denní kontrola, samotest, chyby) beze změny.
+- Node testy 143 → 151 (`spojitPrijemce_` + integrace v `sendNotification_`).
+### Ověřeno
+- Živě: e-mail „Víkendové tipy" dorazil oběma adresátům v jednom odeslání.
+
 ## v3.16–v3.18 — 5. 8. 2026
 ### Přidáno
 - Sledovaná města: nový list SLEDOVANÁ MĚSTA, funkce `zpracovatSledovanaMesta` tiše (bez notifikace) doplňuje data pro vybraná města mimo domácí profil – stejná kritéria jako domácí profil (dojezd/horizont/kategorie), jen jiné cílové město. Dva nové triggery (neděle 20:00, čtvrtek 10:00) + menu položka pro ruční spuštění. Časově rozpočtováno (~4,5 min).

@@ -1088,3 +1088,51 @@ test('jeDnesJizZpracovano_: přesně půlnoc dneška se počítá jako dnešek (
   const dnes = new r.__Date(2026, 7, 5, 23, 0);
   assert.equal(r.jeDnesJizZpracovano_('5. 8. 2026 0:00', dnes), true);
 });
+
+// ---------------------------------------------------------------------------
+// v3.19: Víkendové tipy – volitelný druhý příjemce (NOTIFY_EMAIL_VIKEND)
+// ---------------------------------------------------------------------------
+
+test('spojitPrijemce_: oba zadané → spojí čárkou', () => {
+  assert.equal(r.spojitPrijemce_('vojta@example.com', 'monika@example.com'),
+    'vojta@example.com,monika@example.com');
+});
+
+test('spojitPrijemce_: jen základní → vrátí jen jeho', () => {
+  assert.equal(r.spojitPrijemce_('vojta@example.com', ''), 'vojta@example.com');
+  assert.equal(r.spojitPrijemce_('vojta@example.com', null), 'vojta@example.com');
+  assert.equal(r.spojitPrijemce_('vojta@example.com', undefined), 'vojta@example.com');
+});
+
+test('spojitPrijemce_: jen extra (základní chybí) → vrátí jen jeho', () => {
+  assert.equal(r.spojitPrijemce_('', 'monika@example.com'), 'monika@example.com');
+  assert.equal(r.spojitPrijemce_(null, 'monika@example.com'), 'monika@example.com');
+});
+
+test('spojitPrijemce_: oba prázdné → prázdný řetězec (žádný e-mail se neposílá)', () => {
+  assert.equal(r.spojitPrijemce_('', ''), '');
+  assert.equal(r.spojitPrijemce_(null, undefined), '');
+});
+
+test('spojitPrijemce_: stejná adresa dvakrát → nezdvojí se', () => {
+  assert.equal(r.spojitPrijemce_('vojta@example.com', 'vojta@example.com'), 'vojta@example.com');
+});
+
+test('spojitPrijemce_: mezery kolem adres se ořežou', () => {
+  assert.equal(r.spojitPrijemce_('  vojta@example.com  ', ' monika@example.com '),
+    'vojta@example.com,monika@example.com');
+});
+
+test('v3.19: sendNotification_ s extraEmail pošle e-mail oběma adresám najednou', () => {
+  const ctx = nactiRadar({ properties: { NOTIFY_EMAIL: 'vojta@example.com' } });
+  ctx.sendNotification_('Víkendové tipy', 'telo', null, 'monika@example.com');
+  const mail = ctx.__odeslaneEmaily.find(m => m.komu === 'vojta@example.com,monika@example.com');
+  assert.ok(mail, 'e-mail šel na oba adresáty najednou v jednom volání MailApp');
+});
+
+test('v3.19: sendNotification_ beze extraEmail (jiné notifikace) se chová jako dřív', () => {
+  const ctx = nactiRadar({ properties: { NOTIFY_EMAIL: 'vojta@example.com' } });
+  ctx.sendNotification_('Denní kontrola', 'telo');
+  const mail = ctx.__odeslaneEmaily.find(m => m.komu === 'vojta@example.com');
+  assert.ok(mail, 'bez extraEmail jde pořád jen na základní adresu');
+});
