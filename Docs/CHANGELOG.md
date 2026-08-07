@@ -1,5 +1,24 @@
 # Changelog
 
+## v3.20 (backend) + v3.13 (frontend) — 7.–8. 8. 2026
+### Přidáno
+- **Uživatelské profily**: nový list UŽIVATELÉ (ID, Jméno, PIN_hash, Filtry, Vytvořeno). Přihlášení PIN (SHA-256 + sůl, `hashPin_`/`overitPin_`) – hash se nikdy neposílá na frontend, PIN se zadává při každém vstupu (žádné localStorage přihlášení, rozhodnutí 7. 8.).
+- Oblíbené/Navštívené jsou od teď **osobní** (per profil), ne sdílené za celou domácnost jako dřív – OZNAČENÍ rozšířeno o sloupec Uživatel (`toggleOznaceni_`, `oznaceniMapy_`, `apiToggle_` přijímají uzivatelId).
+- Osobní filtry (kategorie/dojezd) + `apiNajdiProUzivatele_`: AI hledání NA VYŽÁDÁNÍ s přepsanými kritérii, chráněné WEB_TOKEN + zámkem proti souběhu. Náklad vzniká jen při explicitním kliknutí "Najít akce pro mě", automatické běhy (denní/týdenní/sledovaná města) beze změny – vědomé rozhodnutí proti nekontrolovanému ×4 nárůstu API volání.
+- Frontend: přihlašovací obrazovka (dlaždice profilů + PIN), badge profilu v hlavičce, dialog osobních filtrů.
+- Migrace: menu "Nastavit uživatelské profily (jednorázově)" – založí UŽIVATELÉ, vymaže staré sdílené OZNAČENÍ (rozhodnutí 7. 8.: bez majitele, nedalo by se spravedlivě přiřadit, historie začíná od nuly pro všechny profily).
+- Samotest: kontrola sirotčích záznamů v OZNAČENÍ odkazujících na neexistující uživatelský profil.
+- `tests/robot/resources.robot`: sdílené proměnné pro RF sadu (BASE_URL, DATUM_RE, RF_TEST_USER_ID/PIN) – sjednocuje dřív mírně odlišný DATUM_RE mezi api.robot a frontend.robot.
+- Vyhrazený testovací uživatelský profil `rf-test` pro CI/RF, oddělený od rodinných profilů (toggle testy nezasahují do rodinné historie).
+- Node testy 151 → 164 (137 unit +10, 27 frontend +2). RF testy: 21 frontend (+4 nové – přihlašovací dlaždice, špatný PIN, odhlášení, dialog profilu), 8 API beze změny.
+### Opraveno (nalezeno při ostrém testování 7. 8.)
+- BUG: `location.reload()` uvnitř sandboxovaného Apps Script iframu restartoval jen vnitřní iframe, ne skutečnou `/exec` URL → appka po odhlášení zůstala na prázdné stránce. Fix: "měkké" odhlášení (vyčištění stavu v paměti + znovu-zobrazení login obrazovky), žádný reload.
+- BUG: `init()` se od teď volá vícekrát (při každém přihlášení), ne jen jednou při načtení stránky – bez pojistky by se listenery na statických prvcích (chip-oblibene, chip-navstivene, obdobi-select, profil-select) skládaly na sebe s každým dalším přihlášením a klik by postupně spouštěl akci 2×, 3×… Fix: vyčištění DOM (`kat-chips`, `profil-select` se mažou před znovu-naplněním) + jednorázové přidání listenerů přes flag.
+- BUG: "Najít akce pro mě" spouštělo osobní hledání s POSLEDNÍ ULOŽENOU hodnotou filtrů, ne s aktuálně vyplněnými poli – kdo neklikl napřed zvlášť na "Uložit", hledalo se se starými/prázdnými filtry (potvrzeno živě: dojezd 30 min v poli, ale KONTROLY log ukázal použitých 120 min). Fix: uložení filtrů proběhne vždy těsně před spuštěním hledání, ne jen na vyžádání.
+- RF: `.den-hlavicka` sdílí třídu mezi denními hlavičkami akcí a hlavičkami typů stálých míst (renderMista) – testy na české datum ji sbíraly obě dohromady, spadlo to až s příchodem druhého typu místa v Brně ("AQUAPARK"). Fix: selektor zúžen na `:not(#mista-sekce .den-hlavicka)`.
+### Ověřeno
+- Node 164/164. RF 21/21 frontend + 7/8 API (1 skip bez NTFY_TOPIC v lokálním běhu, záměrné chování). Živě ověřeno: přihlášení a PIN validace pro 5 profilů, osobní ★/✓ izolace mezi profily (Vojta/Monika nezávisle), osobní hledání s filtry zapsalo správná kritéria do KONTROLY po opravě bugu.
+
 ## v3.19 — 7. 8. 2026
 ### Přidáno
 - Víkendové tipy: volitelný druhý příjemce (`NOTIFY_EMAIL_VIKEND`) – posílá se v jednom e-mailu spolu se základním příjemcem (`MailApp.sendEmail` podporuje čárkou oddělené adresy). Ovlivňuje jen tenhle jeden typ notifikace, ostatní (denní kontrola, samotest, chyby) beze změny.
