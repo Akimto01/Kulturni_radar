@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.15 – Dvourežimový gsr(): google.script.run uvnitř Apps Scriptu, fetch() na /exec pro statické nasazení (GitHub Pages) -->
+<!-- Kulturní radar Index.html v3.16 – Zapamatování kategorie-chipů per uživatelský profil (localStorage, klientská preference, neplést s filtry AI hledání) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -651,6 +651,7 @@
         // zápisu, karty zmizely z filtru „★ Oblíbené" i po úspěšném apiToggle).
         const sel = document.getElementById('profil-select');
         await nactiAkce((sel && sel.value) || aktivniProfil);
+        nacistChipyProfil_();   // v3.16: obnovit uložený výběr kategorií tohoto profilu
         zavritLogin();
         const badge = document.getElementById('uzivatel-badge');
         badge.textContent = '👤 ' + res.jmeno;
@@ -683,6 +684,12 @@
     document.getElementById('filtry-dialog').classList.remove('open');
     prihlasenyUzivatel = null;
     zavritLogin();
+
+    // v3.16: reset kategorie-chipů – uložený výběr je osobní preference
+    // TOHOTO profilu, po odhlášení by neměl "prosakovat" do anonymního
+    // prohlížení ani do dalšího profilu, co se případně přihlásí.
+    aktKategorie.clear();
+    syncChipy();
 
     const badge = document.getElementById('uzivatel-badge');
     badge.textContent = 'Přihlásit se';
@@ -819,6 +826,7 @@
       vseChip.addEventListener('click', () => {
         aktKategorie.clear();
         rezimZobrazeni = 'vse';
+        ulozitChipyProfil_();
         prekreslit();
       });
       chips.appendChild(vseChip);
@@ -1306,10 +1314,57 @@
     return b;
   }
 
+  // ── v3.16: zapamatování kategorie-chipů per uživatelský profil ──────
+  // Čistě UI preference k ZOBRAZENÍ (klientský filtr nad už staženými
+  // akcemi) – nezaměňovat s "filtry" v dialogu profilu, které řídí AI
+  // hledání na vyžádání (apiNajdiProUzivatele). Ukládá se do localStorage,
+  // klíčované podle uzivatelId, ať se profily navzájem nepřepisují.
+
+  /** PURE: localStorage klíč pro uložené chipy daného profilu. */
+  function klicUlozenychChipu_(uzivatelId) {
+    return 'radar_chipy:' + uzivatelId;
+  }
+
+  /** PURE: Set kategorií → JSON pro uložení. */
+  function serializovatKategorie_(kategorieSet) {
+    return JSON.stringify([...kategorieSet]);
+  }
+
+  /** PURE: uložený JSON → pole kategorií. Neplatný/chybějící vstup →
+   *  prázdné pole (bezpečný fallback, appka nikdy nespadne na starých datech). */
+  function deserializovatKategorie_(json) {
+    if (!json) return [];
+    try {
+      const pole = JSON.parse(json);
+      return Array.isArray(pole) ? pole.filter(x => typeof x === 'string') : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /** Uloží aktuální výběr kategorií pro přihlášený profil. Bez přihlášení
+   *  se neukládá nic – anonymní prohlížení si nic nepamatuje. */
+  function ulozitChipyProfil_() {
+    if (!prihlasenyUzivatel) return;
+    localStorage.setItem(klicUlozenychChipu_(prihlasenyUzivatel.id), serializovatKategorie_(aktKategorie));
+  }
+
+  /** Načte a aplikuje uložený výběr kategorií po přihlášení. Volá se až po
+   *  vykreslení chipů (init proběhl na startu, tohle jen doladí výběr). */
+  function nacistChipyProfil_() {
+    if (!prihlasenyUzivatel) return;
+    const ulozene = deserializovatKategorie_(localStorage.getItem(klicUlozenychChipu_(prihlasenyUzivatel.id)));
+    if (!ulozene.length) return;
+    aktKategorie = new Set(ulozene);
+    syncChipy();
+    prekreslit();
+  }
+
   function toggleKat(k) {
     if (aktKategorie.has(k)) aktKategorie.delete(k);
     else aktKategorie.add(k);
     rezimZobrazeni = 'vse';
+    ulozitChipyProfil_();
     prekreslit();
   }
 

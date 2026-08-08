@@ -11,6 +11,7 @@ const f = nactiFrontendFunkce([
   'parseCeskeDatum', 'dateKeyBezpecne_', 'pad2_', 'gcalUrl_',
   'filtrovatNavstivenaPodleObdobi_', 'sestavTextSdileni_', 'mapsUrl_',
   'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
+  'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -271,4 +272,42 @@ test('v3.15: sestavFetchPozadavek_ – POST routy: PIN a token jdou v TĚLE, nik
 
 test('v3.15: sestavFetchPozadavek_ – neznámá funkce vrací null (gsr vyhodí srozumitelnou chybu)', () => {
   assert.equal(f.sestavFetchPozadavek_('apiNeexistuje', [], EXEC), null);
+});
+
+// ---------------------------------------------------------------------------
+// v3.16: zapamatování kategorie-chipů per uživatelský profil (localStorage)
+// ---------------------------------------------------------------------------
+
+test('v3.16: klicUlozenychChipu_ – stabilní klíč per profil, různí uživatelé nekolidují', () => {
+  assert.equal(f.klicUlozenychChipu_('vojta'), 'radar_chipy:vojta');
+  assert.notEqual(f.klicUlozenychChipu_('vojta'), f.klicUlozenychChipu_('monika'));
+});
+
+test('v3.16: serializovatKategorie_ – Set → JSON pole, prázdný Set → "[]"', () => {
+  assert.equal(f.serializovatKategorie_(new Set(['koncerty', 'festivaly'])),
+    JSON.stringify(['koncerty', 'festivaly']));
+  assert.equal(f.serializovatKategorie_(new Set()), '[]');
+});
+
+test('v3.16: deserializovatKategorie_ – validní JSON pole se vrátí beze změny', () => {
+  shodneNapricRealmy(f.deserializovatKategorie_('["koncerty","festivaly"]'), ['koncerty', 'festivaly']);
+  shodneNapricRealmy(f.deserializovatKategorie_('[]'), []);
+});
+
+test('v3.16: deserializovatKategorie_ – chybějící/rozbitá/nepolová data → bezpečně [] (appka nespadne)', () => {
+  shodneNapricRealmy(f.deserializovatKategorie_(null), []);
+  shodneNapricRealmy(f.deserializovatKategorie_(''), []);
+  shodneNapricRealmy(f.deserializovatKategorie_('{rozbite json'), []);
+  shodneNapricRealmy(f.deserializovatKategorie_('"jen retezec, ne pole"'), []);
+  shodneNapricRealmy(f.deserializovatKategorie_('{"a":1}'), []);
+});
+
+test('v3.16: deserializovatKategorie_ – nečistá data v poli (čísla/null) se vyfiltrují, ne pád', () => {
+  shodneNapricRealmy(f.deserializovatKategorie_('["koncerty", 42, null, "folklor"]'), ['koncerty', 'folklor']);
+});
+
+test('v3.16: round-trip serializace/deserializace zachová obsah', () => {
+  const puvodni = new Set(['koncerty', 'divadlo', 'folklor']);
+  const obnovene = f.deserializovatKategorie_(f.serializovatKategorie_(puvodni));
+  shodneNapricRealmy([...obnovene].sort(), [...puvodni].sort());
 });

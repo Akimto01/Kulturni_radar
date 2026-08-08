@@ -1,5 +1,12 @@
 # Changelog
 
+## Index.html v3.16 — Zapamatování kategorie-chipů per uživatelský profil — 8. 8. 2026
+### Přidáno
+- Výběr kategorie-chipů v horní liště se teď ukládá do `localStorage` per přihlášený profil a po přihlášení se automaticky obnoví (`ulozitChipyProfil_`/`nacistChipyProfil_`, klíč `radar_chipy:<uzivatelId>` z `klicUlozenychChipu_`). Čistě klientská UI preference k zobrazení — nemá nic společného s „filtry" v profilu, které řídí AI hledání na vyžádání.
+- Po odhlášení se výběr resetuje (`aktKategorie.clear()`), ať osobní preference „neprosakuje" do anonymního prohlížení ani do dalšího profilu.
+- Bez přihlášení se nic neukládá ani nenačítá.
+- Node testy 173 → 179 (+6 pro `klicUlozenychChipu_`/`serializovatKategorie_`/`deserializovatKategorie_`, včetně fallbacku na rozbitá/nečistá data v `localStorage`).
+
 ## Infrastruktura — migrace na Cloudflare Pages + doména kulturniradar.cz — 8. 8. 2026
 ### Přidáno
 - Frontend (`Index.html`) migrován z Apps Script webové appky na statický hosting **Cloudflare Pages**, napojený na privátní GitHub repo (přístup jen k tomuto repu, žádný jiný).

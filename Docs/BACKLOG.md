@@ -25,7 +25,6 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 - Kalendářní pohled s proklikem na akce v daném termínu (~4–6 h, odhad nejistý bez detailního rozvržení)
 - Filtr podle vystupujících/žánrů (taneční, hudební…) — pole `podkategorie` v datech existuje, ale nepoužívá se nikde ve frontendu; nejdřív ověřit, jestli in data reálně obsahuje užitečné hodnoty, než slibovat rozsah
 - UX: rozlišit „0 akcí, nikdy neprohledáno" od „0 akcí, prohledáno, nic nenalezeno" (jasnější stav pro neaktivní profily v dropdownu)
-- Zapamatovat si poslední zvolené kategorie-chipy v horní liště per uživatelský profil (čistě UI preference k zobrazení; nápad Vojty 7. 8. 2026 — neplést s „filtry" v profilu, které řídí AI hledání na vyžádání, to je jiná věc)
 
 ## Ke kontrole
 
