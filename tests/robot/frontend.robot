@@ -2,19 +2,19 @@
 Documentation     E2E testy frontendu Kulturního radaru (Browser Library / Playwright).
 ...
 ...               Příprava (jednou):  rfbrowser init chromium
-...               Spuštění:  robot --variable BASE_URL:https://script.google.com/macros/s/.../exec tests/robot/frontend.robot
+...               Spuštění (výchozí cíl – statická doména, žádný iframe):
+...               robot tests/robot/frontend.robot
 ...
-...               DŮLEŽITÉ – Apps Script sandbox: web app balí uživatelské HTML
-...               do dvou vnořených iframe (#sandboxFrame > #userHtmlFrame).
-...               Selector Prefix s frame-piercing syntaxí „>>>“ zajistí,
-...               že všechny selektory míří dovnitř aplikace.
+...               Spuštění proti Apps Scriptu (sandboxovaný iframe, frame-piercing
+...               prefix nutný – viz FRAME v resources.robot):
+...               robot --variable SITE_URL:https://script.google.com/macros/s/.../exec ^
+...               --variable FRAME:"id=sandboxFrame >>> id=userHtmlFrame >>>" tests/robot/frontend.robot
 Library           Browser
 Resource          resources.robot
 Suite Setup       Otevřít radar
 Suite Teardown    Close Browser
 
 *** Variables ***
-${FRAME}          id=sandboxFrame >>> id=userHtmlFrame >>>
 ${PROBIHA_LABEL}    Probíhá / dlouhodobé
 
 *** Test Cases ***
@@ -27,7 +27,7 @@ Přihlašovací obrazovka nabízí dlaždice profilů k výběru
     [Documentation]    v3.14: appka startuje anonymně – login overlay se otevírá
     ...    badgem "Přihlásit se". Vlastní nezávislá stránka, aby test ověřil
     ...    počáteční stav bez ovlivnění přihlášení sdílené stránky.
-    New Page    ${BASE_URL}
+    New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Click    ${FRAME} \#uzivatel-badge
     Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
@@ -44,7 +44,7 @@ Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastn
     ...    2) Klik na ★ v anonymním stavu NEZAPÍŠE nic – místo toho otevře
     ...    login overlay s vysvětlením. Overlay jde zavřít "Pokračovat bez
     ...    přihlášení" a appka zůstává funkční.
-    New Page    ${BASE_URL}
+    New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
     ${overlay_na_startu}=    Get Element Count    ${FRAME} \#login-overlay:not(.skryto)
@@ -64,7 +64,7 @@ Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastn
     ...    Záměrně syntakticky platný PIN (splňuje pinVypadaPlatne_, 4–8 znaků,
     ...    bez mezer), jen espere nesprávný, ať se otestuje SERVEROVÁ validace,
     ...    ne jen klientská. v3.14: overlay se otevírá badgem.
-    New Page    ${BASE_URL}
+    New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Click    ${FRAME} \#uzivatel-badge
     Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
@@ -85,7 +85,7 @@ Odhlášení vrátí appku do anonymního režimu (vlastní stránka)
     ...    v sandboxovaném iframu → prázdná stránka) + v3.14 chování: po
     ...    odhlášení se appka vrací do FUNKČNÍHO anonymního režimu (karty
     ...    viditelné, badge zpět na "Přihlásit se"), žádný vynucený login.
-    New Page    ${BASE_URL}
+    New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
     Click    ${FRAME} \#uzivatel-badge
@@ -413,7 +413,7 @@ Otevřít radar
     ...    RF_TEST_USER_ID/RF_TEST_PIN nenastaveny – frontend suita vyžaduje vyhrazený testovací profil (viz resources.robot)
     New Browser    chromium    headless=True
     New Context    viewport={'width': 1280, 'height': 900}
-    New Page       ${BASE_URL}
+    New Page       ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
     # Data přicházejí asynchronně přes google.script.run → počkat na
