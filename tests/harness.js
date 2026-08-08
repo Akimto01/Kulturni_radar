@@ -34,6 +34,8 @@ function nactiRadar(volby = {}) {
   const props = Object.assign({}, volby.properties || {});
   const odeslane = [];   // zachycené MailApp.sendEmail volání
   const ctxSleepMs = []; // zachycené Utilities.sleep (retry pauzy)
+  const cacheStore = {}; // v3.26: in-memory stub CacheService.getScriptCache()
+  const cacheSelze = !!volby.cacheThrows;   // simulace výpadku CacheService (fail-open testy)
 
   const ctx = {
     console,
@@ -66,6 +68,29 @@ function nactiRadar(volby = {}) {
     SpreadsheetApp: {
       getActiveSpreadsheet: () => ({ getUrl: () => 'https://sheet.example/test' }),
     },
+    // v3.26: stub CacheService – vždy přítomný (jako MailApp/PropertiesService),
+    // ať existující testy funkcí, co teď cache i invalidují, nemusí nic navíc
+    // nastavovat. volby.cacheThrows: true simuluje výpadek (fail-open testy).
+    CacheService: {
+      getScriptCache: () => ({
+        get: (k) => {
+          if (cacheSelze) throw new Error('CacheService nedostupný (test)');
+          return (k in cacheStore) ? cacheStore[k] : null;
+        },
+        put: (k, v) => {
+          if (cacheSelze) throw new Error('CacheService nedostupný (test)');
+          cacheStore[k] = String(v);
+        },
+        remove: (k) => {
+          if (cacheSelze) throw new Error('CacheService nedostupný (test)');
+          delete cacheStore[k];
+        },
+        removeAll: (keys) => {
+          if (cacheSelze) throw new Error('CacheService nedostupný (test)');
+          (keys || []).forEach(k => delete cacheStore[k]);
+        },
+      }),
+    },
     UrlFetchApp: volby.urlFetch ? { fetch: volby.urlFetch } : zakazano('UrlFetchApp'),
     ScriptApp: zakazano('ScriptApp'),
     LockService: zakazano('LockService'),
@@ -78,6 +103,7 @@ function nactiRadar(volby = {}) {
 
   ctx.__odeslaneEmaily = odeslane;
   ctx.__sleepMs = ctxSleepMs;
+  ctx.__cacheStore = cacheStore;
   // Konstruktor Date ze sandboxu – `instanceof Date` napříč realmy nefunguje,
   // takže testy musí Date vytvářet uvnitř stejného realmu jako skript.
   ctx.__Date = vm.runInContext('Date', ctx);

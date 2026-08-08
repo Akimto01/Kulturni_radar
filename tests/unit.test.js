@@ -1409,7 +1409,12 @@ class MemSheet {
 
 function fakeSpreadsheet(pocatecni) {
   const sheets = {};
-  Object.keys(pocatecni || {}).forEach(n => { sheets[n] = new MemSheet(pocatecni[n]); });
+  Object.keys(pocatecni || {}).forEach(n => {
+    const hodnota = pocatecni[n];
+    // v3.26: umožní předat i už sestavený (např. počítající) sheet objekt,
+    // ne jen syrová data – zpětně kompatibilní s dřívějším voláním.
+    sheets[n] = (hodnota instanceof MemSheet) ? hodnota : new MemSheet(hodnota);
+  });
   return {
     getSheetByName: (n) => sheets[n] || null,
     insertSheet: (n) => { const sh = new MemSheet(); sheets[n] = sh; return sh; },
@@ -1530,4 +1535,135 @@ test('v3.22: aktualizujPocasi_ – zrušené/proběhlé a minulé akce se nezpra
   ctx.aktualizujPocasi_(ss);
 
   assert.equal(ctx.readPocasi_(ss).length, 0, 'žádná akce nesplňuje podmínku budoucí+neproběhlá/nezrušená');
+});
+
+// ---------------------------------------------------------------------------
+// v3.26: Cache apiEvents – sestavKlicCacheEventu_, fail-open, cache-hit/miss
+// ---------------------------------------------------------------------------
+
+test('v3.26: sestavKlicCacheEventu_ – stejné vstupy dají stejný klíč', () => {
+  const a = r.sestavKlicCacheEventu_('42', 'Brno', 'vojta', true);
+  const b = r.sestavKlicCacheEventu_('42', 'Brno', 'vojta', true);
+  assert.equal(a, b);
+});
+
+test('v3.26: sestavKlicCacheEventu_ – různý profil/uživatel/verze/zahrnoutOznacene dá různý klíč', () => {
+  const zaklad = r.sestavKlicCacheEventu_('1', 'Brno', 'vojta', true);
+  assert.notEqual(zaklad, r.sestavKlicCacheEventu_('2', 'Brno', 'vojta', true), 'jiná verze');
+  assert.notEqual(zaklad, r.sestavKlicCacheEventu_('1', 'Praha', 'vojta', true), 'jiný profil');
+  assert.notEqual(zaklad, r.sestavKlicCacheEventu_('1', 'Brno', 'monika', true), 'jiný uživatel');
+  assert.notEqual(zaklad, r.sestavKlicCacheEventu_('1', 'Brno', 'vojta', false), 'jiné zahrnoutOznacene');
+});
+
+test('v3.26: sestavKlicCacheEventu_ – profil/uživatel se normalizují (case-insensitive)', () => {
+  assert.equal(
+    r.sestavKlicCacheEventu_('1', 'Brno', 'Vojta', true),
+    r.sestavKlicCacheEventu_('1', 'BRNO', 'vojta', true));
+});
+
+test('v3.26: ziskatVerziCacheEventu_ – bez předchozí invalidace vrátí "0"', () => {
+  const ctx = nactiRadar();
+  assert.equal(ctx.ziskatVerziCacheEventu_(), '0');
+});
+
+test('v3.26: invalidovatCacheEventu_ posune verzi – další ziskatVerziCacheEventu_ ji vidí', () => {
+  const ctx = nactiRadar();
+  const puvodni = ctx.ziskatVerziCacheEventu_();
+  ctx.invalidovatCacheEventu_();
+  const nova = ctx.ziskatVerziCacheEventu_();
+  assert.notEqual(nova, puvodni);
+});
+
+test('v3.26: ziskatVerziCacheEventu_ – fail-open (CacheService nedostupný) vrátí "0", nespadne', () => {
+  const ctx = nactiRadar({ cacheThrows: true });
+  assert.equal(ctx.ziskatVerziCacheEventu_(), '0');
+});
+
+test('v3.26: invalidovatCacheEventu_ – fail-open (CacheService nedostupný) nevyhodí výjimku', () => {
+  const ctx = nactiRadar({ cacheThrows: true });
+  assert.doesNotThrow(() => ctx.invalidovatCacheEventu_());
+});
+
+test('v3.26: nactiZCacheEventu_/ulozitDoCacheEventu_ – round-trip uloží a přečte stejný objekt', () => {
+  const ctx = nactiRadar();
+  const klic = ctx.sestavKlicCacheEventu_('0', 'Brno', '', false);
+  assert.equal(ctx.nactiZCacheEventu_(klic), null, 'zatím nic uloženo – miss');
+  const data = { ok: true, profil: 'Brno', akce: [{ id: 'x' }] };
+  ctx.ulozitDoCacheEventu_(klic, data);
+  // Cross-realm past (viz SKILL.md): `data` je z realmu testu, přečtená
+  // hodnota prošla JSON.parse uvnitř vm sandboxu → jiný Object.prototype,
+  // deepStrictEqual by padlo i při identickém obsahu. Porovnat přes JSON.
+  assert.equal(JSON.stringify(ctx.nactiZCacheEventu_(klic)), JSON.stringify(data));
+});
+
+test('v3.26: nactiZCacheEventu_ – fail-open (CacheService nedostupný) vrátí null, nespadne', () => {
+  const ctx = nactiRadar({ cacheThrows: true });
+  assert.equal(ctx.nactiZCacheEventu_('cokoli'), null);
+});
+
+test('v3.26: ulozitDoCacheEventu_ – fail-open (CacheService nedostupný) nevyhodí výjimku', () => {
+  const ctx = nactiRadar({ cacheThrows: true });
+  assert.doesNotThrow(() => ctx.ulozitDoCacheEventu_('cokoli', { a: 1 }));
+});
+
+/** Sheet, co si počítá, kolikrát se na něj zavolalo getRange – aby šlo
+ *  přímo dokázat, že cache-hit AKCE vůbec nečte (a invalidace ji donutí
+ *  přečíst znovu), ne jen že vrací "nějaká" data. */
+class PocitaciMemSheet extends MemSheet {
+  constructor(rows) { super(rows); this.pocetGetRange = 0; }
+  getRange(...args) { this.pocetGetRange++; return super.getRange(...args); }
+}
+
+test('v3.26: readEventsApi_ – cache hit nečte AKCE znovu; invalidace vynutí nové čtení', () => {
+  const zitra = pridatDny_(new Date(), 1);
+  const akceSheet = new PocitaciMemSheet([
+    [],
+    ['ev-1', czDatum_(zitra), '', '', 'Akce', 'Místo', 'Brno', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Brno'],
+  ]);
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ AKCE: akceSheet });
+
+  const prvni = ctx.readEventsApi_(ss, 'Brno', false, '');
+  assert.equal(prvni.akce.length, 1);
+  assert.equal(akceSheet.pocetGetRange, 1, 'první volání musí přečíst AKCE');
+
+  const druhy = ctx.readEventsApi_(ss, 'Brno', false, '');
+  assert.deepEqual(druhy, prvni, 'z cache musí přijít identická odpověď');
+  assert.equal(akceSheet.pocetGetRange, 1, 'druhé volání (cache hit) AKCE znovu nečte');
+
+  ctx.invalidovatCacheEventu_();   // simulace zápisu jinde (upsertEvents_/apiToggle_/…)
+  const treti = ctx.readEventsApi_(ss, 'Brno', false, '');
+  assert.equal(treti.akce.length, 1);
+  assert.equal(akceSheet.pocetGetRange, 2, 'po invalidaci se musí AKCE přečíst znovu');
+});
+
+test('v3.26: readEventsApi_ – různí uživatelé nedostanou data z cache toho druhého', () => {
+  const zitra = pridatDny_(new Date(), 1);
+  const akceSheet = new PocitaciMemSheet([
+    [],
+    ['ev-1', czDatum_(zitra), '', '', 'Akce', 'Místo', 'Brno', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Brno'],
+  ]);
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ AKCE: akceSheet });
+
+  ctx.readEventsApi_(ss, 'Brno', true, 'vojta');
+  assert.equal(akceSheet.pocetGetRange, 1);
+  ctx.readEventsApi_(ss, 'Brno', true, 'monika');
+  assert.equal(akceSheet.pocetGetRange, 2, 'jiný uzivatelId = jiný cache klíč = znovu čte AKCE');
+});
+
+test('v3.26: readEventsApi_ – funguje i s nedostupným CacheService (fail-open, žádný pád)', () => {
+  const zitra = pridatDny_(new Date(), 1);
+  const akceSheet = new PocitaciMemSheet([
+    [],
+    ['ev-1', czDatum_(zitra), '', '', 'Akce', 'Místo', 'Brno', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Brno'],
+  ]);
+  const ctx = nactiRadar({ cacheThrows: true });
+  const ss = fakeSpreadsheet({ AKCE: akceSheet });
+
+  const prvni = ctx.readEventsApi_(ss, 'Brno', false, '');
+  assert.equal(prvni.akce.length, 1);
+  const druhy = ctx.readEventsApi_(ss, 'Brno', false, '');
+  assert.equal(druhy.akce.length, 1);
+  assert.equal(akceSheet.pocetGetRange, 2, 'bez funkční cache se AKCE čte při každém volání znovu – správně, ne pád');
 });

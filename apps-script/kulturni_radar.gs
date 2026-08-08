@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.22 (8. 8. 2026) – Počasí u akce (list POČASÍ, Open-Meteo + met.no fallback,
- * přepočet v triggeru sledovaných měst, obohacené apiEvents)
+ * Verze: 3.23 (8. 8. 2026) – Zrychlení přihlášení: krátkodobá cache apiEvents
+ * (CacheService, fail-open, invalidace při zápisu do AKCE/OZNAČENÍ/SOUŘADNICE/POČASÍ)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -65,7 +65,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.22';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.23';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -232,6 +232,64 @@ function zahrnoutAkciDoVysledku_(stav, datumOd, dnes, zahrnoutOznacene, jeOznace
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// CACHE pro apiEvents (v3.26) – krátkodobá cache přes CacheService, aby se
+// při KAŽDÉM volání nečetly celé 4 listy (AKCE/OZNAČENÍ/SOUŘADNICE/POČASÍ).
+// Zjištěno 8. 8. 2026 diagnostikou: apiEvents byl dominantní část 6–10s
+// čekání při přihlášení (viz SKILL.md, diagnostika rychlosti). Fail-open:
+// jakákoli chyba CacheService (výpadek, kvóta, moc velká položka) spadne
+// zpět na normální čtení ze Sheets – cache nikdy nesmí shodit apiEvents.
+// ---------------------------------------------------------------------------
+
+const EVENTS_CACHE_TTL_S = 45;               // 30–60s – kompromis rychlost/čerstvost dat
+const EVENTS_CACHE_VERZE_KLIC = 'events_cache_verze';
+
+/** PURE: sestaví klíč cache pro apiEvents – zahrnuje verzi (invalidace při
+ *  zápisu), profil i uživatele (ať se nesmíchají data různých lidí/měst) a
+ *  zahrnoutOznacene (mění obsah odpovědi, viz zahrnoutAkciDoVysledku_). */
+function sestavKlicCacheEventu_(verze, profil, uzivatelId, zahrnoutOznacene) {
+  return 'events_v' + verze + '_' + norm_(profil) + '_' + norm_(uzivatelId) + '_' + (zahrnoutOznacene ? '1' : '0');
+}
+
+/** Aktuální "verze" cache apiEvents – součást klíče. Fail-open: chyba
+ *  CacheService → '0' (chová se, jako by cache nebyla, ne pád). */
+function ziskatVerziCacheEventu_() {
+  try {
+    return CacheService.getScriptCache().get(EVENTS_CACHE_VERZE_KLIC) || '0';
+  } catch (e) {
+    return '0';
+  }
+}
+
+/** Posune verzi cache apiEvents – volat po KAŽDÉM zápisu, který mění data,
+ *  jež apiEvents vrací (AKCE/OZNAČENÍ/SOUŘADNICE/POČASÍ). Staré položky se
+ *  nemažou explicitně – s jinou verzí v klíči už nejsou dosažitelné a samy
+ *  vyexpirují přes TTL. Fail-open: chyba tady nesmí shodit volající zápis. */
+function invalidovatCacheEventu_() {
+  try {
+    CacheService.getScriptCache().put(EVENTS_CACHE_VERZE_KLIC, String(Date.now()), 6 * 60 * 60);
+  } catch (e) { Logger.log('invalidovatCacheEventu_ selhalo (fail-open): ' + e); }
+}
+
+/** Načte cachovanou odpověď apiEvents, nebo null (miss i chyba CacheService
+ *  – fail-open, volající pak čte normálně ze Sheets). */
+function nactiZCacheEventu_(klic) {
+  try {
+    const hodnota = CacheService.getScriptCache().get(klic);
+    return hodnota ? JSON.parse(hodnota) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Uloží odpověď apiEvents do cache s TTL. Fail-open: chyba (výpadek,
+ *  překročená kvóta/velikost položky) se jen zaloguje, nikdy nevyhodí. */
+function ulozitDoCacheEventu_(klic, hodnota) {
+  try {
+    CacheService.getScriptCache().put(klic, JSON.stringify(hodnota), EVENTS_CACHE_TTL_S);
+  } catch (e) { Logger.log('ulozitDoCacheEventu_ selhalo (fail-open): ' + e); }
+}
+
 /** API: akce profilu v databázi (neprobíhající, přijde – nebo označené, viz zahrnoutOznacene).
  *  uzivatelId: ID přihlášeného uživatelského profilu – oblíbené/navštívené jsou
  *  od v3.20 osobní, takže bez přihlášení (uzivatelId = '') vyjdou vždy false/''. */
@@ -240,9 +298,17 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
   const aktivniProfil = krit ? String(krit.getRange(KRIT.PROFIL).getValue()).trim() : '';
   const profil = profilParam || aktivniProfil;
 
+  const cacheKlic = sestavKlicCacheEventu_(ziskatVerziCacheEventu_(), profil, uzivatelId, zahrnoutOznacene);
+  const zCache = nactiZCacheEventu_(cacheKlic);
+  if (zCache) return zCache;
+
   const sh = ss.getSheetByName(SHEET.AKCE);
   const lastRow = sh ? sh.getLastRow() : 1;
-  if (lastRow < 2) return { ok: true, profil, akce: [] };
+  if (lastRow < 2) {
+    const prazdnyVysledek = { ok: true, profil, akce: [] };
+    ulozitDoCacheEventu_(cacheKlic, prazdnyVysledek);
+    return prazdnyVysledek;
+  }
 
   const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
   const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
@@ -289,7 +355,9 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
     const ka = dateKey_(a.datumOd), kb = dateKey_(b.datumOd);
     return ka < kb ? -1 : ka > kb ? 1 : b.skore - a.skore;
   });
-  return { ok: true, generovano: formatDate_(new Date()), profil, akce };
+  const vysledek = { ok: true, generovano: formatDate_(new Date()), profil, akce };
+  ulozitDoCacheEventu_(cacheKlic, vysledek);
+  return vysledek;
 }
 
 /** API: stálá místa profilu. */
@@ -924,6 +992,7 @@ function upsertEvents_(ss, cfg, events) {
     }
   });
 
+  invalidovatCacheEventu_();   // v3.26: AKCE se změnilo – cache apiEvents by ukazovala staré akce
   return stats;
 }
 
@@ -1001,6 +1070,7 @@ function markPastEvents() {
 
   const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
   const today = new Date(); today.setHours(0, 0, 0, 0);
+  let zmeneno = 0;
 
   data.forEach((row, i) => {
     const stav = norm_(row[13]);
@@ -1008,8 +1078,11 @@ function markPastEvents() {
     const end = parseCzDate_(row[2]) || parseCzDate_(row[1]);
     if (end && end < today) {
       sh.getRange(i + 2, 14).setValue('proběhlo');
+      zmeneno++;
     }
   });
+
+  if (zmeneno) invalidovatCacheEventu_();   // v3.26: AKCE se změnilo (stav proběhlo)
 }
 
 // ---------------------------------------------------------------------------
@@ -1125,6 +1198,7 @@ function apiToggle_(ss, id, typ, uzivatelId) {
   const rows = readOznaceni_(ss);
   const vysledek = toggleOznaceni_(rows, id, typ, formatDateOnly_(new Date()), akceInfo.nazev, akceInfo.misto, uzivatelId);
   zapsatOznaceni_(ss, vysledek.rows);
+  invalidovatCacheEventu_();   // v3.26: OZNAČENÍ se změnilo (★/✓) – ovlivňuje apiEvents
 
   const rowsTohotoUzivatele = vysledek.rows.filter(r => r.uzivatel === uzivatelId);
   const stavPoTom = oznaceniMapy_(rowsTohotoUzivatele).get(id) || { oblibene: false, navstivenoDne: null };
@@ -1299,6 +1373,7 @@ function souradniceMapy_(rows) {
 function pridatSouradnici_(ss, klic, lat, lng, zdrojText) {
   const sh = ensureSouradniceSheet_(ss);
   sh.appendRow([klic, lat, lng, zdrojText, formatDateOnly_(new Date())]);
+  invalidovatCacheEventu_();   // v3.26: SOUŘADNICE se změnilo – ovlivňuje lat/lng v apiEvents
 }
 
 /** Zavolá Nominatim pro daný dotaz; vrací {lat, lng} nebo null. Sama si
@@ -1435,6 +1510,7 @@ function zapsatPocasi_(ss, rows) {
     sh.getRange(2, 1, rows.length, POCASI_HLAVICKA.length).setValues(
       rows.map(r => [r.id, r.aktualizovano, r.stav, r.kod, r.teplota]));
   }
+  invalidovatCacheEventu_();   // v3.26: POČASÍ se změnilo – ovlivňuje pole pocasi v apiEvents
 }
 
 /** PURE: převod hrubého met.no textu (metNoTextFor_) na číselný kód ve

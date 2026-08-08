@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.25 – Počasí u akce: malé políčko (ikona + teplota, N/A při stavu mimo dosah) vedle data -->
+<!-- Kulturní radar Index.html v3.26 – Zrychlení přihlášení: viditelný spinner ("Přihlašuji…") na tlačítku PIN dialogu po dobu přihlašování -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -651,7 +651,8 @@
     if (!vybranyUzivatelId) { chyba.textContent = 'Nejdřív vyber profil.'; return; }
     if (!pinVypadaPlatne_(pin)) { chyba.textContent = 'PIN má mít 4–8 znaků bez mezer.'; return; }
     const btn = document.getElementById('login-potvrdit');
-    btn.disabled = true; chyba.textContent = '';
+    const puvodniTextTlacitka = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Přihlašuji…'; chyba.textContent = '';
     try {
       const res = await gsr('apiPrihlaseniUzivatele', vybranyUzivatelId, pin);
       if (res && res.ok) {
@@ -674,7 +675,7 @@
     } catch (e) {
       chyba.textContent = 'Chyba: ' + e.message;
     } finally {
-      btn.disabled = false;
+      btn.disabled = false; btn.textContent = puvodniTextTlacitka;
     }
   }
 
