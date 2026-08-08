@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.22 – Kompaktnější text sdílení: bez mezer mezi řádky, odkaz jako druhá odrážka ("Odkaz: "), jen 1 prázdný řádek na konci -->
+<!-- Kulturní radar Index.html v3.24 – Oprava: viditelný "podpis appky" (— Kulturní radar) místo nespolehlivých prázdných koncových řádků u sdílení -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1227,14 +1227,18 @@
   /** PURE: sestaví text ke sdílení akce (název, datum, místo, odkaz) –
    *  oddělené od samotného window.navigator volání, aby šlo testovat v Node.
    *  v3.22: kompaktnější formát – název, odrážka s datem/místem, odrážka
-   *  s odkazem, žádné mezery mezi řádky, jen JEDEN prázdný řádek na konci
-   *  (prostor pro e-mailový podpis, ne celý odstavec). */
+   *  s odkazem, žádné mezery mezi řádky uvnitř zprávy.
+   *  v3.24→oprava: prázdné řádky na konci coby oddělovač od e-mailového
+   *  podpisu se ukázaly nespolehlivé (Gmail je při vložení textu ořezává –
+   *  viz v3.23). Řešení: viditelný "podpis appky" (— Kulturní radar) místo
+   *  prázdna – text se ořezat nedá, navíc dává smysl i mimo e-mail
+   *  (WhatsApp/SMS), kde příjemce hned vidí, odkud zpráva pochází. */
   function sestavTextSdileni_(a) {
     const radky = [a.nazev || ''];
     const druhyRadek = [a.datumOd || '', a.misto || ''].filter(Boolean).join(' · ');
     if (druhyRadek) radky.push('• ' + druhyRadek);
     if (a.url) radky.push('• Odkaz: ' + a.url);
-    radky.push('');   // jediný prázdný řádek na konci
+    radky.push('', '— Kulturní radar');
     return radky.join('\n');
   }
 
@@ -1314,9 +1318,9 @@
     const profil = (sel && sel.value) || aktivniProfil;
     const odkaz = sestavOdkazNaVyber_(profil, aktKategorie, window.location.origin);
     const popisKategorii = aktKategorie.size ? ' (' + [...aktKategorie].join(', ') + ')' : '';
-    // v3.22: stejný kompaktní formát jako sestavTextSdileni_ – odkaz jako
-    // odrážka s popiskem, jeden prázdný řádek na konci.
-    const text = 'Kulturní radar – ' + profil + popisKategorii + '\n• Odkaz: ' + odkaz + '\n';
+    // v3.24→oprava: viditelný "podpis appky" místo prázdných řádků na konci
+    // (nespolehlivé, e-mailoví klienti je ořezávají – viz sestavTextSdileni_).
+    const text = 'Kulturní radar – ' + profil + popisKategorii + '\n• Odkaz: ' + odkaz + '\n\n— Kulturní radar';
     await sdiletText_('Kulturní radar', text, 'Odkaz na výběr zkopírován do schránky – vlož ho, kam chceš poslat.');
   }
 

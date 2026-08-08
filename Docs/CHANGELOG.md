@@ -1,5 +1,10 @@
 # Changelog
 
+## Index.html v3.24 — 8. 8. 2026
+### Opraveno (UX, definitivní oprava oddělovače u sdílení)
+- Prázdné koncové řádky (v3.22, zúžené z v3.21) se ukázaly nespolehlivé — Gmail je při vložení textu ořezává, takže se e-mailový podpis stejně lepil za sdílenou zprávu (zkoušeno naostro jako v3.23, přímo nasazeno bez commitu do repa, nahrazeno hned touto opravou). Řešení: viditelný podpis appky (`— Kulturní radar`) na konci `sestavTextSdileni_` i `sdiletVyber_` — text se ořezat nedá, navíc dává smysl i mimo e-mail (WhatsApp/SMS), kde příjemce hned vidí, odkud zpráva pochází.
+- Node testy beze změny počtu (196/196) — existující testy přepsané na nový formát.
+
 ## Index.html v3.22 — 8. 8. 2026
 ### Opraveno (UX, ze živého testování v3.21 v Gmailu)
 - Text sdílení zkompaktněn: bez prázdných řádků mezi částmi, odkaz teď jako druhá odrážka (`• Odkaz: ...`) místo samostatného řádku, na konci jen JEDEN prázdný řádek místo tří (`sestavTextSdileni_` i `sdiletVyber_`).
