@@ -1,5 +1,9 @@
 # Changelog
 
+## Index.html v3.19 — 8. 8. 2026
+### Opraveno (UX, ze živého testování v3.18)
+- Pulzování zvýrazněné karty (`zvyraznPulz`) teď trvá po celou dobu zvýraznění (do kliknutí nebo 30s pojistky), ne jen 2 opakování na začátku. Čistě CSS (`animation: ... 2` → `... infinite`), Node testy beze změny (186/186).
+
 ## Index.html v3.18 — 8. 8. 2026
 ### Opraveno (UX, ze živého testování v3.17)
 - Zvýraznění karty otevřené přes sdílený odkaz (`.zvyrazneno`) teď zůstává, dokud uživatel nikam neklikne, místo pevných 4 vteřin — víc času se zorientovat. Pojistka 30 s, kdyby uživatel neklikl vůbec.

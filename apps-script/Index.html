@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.18 – Lehčí sdílení: "Sdílet" vede zpátky do appky, zvýraznění sdílené karty zůstává do kliknutí uživatele (max 30 s) -->
+<!-- Kulturní radar Index.html v3.19 – Lehčí sdílení: pulzování zvýrazněné karty trvá celou dobu zvýraznění (do kliknutí, max 30 s), ne jen na začátku -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -147,7 +147,7 @@
   /* v3.17: dočasné zvýraznění karty otevřené přes sdílený odkaz */
   .karta.zvyrazneno {
     box-shadow: 0 0 0 2px var(--accent), 0 4px 16px rgba(0,0,0,.12);
-    animation: zvyraznPulz 1.6s ease-in-out 2;
+    animation: zvyraznPulz 1.6s ease-in-out infinite;
   }
   @keyframes zvyraznPulz {
     0%, 100% { background: var(--card); }
