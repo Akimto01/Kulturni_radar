@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.17 – Lehčí sdílení: "Sdílet" teď vede zpátky do appky (deep link ?akce=ID&profil=Město), ne na zdrojovou stránku; příjemce vidí zvýrazněnou kartu -->
+<!-- Kulturní radar Index.html v3.18 – Lehčí sdílení: "Sdílet" vede zpátky do appky, zvýraznění sdílené karty zůstává do kliknutí uživatele (max 30 s) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -892,14 +892,24 @@
 
   /** v3.17: najde kartu podle ID (ze sdíleného odkazu), odscrolluje na ni
    *  a dočasně zvýrazní. Karta nemusí existovat (starý/neplatný odkaz,
-   *  akce mezitím zmizela) – v tom případě se tiše nic nestane. */
+   *  akce mezitím zmizela) – v tom případě se tiše nic nestane.
+   *  v3.17→úprava: zvýraznění zůstává, dokud uživatel nikam neklikne (dá mu
+   *  čas se zorientovat), s pojistkou 30 s pro případ, že vůbec neklikne. */
   function zvyraznitAkci_(id) {
     if (!id) return;
     const el = document.querySelector('.karta[data-id="' + CSS.escape(id) + '"]');
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.classList.add('zvyrazneno');
-    setTimeout(() => el.classList.remove('zvyrazneno'), 4000);
+    let odstraneno = false;
+    const odstranit = () => {
+      if (odstraneno) return;
+      odstraneno = true;
+      el.classList.remove('zvyrazneno');
+      document.removeEventListener('click', odstranit);
+    };
+    document.addEventListener('click', odstranit);
+    setTimeout(odstranit, 30000);
   }
 
   /** Zobrazí stavovou hlášku v #main. BUG opravený 5. 8. 2026: statický

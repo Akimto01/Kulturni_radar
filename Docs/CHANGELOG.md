@@ -1,5 +1,10 @@
 # Changelog
 
+## Index.html v3.18 — 8. 8. 2026
+### Opraveno (UX, ze živého testování v3.17)
+- Zvýraznění karty otevřené přes sdílený odkaz (`.zvyrazneno`) teď zůstává, dokud uživatel nikam neklikne, místo pevných 4 vteřin — víc času se zorientovat. Pojistka 30 s, kdyby uživatel neklikl vůbec.
+- Node testy beze změny (186/186) — `zvyraznitAkci_` pracuje s DOM/timerem, mimo testovatelnou čistou vrstvu.
+
 ## Index.html v3.17 — Lehčí sdílení: odkaz zpátky do appky — 8. 8. 2026
 ### Změněno
 - Tlačítko „📤 Sdílet" u karty akce teď generuje odkaz zpátky do appky (`kulturniradar.cz/?akce=ID&profil=Město`, `sestavOdkazNaAkci_`) místo odkazu na zdrojovou stránku akce. Příjemce tak vidí náš zpracovaný přehled (dojezd, kategorie, skóre), ne holou úřední stránku.
