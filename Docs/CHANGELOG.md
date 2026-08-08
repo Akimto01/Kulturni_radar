@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.14 (frontend) — 8. 8. 2026
+### Přidáno
+- **Anonymní režim prohlížení**: appka od teď startuje rovnou plně funkční (karty, filtry, vyhledávání), bez vynuceného přihlášení. Přihlašovací obrazovka se otevírá jen na vyžádání – klikem na badge "Přihlásit se" v hlavičce, nebo automaticky při pokusu o ★ Oblíbené / ✓ Navštívené (osobní funkce), se srozumitelnou hláškou proč se přihlášení žádá.
+- Nové tlačítko "Pokračovat bez přihlášení" – zavře login overlay, appka zůstává funkční anonymně.
+- Po odhlášení appka zůstává funkční v anonymním režimu (žádné ★/✓ konkrétního profilu), ne vynucený návrat na login.
+- RF testy 21 → 22: nový klíčový test "Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login" + upravené login/odhlašovací testy na nový flow (overlay se otevírá badgem, ne automaticky).
+### Opraveno
+- BUG (race condition, nalezeno při RF testování 8. 8.): po přihlášení se přihlašovací overlay zavíral DŘÍV, než doběhlo dotažení osobních ★/✓ dat (`nactiAkce` po loginu) – klik na kartu hned po přihlášení mohl zasáhnout element, který vzápětí přepsal ještě doběhající přechod anonymní→osobní data, a optimistický zápis (★) se ztratil z UI i přes úspěšný zápis na serveru. Fix: `nactiAkce` po přihlášení se teď čeká (`await`) PŘED zavřením overlaye, ne po něm.
+### Beze změny
+- Backend (`.gs`) – zůstává v3.20, tahle verze je čistě frontendová.
+
 ## v3.20 (backend) + v3.13 (frontend) — 7.–8. 8. 2026
 ### Přidáno
 - **Uživatelské profily**: nový list UŽIVATELÉ (ID, Jméno, PIN_hash, Filtry, Vytvořeno). Přihlášení PIN (SHA-256 + sůl, `hashPin_`/`overitPin_`) – hash se nikdy neposílá na frontend, PIN se zadává při každém vstupu (žádné localStorage přihlášení, rozhodnutí 7. 8.).

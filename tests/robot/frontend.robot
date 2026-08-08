@@ -24,10 +24,12 @@ Hlavička a základní prvky jsou na místě
     Get Element    ${FRAME} \#fab
 
 Přihlašovací obrazovka nabízí dlaždice profilů k výběru
-    [Documentation]    v3.13: Suite Setup se už přihlásil na sdílené stránce,
-    ...    takže tenhle test si otevře VLASTNÍ nezávislou stránku, aby ověřil
-    ...    počáteční (nepřihlášený) stav bez ovlivnění zbytku suity.
+    [Documentation]    v3.14: appka startuje anonymně – login overlay se otevírá
+    ...    badgem "Přihlásit se". Vlastní nezávislá stránka, aby test ověřil
+    ...    počáteční stav bez ovlivnění přihlášení sdílené stránky.
     New Page    ${BASE_URL}
+    Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Click    ${FRAME} \#uzivatel-badge
     Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
     ${pocet}=    Get Element Count    ${FRAME} \#login-dlazdice .dlazdice-uzivatel
     Should Be True    ${pocet} >= 1    Má se nabídnout aspoň jeden uživatelský profil
@@ -36,12 +38,35 @@ Přihlašovací obrazovka nabízí dlaždice profilů k výběru
     ...    msg=Testovací profil RF_TEST_USER_ID se mezi dlaždicemi nenašel – je založený v UŽIVATELÍCH?
     Close Page
 
+Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastní stránka)
+    [Documentation]    v3.14: klíčový test nového chování (rozhodnutí 8. 8. 2026).
+    ...    1) Appka se načte rovnou s kartami, BEZ přihlašovacího overlay.
+    ...    2) Klik na ★ v anonymním stavu NEZAPÍŠE nic – místo toho otevře
+    ...    login overlay s vysvětlením. Overlay jde zavřít "Pokračovat bez
+    ...    přihlášení" a appka zůstává funkční.
+    New Page    ${BASE_URL}
+    Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
+    ${overlay_na_startu}=    Get Element Count    ${FRAME} \#login-overlay:not(.skryto)
+    Should Be Equal As Integers    ${overlay_na_startu}    0
+    ...    msg=Appka má startovat anonymně – login overlay NESMÍ být na startu viditelný
+    Click    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.hvezda
+    Wait For Elements State    ${FRAME} \#login-overlay:not(.skryto)    visible    timeout=10s
+    ${duvod}=    Get Text    ${FRAME} \#login-duvod
+    Should Contain    ${duvod}    přihlas    msg=Overlay má vysvětlit, PROČ se objevil (hláška s výzvou k přihlášení)
+    Click    ${FRAME} \#login-pokracovat-bez
+    Wait For Elements State    ${FRAME} \#login-overlay    hidden    timeout=5s
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
+    Close Page
+
 Špatný PIN zobrazí chybu a nepřihlásí (vlastní stránka)
     [Documentation]    Vlastní nezávislá stránka – viz dokumentace testu výš.
     ...    Záměrně syntakticky platný PIN (splňuje pinVypadaPlatne_, 4–8 znaků,
     ...    bez mezer), jen espere nesprávný, ať se otestuje SERVEROVÁ validace,
-    ...    ne jen klientská.
+    ...    ne jen klientská. v3.14: overlay se otevírá badgem.
     New Page    ${BASE_URL}
+    Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Click    ${FRAME} \#uzivatel-badge
     Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
     Click    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id="${RF_TEST_USER_ID}"]
     Wait For Elements State    ${FRAME} \#login-pin-sekce.zobrazit    visible    timeout=5s
@@ -55,21 +80,23 @@ Přihlašovací obrazovka nabízí dlaždice profilů k výběru
     ...    msg=Po špatném PINu appka NESMÍ přihlásit – overlay musí zůstat viditelný
     Close Page
 
-Odhlášení vrátí na výběr profilů bez plné stránky (vlastní stránka)
-    [Documentation]    Regresní test bugu z 7. 8. 2026: location.reload() uvnitř
-    ...    sandboxovaného Apps Script iframu restartoval jen vnitřní iframe,
-    ...    ne skutečnou /exec URL → appka po odhlášení zůstala na prázdné
-    ...    stránce. Oprava: "měkké" odhlášení bez reloadu (viz odhlasit_).
-    ...    Vlastní nezávislá stránka, ať test nezruší přihlášení sdílené
-    ...    stránky, na které stojí zbytek suity.
+Odhlášení vrátí appku do anonymního režimu (vlastní stránka)
+    [Documentation]    Regresní pojistka na bug ze 7. 8. 2026 (location.reload()
+    ...    v sandboxovaném iframu → prázdná stránka) + v3.14 chování: po
+    ...    odhlášení se appka vrací do FUNKČNÍHO anonymního režimu (karty
+    ...    viditelné, badge zpět na "Přihlásit se"), žádný vynucený login.
     New Page    ${BASE_URL}
+    Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
     Click    ${FRAME} \#uzivatel-badge
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
     Click    ${FRAME} \#filtry-odhlasit
-    Wait For Elements State    ${FRAME} \#login-overlay:not(.skryto)    visible    timeout=10s
-    ${pocet}=    Get Element Count    ${FRAME} \#login-dlazdice .dlazdice-uzivatel
-    Should Be True    ${pocet} >= 1    Po odhlášení má appka znovu nabídnout výběr profilu, ne prázdnou stránku
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=15s
+    ${overlay}=    Get Element Count    ${FRAME} \#login-overlay:not(.skryto)
+    Should Be Equal As Integers    ${overlay}    0
+    ...    msg=Po odhlášení má appka zůstat funkční anonymně, ne vynucovat login
+    ${badge}=    Get Text    ${FRAME} \#uzivatel-badge
+    Should Contain    ${badge}    Přihlásit    msg=Badge se má vrátit na "Přihlásit se"
     Close Page
 
 Profil: dialog obsahuje osobní filtry a tlačítko Najít akce pro mě (bez spuštění)
@@ -377,19 +404,16 @@ Ověřit plný cyklus označení (přidat i odebrat) s reloadem
     RETURN    ${puvodni}
 
 Otevřít radar
-    [Documentation]    v3.13: appka teď za úvodní obrazovkou VYŽADUJE přihlášení
-    ...    uživatelského profilu, jinak se meta/events vůbec nenačtou (init()
-    ...    se volá až po úspěšném apiPrihlaseniUzivatele). Bez vyhrazeného
-    ...    testovacího profilu (RF_TEST_USER_ID/RF_TEST_PIN) celá suita nemá
-    ...    jak proběhnout – radši hlasitě Skip než nedeterministické pády
-    ...    na "element not found" o pár řádků níž.
+    [Documentation]    v3.14: appka startuje anonymně a login je na vyžádání.
+    ...    Suite Setup se přesto přihlašuje (přes badge), protože toggle testy
+    ...    ★/✓ přihlášení potřebují. Bez vyhrazeného testovacího profilu
+    ...    (RF_TEST_USER_ID/RF_TEST_PIN) radši hlasitě Skip než
+    ...    nedeterministické pády na "element not found" o pár řádků níž.
     Skip If    '${RF_TEST_USER_ID}' == '' or '${RF_TEST_PIN}' == ''
     ...    RF_TEST_USER_ID/RF_TEST_PIN nenastaveny – frontend suita vyžaduje vyhrazený testovací profil (viz resources.robot)
     New Browser    chromium    headless=True
     New Context    viewport={'width': 1280, 'height': 900}
     New Page       ${BASE_URL}
-    # Apps Script shell → počkat na vnitřní aplikaci (header existuje v DOM
-    # hned, i pod přihlašovacím overlayem – ten ho jen vizuálně překrývá).
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
     # Data přicházejí asynchronně přes google.script.run → počkat na
@@ -400,9 +424,14 @@ Otevřít radar
 
 Přihlásit se do radaru
     [Arguments]    ${uzivatel_id}    ${pin}
-    [Documentation]    Očekává, že přihlašovací overlay je už viditelný
-    ...    (dlaždice profilů načtené) – volající zajistí čekání PŘED voláním,
-    ...    pokud jde o čerstvě otevřenou stránku (viz "Otevřít radar" výš).
+    [Documentation]    v3.14: appka startuje anonymně, takže keyword NEJDŘÍV
+    ...    otevře login overlay klikem na badge "Přihlásit se" (pokud už není
+    ...    otevřený – např. po pokusu o ★ bez přihlášení), pak vybere profil,
+    ...    vyplní PIN a počká na skrytí overlay.
+    ${overlay_otevreny}=    Get Element Count    ${FRAME} \#login-overlay:not(.skryto)
+    IF    ${overlay_otevreny} == 0
+        Click    ${FRAME} \#uzivatel-badge
+    END
     Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
     Click    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id="${uzivatel_id}"]
     Wait For Elements State    ${FRAME} \#login-pin-sekce.zobrazit    visible    timeout=5s

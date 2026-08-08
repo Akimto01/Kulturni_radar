@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.13 – Uživatelské profily: přihlášení PIN, osobní ★/✓, osobní filtry, hledání na vyžádání -->
+<!-- Kulturní radar Index.html v3.14 – Anonymní režim: appka startuje rovnou funkční bez přihlášení; login se vyžádá až při ★/✓ (rozhodnutí 8. 8. 2026) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -397,7 +397,7 @@
 <header>
   <h1>🎭 Kulturní radar</h1>
   <span id="meta-info">načítám…</span>
-  <button id="uzivatel-badge" style="display:none" title="Profil – filtry, hledání, odhlášení">👤</button>
+  <button id="uzivatel-badge" title="Přihlásit se k osobnímu profilu">Přihlásit se</button>
 </header>
 
 <div id="controls">
@@ -425,10 +425,11 @@
 
 <button id="fab" title="Spustit vyhledávání nových akcí">Spustit kontrolu</button>
 
-<!-- v3.13: Přihlášení uživatelského profilu (overlay přes celou app) -->
-<div id="login-overlay">
+<!-- v3.13: Přihlášení uživatelského profilu (overlay); v3.14: skrytý na startu,
+     zobrazuje se až na vyžádání (badge, nebo pokus o ★/✓ bez přihlášení) -->
+<div id="login-overlay" class="skryto">
   <h2>🎭 Kulturní radar</h2>
-  <span class="login-pokyn">Kdo se dívá? Vyber svůj profil.</span>
+  <span class="login-pokyn" id="login-duvod">Kdo se dívá? Vyber svůj profil.</span>
   <div id="login-dlazdice"><span class="login-pokyn">Načítám profily…</span></div>
   <div id="login-pin-sekce">
     <input id="login-pin" type="password" inputmode="numeric" autocomplete="off"
@@ -439,6 +440,7 @@
       <button class="btn-ok" id="login-potvrdit">Přihlásit</button>
     </div>
   </div>
+  <button class="btn-cancel" id="login-pokracovat-bez">Pokračovat bez přihlášení</button>
 </div>
 
 <!-- v3.13: Dialog osobních filtrů + hledání na vyžádání -->
@@ -523,7 +525,28 @@
   }
 
   // ── v3.13: Přihlášení uživatelského profilu ───────────────
+  // v3.14: overlay je na startu skrytý – appka běží anonymně a login se
+  // otevírá až na vyžádání (badge, nebo pokus o ★/✓ bez přihlášení).
   let vybranyUzivatelId = '';
+  let dlazdiceNactene = false;
+
+  /** Otevře přihlašovací obrazovku; duvod (volitelný) se ukáže místo
+   *  standardního "Kdo se dívá?" – např. u pokusu o ★ bez přihlášení. */
+  function otevritLogin(duvod) {
+    document.getElementById('login-duvod').textContent =
+      duvod || 'Kdo se dívá? Vyber svůj profil.';
+    document.getElementById('login-chyba').textContent = '';
+    document.getElementById('login-overlay').classList.remove('skryto');
+    if (!dlazdiceNactene) zobrazitLogin();
+  }
+
+  function zavritLogin() {
+    document.getElementById('login-overlay').classList.add('skryto');
+    vybranyUzivatelId = '';
+    document.querySelectorAll('.dlazdice-uzivatel').forEach(x => x.classList.remove('vybrana'));
+    document.getElementById('login-pin-sekce').classList.remove('zobrazit');
+    document.getElementById('login-pin').value = '';
+  }
 
   async function zobrazitLogin() {
     const kontejner = document.getElementById('login-dlazdice');
@@ -550,6 +573,7 @@
         });
         kontejner.appendChild(d);
       });
+      dlazdiceNactene = true;
     } catch (e) {
       kontejner.innerHTML = '<span class="login-pokyn">Profily se nepodařilo načíst: ' + e.message + '</span>';
     }
@@ -566,11 +590,17 @@
       const res = await gsr('apiPrihlaseniUzivatele', vybranyUzivatelId, pin);
       if (res && res.ok) {
         prihlasenyUzivatel = { id: res.id, jmeno: res.jmeno, filtry: res.filtry || {} };
-        document.getElementById('login-overlay').classList.add('skryto');
+        // v3.14→oprava: nactiAkce (osobní ★/✓) MUSÍ doběhnout PŘED zavřením
+        // overlaye, jinak hrozí race condition – klik na kartu hned po
+        // přihlášení mohl zasáhnout element, který vzápětí přepsal ještě
+        // doběhající přechod anonymní→osobní data (ztráta optimistického
+        // zápisu, karty zmizely z filtru „★ Oblíbené" i po úspěšném apiToggle).
+        const sel = document.getElementById('profil-select');
+        await nactiAkce((sel && sel.value) || aktivniProfil);
+        zavritLogin();
         const badge = document.getElementById('uzivatel-badge');
         badge.textContent = '👤 ' + res.jmeno;
-        badge.style.display = '';
-        await init();
+        badge.title = 'Profil – filtry, hledání, odhlášení';
       } else {
         chyba.textContent = (res && res.error) || 'Přihlášení se nepodařilo.';
       }
@@ -588,35 +618,30 @@
     document.querySelectorAll('.dlazdice-uzivatel').forEach(x => x.classList.remove('vybrana'));
     document.getElementById('login-pin-sekce').classList.remove('zobrazit');
   });
+  document.getElementById('login-pokracovat-bez').addEventListener('click', zavritLogin);
 
   function odhlasit_() {
-    // v3.13→oprava: location.reload() restartuje jen vnitřní sandboxovaný
-    // iframe Apps Scriptu (ne skutečnou /exec URL), takže po odhlášení
-    // zůstávala prázdná stránka až do ručního refreshe. Řešení: "měkké"
-    // odhlášení – vyčistit stav v paměti a znovu ukázat login obrazovku,
-    // žádný reload.
+    // v3.13→oprava: location.reload() uvnitř sandboxovaného Apps Script
+    // iframu restartoval jen vnitřní iframe → prázdná stránka. Řešení:
+    // "měkké" odhlášení bez reloadu.
+    // v3.14: po odhlášení se appka vrací do anonymního režimu (žádný
+    // vynucený login) – jen se znovu načtou akce bez osobních ★/✓.
     document.getElementById('filtry-dialog').classList.remove('open');
     prihlasenyUzivatel = null;
-    vybranyUzivatelId = '';
-    vsechnaAkce = [];
-    rezimZobrazeni = 'vse';
+    zavritLogin();
 
     const badge = document.getElementById('uzivatel-badge');
-    badge.style.display = 'none';
-    badge.textContent = '👤';
+    badge.textContent = 'Přihlásit se';
+    badge.title = 'Přihlásit se k osobnímu profilu';
 
-    document.querySelectorAll('.dlazdice-uzivatel').forEach(x => x.classList.remove('vybrana'));
-    document.getElementById('login-pin-sekce').classList.remove('zobrazit');
-    document.getElementById('login-pin').value = '';
-    document.getElementById('login-chyba').textContent = '';
-    document.getElementById('login-overlay').classList.remove('skryto');
-
-    zobrazitLogin();
+    const sel = document.getElementById('profil-select');
+    nactiAkce((sel && sel.value) || aktivniProfil);
   }
 
   // ── v3.13: Dialog osobních filtrů + hledání na vyžádání ───
+  // v3.14: badge má dvojí roli – nepřihlášený otevírá login, přihlášený dialog profilu.
   document.getElementById('uzivatel-badge').addEventListener('click', () => {
-    if (!prihlasenyUzivatel) return;
+    if (!prihlasenyUzivatel) { otevritLogin(); return; }
     document.getElementById('filtry-nadpis').textContent = 'Profil: ' + prihlasenyUzivatel.jmeno;
     document.getElementById('filtry-kategorie').value = prihlasenyUzivatel.filtry.kategorie || '';
     document.getElementById('filtry-dojezd').value = prihlasenyUzivatel.filtry.dojezd || '';
@@ -1290,6 +1315,14 @@
   const probihaUkladani = new Set();   // klíč id:typ – po dobu round-tripu na server
 
   async function prepniOznaceni(id, typ) {
+    // v3.14: ★/✓ jsou osobní funkce – bez přihlášení otevřít login
+    // s vysvětlením místo tichého serverového selhání.
+    if (!prihlasenyUzivatel) {
+      otevritLogin(typ === 'oblibene'
+        ? 'Pro ukládání do ★ Oblíbených se prosím přihlas.'
+        : 'Pro označování ✓ Navštívených se prosím přihlas.');
+      return;
+    }
     const a = vsechnaAkce.find(x => x.id === id);
     if (!a) return;
     // Optimistická odezva – přepnout hned, server potvrdí (nebo vrátí zpět).
@@ -1373,9 +1406,10 @@
   }
 
   // ── Start ─────────────────────────────────────────────────
-  // v3.13: napřed přihlášení profilu (PIN při každém vstupu), init() se volá
-  // až po úspěšném přihlášení z prihlasit_().
-  zobrazitLogin();
+  // v3.14: appka startuje rovnou v plně funkčním anonymním režimu
+  // (rozhodnutí 8. 8. 2026) – init() běží hned, přihlášení je na vyžádání
+  // (badge "Přihlásit se", nebo pokus o ★/✓).
+  init();
 </script>
 </body>
 </html>
