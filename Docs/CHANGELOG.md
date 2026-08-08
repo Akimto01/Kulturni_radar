@@ -1,5 +1,10 @@
 # Changelog
 
+## Index.html v3.22 — 8. 8. 2026
+### Opraveno (UX, ze živého testování v3.21 v Gmailu)
+- Text sdílení zkompaktněn: bez prázdných řádků mezi částmi, odkaz teď jako druhá odrážka (`• Odkaz: ...`) místo samostatného řádku, na konci jen JEDEN prázdný řádek místo tří (`sestavTextSdileni_` i `sdiletVyber_`).
+- Node testy beze změny počtu (196/196) — existující testy přepsané na nový formát.
+
 ## Index.html v3.21 — 8. 8. 2026
 ### Opraveno (UX, formát textu sdílení)
 - `sestavTextSdileni_` (jedna akce): datum+místo teď na vlastní odrážce (`• `), oddělené prázdnými řádky od názvu i odkazu, čitelnější v e-mailu/SMS než dřívější tři řádky natěsno.
