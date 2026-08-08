@@ -47,11 +47,7 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 ## Větší témata
 - Plnohodnotná interaktivní mapa akcí (víc pinů najednou, places_map) — vědomě odložená budoucí varianta. Odkaz „📍 Mapa" na kartě (v3.10, garantovaný pin díky souřadnicím z Nominatim) pokrývá jednu akci najednou a je hotový.
 - Strukturované časy `cas_od`/`cas_do` — přesnější „Do kalendáře" (dnes celodenní), řazení akcí v rámci dne.
-- Frontendový večer: `Index.html` → GitHub Pages + DNS `kulturniradar.cz`.
-  CORS chování `/exec` endpointu ověřeno 7. 8. 2026 (GET i POST z cizí
-  originy procházejí bez blokace) — migrace proveditelná bez proxy/JSONP.
-  Zbývá přepsat `google.script.run` volání na `fetch()`.
-- Případná Android aplikace (výukový projekt) — cesta: PWA → Trusted Web Activity → Google Play. Podmíněno dokončením frontendového večera výše.
+- Případná Android aplikace (výukový projekt) — cesta: PWA → Trusted Web Activity → Google Play. Frontendový večer (podmínka vlastní domény) hotov 8. 8. 2026.
 
 ## Plán rozvoje — schváleno 4. 8. 2026, aktualizováno 8. 8. 2026
 1. ~~**Rodinné profily**~~ — **HOTOVO 7.–8. 8. 2026** (backend v3.20, frontend
@@ -59,12 +55,11 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
    plánováno) a s podporou osobních vyhledávacích filtrů navíc oproti
    původnímu rozsahu. Realita: 4 rodinné profily + 1 vyhrazený `rf-test`
    pro CI, prostor pro další.
-2. **Frontendový večer** (~3–4 h, možná 2 sezení) — GitHub Pages + DNS
-   kulturniradar.cz. Riziko z minula **vyřešeno 7. 8. 2026**: CORS spike
-   potvrdil, že GET i POST na `/exec` z cizí originy procházejí bez
-   blokace (Apps Script vrací CORS hlavičky defaultně), takže migrace je
-   proveditelná bez proxy/JSONP obchvatu. Zbývá samotné přestěhování
-   `Index.html` a přepis `google.script.run` volání na `fetch()`.
+2. ~~**Frontendový večer**~~ — **HOTOVO 8. 8. 2026**: `Index.html` migrován
+   na Cloudflare Pages (ne GitHub Pages, jak se plánovalo — jinak beze
+   změny záměru), doména kulturniradar.cz aktivní se SSL, Email Routing
+   pro info@ ověřeno doručením, RF sada 22/22 na nové doméně. Viz
+   CHANGELOG.md.
 3. **Lehčí sdílení** (~2–3 h) — veřejný odkaz s vybranými akcemi v URL, bez
    účtů pro čtenáře. Nezávislé na kroku 2, může jít kdykoli mezitím.
 4. **Android appka** (~3–4 h práce + dny čekání na schválení Play Store) —
@@ -89,7 +84,8 @@ parsování datumů, detekce vycpávek).
 
 Doporučený postupný krok (ne najednou):
 1. ~~Osobní profily v rámci jedné rodiny~~ — hotovo 7.–8. 8. 2026, viz plán výše.
-2. Frontendový večer (GitHub Pages + doména) – nutný předstupeň, CORS ověřen
+2. ~~Frontendový večer (doména)~~ — hotovo 8. 8. 2026 (Cloudflare Pages,
+   ne GitHub Pages, viz plán výše)
 3. Lehčí sdílení: veřejná stránka s plánem bez účtů pro čtenáře
 4. Plnohodnotný multi-tenant systém – dlouhodobý horizont, ne blízký plán
 

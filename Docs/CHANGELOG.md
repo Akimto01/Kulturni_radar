@@ -1,5 +1,21 @@
 # Changelog
 
+## Infrastruktura — migrace na Cloudflare Pages + doména kulturniradar.cz — 8. 8. 2026
+### Přidáno
+- Frontend (`Index.html`) migrován z Apps Script webové appky na statický hosting **Cloudflare Pages**, napojený na privátní GitHub repo (přístup jen k tomuto repu, žádný jiný).
+- Vlastní doména **kulturniradar.cz** (+ `www.kulturniradar.cz`) aktivní, SSL certifikát zdarma.
+- **Email Routing**: `info@kulturniradar.cz` → přesměrování, ověřeno živým doručením.
+- RF sada přepnuta na novou doménu beze změny jednotlivých selektorů: `tests/robot/resources.robot` má nově `SITE_URL` (výchozí `https://kulturniradar.cz`, žádný iframe → `FRAME` prázdné) pro `frontend.robot`, zatímco `BASE_URL` zůstává vyhrazené pro `api.robot` (přímé volání Apps Script `/exec` — statický frontend vlastní API endpointy nemá, jen volá stejnou `/exec` URL). Test proti starému Apps Script vstupu (sandboxovaný iframe) zůstává možný přes `--variable SITE_URL:... --variable FRAME:"id=sandboxFrame >>> id=userHtmlFrame >>>"`.
+### Ověřeno
+- RF 22/22 na kulturniradar.cz.
+
+## v3.21 (backend) + v3.15 (frontend) — Dvourežimový gsr() + HTTP API — 8. 8. 2026
+### Přidáno
+- **Dvourežimový `gsr()`** ve frontendu: detekuje prostředí a volá `google.script.run` uvnitř Apps Scriptu, nebo `fetch()` jinde — příprava na provoz mimo Apps Script (viz migrace na Cloudflare Pages výše).
+- `sestavFetchPozadavek_`: překlad volání na HTTP požadavky; PIN i token se posílají vždy POSTem, nikdy v URL.
+- Backend: `routePost_` směruje POST akce (login/toggle/filtry/najdi/run) pro statický frontend, `doGet` přidává `api=uzivatele`.
+- Node testy 164 → 173 (unit +9 pro `routePost_`, frontend +6 pro `sestavFetchPozadavek_`).
+
 ## v3.14 (frontend) — 8. 8. 2026
 ### Přidáno
 - **Anonymní režim prohlížení**: appka od teď startuje rovnou plně funkční (karty, filtry, vyhledávání), bez vynuceného přihlášení. Přihlašovací obrazovka se otevírá jen na vyžádání – klikem na badge "Přihlásit se" v hlavičce, nebo automaticky při pokusu o ★ Oblíbené / ✓ Navštívené (osobní funkce), se srozumitelnou hláškou proč se přihlášení žádá.
