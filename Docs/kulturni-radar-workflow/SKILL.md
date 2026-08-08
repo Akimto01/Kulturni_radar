@@ -283,6 +283,65 @@ ale přímo přes Apps Script API (`script.projects`, `script.deployments`,
 napojeného projektu tedy funguje bez nutnosti šířeho OAuth souhlasu
 nebo opakovaného loginu.
 
+### Které konkrétní scopy zaškrtnout při clasp login
+Ověřeno 8. 8. 2026: výchozí `clasp login` grant obsahuje jen identity
+scopy (email/profile/openid) — BEZ přístupu k Apps Script API. Při
+OAuth souhlasu v prohlížeči je nutné ručně zaškrtnout přesně tyto tři
+položky (ne "Vybrat vše" — zbytečně široký přístup k Disku a Cloud
+nastavením):
+- "Vytvoření a aktualizace projektu v jazyce Google Apps Script"
+  (`script.projects` — pro `push`)
+- "Vytvoření a aktualizace nasazení jazyka Google Apps Script"
+  (`script.deployments` — pro `deploy`)
+- "Publikování aplikace jako webové aplikace nebo služby…"
+  (`script.webapp.deploy` — nutné, protože appka běží jako webová
+  aplikace)
+Ověření scopů jde udělat přes Google `tokeninfo` endpoint na
+`~/.clasprc.json` access_token, ne jen spolehnutím na to, že přihlášení
+"prošlo".
+
+### appsscript.json manifest musí existovat lokálně
+`clasp push` selže na "Project contents must include a manifest file
+named appsscript", i když manifest dávno existuje na serveru — clasp
+vyžaduje i lokální kopii v `apps-script/`. NEPOUŽÍVAT `clasp pull` na
+opravu (přepsalo by `kulturni_radar.gs`/`Index.html` starší verzí ze
+serveru). Bezpečný postup: stáhnout JEN manifest přes Apps Script API
+(`script.projects.getContent`, stejné scriptId) a uložit jako
+`apps-script/appsscript.json`, bez zásahu do ostatních souborů. Po
+prvním stažení commitnout do repa, ať je pro příští push už připravený.
+
+### clasp deploy vyžaduje -i, jinak vznikne nová implementace
+Ověřeno 8. 8. 2026 při prvním ostrém použití: `clasp deploy` spuštěný
+BEZ parametru `-i <deploymentId>` nevytvoří "Novou verzi" na existující
+aktivní implementaci (jak dělá ruční postup "Spravovat implementace →
+Upravit aktivní implementaci → Nová verze"), ale založí ÚPLNĚ NOVOU
+implementaci s novou, dosud nikde nepoužitou `/exec` URL. Produkce
+(URL používaná v `tests/robot/resources.robot` i appkou na
+kulturniradar.cz) zůstane běžet na starém kódu, dokud se to nezjistí
+a neopraví.
+
+Správný příkaz pro aktualizaci existující produkční implementace:
+
+```
+clasp deploy -i <ID_PRODUKČNÍ_IMPLEMENTACE> --description "vXX"
+```
+
+ID produkční implementace lze zjistit z `clasp deployments` (řádek bez
+`@HEAD`, s aktuálním popisem předchozí verze) nebo přímo z produkční
+`/exec` URL, kterou používá `tests/robot/resources.robot`.
+
+Pokud omylem vznikne nová implementace bez `-i` (jak se stalo při prvním
+použití), lze ji bezpečně smazat přes `clasp deployments` + ruční
+identifikaci ID — nová implementace není nikde odkazovaná, takže její
+smazání nic nerozbije.
+
+### PYTHONIOENCODING a RF na pozadí
+Ověřeno 8. 8. 2026: systémová proměnná `PYTHONIOENCODING=utf-8:surrogateescape`
+shazuje Robot Framework, když běží s přesměrovaným výstupem (na pozadí/
+přes skript), ne v interaktivním terminálu — známý RF bug, nesouvisí
+s appkou. Obchvat: před spuštěním RF sady takhle nastavit
+`$env:PYTHONIOENCODING = "utf-8"` jen pro daný běh.
+
 ### Proč to NEJDE spustit odsud (Claude v tomhle chatu)
 Síťový přístup z tohoto prostředí je omezený na povolený seznam domén
 (GitHub, npm, PyPI apod.) — `script.google.com` ani `accounts.google.com`
@@ -313,4 +372,14 @@ souhlas s jeho Google účtem (citlivé oprávnění, ne něco, co se zapojí
 "mimochodem"). Až/pokud se Vojta rozhodne pokračovat, je tohle hotový
 podklad k tomu, aby to šlo rovnou technicky realizovat, ne znovu zkoumat
 od nuly.
+
+### Přenos textových souborů s diakritikou do Claude Code
+Ověřeno 8. 8. 2026 (SKILL.md samotný): vkládání textového souboru s
+českou diakritikou jako přílohy přímo do promptu (ať už přes kopírování
+textu, nebo drag&drop souboru) opakovaně způsobovalo nevratný mojibake
+(ztracený C1 control byte) — ověřeno byte-přesně identickým výsledkem
+bez ohledu na zdroj/formát přílohy. Spolehlivé řešení: uložit soubor
+ručně přímo na disk do repa (mimo chat, mimo přílohy) a požádat Claude
+Code, ať ho přečte přímo ze souborového systému (svým file/read
+nástrojem), ne z přílohy zprávy.
 
