@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.19 – Lehčí sdílení: pulzování zvýrazněné karty trvá celou dobu zvýraznění (do kliknutí, max 30 s), ne jen na začátku -->
+<!-- Kulturní radar Index.html v3.20 – Lehčí sdílení: nové "Sdílet výběr" (město + kategorie), deep link ?profil=...&kategorie=..., odlišné od jedno-akcového ?akce=... -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -419,6 +419,7 @@
   <div class="chips">
     <button id="chip-oblibene" class="chip chip-special">★ Oblíbené</button>
     <button id="chip-navstivene" class="chip chip-special">✓ Navštívené</button>
+    <button id="btn-sdilet-vyber" class="chip chip-special" title="Sdílet aktuální výběr (město + kategorie)">📤 Sdílet výběr</button>
   </div>
   <select id="obdobi-select" style="display:none">
     <option value="30">poslední měsíc</option>
@@ -820,7 +821,11 @@
       // ze SPRÁVNÉHO města (bez toho by se sdílená akce nemusela objevit,
       // kdyby uživatel měl výchozí jiné/žádné aktivní město).
       const odkazNaAkci = parsovatOdkazNaAkci_(window.location.search);
+      // v3.20: odkaz na sdílený VÝBĚR (?profil=Město&kategorie=a,b) – řeší se
+      // jen když není jedno-akcový odkaz (ten má přednost, ať se nekříží).
+      const odkazNaVyber = odkazNaAkci ? null : parsovatOdkazNaVyber_(window.location.search);
       if (odkazNaAkci && odkazNaAkci.profil) aktivniProfil = odkazNaAkci.profil;
+      else if (odkazNaVyber && odkazNaVyber.profil) aktivniProfil = odkazNaVyber.profil;
 
       // Profily do selectu – seřazené abecedně (zpětná vazba 5. 8. 2026:
       // dřív v pořadí, jak je vrátil list LOKALITY, což se hůř hledá)
@@ -853,6 +858,15 @@
         chips.appendChild(ch);
       });
 
+      // v3.20: aplikovat kategorie ze sdíleného odkazu na výběr (jen platné
+      // kategorie, co appka fakticky zná – neplatný/starý název z odkazu se
+      // tiše ignoruje, ne pád).
+      if (odkazNaVyber && odkazNaVyber.kategorie.length) {
+        const dostupneKategorie = new Set(meta.kategorie || []);
+        aktKategorie = new Set(odkazNaVyber.kategorie.filter(k => dostupneKategorie.has(k)));
+        syncChipy();
+      }
+
       // Listenery na STATICKÝCH prvcích (existují jen jednou v DOM, nemažou
       // se) – přidat jen při úplně prvním init() za život stránky.
       if (!posluchaceStatickychPrvkuNastaveny) {
@@ -869,6 +883,7 @@
           rezimZobrazeni = rezimZobrazeni === 'navstivene' ? 'vse' : 'navstivene';
           prekreslit();
         });
+        document.getElementById('btn-sdilet-vyber').addEventListener('click', () => sdiletVyber_());
         document.getElementById('obdobi-select').addEventListener('change', (e) => {
           obdobiNavstivene = e.target.value;
           prekreslit();
@@ -1219,23 +1234,19 @@
     return radky.join('\n');
   }
 
-  /** Sdílení akce – tři úrovně odstupňovaného fallbacku, protože chování
-   *  nativního Web Share API i schránky uvnitř sandboxovaného iframe Apps
-   *  Scriptu není zaručené (stejná nejistota jako u window.open, viz iPad):
+  /** Odstupňovaný fallback řetězec pro sdílení JAKÉHOKOLI textu – tři
+   *  úrovně, protože chování nativního Web Share API i schránky uvnitř
+   *  sandboxovaného iframe Apps Scriptu není zaručené (stejná nejistota
+   *  jako u window.open, viz iPad):
    *  1) navigator.share (mobil: nativní panel se seznamem aplikací – WhatsApp,
    *     SMS, e-mail…), 2) zkopírování do schránky, 3) prompt() s textem k
-   *     ručnímu zkopírování jako poslední záchrana, když selže úplně vše. */
-  async function sdiletAkci_(a) {
-    // v3.17: odkaz zpátky do appky (viz sestavOdkazNaAkci_), ne na zdrojovou
-    // stránku – sestavTextSdileni_ zůstává beze změny (a i její testy),
-    // jen jí předáme kopii akce s přepsanou url.
-    const sel = document.getElementById('profil-select');
-    const profil = (sel && sel.value) || aktivniProfil;
-    const odkaz = sestavOdkazNaAkci_(a.id, profil, window.location.origin);
-    const text = sestavTextSdileni_(Object.assign({}, a, { url: odkaz }));
+   *     ručnímu zkopírování jako poslední záchrana, když selže úplně vše.
+   *  Sdílené mezi sdiletAkci_ (v3.13) a sdiletVyber_ (v3.20), ať se stejná
+   *  trojice fallbacků nekopíruje na dvou místech. */
+  async function sdiletText_(title, text, hlaskaKopie) {
     if (navigator.share) {
       try {
-        await navigator.share({ title: a.nazev || 'Kulturní radar', text });
+        await navigator.share({ title, text });
         return;
       } catch (e) {
         if (e && e.name === 'AbortError') return;   // uživatel sdílení sám zrušil
@@ -1244,11 +1255,65 @@
     }
     try {
       await navigator.clipboard.writeText(text);
-      alert('Text akce zkopírován do schránky – vlož ho, kam chceš poslat.');
+      alert(hlaskaKopie);
     } catch (e2) {
-      prompt('Zkopíruj text akce (Ctrl+C / podrž prst a Kopírovat):', text);
+      prompt('Zkopíruj text (Ctrl+C / podrž prst a Kopírovat):', text);
     }
   }
+
+  async function sdiletAkci_(a) {
+    // v3.17: odkaz zpátky do appky (viz sestavOdkazNaAkci_), ne na zdrojovou
+    // stránku – sestavTextSdileni_ zůstává beze změny (a i její testy),
+    // jen jí předáme kopii akce s přepsanou url.
+    const sel = document.getElementById('profil-select');
+    const profil = (sel && sel.value) || aktivniProfil;
+    const odkaz = sestavOdkazNaAkci_(a.id, profil, window.location.origin);
+    const text = sestavTextSdileni_(Object.assign({}, a, { url: odkaz }));
+    await sdiletText_(a.nazev || 'Kulturní radar', text, 'Text akce zkopírován do schránky – vlož ho, kam chceš poslat.');
+  }
+
+  // ── v3.20: Lehčí sdílení – celý výběr (město + kategorie) ────────────
+  // Na rozdíl od sdiletAkci_ (jedna konkrétní akce) tohle sdílí AKTUÁLNÍ
+  // filtrovaný pohled – např. "co se děje v Brně tenhle víkend v kategorii
+  // koncerty". Příjemce po otevření odkazu vidí appku rovnou takhle
+  // předfiltrovanou, může dál libovolně upravovat.
+
+  /** PURE: sestaví odkaz na filtrovaný výběr (město + volitelně kategorie).
+   *  Bez kategorie (aktKategorie prázdná = "Vše") se parametr kategorie
+   *  vůbec nepřidává. */
+  function sestavOdkazNaVyber_(profil, kategorieSet, baseUrl) {
+    const zaklad = String(baseUrl || '').replace(/\/+$/, '');
+    const params = new URLSearchParams();
+    if (profil) params.set('profil', profil);
+    const kategorie = [...kategorieSet].filter(Boolean);
+    if (kategorie.length) params.set('kategorie', kategorie.join(','));
+    const qs = params.toString();
+    return zaklad + '/' + (qs ? '?' + qs : '');
+  }
+
+  /** PURE: rozparsuje query string na { profil, kategorie }. Bez parametrů
+   *  'profil' i 'kategorie' → null (žádný deep link na výběr) – tak se
+   *  nekříží s jedno-akcovým odkazem (?akce=...), který se řeší zvlášť. */
+  function parsovatOdkazNaVyber_(queryString) {
+    const params = new URLSearchParams(queryString || '');
+    const profil = params.get('profil');
+    const kategorieRaw = params.get('kategorie');
+    if (!profil && !kategorieRaw) return null;
+    const kategorie = kategorieRaw
+      ? kategorieRaw.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    return { profil: profil || '', kategorie };
+  }
+
+  async function sdiletVyber_() {
+    const sel = document.getElementById('profil-select');
+    const profil = (sel && sel.value) || aktivniProfil;
+    const odkaz = sestavOdkazNaVyber_(profil, aktKategorie, window.location.origin);
+    const popisKategorii = aktKategorie.size ? ' (' + [...aktKategorie].join(', ') + ')' : '';
+    const text = 'Kulturní radar – ' + profil + popisKategorii + '\n' + odkaz;
+    await sdiletText_('Kulturní radar', text, 'Odkaz na výběr zkopírován do schránky – vlož ho, kam chceš poslat.');
+  }
+
 
   /** PURE: odkaz na Google Maps – oficiální dokumentované URL schéma
    *  (ne JS API), takže žádný API klíč ani placení, jen deep-link. Na mobilu

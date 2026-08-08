@@ -13,6 +13,7 @@ const f = nactiFrontendFunkce([
   'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
   'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
   'sestavOdkazNaAkci_', 'parsovatOdkazNaAkci_',
+  'sestavOdkazNaVyber_', 'parsovatOdkazNaVyber_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -360,4 +361,59 @@ test('v3.17: round-trip sestavení → parsování zachová id i profil', () => 
   const zpet = f.parsovatOdkazNaAkci_(query);
   assert.equal(zpet.id, 'nejaka-akce');
   assert.equal(zpet.profil, 'Znojmo');
+});
+
+// ---------------------------------------------------------------------------
+// v3.20: Lehčí sdílení – celý výběr (?profil=Město&kategorie=a,b,c)
+// ---------------------------------------------------------------------------
+
+test('v3.20: sestavOdkazNaVyber_ – jen profil, žádná kategorie (== "Vše")', () => {
+  const url = f.sestavOdkazNaVyber_('Brno', new Set(), 'https://kulturniradar.cz');
+  assert.equal(url, 'https://kulturniradar.cz/?profil=Brno');
+});
+
+test('v3.20: sestavOdkazNaVyber_ – profil i kategorie, spojené čárkou', () => {
+  const url = f.sestavOdkazNaVyber_('Brno', new Set(['koncerty', 'folklor']), 'https://kulturniradar.cz');
+  assert.equal(url, 'https://kulturniradar.cz/?profil=Brno&kategorie=koncerty%2Cfolklor');
+});
+
+test('v3.20: sestavOdkazNaVyber_ – koncové lomítko v baseUrl se nezdvojí', () => {
+  const url = f.sestavOdkazNaVyber_('Brno', new Set(), 'https://kulturniradar.cz/');
+  assert.equal(url, 'https://kulturniradar.cz/?profil=Brno');
+});
+
+test('v3.20: sestavOdkazNaVyber_ – bez profilu i kategorií vrátí jen kořen domény', () => {
+  const url = f.sestavOdkazNaVyber_('', new Set(), 'https://kulturniradar.cz');
+  assert.equal(url, 'https://kulturniradar.cz/');
+});
+
+test('v3.20: parsovatOdkazNaVyber_ – profil i kategorie se rozparsují', () => {
+  const vysledek = f.parsovatOdkazNaVyber_('?profil=Brno&kategorie=koncerty,folklor');
+  assert.equal(vysledek.profil, 'Brno');
+  shodneNapricRealmy(vysledek.kategorie, ['koncerty', 'folklor']);
+});
+
+test('v3.20: parsovatOdkazNaVyber_ – jen profil, bez kategorie → prázdné pole, ne pád', () => {
+  const vysledek = f.parsovatOdkazNaVyber_('?profil=Brno');
+  assert.equal(vysledek.profil, 'Brno');
+  shodneNapricRealmy(vysledek.kategorie, []);
+});
+
+test('v3.20: parsovatOdkazNaVyber_ – ani profil ani kategorie → null (žádný deep link)', () => {
+  assert.equal(f.parsovatOdkazNaVyber_(''), null);
+  assert.equal(f.parsovatOdkazNaVyber_(null), null);
+  assert.equal(f.parsovatOdkazNaVyber_('?akce=x'), null);
+});
+
+test('v3.20: parsovatOdkazNaVyber_ – prázdné položky a mezery v kategoriích se vyčistí', () => {
+  const vysledek = f.parsovatOdkazNaVyber_('?kategorie=koncerty, ,folklor,');
+  shodneNapricRealmy(vysledek.kategorie, ['koncerty', 'folklor']);
+});
+
+test('v3.20: round-trip sestavení → parsování zachová profil i kategorie', () => {
+  const url = f.sestavOdkazNaVyber_('Znojmo', new Set(['divadlo', 'jarmarky']), 'https://kulturniradar.cz');
+  const query = url.slice(url.indexOf('?'));
+  const zpet = f.parsovatOdkazNaVyber_(query);
+  assert.equal(zpet.profil, 'Znojmo');
+  shodneNapricRealmy([...zpet.kategorie].sort(), ['divadlo', 'jarmarky'].sort());
 });

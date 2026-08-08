@@ -58,11 +58,12 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
    změny záměru), doména kulturniradar.cz aktivní se SSL, Email Routing
    pro info@ ověřeno doručením, RF sada 22/22 na nové doméně. Viz
    CHANGELOG.md.
-3. **Sdílení celého výběru/filtrovaného seznamu** (~2–3 h) — veřejný odkaz
-   s vybranými akcemi v URL, bez účtů pro čtenáře. Nezaměňovat s jedno-
-   akcovým sdílením (tlačítko „Sdílet" u karty, hotovo od v3.8, deep link
-   zpátky do appky přidán v3.17) — tohle je sdílení VÍCE akcí najednou.
-   Nezávislé na kroku 2, může jít kdykoli mezitím.
+3. ~~**Sdílení celého výběru/filtrovaného seznamu**~~ — **HOTOVO 8. 8. 2026**
+   (frontend v3.20): tlačítko „📤 Sdílet výběr" vedle ★ Oblíbené/✓ Navštívené
+   sdílí aktuální město + zvolené kategorie jako deep link
+   (`?profil=Město&kategorie=a,b`), odlišný formát od jedno-akcového
+   `?akce=ID&profil=Město` (v3.17). Příjemce otevře odkaz a appka je rovnou
+   předfiltrovaná. Viz CHANGELOG.md.
 4. **Android appka** (~3–4 h práce + dny čekání na schválení Play Store) —
    vyžaduje krok 2 hotový (PWA potřebuje vlastní doménu).
 5. **Multi-tenant systém** — řádově týdny, viz vize níže.
@@ -87,7 +88,7 @@ Doporučený postupný krok (ne najednou):
 1. ~~Osobní profily v rámci jedné rodiny~~ — hotovo 7.–8. 8. 2026, viz plán výše.
 2. ~~Frontendový večer (doména)~~ — hotovo 8. 8. 2026 (Cloudflare Pages,
    ne GitHub Pages, viz plán výše)
-3. Sdílení celého výběru/filtrovaného seznamu: veřejná stránka s plánem bez účtů pro čtenáře (jedno-akcové sdílení už hotovo, viz plán výše)
+3. ~~Sdílení celého výběru/filtrovaného seznamu~~ — hotovo 8. 8. 2026, viz plán výše.
 4. Plnohodnotný multi-tenant systém – dlouhodobý horizont, ne blízký plán
 
 Odhad rozsahu: řádově týdny soustředěné práce, ne jedna session.

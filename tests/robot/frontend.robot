@@ -198,6 +198,14 @@ Karta má tlačítko Sdílet
     ${text}=    Get Text    ${FRAME} .karta >> nth=0 >> .karta-akce
     Should Contain    ${text}    Sdílet
 
+Tlačítko Sdílet výběr existuje
+    [Documentation]    v3.20: existence tlačítka „📤 Sdílet výběr" vedle
+    ...    ★ Oblíbené / ✓ Navštívené. NEKLIKÁME – stejný důvod jako u tlačítka
+    ...    Sdílet na kartě výše (nedeterministické Web Share/clipboard chování
+    ...    v headless prohlížeči).
+    ${text}=    Get Text    ${FRAME} \#btn-sdilet-vyber
+    Should Contain    ${text}    Sdílet výběr
+
 Karta má odkaz Mapa
     [Documentation]    v3.13: 📍 Mapa je čistě klientský odkaz (Google Maps
     ...    URL schéma, žádný API klíč) – existence a text stačí ověřit stejně

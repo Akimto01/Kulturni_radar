@@ -1,5 +1,14 @@
 # Changelog
 
+## Index.html v3.20 — Lehčí sdílení: sdílet celý výběr — 8. 8. 2026
+### Přidáno
+- Nové tlačítko „📤 Sdílet výběr" vedle ★ Oblíbené/✓ Navštívené — sdílí aktuální město + zvolené kategorie jako deep link (`?profil=Město&kategorie=a,b`, `sestavOdkazNaVyber_`), odlišný formát od jedno-akcového `?akce=ID&profil=Město` (v3.17). Bez zvolené kategorie (= „Vše") se parametr `kategorie` vůbec nepřidává.
+- Appka po otevření takového odkazu (`parsovatOdkazNaVyber_`) přepne na dané město a aplikuje jen kategorie, které fakticky zná — neplatný/starý název z odkazu se tiše ignoruje. Jedno-akcový odkaz má přednost, ať se oba formáty nekříží.
+- Sdílený fallback řetězec (`sdiletText_`: navigator.share → schránka → prompt) vytažen z `sdiletAkci_` a použit i pro `sdiletVyber_`, ať se trojice fallbacků nekopíruje.
+- Node testy 186 → 195 (+9 pro `sestavOdkazNaVyber_`/`parsovatOdkazNaVyber_`), RF testy 22 → 23 (existence tlačítka, bez klikání — stejný důvod jako u „Sdílet" na kartě).
+### Beze změny (vědomě)
+- Sdílený odkaz obsahuje filtr (město + kategorie), ne konkrétní seznam ID akcí — dostupné akce se dál řídí tím, co appka právě má načtené pro dané město.
+
 ## Index.html v3.19 — 8. 8. 2026
 ### Opraveno (UX, ze živého testování v3.18)
 - Pulzování zvýrazněné karty (`zvyraznPulz`) teď trvá po celou dobu zvýraznění (do kliknutí nebo 30s pojistky), ne jen 2 opakování na začátku. Čistě CSS (`animation: ... 2` → `... infinite`), Node testy beze změny (186/186).
