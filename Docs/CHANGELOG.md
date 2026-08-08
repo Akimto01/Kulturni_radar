@@ -1,5 +1,19 @@
 # Changelog
 
+## v3.23 (backend) + v3.26 (frontend) — Zrychlení přihlášení: cache apiEvents + spinner — 8. 8. 2026
+### Přidáno
+- **Krátkodobá cache `apiEvents`** (`CacheService`, TTL 45 s) — diagnostikou zjištěno, že `apiEvents` je dominantní část 6–10s čekání při přihlášení (čte 4 listy: AKCE/OZNAČENÍ/SOUŘADNICE/POČASÍ při každém volání). Klíč cache zahrnuje verzi (kvůli invalidaci), profil, uživatele i `zahrnoutOznacene`, ať se nesmíchají data různých lidí/měst. **Fail-open**: jakákoli chyba CacheService (výpadek, kvóta, moc velká položka) spadne zpět na normální čtení ze Sheets — cache nikdy nesmí shodit `apiEvents`.
+- Invalidace cache po každém zápisu, který mění data vracená `apiEvents`: AKCE (stav proběhlo), OZNAČENÍ (★/✓ toggle), SOUŘADNICE (nová souřadnice), POČASÍ (přepočet předpovědi).
+- Frontend: viditelný spinner („Přihlašuji…") na tlačítku `#login-potvrdit` po dobu přihlašování — dřív tlačítko za tuhle dobu nedávalo žádnou zpětnou vazbu, uživatel nevěděl, jestli appka reaguje.
+- Node testy 214 → 227 (+13).
+
+### Ověřeno — reálné zrychlení přihlášení (měřeno na produkci po nasazení v3.23)
+- Total (klik → zavření overlaye): 11147/4940/4937 ms → 7028/3943/3429 ms (-21 až -37 %)
+- apiEvents samotné: 8605/2885/2535 ms → 3597/1870/1753 ms (-31 až -58 %)
+- `apiPrihlaseniUzivatele` stabilně ~1,6–2,9 s i po cache — fixní síťová režie Apps Script web-app volání, cache to neovlivňuje (poznámka pro případné další optimalizace).
+
+Poznámka k metodice: druhé měření použilo rekonstruovanou metodiku (slovní popis, ne uložený skript z prvního měření) — čísla jsou srovnatelná, ne byte-přesně identická metoda.
+
 ## RF testy — ověření nasazené verze a políčka počasí — 8. 8. 2026
 ### Přidáno (testovací dluh, ne feature — bez změny verze .gs/Index.html)
 - `api.robot`: **„Nasazená verze odpovídá repu"** — čte `VERZE` přímo z `apps-script/kulturni_radar.gs` (regex, ne z dokumentace/paměti) a porovná s `verze` z `?api=meta`. Zachycuje přesně scénář z 8. 8. 2026, kdy `clasp deploy` bez `-i <deploymentId>` nechal produkci na staré verzi (viz SKILL.md sekce 6). Krátký timeout (10 s) + TRY/EXCEPT: bez připojení na produkci test selže srozumitelnou hláškou, ne visí na výchozím timeoutu.
