@@ -129,31 +129,43 @@ test('filtrovatNavstivenaPodleObdobi_: řadí od nejnovější návštěvy', () 
 // sestavTextSdileni_ – text pro sdílení akce (WhatsApp/SMS/e-mail)
 // ---------------------------------------------------------------------------
 
-test('sestavTextSdileni_: kompletní akce – název, datum+místo, odkaz na třech řádcích', () => {
+test('sestavTextSdileni_: kompletní akce – název, prázdný řádek, odrážka s datem+místem, odkaz, prázdné řádky na konci', () => {
   const text = f.sestavTextSdileni_({
     nazev: 'Balkan Night', datumOd: '7. 8. 2026', misto: 'Špilberk', url: 'https://example.com',
   });
-  assert.equal(text, 'Balkan Night\n7. 8. 2026 · Špilberk\nhttps://example.com');
+  assert.equal(text, 'Balkan Night\n\n• 7. 8. 2026 · Špilberk\n\nhttps://example.com\n\n\n');
 });
 
-test('sestavTextSdileni_: chybějící misto – druhý řádek jen datum, bez osamocené odrážky', () => {
+test('sestavTextSdileni_: chybějící misto – odrážka jen s datem, žádná osamocená čárka', () => {
   const text = f.sestavTextSdileni_({ nazev: 'X', datumOd: '7. 8. 2026', misto: '', url: '' });
-  assert.equal(text, 'X\n7. 8. 2026');
+  assert.equal(text, 'X\n\n• 7. 8. 2026\n\n\n');
 });
 
-test('sestavTextSdileni_: chybějící datum i misto – jen název (žádný prázdný druhý řádek)', () => {
+test('sestavTextSdileni_: chybějící datum i misto – žádná odrážka, jen název + prázdné řádky na konci', () => {
   const text = f.sestavTextSdileni_({ nazev: 'X', datumOd: '', misto: '', url: '' });
-  assert.equal(text, 'X');
+  assert.equal(text, 'X\n\n\n');
 });
 
-test('sestavTextSdileni_: bez url se poslední řádek s odkazem vynechá', () => {
+test('sestavTextSdileni_: bez url se odkazová část vynechá, prázdné řádky na konci zůstávají', () => {
   const text = f.sestavTextSdileni_({ nazev: 'X', datumOd: '1. 1. 2026', misto: 'Y', url: '' });
-  assert.equal(text, 'X\n1. 1. 2026 · Y');
+  assert.equal(text, 'X\n\n• 1. 1. 2026 · Y\n\n\n');
 });
 
 test('sestavTextSdileni_: chybějící nazev nepadá (prázdný první řádek)', () => {
   const text = f.sestavTextSdileni_({ datumOd: '1. 1. 2026' });
-  assert.equal(text, '\n1. 1. 2026');
+  assert.equal(text, '\n\n• 1. 1. 2026\n\n\n');
+});
+
+test('v3.21: sestavTextSdileni_ – vždy končí aspoň dvěma prázdnými řádky (prostor pro e-mailový podpis)', () => {
+  const varianty = [
+    { nazev: 'A', datumOd: 'd', misto: 'm', url: 'u' },
+    { nazev: 'A', datumOd: '', misto: '', url: '' },
+    { nazev: '', datumOd: '', misto: '', url: '' },
+  ];
+  varianty.forEach(a => {
+    const text = f.sestavTextSdileni_(a);
+    assert.ok(text.endsWith('\n\n'), 'text má končit prázdnými řádky: ' + JSON.stringify(text));
+  });
 });
 
 // ---------------------------------------------------------------------------

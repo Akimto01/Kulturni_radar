@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.20 – Lehčí sdílení: nové "Sdílet výběr" (město + kategorie), deep link ?profil=...&kategorie=..., odlišné od jedno-akcového ?akce=... -->
+<!-- Kulturní radar Index.html v3.21 – Přehlednější text sdílení: odrážka u data/místa, prázdné řádky mezi částmi i na konci (odsunutí e-mailového podpisu od sdílené zprávy) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1225,12 +1225,23 @@
   }
 
   /** PURE: sestaví text ke sdílení akce (název, datum, místo, odkaz) –
-   *  oddělené od samotného window.navigator volání, aby šlo testovat v Node. */
+   *  oddělené od samotného window.navigator volání, aby šlo testovat v Node.
+   *  v3.21: přehlednější formát (odrážka u data/místa, prázdné řádky mezi
+   *  částmi) + několik prázdných řádků na konci – e-mailoví klienti (Gmail
+   *  apod.) připojují firemní podpis hned za náš text, prázdné řádky ho
+   *  vizuálně odsunou, ať nepůsobí jako součást sdílené zprávy. */
   function sestavTextSdileni_(a) {
     const radky = [a.nazev || ''];
     const druhyRadek = [a.datumOd || '', a.misto || ''].filter(Boolean).join(' · ');
-    if (druhyRadek) radky.push(druhyRadek);
-    if (a.url) radky.push(a.url);
+    if (druhyRadek) {
+      radky.push('');
+      radky.push('• ' + druhyRadek);
+    }
+    if (a.url) {
+      radky.push('');
+      radky.push(a.url);
+    }
+    radky.push('', '', '');   // prostor před e-mailovým podpisem
     return radky.join('\n');
   }
 
@@ -1310,7 +1321,9 @@
     const profil = (sel && sel.value) || aktivniProfil;
     const odkaz = sestavOdkazNaVyber_(profil, aktKategorie, window.location.origin);
     const popisKategorii = aktKategorie.size ? ' (' + [...aktKategorie].join(', ') + ')' : '';
-    const text = 'Kulturní radar – ' + profil + popisKategorii + '\n' + odkaz;
+    // v3.21: prázdné řádky na konci ze stejného důvodu jako u sestavTextSdileni_
+    // – odsunutí e-mailového podpisu od sdílené zprávy.
+    const text = 'Kulturní radar – ' + profil + popisKategorii + '\n\n' + odkaz + '\n\n\n';
     await sdiletText_('Kulturní radar', text, 'Odkaz na výběr zkopírován do schránky – vlož ho, kam chceš poslat.');
   }
 

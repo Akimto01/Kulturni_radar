@@ -1,5 +1,11 @@
 # Changelog
 
+## Index.html v3.21 — 8. 8. 2026
+### Opraveno (UX, formát textu sdílení)
+- `sestavTextSdileni_` (jedna akce): datum+místo teď na vlastní odrážce (`• `), oddělené prázdnými řádky od názvu i odkazu, čitelnější v e-mailu/SMS než dřívější tři řádky natěsno.
+- Oba typy sdílení (jedna akce i `sdiletVyber_` — celý výběr) teď končí několika prázdnými řádky — e-mailoví klienti (Gmail apod.) jinak připojují firemní podpis hned za sdílený text, jako by byl jeho součástí.
+- Node testy 195 → 196 (existující testy `sestavTextSdileni_` přepsané na nový formát, +1 nový test na koncové prázdné řádky napříč variantami).
+
 ## Index.html v3.20 — Lehčí sdílení: sdílet celý výběr — 8. 8. 2026
 ### Přidáno
 - Nové tlačítko „📤 Sdílet výběr" vedle ★ Oblíbené/✓ Navštívené — sdílí aktuální město + zvolené kategorie jako deep link (`?profil=Město&kategorie=a,b`, `sestavOdkazNaVyber_`), odlišný formát od jedno-akcového `?akce=ID&profil=Město` (v3.17). Bez zvolené kategorie (= „Vše") se parametr `kategorie` vůbec nepřidává.
