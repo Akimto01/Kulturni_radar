@@ -10,3 +10,7 @@ vysledky/
 /output.xml
 /report.html
 /playwright-log.txt
+
+# clasp OAuth token – normálně žije v ~/.clasprc.json mimo repo,
+# ale pro jistotu i tady (viz SKILL.md sekce 6)
+.clasprc.json
