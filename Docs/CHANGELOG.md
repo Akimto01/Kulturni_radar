@@ -1,5 +1,11 @@
 # Changelog
 
+## RF testy — ověření nasazené verze a políčka počasí — 8. 8. 2026
+### Přidáno (testovací dluh, ne feature — bez změny verze .gs/Index.html)
+- `api.robot`: **„Nasazená verze odpovídá repu"** — čte `VERZE` přímo z `apps-script/kulturni_radar.gs` (regex, ne z dokumentace/paměti) a porovná s `verze` z `?api=meta`. Zachycuje přesně scénář z 8. 8. 2026, kdy `clasp deploy` bez `-i <deploymentId>` nechal produkci na staré verzi (viz SKILL.md sekce 6). Krátký timeout (10 s) + TRY/EXCEPT: bez připojení na produkci test selže srozumitelnou hláškou, ne visí na výchozím timeoutu.
+- `frontend.robot`: **„Políčko počasí se zobrazuje správně"** — ověřuje na produkci u karty akce SPRÁVNÝ typ obsahu políčka počasí (v3.25), ne jen že appka nespadla: buď ikona + teplota s `°C` (stav OK/CHYBA se zachovanou hodnotou), nebo viditelné „N/A" se skutečně tlumeným stylem (`Get Style` na `opacity`, ne jen text). Selektory zúžené na `.karta` (stejný důvod jako u `.chip` kolize v SKILL.md sekci 2). Data v listu POČASÍ jsou nedeterministická — pokud aktuální karty nemají ani jeden ze dvou stavů, test se přeskočí se srozumitelnou zprávou, ne padá.
+- RF testy 31 → 33 (api 8→9, frontend 23→24), oba nové testy ověřeny naostro proti produkci (`v3.22`/`@51`) — oba PASS.
+
 ## v3.22 (backend) + v3.25 (frontend) — Počasí u akce — 8. 8. 2026
 ### Přidáno
 - **Nový list POČASÍ** (ID akce, Aktualizováno, Stav, Kód počasí, Teplota) – oddělený od AKCE (A:V se nedotýká), stejný duch jako OZNAČENÍ/SOUŘADNICE. Full-rewrite při každém běhu, takže staré (proběhlé/zrušené) akce z listu přirozeně odpadnou.
