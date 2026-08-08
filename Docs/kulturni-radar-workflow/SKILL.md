@@ -153,6 +153,13 @@ session se ukázalo, že několik funkcí (`parseEvents_`, `najdiDuplicity_`,
 `jeVycpavka_`, `callAnthropic_`) vypadalo netestovaně, ale ve skutečnosti
 testy měly, jen chyběly v BACKLOG.md poznámce.
 
+### Udržovat aktuální "Doporučené pořadí"
+Při každé větší změně BACKLOG.md (přidání/dokončení položky, změna
+odhadu) zkontrolovat, jestli sekce „Doporučené pořadí" na začátku
+souboru pořád odpovídá realitě — závislosti mezi položkami se mohou
+změnit (např. dokončení jedné položky odemkne jinou). Aktualizovat
+pořadí při změně, ne nechávat zastaralé.
+
 ## 4. Konec pracovní session
 
 Na konci každé pracovní session (rozloučení, „jdu spát", „končím na dnešek",

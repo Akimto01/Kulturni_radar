@@ -3,6 +3,35 @@
 Poslední aktualizace: 8. 8. 2026. Neplánované nápady a rozpracované položky —
 na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 
+## Doporučené pořadí
+Zohledňuje závislosti mezi položkami a paralelizaci čekacích dob
+(Google Play schvalování běží mimo aktivní práci), stanoveno 8. 8. 2026:
+
+1. **Design večer s dcerou** (rozvržení, ikony/branding appky) —
+   odemyká Android submission a snižuje riziko předělávek u
+   kalendářního pohledu
+2. **Android appka — start submission** (~3–4 h aktivní práce) —
+   spustit hned po designu, schvalovací proces v Google Play trvá
+   dny a běží na pozadí, ať se nečeká zbytečně
+3. **API credit optimalizace** (~0,5–1 h) — rychlý nezávislý win,
+   kdykoli mezi ostatním
+4. **Filtr žánrů/podkategorie** (~2–4 h) — nezávislý, nejdřív ověřit
+   kvalitu dat v poli podkategorie (~30 min)
+5. **Roční přehled** + **Doporučení podle historie** (~2–3 h + 2–3 h) —
+   spárováno, obě staví na stejných datech (OZNAČENÍ)
+6. **Mapa akcí** — vědomě odložená budoucí varianta (viz Větší
+   témata), ne aktivně plánovaná v tomhle pořadí; jednotlivá akce
+   je už pokrytá hotovým odkazem „📍 Mapa" na kartě
+7. **Kalendářní pohled** (~4–6 h) — po designu, největší UI zásah
+8. **Email zpracování návrhů** (~2–3 h) — potřebuje nejdřív ujasnit
+   koncept
+9. **Cesta B zrychlení přihlášení** (~1–2 h) — volitelné, nejvyšší
+   riziko regrese, nejnižší priorita
+
+Poznámka: pořadí není striktní závazek, jen doporučení podle
+závislostí a efektivity — aktualizuj tuto sekci při každé větší
+změně BACKLOGu.
+
 ## K ověření
 - iPad: ověřit, jestli window.open() (v3.7 Index.html) vyřešil otevírání „Více info"/„Do kalendáře" v nové záložce — dcera se ještě nevrátila s iPadem. (Dojezd v km u nově nalezených akcí ověřen 7. 8. jako OK, položka odstraněna.)
 
@@ -42,6 +71,9 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 - Plnohodnotná interaktivní mapa akcí (víc pinů najednou, places_map) — vědomě odložená budoucí varianta. Odkaz „📍 Mapa" na kartě (v3.10, garantovaný pin díky souřadnicím z Nominatim) pokrývá jednu akci najednou a je hotový.
 - Strukturované časy `cas_od`/`cas_do` — přesnější „Do kalendáře" (dnes celodenní), řazení akcí v rámci dne.
 - Případná Android aplikace (výukový projekt) — cesta: PWA → Trusted Web Activity → Google Play. Frontendový večer (podmínka vlastní domény) hotov 8. 8. 2026.
+- **API credit optimalizace** (~0,5–1 h): v konzoli Anthropic snížit Monthly spend limit (~$15) + e-mailové notifikace, zvážit auto-reload s malým prahem; v kódu `MAX_WEB_SEARCHES` už je 3 (ověřeno dříve); experiment: denní kontrolu zkusit na Haiku, Sonnet jen pro mimořádné a měsíční místa (týden měření kvality úlovků před rozhodnutím).
+- **Email zpracování návrhů** (~2–3 h, rozsah zatím nejasný): `info@kulturniradar.cz` už přesměrovává na Gmail (Cloudflare Email Routing, hotovo 8. 8.) — další krok je zpracování takových mailů (ruční nebo AI) na návrh nové akce do systému; potřebuje nejdřív ujasnit konkrétní koncept, než se odhad zpřísní.
+- **Cesta B zrychlení přihlášení** (~1–2 h, volitelné, vyšší riziko): omezit `apiEvents` čtení jen na relevantní profil místo plných čtení celých listů (AKCE/OZNAČENÍ/SOUŘADNICE/POČASÍ) — alternativa/doplněk k už hotové cache (v3.23); vyšší riziko regrese ve filtrovací logice než cache řešení.
 
 ## Plán rozvoje — schváleno 4. 8. 2026, aktualizováno 8. 8. 2026
 1. ~~**Rodinné profily**~~ — **HOTOVO 7.–8. 8. 2026** (backend v3.20, frontend
