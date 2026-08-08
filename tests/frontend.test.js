@@ -12,6 +12,7 @@ const f = nactiFrontendFunkce([
   'filtrovatNavstivenaPodleObdobi_', 'sestavTextSdileni_', 'mapsUrl_',
   'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
   'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
+  'sestavOdkazNaAkci_', 'parsovatOdkazNaAkci_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -310,4 +311,53 @@ test('v3.16: round-trip serializace/deserializace zachová obsah', () => {
   const puvodni = new Set(['koncerty', 'divadlo', 'folklor']);
   const obnovene = f.deserializovatKategorie_(f.serializovatKategorie_(puvodni));
   shodneNapricRealmy([...obnovene].sort(), [...puvodni].sort());
+});
+
+// ---------------------------------------------------------------------------
+// v3.17: Lehčí sdílení – deep link zpátky do appky (?akce=ID&profil=Město)
+// ---------------------------------------------------------------------------
+
+test('v3.17: sestavOdkazNaAkci_ – sestaví URL s id a profilem, diakritika escapovaná', () => {
+  const url = f.sestavOdkazNaAkci_('2026-05-14-leto-na-zelnaku', 'Brno', 'https://kulturniradar.cz');
+  assert.equal(url, 'https://kulturniradar.cz/?akce=2026-05-14-leto-na-zelnaku&profil=Brno');
+
+  const sPlzni = f.sestavOdkazNaAkci_('x', 'Plzeň', 'https://kulturniradar.cz');
+  assert.ok(sPlzni.includes(encodeURIComponent('Plzeň')));
+  assert.ok(!sPlzni.includes('Plzeň'), 'surová diakritika nemá být v URL');
+});
+
+test('v3.17: sestavOdkazNaAkci_ – koncové lomítko v baseUrl se nezdvojí', () => {
+  const url = f.sestavOdkazNaAkci_('x', 'Brno', 'https://kulturniradar.cz/');
+  assert.equal(url, 'https://kulturniradar.cz/?akce=x&profil=Brno');
+});
+
+test('v3.17: sestavOdkazNaAkci_ – chybějící id/profil nepadá, jen prázdná hodnota v URL', () => {
+  const url = f.sestavOdkazNaAkci_('', '', 'https://kulturniradar.cz');
+  assert.equal(url, 'https://kulturniradar.cz/?akce=&profil=');
+});
+
+test('v3.17: parsovatOdkazNaAkci_ – validní query string se rozparsuje', () => {
+  const vysledek = f.parsovatOdkazNaAkci_('?akce=2026-05-14-leto-na-zelnaku&profil=Brno');
+  assert.equal(vysledek.id, '2026-05-14-leto-na-zelnaku');
+  assert.equal(vysledek.profil, 'Brno');
+});
+
+test('v3.17: parsovatOdkazNaAkci_ – chybějící parametr akce → null (žádný deep link)', () => {
+  assert.equal(f.parsovatOdkazNaAkci_(''), null);
+  assert.equal(f.parsovatOdkazNaAkci_('?profil=Brno'), null);
+  assert.equal(f.parsovatOdkazNaAkci_(null), null);
+});
+
+test('v3.17: parsovatOdkazNaAkci_ – chybějící profil je prázdný řetězec, ne pád', () => {
+  const vysledek = f.parsovatOdkazNaAkci_('?akce=x');
+  assert.equal(vysledek.id, 'x');
+  assert.equal(vysledek.profil, '');
+});
+
+test('v3.17: round-trip sestavení → parsování zachová id i profil', () => {
+  const url = f.sestavOdkazNaAkci_('nejaka-akce', 'Znojmo', 'https://kulturniradar.cz');
+  const query = url.slice(url.indexOf('?'));
+  const zpet = f.parsovatOdkazNaAkci_(query);
+  assert.equal(zpet.id, 'nejaka-akce');
+  assert.equal(zpet.profil, 'Znojmo');
 });

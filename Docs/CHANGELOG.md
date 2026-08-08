@@ -1,5 +1,14 @@
 # Changelog
 
+## Index.html v3.17 — Lehčí sdílení: odkaz zpátky do appky — 8. 8. 2026
+### Změněno
+- Tlačítko „📤 Sdílet" u karty akce teď generuje odkaz zpátky do appky (`kulturniradar.cz/?akce=ID&profil=Město`, `sestavOdkazNaAkci_`) místo odkazu na zdrojovou stránku akce. Příjemce tak vidí náš zpracovaný přehled (dojezd, kategorie, skóre), ne holou úřední stránku.
+- Appka po otevření takového odkazu (`parsovatOdkazNaAkci_` z `window.location.search`) automaticky přepne na správné město a danou kartu odscrolluje a dočasně zvýrazní (`.zvyrazneno`, pulzující animace). Neplatný/starý odkaz (akce mezitím zmizela) se tiše ignoruje.
+- `sestavTextSdileni_` beze změny — jen se jí teď předává kopie akce s přepsanou `url`.
+- Node testy 179 → 186 (+7 pro `sestavOdkazNaAkci_`/`parsovatOdkazNaAkci_`, včetně round-tripu a escapování diakritiky).
+### Beze změny (vědomě)
+- Sdílení CELÉHO výběru/filtrovaného seznamu (víc akcí najednou, veřejný odkaz bez účtu) zůstává samostatný budoucí krok — dnešní změna řeší jen jedno-akcové sdílení. Viz BACKLOG.md.
+
 ## Index.html v3.16 — Zapamatování kategorie-chipů per uživatelský profil — 8. 8. 2026
 ### Přidáno
 - Výběr kategorie-chipů v horní liště se teď ukládá do `localStorage` per přihlášený profil a po přihlášení se automaticky obnoví (`ulozitChipyProfil_`/`nacistChipyProfil_`, klíč `radar_chipy:<uzivatelId>` z `klicUlozenychChipu_`). Čistě klientská UI preference k zobrazení — nemá nic společného s „filtry" v profilu, které řídí AI hledání na vyžádání.

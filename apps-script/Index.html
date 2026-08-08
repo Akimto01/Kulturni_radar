@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.16 – Zapamatování kategorie-chipů per uživatelský profil (localStorage, klientská preference, neplést s filtry AI hledání) -->
+<!-- Kulturní radar Index.html v3.17 – Lehčí sdílení: "Sdílet" teď vede zpátky do appky (deep link ?akce=ID&profil=Město), ne na zdrojovou stránku; příjemce vidí zvýrazněnou kartu -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -143,6 +143,16 @@
   .karta:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08); }
   .karta.zruseno { opacity: .5; border-left-color: var(--ink-3) !important; }
   .karta.zruseno .nazev { text-decoration: line-through; }
+
+  /* v3.17: dočasné zvýraznění karty otevřené přes sdílený odkaz */
+  .karta.zvyrazneno {
+    box-shadow: 0 0 0 2px var(--accent), 0 4px 16px rgba(0,0,0,.12);
+    animation: zvyraznPulz 1.6s ease-in-out 2;
+  }
+  @keyframes zvyraznPulz {
+    0%, 100% { background: var(--card); }
+    50% { background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+  }
 
   /* Barvy kategorií */
   .karta[data-kat="koncerty"]            { border-left-color: #9b59b6; }
@@ -805,6 +815,13 @@
       const meta = await api('meta');
       aktivniProfil = meta.aktivniProfil || '';
 
+      // v3.17: deep link ze sdíleného odkazu (?akce=ID&profil=Město) – pokud
+      // je v URL, přepíše výchozí město appky, ať se rovnou fetchnou akce
+      // ze SPRÁVNÉHO města (bez toho by se sdílená akce nemusela objevit,
+      // kdyby uživatel měl výchozí jiné/žádné aktivní město).
+      const odkazNaAkci = parsovatOdkazNaAkci_(window.location.search);
+      if (odkazNaAkci && odkazNaAkci.profil) aktivniProfil = odkazNaAkci.profil;
+
       // Profily do selectu – seřazené abecedně (zpětná vazba 5. 8. 2026:
       // dřív v pořadí, jak je vrátil list LOKALITY, což se hůř hledá)
       const sel = document.getElementById('profil-select');
@@ -865,9 +882,24 @@
 
       await nactiAkce(aktivniProfil);
       await nactiMista(aktivniProfil);
+
+      // v3.17: teď, když jsou karty vykreslené, najít a zvýraznit sdílenou akci.
+      if (odkazNaAkci) zvyraznitAkci_(odkazNaAkci.id);
     } catch (e) {
       zobrazitStatus_('Chyba načítání: ' + e.message);
     }
+  }
+
+  /** v3.17: najde kartu podle ID (ze sdíleného odkazu), odscrolluje na ni
+   *  a dočasně zvýrazní. Karta nemusí existovat (starý/neplatný odkaz,
+   *  akce mezitím zmizela) – v tom případě se tiše nic nestane. */
+  function zvyraznitAkci_(id) {
+    if (!id) return;
+    const el = document.querySelector('.karta[data-id="' + CSS.escape(id) + '"]');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('zvyrazneno');
+    setTimeout(() => el.classList.remove('zvyrazneno'), 4000);
   }
 
   /** Zobrazí stavovou hlášku v #main. BUG opravený 5. 8. 2026: statický
@@ -1145,6 +1177,28 @@
 
   function pad2_(n) { return String(n).padStart(2, '0'); }
 
+  // ── v3.17: Lehčí sdílení – deep link zpátky do appky ─────────────────
+  // Dřív "Sdílet" posílalo odkaz na ZDROJOVOU stránku (web městské části) –
+  // příjemce tak neviděl náš zpracovaný přehled (dojezd, kategorie, skóre),
+  // jen holou úřední stránku. Nově odkaz vede zpátky na kulturniradar.cz
+  // s query parametry, appka danou akci po načtení najde a zvýrazní.
+
+  /** PURE: sestaví odkaz zpátky do appky na konkrétní akci. baseUrl bez
+   *  koncového lomítka (typicky window.location.origin). */
+  function sestavOdkazNaAkci_(id, profil, baseUrl) {
+    const zaklad = String(baseUrl || '').replace(/\/+$/, '');
+    return zaklad + '/?akce=' + encodeURIComponent(id || '') + '&profil=' + encodeURIComponent(profil || '');
+  }
+
+  /** PURE: rozparsuje query string (window.location.search tvar, s '?' nebo
+   *  bez) na { id, profil }. Bez parametru 'akce' → null (žádný deep link). */
+  function parsovatOdkazNaAkci_(queryString) {
+    const params = new URLSearchParams(queryString || '');
+    const id = params.get('akce');
+    if (!id) return null;
+    return { id, profil: params.get('profil') || '' };
+  }
+
   /** PURE: sestaví text ke sdílení akce (název, datum, místo, odkaz) –
    *  oddělené od samotného window.navigator volání, aby šlo testovat v Node. */
   function sestavTextSdileni_(a) {
@@ -1162,7 +1216,13 @@
    *     SMS, e-mail…), 2) zkopírování do schránky, 3) prompt() s textem k
    *     ručnímu zkopírování jako poslední záchrana, když selže úplně vše. */
   async function sdiletAkci_(a) {
-    const text = sestavTextSdileni_(a);
+    // v3.17: odkaz zpátky do appky (viz sestavOdkazNaAkci_), ne na zdrojovou
+    // stránku – sestavTextSdileni_ zůstává beze změny (a i její testy),
+    // jen jí předáme kopii akce s přepsanou url.
+    const sel = document.getElementById('profil-select');
+    const profil = (sel && sel.value) || aktivniProfil;
+    const odkaz = sestavOdkazNaAkci_(a.id, profil, window.location.origin);
+    const text = sestavTextSdileni_(Object.assign({}, a, { url: odkaz }));
     if (navigator.share) {
       try {
         await navigator.share({ title: a.nazev || 'Kulturní radar', text });
