@@ -60,6 +60,7 @@ souboru.
    tests/frontend.test.js
    tests/harness.js
    tests/frontend-harness.js
+   tests/robot/resources.robot
    tests/robot/api.robot
    tests/robot/frontend.robot
    .github/workflows/*.yml
@@ -172,7 +173,9 @@ Backend (`tests/harness.js`, `nactiRadar(volby)`):
   na takových objektech **padá** i při stejném obsahu
   (`Values have same structure but are not reference-equal`). Řešení:
   porovnávat jednotlivé vlastnosti (`assert.equal(obj.pole, hodnota)`),
-  ne celý objekt/pole najednou.
+  ne celý objekt/pole najednou. U polí/objektů, kde je porovnání nutné
+  celé, použít helper `shodneNapricRealmy(skutecne, ocekavane)` (JSON.stringify
+  porovnání) — viz `tests/frontend.test.js`, sekce v3.15.
 
 Frontend (`tests/frontend-harness.js`, `nactiFrontendFunkce(['fn1','fn2'])`):
 - Vytáhne pojmenované funkce přímo z `<script>` bloku `Index.html` a
@@ -183,3 +186,117 @@ Frontend (`tests/frontend-harness.js`, `nactiFrontendFunkce(['fn1','fn2'])`):
 - Nová čistá funkce v `Index.html` → přidat její jméno do seznamu v
   `tests/frontend.test.js` a napsat testy stejným stylem jako u
   `gcalUrl_`/`mapsUrl_`/`sestavTextSdileni_`.
+
+## 5. Release šablona — balíček + Claude Code prompt v jednom kroku
+
+Vytěženo ze session 8. 8. 2026, kde se tenhle cyklus opakoval ~15×
+(anonymní režim → migrace na Cloudflare Pages → zapamatování chipů →
+sdílení, 4 iterace formátu podle živého testování). Cíl: pokaždé stejný,
+předvídatelný tvar, ať se nemusí vymýšlet znovu.
+
+### Kdy použít
+Pokaždé, když Claude (v tomhle chatu, ne Claude Code) dokončí a otestuje
+změnu v `apps-script/kulturni_radar.gs` a/nebo `apps-script/Index.html`
+(příp. testovací soubory), kterou má Vojta dostat do repa a nasadit.
+
+### Krok A — balíček (dělá Claude v chatu)
+1. Bump verze (viz sekce 1 výše — vždy).
+2. Syntaktická kontrola + `node --test tests/unit.test.js tests/frontend.test.js`
+   — zapsat si přesný počet testů (staré → nové).
+3. Zip **jen skutečně změněných souborů**, zachovat strukturu repa
+   (`apps-script/...`, `tests/...`). Žádné soubory navíc "pro jistotu".
+4. `present_files` s jednořádkovým shrnutím (co se změnilo, kolik testů).
+
+### Krok B — Claude Code prompt (dělá Claude v chatu, hned pod balíčkem)
+Pevná šablona, měnit jen vyplněné části v `[hranatých závorkách]`:
+
+```
+Postupuj podle skillu kulturni-radar-workflow.
+
+Kontext: [1-3 věty CO a PROČ se změnilo]. Přiložený zip obsahuje
+[seznam souborů].
+
+Udělej prosím:
+
+1. Rozbal zip do repa (přepíše [N] soubor/y).
+2. `git status` — potvrď, že se změnily jen tyhle [N].
+3. `node --test tests/unit.test.js tests/frontend.test.js` — očekávám
+   [staré]/[staré] → [nové]/[nové] ([+X] nových testů pro [co]).
+4. Ukaž mi diff [souborů] před commitem.
+5. Po mém potvrzení: [je-li apps-script/*.gs či Index.html mezi soubory:]
+   nasaď do Apps Script editoru (Nová verze, Popis "[vXX]"), commitni
+   s hláškou: "[commit hláška v ~7 slovech, česky bez diakritiky]"
+6. Aktualizuj Docs/CHANGELOG.md [a Docs/BACKLOG.md, pokud se tím něco
+   z BACKLOGu dokončuje — viz sekce 3].
+7. `git add`, `git commit`, `git push`.
+8. Krátké shrnutí a finální commit hash.
+
+Před commitem mi ukaž diff, ať vidím přesně, co jde do gitu.
+```
+
+### Pravidlo pro krok 5 (ruční nasazení)
+Claude Code **nemá přístup** do Apps Script editoru — to je vždy ruční
+krok Vojty. Prompt na to musí vždy explicitně upozornit (krok 5 výše),
+jinak hrozí přesně to, co se stalo 8. 8.: commit proběhne, ale appka na
+`kulturniradar.cz` (statický Cloudflare Pages) se aktualizuje automaticky
+přes `git push`, zatímco Apps Script `/exec` zůstane na staré verzi, dokud
+ho někdo ručně nenasadí — **tohle jsou dva nezávislé nasazovací kanály**,
+je snadné zapomenout na ten druhý.
+
+### Časté doladění po living testu
+Session 8. 8. ukázala vzorec: první verze funkce → živý test → menší
+úprava (barva, časování, formát textu) → nová verze o +0,01–0,1 výš,
+znovu celý cyklus A+B. To je v pořádku a čekané, ne known-issue — raději
+rychlé malé iterace s ověřením v produkci než snaha odhadnout formát
+napoprvé dokonale.
+
+## 6. Automatizace nasazení do Apps Script (clasp) — prozkoumáno, zatím NEzapojeno
+
+Zkoumáno 8. 8. 2026 jako reakce na to, že krok 5 výše (ruční nasazení)
+byl jediný krok v celém release cyklu, který nešel automatizovat.
+
+### Zjištění
+- `clasp` (`google/clasp` na GitHubu) je oficiální CLI od Googlu pro
+  Apps Script — `clasp push` nahraje soubory, `clasp deploy` vytvoří
+  novou verzi s popisem. Přesně nahrazuje dnešní ruční kopírování do
+  editoru + "Nová verze".
+- **Podporuje přímé napojení na Claude Code** jako MCP server/plugin
+  (`google/clasp` repo, sekce o Claude Code CLI) — Claude Code by tak
+  mohl volat `clasp push`/`clasp deploy` přímo jako nástroj, ne přes
+  obcházení přes bash.
+- Běžný vzorec i pro GitHub Actions (auto-deploy při `git push`, stejně
+  jako dnes funguje Cloudflare Pages) — `.clasprc.json` s OAuth tokenem
+  jako GitHub Secret, `clasp push -f` (force, jinak čeká na interaktivní
+  potvrzení a v CI zůstane viset).
+
+### Proč to NEJDE spustit odsud (Claude v tomhle chatu)
+Síťový přístup z tohoto prostředí je omezený na povolený seznam domén
+(GitHub, npm, PyPI apod.) — `script.google.com` ani `accounts.google.com`
+v seznamu nejsou. I kdyby se `clasp` nainstaloval přes npm (to by šlo),
+samotné `clasp login`/`clasp push` by selhalo na síťovém blokování.
+**Tohle není řešitelné odsud, jen z prostředí, kde `clasp` reálně běží.**
+
+### Reálná cesta, pokud by Vojta chtěl pokračovat
+Jde to udělat přes **Claude Code na jeho vlastním počítači** (plný síťový
+přístup, jeho vlastní Google účet už přihlášený v prohlížeči):
+1. `npm install -g @google/clasp`
+2. Povolit Google Apps Script API v nastavení Google účtu (jednorázově,
+   přes web).
+3. `clasp login` — otevře prohlížeč, OAuth souhlas, uloží token do
+   `~/.clasprc.json`.
+4. `clasp clone <scriptId>` NEBO ruční `.clasp.json` se stávajícím
+   `scriptId` (Apps Script projekt "Kulturní radar" už existuje, jen se
+   k němu clasp musí napojit, ne založit nový).
+5. **`~/.clasprc.json` obsahuje access i refresh token** — nikdy
+   necommitovat, přidat do `.gitignore` (pravděpodobně tam analogicky
+   jako `playwright-log.txt`).
+6. Vyzkoušet `clasp push -f` a `clasp deploy --description "vXX"` ručně
+   napřed, než se to zapojí do promptu/CI.
+
+### Doporučení
+**Zatím nezavádět bez výslovného rozhodnutí Vojty** — vyžaduje to OAuth
+souhlas s jeho Google účtem (citlivé oprávnění, ne něco, co se zapojí
+"mimochodem"). Až/pokud se Vojta rozhodne pokračovat, je tohle hotový
+podklad k tomu, aby to šlo rovnou technicky realizovat, ne znovu zkoumat
+od nuly.
+
