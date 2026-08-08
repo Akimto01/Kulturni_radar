@@ -9,6 +9,7 @@ Documentation     API kontrakt Kulturního radaru (doGet JSON endpointy).
 Library           RequestsLibrary
 Library           Collections
 Library           String
+Library           OperatingSystem
 Resource          resources.robot
 
 *** Variables ***
@@ -24,6 +25,30 @@ Meta vrací aktivní profil, profily a kategorie
     ${pocet}=    Get Length    ${j}[profily]
     Should Be True    ${pocet} >= 1    Očekávám aspoň jeden profil v LOKALITÁCH
     List Should Contain Value    ${j}[kategorie]    koncerty
+
+Nasazená verze odpovídá repu
+    [Documentation]    Zachycuje scénář z 8. 8. 2026 (viz SKILL.md sekce 6):
+    ...    `clasp deploy` spuštěný BEZ `-i <deploymentId>` nechá produkci
+    ...    běžet na staré verzi, i když repo i lokální Apps Script editor
+    ...    už mají novější kód. Čte VERZE přímo ze zdroje (ne z dokumentace
+    ...    ani z paměti), aby test nezávisel na tom, jestli se repo a
+    ...    produkce zrovna rozešly. Krátký timeout + TRY/EXCEPT: bez
+    ...    připojení na produkci má test selhat srozumitelnou hláškou,
+    ...    ne viset na výchozím (dlouhém) timeoutu RequestsLibrary.
+    ${zdroj}=    Get File    ${CURDIR}/../../apps-script/kulturni_radar.gs
+    ${shody}=    Get Regexp Matches    ${zdroj}    const VERZE = '([^']+)'    1
+    Length Should Be    ${shody}    1
+    ...    msg=V kulturni_radar.gs se nenašla konstanta VERZE – regenerovat test?
+    ${verze_repo}=    Set Variable    ${shody}[0]
+    TRY
+        ${r}=    GET    ${BASE_URL}    params=api=meta    timeout=10
+    EXCEPT    AS    ${chyba}
+        Fail    Produkce nedostupná (${chyba}) – test vyžaduje připojení na BASE_URL (aktuální produkční /exec URL, viz resources.robot)
+    END
+    Status Should Be    200    ${r}
+    ${j}=    Set Variable    ${r.json()}
+    Should Be Equal As Strings    ${j}[verze]    ${verze_repo}
+    ...    msg=Produkce hlásí verzi „${j}[verze]“, repo má „${verze_repo}“ – zapomenutý "clasp deploy -i" po push? (viz SKILL.md sekce 6)
 
 Events vrací akce s validními českými datumy
     [Documentation]    Regresní test bugů v3.2–3.3: datumOd nesmí být

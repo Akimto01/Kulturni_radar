@@ -213,6 +213,37 @@ Karta má odkaz Mapa
     ${text}=    Get Text    ${FRAME} .karta >> nth=0 >> .karta-akce
     Should Contain    ${text}    Mapa
 
+Políčko počasí se zobrazuje správně
+    [Documentation]    v3.25: ověřuje, že políčko počasí u karty akce má
+    ...    SPRÁVNÝ typ obsahu, ne jen že appka nespadla – buď ikona+teplota
+    ...    (stav OK, případně CHYBA se zachovanou hodnotou – viz
+    ...    pocasiZobrazeni_ v Index.html), nebo viditelné tlumené „N/A“
+    ...    (stav NA, případně CHYBA bez hodnoty). Selektory zúžené na
+    ...    \#.karta stejně jako u chipů (viz „Filtr kategorie…“ výš a
+    ...    SKILL.md sekce 2 – kolize obecných tříd). Data v POČASÍ listu
+    ...    jsou nedeterministická (závisí na tom, které akce má trigger
+    ...    zrovna spočítané) – pokud se nenajde ani jeden ze dvou stavů,
+    ...    test se přeskočí, ne padá.
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=15s
+    ${ok_pocet}=    Get Element Count    ${FRAME} .karta .pocasi-ok
+    ${na_pocet}=    Get Element Count    ${FRAME} .karta .pocasi-na
+    Skip If    ${ok_pocet} == 0 and ${na_pocet} == 0
+    ...    Žádná karta nemá viditelné políčko počasí (ani .pocasi-ok, ani .pocasi-na) – POČASÍ list nejspíš zatím nemá data pro žádnou zobrazenou akci
+    IF    ${ok_pocet} > 0
+        ${text}=    Get Text    ${FRAME} .karta .pocasi-ok >> nth=0
+        Should Contain    ${text}    °C
+        ...    msg=Stav OK: políčko počasí „${text}“ neobsahuje teplotu (°C) – formát pocasiZobrazeni_ neodpovídá
+        Should Not Be Equal    ${text}    N/A
+        ...    msg=Stav OK: políčko počasí zobrazuje N/A, i když má třídu pocasi-ok – neshoda mezi stavem a obsahem
+    END
+    IF    ${na_pocet} > 0
+        ${text}=    Get Text    ${FRAME} .karta .pocasi-na >> nth=0
+        Should Be Equal    ${text}    N/A
+        ...    msg=Stav N/A: text políčka „${text}“ neodpovídá očekávanému „N/A“
+        Get Style    ${FRAME} .karta .pocasi-na >> nth=0    key=opacity    assertion_operator=<    assertion_expected=1
+        ...    message=Stav N/A: políčko nemá tlumený styl (opacity >= 1) – vizuálně by nemělo splývat s běžnou ikonou počasí
+    END
+
 Chip typu stálého místa zúží seznam (pokud profil má 2+ typů)
     [Documentation]    v3.10: chipy typů se vykreslí jen když má profil 2+
     ...    různé typy míst (viz Index.html renderMista – chip „Vše" + 1 typ by
