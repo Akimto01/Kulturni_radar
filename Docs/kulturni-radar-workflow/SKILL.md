@@ -269,6 +269,20 @@ byl jediný krok v celém release cyklu, který nešel automatizovat.
   jako GitHub Secret, `clasp push -f` (force, jinak čeká na interaktivní
   potvrzení a v CI zůstane viset).
 
+### OAuth scopy — co push/deploy potřebují a co ne
+Ověřeno 8. 8. 2026 při prvním napojení: `clasp list-scripts` selhává na
+"Insufficient Permission" s výchozím grantem z `clasp login` — potřebuje
+širokoúhlé prohledávání celého Disku (`drive.readonly`/`drive`), které
+grant neobsahuje (jen `drive.metadata.readonly` a `drive.file`). To je
+v pořádku a nevadí — `list-scripts` je jen doplňková kontrola, kterou
+nepotřebujeme, protože `scriptId` máme napevno v `.clasp.json`.
+
+`clasp push` a `clasp deploy` naproti tomu nejedou přes Drive API vůbec,
+ale přímo přes Apps Script API (`script.projects`, `script.deployments`,
+`script.webapp.deploy`) — ty výchozí grant obsahuje. Push/deploy do už
+napojeného projektu tedy funguje bez nutnosti šířeho OAuth souhlasu
+nebo opakovaného loginu.
+
 ### Proč to NEJDE spustit odsud (Claude v tomhle chatu)
 Síťový přístup z tohoto prostředí je omezený na povolený seznam domén
 (GitHub, npm, PyPI apod.) — `script.google.com` ani `accounts.google.com`
