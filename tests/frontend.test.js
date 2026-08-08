@@ -14,6 +14,7 @@ const f = nactiFrontendFunkce([
   'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
   'sestavOdkazNaAkci_', 'parsovatOdkazNaAkci_',
   'sestavOdkazNaVyber_', 'parsovatOdkazNaVyber_',
+  'weathercodeEmoji_', 'pocasiZobrazeni_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -428,4 +429,53 @@ test('v3.20: round-trip sestavení → parsování zachová profil i kategorie',
   const zpet = f.parsovatOdkazNaVyber_(query);
   assert.equal(zpet.profil, 'Znojmo');
   shodneNapricRealmy([...zpet.kategorie].sort(), ['divadlo', 'jarmarky'].sort());
+});
+
+// ---------------------------------------------------------------------------
+// v3.25: Počasí u akce – weathercodeEmoji_, pocasiZobrazeni_
+// ---------------------------------------------------------------------------
+
+test('v3.25: weathercodeEmoji_ – reprezentativní kódy stejného bucketingu jako weatherText_ v .gs', () => {
+  assert.equal(f.weathercodeEmoji_(0), '☀️');
+  assert.equal(f.weathercodeEmoji_(2), '🌤️');
+  assert.equal(f.weathercodeEmoji_(3), '☁️');
+  assert.equal(f.weathercodeEmoji_(45), '🌫️');
+  assert.equal(f.weathercodeEmoji_(63), '🌧️');
+  assert.equal(f.weathercodeEmoji_(71), '❄️');
+  assert.equal(f.weathercodeEmoji_(95), '⛈️');
+});
+
+test('v3.25: weathercodeEmoji_ – nečíselný/chybějící kód nespadne, vrátí placeholder', () => {
+  assert.equal(f.weathercodeEmoji_(''), '❓');
+  assert.equal(f.weathercodeEmoji_(null), '❓');
+  assert.equal(f.weathercodeEmoji_(undefined), '❓');
+});
+
+test('v3.25: pocasiZobrazeni_ – stav OK: ikona + zaokrouhlená teplota, normální třída', () => {
+  const v = f.pocasiZobrazeni_({ stav: 'OK', kod: 61, teplota: 14.6 });
+  assert.equal(v.text, '🌧️ 15°C');
+  assert.equal(v.trida, 'pocasi-ok');
+});
+
+test('v3.25: pocasiZobrazeni_ – stav NA (mimo dosah) → tlumené "N/A", ne chybová hláška', () => {
+  const v = f.pocasiZobrazeni_({ stav: 'NA', kod: '', teplota: '' });
+  assert.equal(v.text, 'N/A');
+  assert.equal(v.trida, 'pocasi-na');
+});
+
+test('v3.25: pocasiZobrazeni_ – stav CHYBA se zachovanou hodnotou se zobrazí jako běžné počasí, ne jako chyba', () => {
+  const v = f.pocasiZobrazeni_({ stav: 'CHYBA', kod: 3, teplota: 19 });
+  assert.equal(v.text, '☁️ 19°C');
+  assert.equal(v.trida, 'pocasi-ok');
+});
+
+test('v3.25: pocasiZobrazeni_ – stav CHYBA bez jakékoli předchozí hodnoty → taky N/A', () => {
+  const v = f.pocasiZobrazeni_({ stav: 'CHYBA', kod: '', teplota: '' });
+  assert.equal(v.text, 'N/A');
+  assert.equal(v.trida, 'pocasi-na');
+});
+
+test('v3.25: pocasiZobrazeni_ – chybějící pocasi objekt (akce ještě nezpracována triggerem) → N/A', () => {
+  assert.equal(f.pocasiZobrazeni_(undefined).text, 'N/A');
+  assert.equal(f.pocasiZobrazeni_(null).text, 'N/A');
 });

@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.21 (8. 8. 2026) – HTTP API pro statický frontend (doPost: login/toggle/filtry/najdi,
- * doGet: api=uzivatele) – příprava na GitHub Pages migraci
+ * Verze: 3.22 (8. 8. 2026) – Počasí u akce (list POČASÍ, Open-Meteo + met.no fallback,
+ * přepočet v triggeru sledovaných měst, obohacené apiEvents)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -45,6 +45,7 @@ const SHEET = {
   SOURADNICE: 'SOUŘADNICE',
   SLEDOVANA_MESTA: 'SLEDOVANÁ MĚSTA',
   UZIVATELE: 'UŽIVATELÉ',
+  POCASI: 'POČASÍ',
 };
 
 const KRIT = {           // adresy v listu KRITÉRIA
@@ -64,7 +65,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.21';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.22';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -248,6 +249,7 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
   const rowsTohotoUzivatele = uzivatelId ? readOznaceni_(ss).filter(r => r.uzivatel === uzivatelId) : [];
   const oznaceniMapa = oznaceniMapy_(rowsTohotoUzivatele);
   const souradniceMapa = souradniceMapy_(readSouradnice_(ss));
+  const pocasiMapa = pocasiMapy_(readPocasi_(ss));
   const akce = [];
 
   data.forEach(row => {
@@ -259,6 +261,7 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
     const datumOd = parseCzDate_(row[1]);
     if (!zahrnoutAkciDoVysledku_(stav, datumOd, dnes, zahrnoutOznacene, jeOznaceno)) return;
     const souradnice = souradniceMapa.get(klicSouradnic_(row[5], row[6])) || null;
+    const pocasi = pocasiMapa.get(id);
     akce.push({
       id,
       nazev: String(row[4] || ''),
@@ -278,6 +281,7 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
       navstivenoDne: oznaceni.navstivenoDne || '',
       lat: souradnice ? souradnice.lat : null,
       lng: souradnice ? souradnice.lng : null,
+      pocasi: pocasi ? { stav: pocasi.stav, kod: pocasi.kod, teplota: pocasi.teplota } : { stav: 'NA', kod: '', teplota: '' },
     });
   });
 
@@ -487,6 +491,7 @@ function setupTriggers() {
     .create();
 
   // Sledovaná města (v3.16): tiché doplnění dat na pozadí, žádná notifikace.
+  // Od v3.22 stejný běh přepočítá i POČASÍ u budoucích akcí (aktualizujPocasi_).
   // Neděle večer – ať jsou data hotová PŘED pondělním týdenním přehledem (7:00).
   ScriptApp.newTrigger('zpracovatSledovanaMesta')
     .timeBased()
@@ -1379,6 +1384,197 @@ function doplnitSouradniceZpetne() {
 }
 
 // ---------------------------------------------------------------------------
+// POČASÍ (v3.22) – předpověď u budoucích akcí, přepočítává se PŘI KAŽDÉM
+// běhu triggeru zpracovatSledovanaMesta (neděle 20:00, čtvrtek 10:00), ne
+// jen jednou při vzniku akce. Souřadnice se berou z existující cache
+// SOUŘADNICE (Nominatim) – žádné druhé geokódování jen pro počasí.
+// Zdroj: Open-Meteo (16denní denní předpověď), fallback met.no, stejný duch
+// jako weatherFor_ výš. Oddělený list, žádný zásah do sloupců AKCE A:V.
+// ---------------------------------------------------------------------------
+
+const POCASI_HLAVICKA = ['ID akce', 'Aktualizováno', 'Stav', 'Kód počasí', 'Teplota (°C)'];
+const POCASI_FORECAST_DAYS = 16;   // dosah denní předpovědi Open-Meteo
+
+function ensurePocasiSheet_(ss) {
+  let sh = ss.getSheetByName(SHEET.POCASI);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET.POCASI);
+    sh.getRange(1, 1, 1, POCASI_HLAVICKA.length).setValues([POCASI_HLAVICKA])
+      .setFontWeight('bold').setBackground('#2e5c7a').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/** Čte list POČASÍ do prostých objektů. I/O – bez logiky. */
+function readPocasi_(ss) {
+  const sh = ss.getSheetByName(SHEET.POCASI);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, POCASI_HLAVICKA.length).getValues()
+    .map(r => ({
+      id: String(r[0] || ''), aktualizovano: cellText_(r[1]), stav: String(r[2] || ''),
+      kod: r[3] === '' ? '' : Number(r[3]), teplota: r[4] === '' ? '' : Number(r[4]),
+    }))
+    .filter(r => r.id);
+}
+
+/** PURE: pole řádků POČASÍ → Map(id akce → záznam). */
+function pocasiMapy_(rows) {
+  const mapa = new Map();
+  rows.forEach(r => mapa.set(r.id, r));
+  return mapa;
+}
+
+/** Přepíše list POČASÍ zadanými řádky (full-rewrite jako OZNAČENÍ – dataset je
+ *  malý a vždy jen budoucí akce, staré řádky tak přirozeně odpadnou samy). */
+function zapsatPocasi_(ss, rows) {
+  const sh = ensurePocasiSheet_(ss);
+  const posledni = sh.getLastRow();
+  if (posledni > 1) sh.getRange(2, 1, posledni - 1, POCASI_HLAVICKA.length).clearContent();
+  if (rows.length) {
+    sh.getRange(2, 1, rows.length, POCASI_HLAVICKA.length).setValues(
+      rows.map(r => [r.id, r.aktualizovano, r.stav, r.kod, r.teplota]));
+  }
+}
+
+/** PURE: převod hrubého met.no textu (metNoTextFor_) na číselný kód ve
+ *  stejné škále jako WMO weathercode z Open-Meteo – aby políčko počasí u
+ *  akce mělo JEDNOTNÝ číselný kód bez ohledu na zdroj (frontend mapuje jen
+ *  jednou, na weathercode). */
+function metNoTextNaKod_(text) {
+  const mapa = {
+    'jasno': 0, 'skoro jasno': 1, 'polojasno': 2, 'zataženo': 3, 'mlha': 45,
+    'mrholení': 51, 'déšť': 61, 'sněžení': 71, 'přeháňky': 80,
+    'sněhové přeháňky': 85, 'bouřky': 95, 'proměnlivo': 2,
+  };
+  return mapa.hasOwnProperty(text) ? mapa[text] : 2;
+}
+
+/** PURE: rozhodne výsledný záznam počasí pro JEDNU budoucí akci.
+ *  - souradnice chybí (ještě negeokódováno) → NA.
+ *  - forecast (Open-Meteo, {time,code,teplota}) obsahuje datum akce → OK.
+ *  - forecast je non-null, ale datum akce v něm není → mimo 16denní dosah → NA
+ *    (Open-Meteo fungovalo, prostě tak daleko nevidí – to NENÍ chyba).
+ *  - forecast je null (Open-Meteo request selhal) → zkusit metNoDenni
+ *    (agregovatMetNoDen_ výsledek); když i ten chybí → CHYBA, se zachováním
+ *    poslední OK hodnoty ze `stary`, pokud existuje (jinak NA-like prázdno,
+ *    ale stav zůstává CHYBA, ať frontend/KONTROLY vidí skutečný výpadek). */
+function vyhodnotPocasiUdalosti_(iso, souradnice, forecast, metNoDenni, stary) {
+  if (!souradnice) return { stav: 'NA', kod: '', teplota: '' };
+  if (forecast) {
+    const i = forecast.time.indexOf(iso);
+    if (i >= 0) return { stav: 'OK', kod: forecast.code[i], teplota: Math.round(forecast.teplota[i]) };
+    return { stav: 'NA', kod: '', teplota: '' };
+  }
+  if (metNoDenni) {
+    return {
+      stav: 'OK',
+      kod: metNoTextNaKod_(metNoTextFor_(metNoDenni.symbolCode)),
+      teplota: Math.round(metNoDenni.maxTeplota),
+    };
+  }
+  if (stary && stary.kod !== '' && stary.kod != null) {
+    return { stav: 'CHYBA', kod: stary.kod, teplota: stary.teplota };
+  }
+  return { stav: 'CHYBA', kod: '', teplota: '' };
+}
+
+/** Zavolá Open-Meteo pro dané souřadnice; vrací {time, code, teplota} (paralelní
+ *  pole stejná jako v odpovědi API), nebo null při selhání requestu. */
+function ziskatOpenMeteoPredpoved_(lat, lng) {
+  const d = fetchJson_(
+    'https://api.open-meteo.com/v1/forecast?daily=weather_code,temperature_2m_max' +
+    '&timezone=Europe%2FPrague&forecast_days=' + POCASI_FORECAST_DAYS +
+    '&latitude=' + lat + '&longitude=' + lng);
+  if (!d || !d.daily || !d.daily.time) return null;
+  return { time: d.daily.time, code: d.daily.weather_code, teplota: d.daily.temperature_2m_max };
+}
+
+/** Zaloguje do KONTROL, že se pro část akcí nepodařilo počasí získat ani ze
+ *  záložního met.no – stejný vzor jako ostatní API chyby v projektu (viz
+ *  runSelfTest / weatherApiDostupne_), ať je to vidět i mimo Apps Script log. */
+function logKontrolaPocasi_(ss, pocetChyb) {
+  try {
+    const sh = ss.getSheetByName(SHEET.KONTROLY);
+    if (!sh) return;
+    sh.appendRow([
+      formatDate_(new Date()), 'aktualizace počasí',
+      'Open-Meteo (+ met.no záložně) nedostupné pro ' + pocetChyb + ' akc(i/e)',
+      0, 0, 0, 0, 0, 0, 0,
+      'Poslední známá hodnota zachována v listu POČASÍ (stav CHYBA).',
+      'Apps Script automatizace']);
+  } catch (e) { Logger.log('Log do KONTROL (počasí) selhal: ' + e); }
+}
+
+/** Hlavní běh: pro VŠECHNY budoucí akce (i mimo 16denní dosah – ty dostanou
+ *  NA) přepočítá počasí a přepíše list POČASÍ. Volá se z existujícího
+ *  triggeru zpracovatSledovanaMesta (žádný nový trigger). Chyba tady nesmí
+ *  shodit zbytek běhu (proto vlastní try/catch, stejně jako u souřadnic). */
+function aktualizujPocasi_(ss) {
+  try {
+    const akceSh = ss.getSheetByName(SHEET.AKCE);
+    const lastRow = akceSh ? akceSh.getLastRow() : 1;
+    if (lastRow < 2) return;
+    const data = akceSh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
+    const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+    const dnesText = formatDateOnly_(new Date());
+    const souradniceMapa = souradniceMapy_(readSouradnice_(ss));
+    const staryMapa = pocasiMapy_(readPocasi_(ss));
+
+    const udalosti = [];
+    data.forEach(row => {
+      const stav = norm_(row[13]);
+      if (stav === 'zrušeno' || stav === 'proběhlo') return;
+      const id = String(row[0] || '');
+      const od = parseCzDate_(row[1]);
+      if (!id || !od || od < dnes) return;
+      udalosti.push({
+        id,
+        iso: Utilities.formatDate(od, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+        klic: klicSouradnic_(row[5], row[6]),
+      });
+    });
+    if (!udalosti.length) return;
+
+    const forecastCache = {};   // klic souřadnic → {time,code,teplota} | null
+    const metNoCache = {};      // klic souřadnic → parsovaný met.no JSON | false
+    let chyby = 0;
+
+    const nove = udalosti.map(u => {
+      const souradnice = souradniceMapa.get(u.klic) || null;
+      let forecast = null, metNoDenni = null;
+
+      if (souradnice) {
+        if (!(u.klic in forecastCache)) forecastCache[u.klic] = ziskatOpenMeteoPredpoved_(souradnice.lat, souradnice.lng);
+        forecast = forecastCache[u.klic];
+
+        if (!forecast) {
+          if (!(u.klic in metNoCache)) {
+            metNoCache[u.klic] = fetchJson_(
+              'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + souradnice.lat + '&lon=' + souradnice.lng,
+              { 'User-Agent': METNO_USER_AGENT }) || false;
+          }
+          const metNo = metNoCache[u.klic];
+          if (metNo && metNo.properties && metNo.properties.timeseries) {
+            metNoDenni = agregovatMetNoDen_(metNo.properties.timeseries, u.iso);
+          }
+        }
+      }
+
+      const stary = staryMapa.get(u.id) || null;
+      const vysledek = vyhodnotPocasiUdalosti_(u.iso, souradnice, forecast, metNoDenni, stary);
+      if (vysledek.stav === 'CHYBA') chyby++;
+      return { id: u.id, aktualizovano: dnesText, stav: vysledek.stav, kod: vysledek.kod, teplota: vysledek.teplota };
+    });
+
+    zapsatPocasi_(ss, nove);
+    if (chyby) logKontrolaPocasi_(ss, chyby);
+  } catch (e) {
+    Logger.log('aktualizujPocasi_ selhalo: ' + e);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // SLEDOVANÁ MĚSTA (v3.16) – tiché doplnění dat na pozadí pro města mimo
 // domácí profil. Žádná notifikace (potvrzeno) – jen se doplní AKCE/SOUŘADNICE,
 // uživatel je uvidí, až si dané město sám vybere v dropdownu.
@@ -1483,6 +1679,12 @@ function zpracovatSledovanaMesta() {
     }
     Logger.log('zpracovatSledovanaMesta: hotovo, zpracováno ' + zpracovano + ' z ' + mesta.length
       + ' měst (přeskočeno jako dnes už hotové: ' + preskocenoDnes + ').');
+
+    // v3.22: počasí u akcí se přepočítává PŘI KAŽDÉM běhu tohoto triggeru
+    // (neděle 20:00 + čtvrtek 10:00), ne jen jednou při vzniku akce – blíž
+    // datu konání je předpověď přesnější. Vlastní try/catch uvnitř, takže
+    // selhání sem nespadne.
+    aktualizujPocasi_(ss);
   } finally {
     lock.releaseLock();
   }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.24 – Oprava: viditelný "podpis appky" (— Kulturní radar) místo nespolehlivých prázdných koncových řádků u sdílení -->
+<!-- Kulturní radar Index.html v3.25 – Počasí u akce: malé políčko (ikona + teplota, N/A při stavu mimo dosah) vedle data -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -199,6 +199,7 @@
     gap: 8px;
   }
   .meta span::before { content: ''; }
+  .pocasi-na { opacity: .45; font-style: italic; }
   .kat-badge {
     font-size: .68rem;
     background: var(--accent-2);
@@ -1105,6 +1106,11 @@
     meta.className = 'meta';
     if (jeProbiha && a.datumOd) { const s = document.createElement('span'); s.textContent = '📅 od ' + a.datumOd; meta.appendChild(s); }
     else if (datumLabel) { const s = document.createElement('span'); s.textContent = '📅 ' + datumLabel; meta.appendChild(s); }
+    const pocasi = pocasiZobrazeni_(a.pocasi);
+    const pocasiSpan = document.createElement('span');
+    pocasiSpan.className = pocasi.trida;
+    pocasiSpan.textContent = pocasi.text;
+    meta.appendChild(pocasiSpan);
     if (a.misto) { const s = document.createElement('span'); s.textContent = '📍 ' + a.misto; meta.appendChild(s); }
     if (a.cas)   { const s = document.createElement('span'); s.textContent = '🕐 ' + a.cas;  meta.appendChild(s); }
     if (a.cena)  { const s = document.createElement('span'); s.textContent = '🎟 ' + a.cena; meta.appendChild(s); }
@@ -1201,6 +1207,42 @@
   }
 
   function pad2_(n) { return String(n).padStart(2, '0'); }
+
+  // ── v3.25: Počasí u akce – malé políčko vedle data ───────────────────
+
+  /** PURE: WMO weathercode (Open-Meteo, případně met.no přepočtené na
+   *  stejnou škálu backendem) → emoji ikona. Hrubší bucketing, stejný
+   *  duch jako weatherText_ v .gs (přesné číslo nepotřebujeme, jen kategorii). */
+  function weathercodeEmoji_(kod) {
+    if (kod === '' || kod === null || kod === undefined) return '❓';
+    const k = Number(kod);
+    if (isNaN(k)) return '❓';
+    if (k === 0) return '☀️';
+    if (k <= 2) return '🌤️';
+    if (k === 3) return '☁️';
+    if (k === 45 || k === 48) return '🌫️';
+    if (k <= 57) return '🌦️';
+    if (k <= 67) return '🌧️';
+    if (k <= 77) return '❄️';
+    if (k <= 82) return '🌦️';
+    if (k <= 86) return '🌨️';
+    return '⛈️';
+  }
+
+  /** PURE: text + CSS třída pro políčko počasí u akce. Kód přítomný (ať už
+   *  ze stavu OK, nebo z CHYBA se zachovanou poslední hodnotou) → ikona +
+   *  teplota, normální styl. Kód chybí (NA za hranicí ~16denního dosahu
+   *  Open-Meteo, nebo CHYBA bez jakékoli předchozí hodnoty) → tlumené
+   *  "N/A", ať je na první pohled jasné, že jde o "zatím nedostupné", ne
+   *  o chybu appky. */
+  function pocasiZobrazeni_(pocasi) {
+    if (!pocasi || pocasi.kod === '' || pocasi.kod === null || pocasi.kod === undefined) {
+      return { text: 'N/A', trida: 'pocasi-na' };
+    }
+    const teplota = Number(pocasi.teplota);
+    const teplotaText = isNaN(teplota) ? '' : ' ' + Math.round(teplota) + '°C';
+    return { text: weathercodeEmoji_(pocasi.kod) + teplotaText, trida: 'pocasi-ok' };
+  }
 
   // ── v3.17: Lehčí sdílení – deep link zpátky do appky ─────────────────
   // Dřív "Sdílet" posílalo odkaz na ZDROJOVOU stránku (web městské části) –

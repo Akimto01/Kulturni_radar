@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.22 (backend) + v3.25 (frontend) — Počasí u akce — 8. 8. 2026
+### Přidáno
+- **Nový list POČASÍ** (ID akce, Aktualizováno, Stav, Kód počasí, Teplota) – oddělený od AKCE (A:V se nedotýká), stejný duch jako OZNAČENÍ/SOUŘADNICE. Full-rewrite při každém běhu, takže staré (proběhlé/zrušené) akce z listu přirozeně odpadnou.
+- `aktualizujPocasi_`: pro všechny budoucí akce (i mimo dosah předpovědi) přepočítá počasí – souřadnice bere z existující cache SOUŘADNICE (žádné druhé geokódování). Zdroj Open-Meteo (16denní denní předpověď), fallback met.no při výpadku (`metNoTextNaKod_` sjednotí jeho text na stejnou číselnou škálu jako WMO weathercode).
+- Tři stavy: **OK** (předpověď nalezena), **NA** (akce mimo ~16denní dosah Open-Meteo – ne chyba, jen zatím nedostupné), **CHYBA** (výpadek Open-Meteo i met.no zároveň – zachová se poslední známá hodnota, pokud existuje; zaloguje se do KONTROL stejně jako jiné API chyby v projektu).
+- Volá se z existujícího triggeru `zpracovatSledovanaMesta` (neděle 20:00, čtvrtek 10:00) – žádný nový trigger, předpověď se tak přirozeně zpřesňuje s blížícím se datem akce.
+- `apiEvents` obohaceno o `pocasi: {stav, kod, teplota}` na akci.
+- Frontend: malé políčko počasí (ikona podle `weathercodeEmoji_` + zaokrouhlená teplota) vedle data konání na kartě akce – ne samostatný blok. Stav NA/CHYBA-bez-hodnoty se zobrazí jako tlumené „N/A" (`pocasiZobrazeni_`), vizuálně jasně odlišené od běžné ikony, ať nepůsobí jako chyba appky.
+- Node testy 196 → 214 (unit 142 → 153: +11 pro `metNoTextNaKod_`/`vyhodnotPocasiUdalosti_`/`aktualizujPocasi_` end-to-end přes fake Sheets + urlFetch stub, všechny tři stavy; frontend 54 → 61: +7 pro `weathercodeEmoji_`/`pocasiZobrazeni_`).
+### Poznámka k nasazení
+- Vyžaduje ruční „Nová verze" v Apps Script editoru (`aktualizujPocasi_` běží jen po nasazení backendu) – viz Docs/kulturni-radar-workflow/SKILL.md sekce 1.
+
 ## Index.html v3.24 — 8. 8. 2026
 ### Opraveno (UX, definitivní oprava oddělovače u sdílení)
 - Prázdné koncové řádky (v3.22, zúžené z v3.21) se ukázaly nespolehlivé — Gmail je při vložení textu ořezává, takže se e-mailový podpis stejně lepil za sdílenou zprávu (zkoušeno naostro jako v3.23, přímo nasazeno bez commitu do repa, nahrazeno hned touto opravou). Řešení: viditelný podpis appky (`— Kulturní radar`) na konci `sestavTextSdileni_` i `sdiletVyber_` — text se ořezat nedá, navíc dává smysl i mimo e-mail (WhatsApp/SMS), kde příjemce hned vidí, odkud zpráva pochází.

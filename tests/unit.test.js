@@ -1299,3 +1299,235 @@ test('v3.21: routePost_ najdi – špatný token odmítnut PŘED jakoukoli draž
   assert.equal(vysledek.ok, false);
   assert.match(vysledek.error, /token/i);
 });
+
+// ---------------------------------------------------------------------------
+// v3.22: POČASÍ u akce – metNoTextNaKod_, vyhodnotPocasiUdalosti_ (čistá logika)
+// ---------------------------------------------------------------------------
+
+test('v3.22: metNoTextNaKod_ – zná hlavní kategorie z metNoTextFor_', () => {
+  assert.equal(r.metNoTextNaKod_('jasno'), 0);
+  assert.equal(r.metNoTextNaKod_('zataženo'), 3);
+  assert.equal(r.metNoTextNaKod_('déšť'), 61);
+  assert.equal(r.metNoTextNaKod_('bouřky'), 95);
+});
+
+test('v3.22: metNoTextNaKod_ – neznámý text nespadne, vrátí rozumný výchozí kód', () => {
+  assert.equal(r.metNoTextNaKod_('nesmysl'), 2);
+});
+
+test('v3.22: vyhodnotPocasiUdalosti_ – chybějící souřadnice (ještě negeokódováno) → NA', () => {
+  const v = r.vyhodnotPocasiUdalosti_('2026-08-09', null, { time: ['2026-08-09'], code: [1], teplota: [20] }, null, null);
+  assert.equal(v.stav, 'NA');
+  assert.equal(v.kod, '');
+  assert.equal(v.teplota, '');
+});
+
+test('v3.22: vyhodnotPocasiUdalosti_ – datum je ve vrácené předpovědi → OK, teplota zaokrouhlená', () => {
+  const forecast = { time: ['2026-08-08', '2026-08-09'], code: [3, 61], teplota: [18.6, 15.2] };
+  const v = r.vyhodnotPocasiUdalosti_('2026-08-09', { lat: 49.1, lng: 16.6 }, forecast, null, null);
+  assert.equal(v.stav, 'OK');
+  assert.equal(v.kod, 61);
+  assert.equal(v.teplota, 15);
+});
+
+test('v3.22: vyhodnotPocasiUdalosti_ – Open-Meteo odpověděl, ale datum mimo ~16denní dosah → NA (ne chyba)', () => {
+  const forecast = { time: ['2026-08-08', '2026-08-09'], code: [3, 61], teplota: [18.6, 15.2] };
+  const v = r.vyhodnotPocasiUdalosti_('2026-09-20', { lat: 49.1, lng: 16.6 }, forecast, null, null);
+  assert.equal(v.stav, 'NA');
+  assert.equal(v.kod, '');
+  assert.equal(v.teplota, '');
+});
+
+test('v3.22: vyhodnotPocasiUdalosti_ – Open-Meteo selhal, met.no zachránil → OK přes metNoTextNaKod_', () => {
+  const metNoDenni = { maxTeplota: 22.7, symbolCode: 'rain' };
+  const v = r.vyhodnotPocasiUdalosti_('2026-08-09', { lat: 49.1, lng: 16.6 }, null, metNoDenni, null);
+  assert.equal(v.stav, 'OK');
+  assert.equal(v.kod, r.metNoTextNaKod_('déšť'));
+  assert.equal(v.teplota, 23);
+});
+
+test('v3.22: vyhodnotPocasiUdalosti_ – oba zdroje selhaly, dřív existovala hodnota → CHYBA se zachovanou hodnotou', () => {
+  const stary = { stav: 'OK', kod: 3, teplota: 19 };
+  const v = r.vyhodnotPocasiUdalosti_('2026-08-09', { lat: 49.1, lng: 16.6 }, null, null, stary);
+  assert.equal(v.stav, 'CHYBA');
+  assert.equal(v.kod, 3);
+  assert.equal(v.teplota, 19);
+});
+
+test('v3.22: vyhodnotPocasiUdalosti_ – oba zdroje selhaly a žádná předchozí hodnota → CHYBA prázdná (ne NA)', () => {
+  const v = r.vyhodnotPocasiUdalosti_('2026-08-09', { lat: 49.1, lng: 16.6 }, null, null, null);
+  assert.equal(v.stav, 'CHYBA');
+  assert.equal(v.kod, '');
+  assert.equal(v.teplota, '');
+});
+
+// ---------------------------------------------------------------------------
+// v3.22: aktualizujPocasi_ – end-to-end přes fake Sheets + urlFetch stub
+// (mock Sheets: minimální in-memory Range/Sheet, stejná technika jako
+// fake ss v testech routePost_/apiPrihlaseniUzivatele_ výš, jen s podporou
+// zápisu potřebnou pro POČASÍ full-rewrite).
+// ---------------------------------------------------------------------------
+
+class MemSheet {
+  constructor(rows = []) { this.rows = rows.map(r => r.slice()); }
+  getLastRow() { return this.rows.length; }
+  getRange(row, col, numRows = 1, numCols = 1) {
+    const self = this;
+    return {
+      getValues() {
+        const out = [];
+        for (let r = 0; r < numRows; r++) {
+          const rowArr = self.rows[row - 1 + r] || [];
+          const line = [];
+          for (let c = 0; c < numCols; c++) line.push(rowArr[col - 1 + c] === undefined ? '' : rowArr[col - 1 + c]);
+          out.push(line);
+        }
+        return out;
+      },
+      setValues(vals) {
+        vals.forEach((line, r) => {
+          const rowIdx = row - 1 + r;
+          while (self.rows.length <= rowIdx) self.rows.push([]);
+          line.forEach((v, c) => { self.rows[rowIdx][col - 1 + c] = v; });
+        });
+        return this;
+      },
+      clearContent() {
+        for (let r = 0; r < numRows; r++) {
+          const rowIdx = row - 1 + r;
+          if (self.rows[rowIdx]) self.rows[rowIdx] = [];
+        }
+      },
+      setFontWeight() { return this; },
+      setBackground() { return this; },
+      setFontColor() { return this; },
+    };
+  }
+  appendRow(vals) { this.rows.push(vals.slice()); }
+  setFrozenRows() {}
+}
+
+function fakeSpreadsheet(pocatecni) {
+  const sheets = {};
+  Object.keys(pocatecni || {}).forEach(n => { sheets[n] = new MemSheet(pocatecni[n]); });
+  return {
+    getSheetByName: (n) => sheets[n] || null,
+    insertSheet: (n) => { const sh = new MemSheet(); sheets[n] = sh; return sh; },
+    getUrl: () => 'https://sheet.example/test',
+    __sheets: sheets,
+  };
+}
+
+function pridatDny_(zaklad, n) { const d = new Date(zaklad); d.setDate(d.getDate() + n); return d; }
+function czDatum_(d) { return d.getDate() + '. ' + (d.getMonth() + 1) + '. ' + d.getFullYear(); }
+function isoDatum_(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+test('v3.22: aktualizujPocasi_ – tři budoucí akce → OK / NA (mimo dosah) / CHYBA (výpadek obou zdrojů)', () => {
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const zitra = pridatDny_(dnes, 1);          // v dosahu 16 dní
+  const zaHranici = pridatDny_(dnes, 40);     // daleko mimo dosah
+  const poslezitri = pridatDny_(dnes, 2);     // v dosahu, ale API selže
+
+  const AKCE_ROWS = [
+    [],   // hlavička (obsah nepodstatný, čte se od řádku 2)
+    ['ev-a', czDatum_(zitra), '', '', 'Akce A', 'Místo A', 'Obec A', '', '', '', '', '', '', ''],
+    ['ev-b', czDatum_(zaHranici), '', '', 'Akce B', 'Místo B', 'Obec B', '', '', '', '', '', '', ''],
+    ['ev-c', czDatum_(poslezitri), '', '', 'Akce C', 'Místo C', 'Obec C', '', '', '', '', '', '', ''],
+  ];
+  const klicA = r.klicSouradnic_('Místo A', 'Obec A');
+  const klicB = r.klicSouradnic_('Místo B', 'Obec B');
+  const klicC = r.klicSouradnic_('Místo C', 'Obec C');
+  const SOURADNICE_ROWS = [
+    [],
+    [klicA, 49.1, 16.6, '', ''],
+    [klicB, 49.2, 16.7, '', ''],
+    [klicC, 49.3, 16.8, '', ''],
+  ];
+
+  const FORECAST_A = { code: 200, body: { daily: {
+    time: [isoDatum_(zitra)], weather_code: [3], temperature_2m_max: [18.6],
+  } } };
+  // Odpověď B je „úspěšná“, ale neobsahuje datum akce B (ta je 40 dní napřed,
+  // mimo 16denní dosah Open-Meteo) – proto z toho musí vyjít NA, ne CHYBA.
+  const FORECAST_B = { code: 200, body: { daily: {
+    time: [isoDatum_(dnes)], weather_code: [1], temperature_2m_max: [22.0],
+  } } };
+
+  const volane = [];
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([
+    FORECAST_A,             // A: Open-Meteo uspěje napoprvé
+    FORECAST_B,             // B: Open-Meteo uspěje, ale bez hledaného data
+    'throw', 'throw',       // C: Open-Meteo selže (2 pokusy)
+    'throw', 'throw',       // C: záložní met.no selže taky (2 pokusy)
+  ], volane) });
+
+  const ss = fakeSpreadsheet({
+    AKCE: AKCE_ROWS,
+    SOUŘADNICE: SOURADNICE_ROWS,
+    KONTROLY: [[]],
+  });
+
+  ctx.aktualizujPocasi_(ss);
+
+  const pocasi = ctx.readPocasi_(ss);
+  const mapa = new Map(pocasi.map(p => [p.id, p]));
+
+  assert.equal(mapa.get('ev-a').stav, 'OK');
+  assert.equal(mapa.get('ev-a').kod, 3);
+  assert.equal(mapa.get('ev-a').teplota, 19);
+
+  assert.equal(mapa.get('ev-b').stav, 'NA');
+  assert.equal(mapa.get('ev-b').kod, '');
+  assert.equal(mapa.get('ev-b').teplota, '');
+
+  assert.equal(mapa.get('ev-c').stav, 'CHYBA');
+  assert.equal(mapa.get('ev-c').kod, '');
+  assert.equal(mapa.get('ev-c').teplota, '');
+
+  // CHYBA se zaloguje do KONTROL, stejně jako jiné API chyby v projektu.
+  const kontroly = ss.getSheetByName('KONTROLY');
+  assert.equal(kontroly.getLastRow(), 2, 'přibyl jeden řádek s chybou počasí');
+  assert.match(kontroly.rows[1][1], /počasí/);
+});
+
+test('v3.22: aktualizujPocasi_ – při CHYBA se zachová poslední známá hodnota z předchozího běhu', () => {
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const zitra = pridatDny_(dnes, 1);
+  const klic = r.klicSouradnic_('Místo D', 'Obec D');
+
+  const AKCE_ROWS = [[], ['ev-d', czDatum_(zitra), '', '', 'Akce D', 'Místo D', 'Obec D', '', '', '', '', '', '', '']];
+  const SOURADNICE_ROWS = [[], [klic, 49.1, 16.6, '', '']];
+  const POCASI_ROWS = [[], ['ev-d', '1. 8. 2026', 'OK', 61, 14]];
+
+  const ctx = nactiRadar({ urlFetch: frontaFetchu(['throw', 'throw', 'throw', 'throw']) });
+  const ss = fakeSpreadsheet({
+    AKCE: AKCE_ROWS, SOUŘADNICE: SOURADNICE_ROWS, POČASÍ: POCASI_ROWS, KONTROLY: [[]],
+  });
+
+  ctx.aktualizujPocasi_(ss);
+
+  const zaznam = ctx.readPocasi_(ss).find(p => p.id === 'ev-d');
+  assert.equal(zaznam.stav, 'CHYBA');
+  assert.equal(zaznam.kod, 61, 'poslední známý kód zůstal zachovaný, ne smazaný');
+  assert.equal(zaznam.teplota, 14);
+});
+
+test('v3.22: aktualizujPocasi_ – zrušené/proběhlé a minulé akce se nezpracovávají', () => {
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const vcera = pridatDny_(dnes, -1);
+  const zitra = pridatDny_(dnes, 1);
+  const AKCE_ROWS = [
+    [],
+    ['ev-e', czDatum_(zitra), '', '', 'Zrušená', 'Místo E', 'Obec E', '', '', '', '', '', '', 'zrušeno'],
+    ['ev-f', czDatum_(vcera), '', '', 'Minulá', 'Místo F', 'Obec F', '', '', '', '', '', '', ''],
+  ];
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([], []) });   // fronta by spadla na prázdno, kdyby se volalo
+  const ss = fakeSpreadsheet({ AKCE: AKCE_ROWS, SOUŘADNICE: [[]], KONTROLY: [[]] });
+
+  ctx.aktualizujPocasi_(ss);
+
+  assert.equal(ctx.readPocasi_(ss).length, 0, 'žádná akce nesplňuje podmínku budoucí+neproběhlá/nezrušená');
+});

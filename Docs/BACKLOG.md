@@ -17,7 +17,6 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 - Barevné rozlišení mezi položkami/kategoriemi (budoucí potřeba, ne akutní)
 
 ### Chybí/neúplné (vysvětleno, není to bug)
-- Počasí ve webu — dnes jen v e-mailových přehledech (~1–2 h, ale s architektonickou pastí: nesmí se volat živě při načtení stránky, potřebuje cache jako souřadnice)
 - Dojezd v km a piny na mapě u starších akcí — čeká na doběhnutí zpětného geokódování/přegenerování dat, není potřeba nic opravovat
 - Rozdíl v počtu akcí mezi městy (Praha 7, Brno 30+, jiná 0) — dané tím, že automatika běží jen pro aktivní profil; ostatní mají data jen z jednorázových ručních kontrol, nebo žádná
 
@@ -38,9 +37,6 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 ## Nové funkce (schváleno, čeká na zpětnou vazbu rodiny)
 - Doporučení podle historie navštívených akcí.
 - Roční přehled/statistika navštívených akcí a typů.
-
-## Počasí ve webu
-- `weatherFor_` dnes jen v digestech; šlo by vystavit přes API i na kartu/místa ve webové aplikaci.
 
 ## Větší témata
 - Plnohodnotná interaktivní mapa akcí (víc pinů najednou, places_map) — vědomě odložená budoucí varianta. Odkaz „📍 Mapa" na kartě (v3.10, garantovaný pin díky souřadnicím z Nominatim) pokrývá jednu akci najednou a je hotový.
