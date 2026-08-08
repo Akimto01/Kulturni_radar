@@ -161,6 +161,12 @@ co se ten den udělalo — bez čekání, až o to Vojta výslovně požádá. T
 obecná preference uložená i v paměti Claude (napříč projekty), tady je jen
 zapsaná pro viditelnost v repu.
 
+Součástí tohoto shrnutí je i stručný výpis dalších plánovaných aktivit
+z BACKLOG.md (co ještě čeká), každá s hrubým časovým odhadem (např.
+„1–2 h", „2–3 h") — ať je hned vidět, co by se dalo stihnout v rámci
+zbývajícího času případně pokračující session, bez nutnosti znovu
+procházet celý BACKLOG.md ručně.
+
 ## Referenční vzorce pro psaní nových testů (harness)
 
 Backend (`tests/harness.js`, `nactiRadar(volby)`):
