@@ -10,7 +10,7 @@ const { nactiFrontendFunkce } = require('./frontend-harness');
 const f = nactiFrontendFunkce([
   'parseCeskeDatum', 'dateKeyBezpecne_', 'pad2_', 'gcalUrl_',
   'filtrovatNavstivenaPodleObdobi_', 'sestavTextSdileni_', 'mapsUrl_',
-  'sestavFiltry_', 'pinVypadaPlatne_',
+  'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -213,4 +213,62 @@ test('v3.13: pinVypadaPlatne_ – 4–8 znaků bez mezer uvnitř, okolní mezery
   assert.equal(f.pinVypadaPlatne_(''), false);
   assert.equal(f.pinVypadaPlatne_(null), false);
   assert.equal(f.pinVypadaPlatne_('  1234  '), true, 'mezery okolo se před kontrolou ořežou');
+});
+
+/** Cross-realm porovnání: objekty z vm sandboxu nejsou referenčně shodné
+ *  s objekty testu (viz harness.js pozn. o Date) – porovnáváme přes JSON. */
+function shodneNapricRealmy(skutecne, ocekavane, zprava) {
+  assert.equal(JSON.stringify(skutecne), JSON.stringify(ocekavane), zprava);
+}
+
+// ---------------------------------------------------------------------------
+// v3.15: sestavFetchPozadavek_ – překlad gsr volání na HTTP pro statický hosting
+// ---------------------------------------------------------------------------
+
+const EXEC = 'https://example.com/exec';
+
+test('v3.15: sestavFetchPozadavek_ – GET routy (meta, events, places, uzivatele)', () => {
+  shodneNapricRealmy(f.sestavFetchPozadavek_('apiMeta', [], EXEC),
+    { metoda: 'GET', url: EXEC + '?api=meta' });
+  const events = f.sestavFetchPozadavek_('apiEvents', ['Brno', true, 'rf-test'], EXEC);
+  assert.equal(events.metoda, 'GET');
+  assert.ok(events.url.includes('api=events'));
+  assert.ok(events.url.includes('profil=Brno'));
+  assert.ok(events.url.includes('oznacene=1'));
+  assert.ok(events.url.includes('uzivatel=rf-test'));
+  const eventsBez = f.sestavFetchPozadavek_('apiEvents', ['', false, ''], EXEC);
+  assert.ok(!eventsBez.url.includes('oznacene'), 'bez oznacene=1 když false');
+  shodneNapricRealmy(f.sestavFetchPozadavek_('apiSeznamUzivatelu', [], EXEC),
+    { metoda: 'GET', url: EXEC + '?api=uzivatele' });
+});
+
+test('v3.15: sestavFetchPozadavek_ – diakritika v profilu se URL-escapuje', () => {
+  const poz = f.sestavFetchPozadavek_('apiPlaces', ['Plzeň'], EXEC);
+  assert.ok(poz.url.includes(encodeURIComponent('Plzeň')));
+  assert.ok(!poz.url.includes('Plzeň'), 'surová diakritika nemá být v URL');
+});
+
+test('v3.15: sestavFetchPozadavek_ – POST routy: PIN a token jdou v TĚLE, nikdy v URL', () => {
+  const login = f.sestavFetchPozadavek_('apiPrihlaseniUzivatele', ['vojta', '1234'], EXEC);
+  assert.equal(login.metoda, 'POST');
+  assert.equal(login.url, EXEC, 'POST URL bez query parametrů');
+  shodneNapricRealmy(login.telo, { akce: 'login', uzivatelId: 'vojta', pin: '1234' });
+  assert.ok(!login.url.includes('1234'), 'PIN nesmí být v URL');
+
+  const toggle = f.sestavFetchPozadavek_('apiToggle', ['42', 'oblibene', 'vojta'], EXEC);
+  shodneNapricRealmy(toggle.telo, { akce: 'toggle', id: '42', typ: 'oblibene', uzivatelId: 'vojta' });
+
+  const filtry = f.sestavFetchPozadavek_('apiSetFiltry', ['vojta', { dojezd: '60 min' }], EXEC);
+  shodneNapricRealmy(filtry.telo, { akce: 'filtry', uzivatelId: 'vojta', filtry: { dojezd: '60 min' } });
+
+  const najdi = f.sestavFetchPozadavek_('apiNajdiProUzivatele', ['vojta', 'tok-x'], EXEC);
+  shodneNapricRealmy(najdi.telo, { akce: 'najdi', uzivatelId: 'vojta', token: 'tok-x' });
+  assert.ok(!najdi.url.includes('tok-x'), 'token nesmí být v URL');
+
+  const run = f.sestavFetchPozadavek_('apiSpustKontrolu', ['tok-y'], EXEC);
+  shodneNapricRealmy(run.telo, { akce: 'run', token: 'tok-y' });
+});
+
+test('v3.15: sestavFetchPozadavek_ – neznámá funkce vrací null (gsr vyhodí srozumitelnou chybu)', () => {
+  assert.equal(f.sestavFetchPozadavek_('apiNeexistuje', [], EXEC), null);
 });

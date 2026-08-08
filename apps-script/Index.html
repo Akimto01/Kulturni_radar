@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.14 – Anonymní režim: appka startuje rovnou funkční bez přihlášení; login se vyžádá až při ★/✓ (rozhodnutí 8. 8. 2026) -->
+<!-- Kulturní radar Index.html v3.15 – Dvourežimový gsr(): google.script.run uvnitř Apps Scriptu, fetch() na /exec pro statické nasazení (GitHub Pages) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -503,16 +503,70 @@
     return p.length >= 4 && p.length <= 8 && !/\s/.test(p);
   }
 
-  // ── Načtení dat přes google.script.run ───────────────────
-  // Apps Script web app neumožňuje fetch() na sebe sama (loop přes login).
-  // google.script.run je nativní bridge – volá serverové funkce přímo.
+  // ── Načtení dat: dvourežimový most na server (v3.15) ──────
+  // Uvnitř Apps Scriptu (dnešní /exec) existuje google.script.run – nativní
+  // bridge. Na statickém hostingu (GitHub Pages / kulturniradar.cz) ale
+  // neexistuje, tam se stejná volání překládají na fetch() proti EXEC_URL.
+  // Jeden Index.html tak beze změny funguje v obou prostředích.
+  const EXEC_URL = 'https://script.google.com/macros/s/AKfycbwwLACExWtRUULK5XX1bMD8SJiC6cBqAY-q99Flp3SLAEr4ejB4VnekFNH9yYnlOuJvRQ/exec';
+  const JE_V_APPS_SCRIPTU = typeof google !== 'undefined' && google.script && google.script.run;
+
+  /** PURE: přeloží volání serverové funkce na popis HTTP požadavku
+   *  ({metoda, url} pro GET, {metoda, url, telo} pro POST). PIN a token jdou
+   *  POSTem záměrně – nepatří do URL (historie prohlížeče, serverové logy).
+   *  Vrací null pro neznámou funkci. Bez fetch/DOM – testovatelné v Node. */
+  function sestavFetchPozadavek_(fn, args, execUrl) {
+    const a = args || [];
+    switch (fn) {
+      case 'apiMeta':
+        return { metoda: 'GET', url: execUrl + '?api=meta' };
+      case 'apiEvents':
+        return { metoda: 'GET', url: execUrl + '?api=events'
+          + '&profil=' + encodeURIComponent(a[0] || '')
+          + (a[1] ? '&oznacene=1' : '')
+          + '&uzivatel=' + encodeURIComponent(a[2] || '') };
+      case 'apiPlaces':
+        return { metoda: 'GET', url: execUrl + '?api=places&profil=' + encodeURIComponent(a[0] || '') };
+      case 'apiSeznamUzivatelu':
+        return { metoda: 'GET', url: execUrl + '?api=uzivatele' };
+      case 'apiPrihlaseniUzivatele':
+        return { metoda: 'POST', url: execUrl, telo: { akce: 'login', uzivatelId: a[0], pin: a[1] } };
+      case 'apiToggle':
+        return { metoda: 'POST', url: execUrl, telo: { akce: 'toggle', id: a[0], typ: a[1], uzivatelId: a[2] } };
+      case 'apiSetFiltry':
+        return { metoda: 'POST', url: execUrl, telo: { akce: 'filtry', uzivatelId: a[0], filtry: a[1] } };
+      case 'apiNajdiProUzivatele':
+        return { metoda: 'POST', url: execUrl, telo: { akce: 'najdi', uzivatelId: a[0], token: a[1] } };
+      case 'apiSpustKontrolu':
+        return { metoda: 'POST', url: execUrl, telo: { akce: 'run', token: a[0] } };
+      default:
+        return null;
+    }
+  }
+
+  async function gsrPresFetch_(fn, args) {
+    const poz = sestavFetchPozadavek_(fn, args, EXEC_URL);
+    if (!poz) throw new Error('Neznámá serverová funkce: ' + fn);
+    // Content-Type text/plain: jednoduchý požadavek bez CORS preflight –
+    // přesně varianta ověřená CORS spikem 7. 8. 2026 (GET i POST prošly).
+    const opts = poz.metoda === 'POST'
+      ? { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(poz.telo) }
+      : undefined;
+    const resp = await fetch(poz.url, opts);
+    if (!resp.ok) throw new Error('Server vrátil HTTP ' + resp.status);
+    return resp.json();
+  }
+
   function gsr(fn, ...args) {
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
-        [fn](...args);
-    });
+    if (JE_V_APPS_SCRIPTU) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          [fn](...args);
+      });
+    }
+    return gsrPresFetch_(fn, args);
   }
 
   async function api(endpoint, param = '') {

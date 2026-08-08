@@ -1256,3 +1256,46 @@ test('v3.20: sirotci s neexistujícím uživatelem – filtr nad řádky OZNAČE
   assert.equal(sirotci.length, 1);
   assert.equal(sirotci[0].id, '2');
 });
+
+// ---------------------------------------------------------------------------
+// v3.21: routePost_ – HTTP směrování pro statický frontend (GitHub Pages)
+// ---------------------------------------------------------------------------
+
+test('v3.21: routePost_ – neznámá/chybějící akce vrací ok:false, žádný pád', () => {
+  assert.equal(r.routePost_({}, null).ok, false);
+  assert.equal(r.routePost_({ akce: 'neexistuje' }, null).ok, false);
+  assert.equal(r.routePost_(null, null).ok, false, 'null body nesmí shodit doPost');
+});
+
+test('v3.21: routePost_ run – špatný token je odmítnut (WEB_TOKEN nenastaven → vždy odmítne)', () => {
+  const vysledek = r.routePost_({ akce: 'run', token: 'cokoli' }, null);
+  assert.equal(vysledek.ok, false);
+  assert.match(vysledek.error, /token/i);
+});
+
+test('v3.21: routePost_ login – správný PIN projde přes POST routu (stejná logika jako gsr cesta)', () => {
+  const ctx = nactiRadar();
+  const hash = ctx.hashPin_('1234', 'sul-r');
+  const ss = { getSheetByName: (n) => n === 'UŽIVATELÉ' ? {
+    getLastRow: () => 2,
+    getRange: () => ({ getValues: () => [['vojta', 'Vojta', hash, '{}', '']] }),
+  } : null };
+  const okVysledek = ctx.routePost_({ akce: 'login', uzivatelId: 'vojta', pin: '1234' }, ss);
+  assert.equal(okVysledek.ok, true);
+  assert.equal(okVysledek.jmeno, 'Vojta');
+  const spatny = ctx.routePost_({ akce: 'login', uzivatelId: 'vojta', pin: '9999' }, ss);
+  assert.equal(spatny.ok, false);
+});
+
+test('v3.21: routePost_ toggle – bez uzivatelId vrací ok:false (přihlášení povinné i přes HTTP)', () => {
+  const vysledek = r.routePost_({ akce: 'toggle', id: '42', typ: 'oblibene', uzivatelId: '' },
+    { getSheetByName: () => null });
+  assert.equal(vysledek.ok, false);
+  assert.match(vysledek.error, /profil/);
+});
+
+test('v3.21: routePost_ najdi – špatný token odmítnut PŘED jakoukoli dražší operací', () => {
+  const vysledek = r.routePost_({ akce: 'najdi', uzivatelId: 'vojta', token: 'spatny' }, null);
+  assert.equal(vysledek.ok, false);
+  assert.match(vysledek.error, /token/i);
+});

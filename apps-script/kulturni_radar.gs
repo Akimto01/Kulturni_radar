@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.20 (7. 8. 2026) – Uživatelské profily: osobní oblíbené/navštívené,
- * osobní filtry hledání, přihlášení přes PIN (backend), list UŽIVATELÉ
+ * Verze: 3.21 (8. 8. 2026) – HTTP API pro statický frontend (doPost: login/toggle/filtry/najdi,
+ * doGet: api=uzivatele) – příprava na GitHub Pages migraci
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -64,7 +64,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.20';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.21';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -155,6 +155,7 @@ function doGet(e) {
     if (api === 'events') data = readEventsApi_(ss, profil, (e.parameter && e.parameter.oznacene) === '1', uzivatelId);
     else if (api === 'places') data = readPlacesApi_(ss, profil);
     else if (api === 'meta') data = readMetaApi_(ss);
+    else if (api === 'uzivatele') data = apiSeznamUzivatelu_(ss);   // v3.21: seznam profilů pro statický frontend (jen id+jméno, bez PINů)
     else if (api === 'run') data = spustKontroluCore_((e.parameter && e.parameter.token) || '');
     else data = { ok: false, error: 'Neznámý endpoint: ' + api };
   } catch (err) {
@@ -166,22 +167,38 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+/** v3.21: směrování POST akcí na API funkce – vyčleněno z doPost kvůli
+ *  testovatelnosti (Node testy volají routePost_ přímo se stub ss, bez
+ *  ContentService). PIN a token jdou POSTem záměrně: nepatří do URL,
+ *  kde by končily v prohlížečové historii a serverových lozích. */
+function routePost_(body, ss) {
+  const akce = (body && body.akce) || '';
+  if (akce === 'run')    return spustKontroluCore_(body.token);
+  if (akce === 'login')  return apiPrihlaseniUzivatele_(ss, body.uzivatelId, body.pin);
+  if (akce === 'toggle') return apiToggle_(ss, body.id, body.typ, body.uzivatelId);
+  if (akce === 'filtry') return apiSetFiltry_(ss, body.uzivatelId, body.filtry);
+  if (akce === 'najdi')  return apiNajdiProUzivatele_(ss, body.uzivatelId, body.token);
+  return { ok: false, error: 'Neznámá akce.' };
+}
+
 /**
- * POST /exec {token, akce:'run'} → spustí mimořádnou kontrolu asynchronně.
- * Nespouští přímo (timeout), ale zakládá jednorázový trigger after(1s).
- * Token chrání endpoint před neoprávněným spouštěním.
+ * POST /exec {akce:'run'|'login'|'toggle'|'filtry'|'najdi', ...} → JSON.
+ * v3.21: rozšířeno z původního jen-run na plné API pro statický frontend
+ * (GitHub Pages) – google.script.run mimo Apps Script neexistuje.
  */
 function doPost(e) {
   let body;
   try { body = JSON.parse(e.postData.contents); } catch (_) { body = {}; }
 
-  if (body.akce !== 'run') {
-    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Neznámá akce.' }))
-      .setMimeType(ContentService.MimeType.JSON);
+  let data;
+  try {
+    data = routePost_(body, SpreadsheetApp.getActiveSpreadsheet());
+  } catch (err) {
+    data = { ok: false, error: String(err) };
   }
 
   return ContentService
-    .createTextOutput(JSON.stringify(spustKontroluCore_(body.token)))
+    .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
