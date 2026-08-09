@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.24 (backend) + Index.html v3.29 — Kontaktní formulář — 10. 8. 2026
+### Přidáno
+- Tlačítko **„Kontakt"** (bez emoji) vedle profilového badge — otevře modální formulář (jméno nepovinné, předvyplní se z přihlášeného profilu; zpráva povinná, limit 2000 znaků). Dostupné i bez přihlášení, žádný PIN.
+- Backend `apiKontakt_(jmeno, zprava, uzivatelId)` napojený do `routePost_` (`akce: 'kontakt'`) stejným vzorem jako `apiToggle` — funguje tedy shodně přes `google.script.run` i přes POST na statické doméně. Odesílá e-mail přes `MailApp.sendEmail()` na `info@kulturniradar.cz`; předmět nese jméno odesílatele (`'[Kulturní radar] Zpráva od ' + jméno/'anonym'`), tělo navíc uživatelský profil a časovou značku.
+- Jednoduchý globální cooldown (30 s, `KONTAKT_COOLDOWN_MS`) proti spamu — stejný duch jako `WEB_COOLDOWN_MS`. Protože je cooldown globální (ne per-uživatel), hláška při zablokování výslovně upozorňuje, že poslední zprávu mohl odeslat kdokoli jiný z rodiny, ne nutně stejný člověk. Cooldown se nastaví až po úspěšném odeslání, ať neúspěšný pokus (výpadek MailApp) neblokuje opakování.
+- Patička appky s krátkou zmínkou a `mailto:` odkazem na `info@kulturniradar.cz`.
+- Node testy 240 → 247 (+7 pro `apiKontakt_`: prázdná/příliš dlouhá/přesně na limitu zpráva, OK případ, anonymní odeslání, cooldown, selhání MailApp bez nastavení cooldownu). Rozšířen `tests/harness.js` o stub `PropertiesService.setProperty` (dřív chyběl).
+
 ## Index.html v3.27 — Chip „❓ Neověřeno" — 9. 8. 2026
 ### Přidáno
 - Nový filtrovací chip **„❓ Neověřeno"** vedle ★ Oblíbené / ✓ Navštívené — po kliknutí ukáže jen budoucí akce se stavem `neověřeno` a prázdným URL. V běžném zobrazení se tyhle akce teď skrývají (`jeNeoverenaBezUrl_`), stejný princip jako dnes „proběhlo". Kategorie zůstávají viditelné na kartě i uvnitř tohoto pohledu — žádné backendové změny (`kulturni_radar.gs` beze změny, `apiEvents` už dnes vrací vše a filtruje se v UI, žádný dopad na cache klíč).
