@@ -34,6 +34,8 @@ změně BACKLOGu.
 
 ## K ověření
 - iPad: ověřit, jestli window.open() (v3.7 Index.html) vyřešil otevírání „Více info"/„Do kalendáře" v nové záložce — dcera se ještě nevrátila s iPadem. (Dojezd v km u nově nalezených akcí ověřen 7. 8. jako OK, položka odstraněna.)
+- Duplicita „ŠTETL FEST 2026 – Návraty" v AKCÍCH (profil Brno, 2 řádky: ID `2026-08-26-stetl-fest` a `2026-08-26-stetl-fest-2026`) — příčina zatím jen hypotéza (rozdílný formát data při vzniku záznamu, viz diagnostika 9. 8. 2026), potřeba potvrdit ze sloupců Q (První nález) a R (Poslední kontrola) obou řádků přímo v Google Sheet (přes veřejné API nejdou přečíst). I po potvrzení příčiny bude potřeba ruční úklid — `cleanupDuplicates()` není v automatických triggerech, jen ruční spuštění z menu.
+- „Festival Špilberk" (ID `2026-08-17-festival-spilberk`, profil Brno) — AI ho našla jako neověřenou akci bez URL, teď se zobrazuje přes chip „❓ Neověřeno" (v3.27). Potřeba ručně dohledat spolehlivý zdroj/URL (web pořadatele, Brno.cz) a buď označit jako potvrzeno, nebo smazat, pokud zdroj neexistuje.
 
 ## Nejvyšší priorita
 - Předat `Index.html` dceři k designu (CSS tokeny v `:root`). (Rodina appku už používá – 4 profily aktivně vyzkoušené 7.–8. 8., položka „poslat URL rodině" splněna a odstraněna.)
