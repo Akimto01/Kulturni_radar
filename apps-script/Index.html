@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.27 – Chip "❓ Neověřeno" pro budoucí akce bez URL -->
+<!-- Kulturní radar Index.html v3.28 – Vizuální štítek "❓ Neověřeno" na kartě akce -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -199,7 +199,7 @@
     gap: 8px;
   }
   .meta span::before { content: ''; }
-  .pocasi-na { opacity: .45; font-style: italic; }
+  .pocasi-na, .stitek-neovereno { opacity: .45; font-style: italic; }
   .kat-badge {
     font-size: .68rem;
     background: var(--accent-2);
@@ -1120,6 +1120,12 @@
     pocasiSpan.textContent = pocasi.text;
     meta.appendChild(pocasiSpan);
     if (a.misto) { const s = document.createElement('span'); s.textContent = '📍 ' + a.misto; meta.appendChild(s); }
+    if (jeNeoverena_(a)) {
+      const s = document.createElement('span');
+      s.className = 'stitek-neovereno';
+      s.textContent = '❓ Neověřeno';
+      meta.appendChild(s);
+    }
     if (a.cas)   { const s = document.createElement('span'); s.textContent = '🕐 ' + a.cas;  meta.appendChild(s); }
     if (a.cena)  { const s = document.createElement('span'); s.textContent = '🎟 ' + a.cena; meta.appendChild(s); }
     if (a.dojezd){ const s = document.createElement('span'); s.textContent = '🚗 ' + a.dojezd; meta.appendChild(s); }
@@ -1577,16 +1583,23 @@
     document.getElementById('obdobi-select').style.display = rezimZobrazeni === 'navstivene' ? '' : 'none';
   }
 
-  /** PURE: true, pokud je akce "neověřeno", nemá žádné URL A datum od je
-   *  dnes nebo v budoucnu – v běžném zobrazení se skrývá (stejný princip
-   *  jako "proběhlo"), viditelná jen přes chip "❓ Neověřeno" (rozhodnutí
-   *  9. 8. 2026). Datová kontrola je záměrně samostatná (ne spoléhání na to,
-   *  že server staré akce nevrátí) – označené ★/✓ staré akce server vrací
-   *  i mimo běžné okno (zahrnoutOznacene), takže by se sem jinak vloudily
-   *  dávno proběhlé neověřené akce. `dnes` je injektované – stejný vzor
-   *  jako filtrovatNavstivenaPodleObdobi_. */
+  /** PURE: true, pokud je akce "neověřeno" a nemá žádné URL – bez ohledu na
+   *  datum. Použije se pro vizuální štítek "❓ Neověřeno" na kartě (9. 8. 2026),
+   *  ať se ukáže vždy, když stav skutečně platí, i pro tu vzácnou výjimku
+   *  starého ★/✓ záznamu mimo běžné okno. */
+  function jeNeoverena_(a) {
+    return a.stav === 'neověřeno' && !String(a.url || '').trim();
+  }
+
+  /** PURE: true, pokud jeNeoverena_(a) A datum od je dnes nebo v budoucnu –
+   *  v běžném zobrazení se skrývá (stejný princip jako "proběhlo"), viditelná
+   *  jen přes chip "❓ Neověřeno" (rozhodnutí 9. 8. 2026). Datová kontrola je
+   *  záměrně samostatná (ne spoléhání na to, že server staré akce nevrátí) –
+   *  označené ★/✓ staré akce server vrací i mimo běžné okno (zahrnoutOznacene),
+   *  takže by se sem jinak vloudily dávno proběhlé neověřené akce. `dnes` je
+   *  injektované – stejný vzor jako filtrovatNavstivenaPodleObdobi_. */
   function jeNeoverenaBezUrl_(a, dnes) {
-    if (a.stav !== 'neověřeno' || String(a.url || '').trim()) return false;
+    if (!jeNeoverena_(a)) return false;
     const od = parseCeskeDatum(a.datumOd);
     return !!od && od >= dnes;
   }

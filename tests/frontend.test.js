@@ -9,7 +9,7 @@ const { nactiFrontendFunkce } = require('./frontend-harness');
 
 const f = nactiFrontendFunkce([
   'parseCeskeDatum', 'dateKeyBezpecne_', 'pad2_', 'gcalUrl_',
-  'filtrovatNavstivenaPodleObdobi_', 'jeNeoverenaBezUrl_', 'sestavTextSdileni_', 'mapsUrl_',
+  'filtrovatNavstivenaPodleObdobi_', 'jeNeoverena_', 'jeNeoverenaBezUrl_', 'sestavTextSdileni_', 'mapsUrl_',
   'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
   'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
   'sestavOdkazNaAkci_', 'parsovatOdkazNaAkci_',
@@ -124,6 +124,27 @@ test('filtrovatNavstivenaPodleObdobi_: řadí od nejnovější návštěvy', () 
   const vysledek = f.filtrovatNavstivenaPodleObdobi_(
     [akce('1. 8. 2026'), akce('3. 8. 2026'), akce('2. 8. 2026')], 'vse', TED);
   assert.deepEqual(vysledek.map(a => a.navstivenoDne), ['3. 8. 2026', '2. 8. 2026', '1. 8. 2026']);
+});
+
+// ---------------------------------------------------------------------------
+// jeNeoverena_ – vizuální štítek "❓ Neověřeno" na kartě (9. 8. 2026),
+// bez ohledu na datum (na rozdíl od jeNeoverenaBezUrl_ níže).
+// ---------------------------------------------------------------------------
+
+test('jeNeoverena_: stav neověřeno + prázdné URL → true', () => {
+  assert.equal(f.jeNeoverena_({ stav: 'neověřeno', url: '' }), true);
+});
+
+test('jeNeoverena_: stav neověřeno + vyplněné URL → false', () => {
+  assert.equal(f.jeNeoverena_({ stav: 'neověřeno', url: 'https://example.com' }), false);
+});
+
+test('jeNeoverena_: stav potvrzeno + prázdné URL → false', () => {
+  assert.equal(f.jeNeoverena_({ stav: 'potvrzeno', url: '' }), false);
+});
+
+test('jeNeoverena_: dávno proběhlá neověřená akce bez URL → true (na rozdíl od jeNeoverenaBezUrl_, datum se tu neřeší)', () => {
+  assert.equal(f.jeNeoverena_({ stav: 'neověřeno', url: '', datumOd: '1. 1. 2020' }), true);
 });
 
 // ---------------------------------------------------------------------------
