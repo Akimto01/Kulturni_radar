@@ -294,6 +294,24 @@ Chip Oblíbené filtruje bez zápisu do tabulky
     Should Be Equal As Integers    ${zpet}    ${vsech}
     ...    msg=Opětovný klik na chip vrátí plný seznam
 
+Chip Neověřeno filtruje bez zápisu do tabulky
+    [Documentation]    v3.27: stejný vzor jako „Chip Oblíbené" – čistě klientský
+    ...                filtr nad už načtenými daty, žádné volání apiToggle/apiRun.
+    ...                Bezpečné pro CI i když profil aktuálně nemá žádnou
+    ...                neověřenou akci (pak stačí prázdný stav).
+    ${vsech}=    Get Element Count    ${FRAME} .karta
+    Click    ${FRAME} \#chip-neoverene
+    Sleep    300ms
+    ${je_prazdno}=    Get Element Count    ${FRAME} \#status
+    ${neoverenych}=    Get Element Count    ${FRAME} .karta
+    Should Be True    ${je_prazdno} == 1 or ${neoverenych} < ${vsech}
+    ...    msg=Filtr Neověřeno buď ukáže prázdný stav, nebo užší podmnožinu karet
+    Click    ${FRAME} \#chip-neoverene
+    Sleep    300ms
+    ${zpet}=    Get Element Count    ${FRAME} .karta
+    Should Be Equal As Integers    ${zpet}    ${vsech}
+    ...    msg=Opětovný klik na chip vrátí plný seznam
+
 Označení ★ se skutečně promítne do filtru „★ Oblíbené" (integrace, ne jen zápis)
     [Documentation]    Rozdíl oproti „★ Oblíbené: lze označit i odznačit": tam
     ...    jsme ověřovali jen že SE ZAPÍŠE (ikona + reload). Tady ověřujeme, že

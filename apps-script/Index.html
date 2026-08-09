@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.26 – Zrychlení přihlášení: viditelný spinner ("Přihlašuji…") na tlačítku PIN dialogu po dobu přihlašování -->
+<!-- Kulturní radar Index.html v3.27 – Chip "❓ Neověřeno" pro budoucí akce bez URL -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -420,6 +420,7 @@
   <div class="chips">
     <button id="chip-oblibene" class="chip chip-special">★ Oblíbené</button>
     <button id="chip-navstivene" class="chip chip-special">✓ Navštívené</button>
+    <button id="chip-neoverene" class="chip chip-special">❓ Neověřeno</button>
     <button id="btn-sdilet-vyber" class="chip chip-special" title="Sdílet aktuální výběr (město + kategorie)">📤 Sdílet výběr</button>
   </div>
   <select id="obdobi-select" style="display:none">
@@ -491,7 +492,7 @@
   let aktKategorie = new Set();
   let aktivniProfil = '';
   let token = localStorage.getItem('radar_token') || '';
-  let rezimZobrazeni = 'vse';       // 'vse' | 'oblibene' | 'navstivene'
+  let rezimZobrazeni = 'vse';       // 'vse' | 'oblibene' | 'navstivene' | 'neoverene'
   let obdobiNavstivene = 'vse';     // '30' | '90' | '180' | '365' | 'vse'
   // v3.13: přihlášený uživatelský profil – JEN v paměti (rozhodnutí 7. 8. 2026:
   // PIN se zadává při každém vstupu na web, žádné localStorage přihlášení).
@@ -885,6 +886,10 @@
           rezimZobrazeni = rezimZobrazeni === 'navstivene' ? 'vse' : 'navstivene';
           prekreslit();
         });
+        document.getElementById('chip-neoverene').addEventListener('click', () => {
+          rezimZobrazeni = rezimZobrazeni === 'neoverene' ? 'vse' : 'neoverene';
+          prekreslit();
+        });
         document.getElementById('btn-sdilet-vyber').addEventListener('click', () => sdiletVyber_());
         document.getElementById('obdobi-select').addEventListener('change', (e) => {
           obdobiNavstivene = e.target.value;
@@ -975,9 +980,13 @@
     const mistaEl = document.getElementById('mista-sekce');
     if (mistaEl) mistaEl.style.display = '';
 
+    const dnes = new Date();
+    dnes.setHours(0, 0, 0, 0);
+
     // Proběhlé akce se v běžném pohledu neukazují – ty patří jen do „✓ Navštívené“
     // (server je vrací navíc jen proto, aby tam mohly být zobrazeny jako inspirace).
-    const bezProbehlych = vsechnaAkce.filter(a => a.stav !== 'proběhlo');
+    // Stejně tak budoucí "neověřeno" bez URL – ty patří jen do „❓ Neověřeno“ (9. 8. 2026).
+    const bezProbehlych = vsechnaAkce.filter(a => a.stav !== 'proběhlo' && !jeNeoverenaBezUrl_(a, dnes));
     const filtrovane = aktKategorie.size === 0
       ? bezProbehlych
       : bezProbehlych.filter(a => a.kategorie.some(k => aktKategorie.has(k)));
@@ -998,8 +1007,6 @@
     // Skupinovat po dnech; akce začínající v minulosti (dlouhodobé /
     // opakované) nepatří pod dávno minulou denní hlavičku, ale do
     // sekce „Probíhá / dlouhodobé“ na začátku seznamu (v3.3).
-    const dnes = new Date();
-    dnes.setHours(0, 0, 0, 0);
     const probiha = [];
     const dnove = {};
     filtrovane.forEach(a => {
@@ -1035,7 +1042,7 @@
     return new Date(+m[3], +m[2] - 1, +m[1]);
   }
 
-  /** Plochý seznam bez denních hlaviček – pro ★ Oblíbené a ✓ Navštívené. */
+  /** Plochý seznam bez denních hlaviček – pro ★ Oblíbené, ✓ Navštívené a ❓ Neověřeno. */
   function renderSpecialni(seznam, prazdnyText) {
     const main = document.getElementById('main');
     const mistaEl = document.getElementById('mista-sekce');
@@ -1566,10 +1573,25 @@
   function syncSpecialChipy() {
     document.getElementById('chip-oblibene').classList.toggle('active', rezimZobrazeni === 'oblibene');
     document.getElementById('chip-navstivene').classList.toggle('active', rezimZobrazeni === 'navstivene');
+    document.getElementById('chip-neoverene').classList.toggle('active', rezimZobrazeni === 'neoverene');
     document.getElementById('obdobi-select').style.display = rezimZobrazeni === 'navstivene' ? '' : 'none';
   }
 
-  /** Centrální překreslení podle aktuálního režimu (Vše / Oblíbené / Navštívené). */
+  /** PURE: true, pokud je akce "neověřeno", nemá žádné URL A datum od je
+   *  dnes nebo v budoucnu – v běžném zobrazení se skrývá (stejný princip
+   *  jako "proběhlo"), viditelná jen přes chip "❓ Neověřeno" (rozhodnutí
+   *  9. 8. 2026). Datová kontrola je záměrně samostatná (ne spoléhání na to,
+   *  že server staré akce nevrátí) – označené ★/✓ staré akce server vrací
+   *  i mimo běžné okno (zahrnoutOznacene), takže by se sem jinak vloudily
+   *  dávno proběhlé neověřené akce. `dnes` je injektované – stejný vzor
+   *  jako filtrovatNavstivenaPodleObdobi_. */
+  function jeNeoverenaBezUrl_(a, dnes) {
+    if (a.stav !== 'neověřeno' || String(a.url || '').trim()) return false;
+    const od = parseCeskeDatum(a.datumOd);
+    return !!od && od >= dnes;
+  }
+
+  /** Centrální překreslení podle aktuálního režimu (Vše / Oblíbené / Navštívené / Neověřeno). */
   function prekreslit() {
     syncChipy();
     syncSpecialChipy();
@@ -1581,6 +1603,13 @@
     } else if (rezimZobrazeni === 'navstivene') {
       const seznam = filtrovatNavstivenaPodleObdobi_(vsechnaAkce, obdobiNavstivene, new Date());
       renderSpecialni(seznam, 'V tomto období nemáte žádné navštívené akce.');
+    } else if (rezimZobrazeni === 'neoverene') {
+      const dnes = new Date();
+      dnes.setHours(0, 0, 0, 0);
+      const seznam = vsechnaAkce
+        .filter(a => jeNeoverenaBezUrl_(a, dnes))
+        .sort((a, b) => dateKeyBezpecne_(a.datumOd) - dateKeyBezpecne_(b.datumOd));
+      renderSpecialni(seznam, 'Žádné neověřené akce bez odkazu.');
     } else {
       renderAkce();
     }

@@ -9,7 +9,7 @@ const { nactiFrontendFunkce } = require('./frontend-harness');
 
 const f = nactiFrontendFunkce([
   'parseCeskeDatum', 'dateKeyBezpecne_', 'pad2_', 'gcalUrl_',
-  'filtrovatNavstivenaPodleObdobi_', 'sestavTextSdileni_', 'mapsUrl_',
+  'filtrovatNavstivenaPodleObdobi_', 'jeNeoverenaBezUrl_', 'sestavTextSdileni_', 'mapsUrl_',
   'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
   'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
   'sestavOdkazNaAkci_', 'parsovatOdkazNaAkci_',
@@ -124,6 +124,48 @@ test('filtrovatNavstivenaPodleObdobi_: řadí od nejnovější návštěvy', () 
   const vysledek = f.filtrovatNavstivenaPodleObdobi_(
     [akce('1. 8. 2026'), akce('3. 8. 2026'), akce('2. 8. 2026')], 'vse', TED);
   assert.deepEqual(vysledek.map(a => a.navstivenoDne), ['3. 8. 2026', '2. 8. 2026', '1. 8. 2026']);
+});
+
+// ---------------------------------------------------------------------------
+// jeNeoverenaBezUrl_ – chip „❓ Neověřeno" (rozhodnutí 9. 8. 2026)
+// TED = 3. 8. 2026 (viz výše u filtrovatNavstivenaPodleObdobi_)
+// ---------------------------------------------------------------------------
+
+test('jeNeoverenaBezUrl_: stav neověřeno + prázdné URL + budoucí datum → true', () => {
+  assert.equal(f.jeNeoverenaBezUrl_({ stav: 'neověřeno', url: '', datumOd: '10. 8. 2026' }, TED), true);
+});
+
+test('jeNeoverenaBezUrl_: stav neověřeno + jen bílé znaky v URL + budoucí datum → true', () => {
+  assert.equal(f.jeNeoverenaBezUrl_({ stav: 'neověřeno', url: '   ', datumOd: '10. 8. 2026' }, TED), true);
+});
+
+test('jeNeoverenaBezUrl_: datum přesně „dnes" (TED) se ještě počítá (>=)', () => {
+  assert.equal(f.jeNeoverenaBezUrl_({ stav: 'neověřeno', url: '', datumOd: '3. 8. 2026' }, TED), true);
+});
+
+test('jeNeoverenaBezUrl_: stav neověřeno, ale URL vyplněné → false', () => {
+  assert.equal(f.jeNeoverenaBezUrl_({ stav: 'neověřeno', url: 'https://example.com', datumOd: '10. 8. 2026' }, TED), false);
+});
+
+test('jeNeoverenaBezUrl_: stav potvrzeno + prázdné URL → false (jiný stav se neskrývá)', () => {
+  assert.equal(f.jeNeoverenaBezUrl_({ stav: 'potvrzeno', url: '', datumOd: '10. 8. 2026' }, TED), false);
+});
+
+test('jeNeoverenaBezUrl_: stav zrušeno + prázdné URL → false', () => {
+  assert.equal(f.jeNeoverenaBezUrl_({ stav: 'zrušeno', url: '', datumOd: '10. 8. 2026' }, TED), false);
+});
+
+test('jeNeoverenaBezUrl_: chybějící pole url (undefined) + budoucí datum → true', () => {
+  assert.equal(f.jeNeoverenaBezUrl_({ stav: 'neověřeno', datumOd: '10. 8. 2026' }, TED), true);
+});
+
+test('jeNeoverenaBezUrl_: dávno proběhlá neověřená akce bez URL → false (nesmí se vloudit z ★/✓ výjimky)', () => {
+  assert.equal(f.jeNeoverenaBezUrl_({ stav: 'neověřeno', url: '', datumOd: '1. 1. 2026' }, TED), false);
+});
+
+test('jeNeoverenaBezUrl_: neparsovatelné/chybějící datumOd → false (bezpečný default, ne pád)', () => {
+  assert.equal(f.jeNeoverenaBezUrl_({ stav: 'neověřeno', url: '' }, TED), false);
+  assert.equal(f.jeNeoverenaBezUrl_({ stav: 'neověřeno', url: '', datumOd: 'Probíhá / dlouhodobé' }, TED), false);
 });
 
 // ---------------------------------------------------------------------------
