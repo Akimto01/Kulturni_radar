@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.25 (backend) + Index.html v3.30 — Kontaktní formulář: e-mail pro odpověď — 10. 8. 2026
+### Přidáno
+- Nové nepovinné pole **„E-mail pro odpověď"** v kontaktním formuláři, mezi Jménem a Zprávou. Důvod: naostro ověřeno, že `MailApp.sendEmail()` odesílá jako vlastní Google účet provozovatele, takže bez tohoto pole nešlo poznat, komu na tip/připomínku odpovědět.
+- Backend `apiKontakt_` rozšířen o parametr `email` (bez validace formátu, jen trim) — pokud je vyplněný, jde do `MailApp.sendEmail(..., {replyTo: email})` a navíc do těla zprávy (`Email pro odpověď: ...`); bez vyplnění se `replyTo` vůbec nepředává (ne prázdný string) a v těle je „(neuveden)".
+- Node testy 247 → 251 (+4: e-mail → replyTo i tělo, trim bílých znaků, bez e-mailu žádné `options`, formát se nevaliduje). Cestou narazil na cross-realm past ze SKILL.md (`assert.deepEqual` na objektu z vm sandboxu padá i při shodném obsahu) — opraveno porovnáním jednotlivé vlastnosti (`mail.options.replyTo`).
+
 ## v3.24 (backend) + Index.html v3.29 — Kontaktní formulář — 10. 8. 2026
 ### Přidáno
 - Tlačítko **„Kontakt"** (bez emoji) vedle profilového badge — otevře modální formulář (jméno nepovinné, předvyplní se z přihlášeného profilu; zpráva povinná, limit 2000 znaků). Dostupné i bez přihlášení, žádný PIN.
