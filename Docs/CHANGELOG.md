@@ -14,6 +14,18 @@
 - Patička appky s krátkou zmínkou a `mailto:` odkazem na `info@kulturniradar.cz`.
 - Node testy 240 → 247 (+7 pro `apiKontakt_`: prázdná/příliš dlouhá/přesně na limitu zpráva, OK případ, anonymní odeslání, cooldown, selhání MailApp bez nastavení cooldownu). Rozšířen `tests/harness.js` o stub `PropertiesService.setProperty` (dřív chyběl).
 
+## CI: RF_TEST_USER_ID/PIN jako GitHub Secrets — 9. 8. 2026
+### Opraveno
+- `.github/workflows/rf-tests.yml`: krok „Frontend E2E" dostal `env:` blok s `RF_TEST_USER_ID`/`RF_TEST_PIN` ze secrets — stejný mechanismus, jaký `tests/robot/resources.robot` už dlouho čeká (`%{RF_TEST_USER_ID=}`, syntaxe pro proměnné prostředí). Potvrzeno přímo v GitHub Actions logu (ne odhadem): poslední úspěšný běh před opravou celou `frontend.robot` sadu (24 testů) přeskočil za 2 s s hláškou „RF_TEST_USER_ID/RF_TEST_PIN nenastaveny".
+- Z git historie workflow souboru (beze změny od 2. 8. 2026) vůči historii zavedení uživatelských profilů (8. 8. 2026, commit zavádějící `RF_TEST_USER_ID`) plyne, že tahle mezera existovala od 8. 8. 2026 — `frontend.robot` se tedy v CI reálně nespustil ani jednou od zavedení přihlašování.
+- `NTFY_TOPIC` v kroku „API kontrakt" jde jiným mechanismem (`--variable`, ne `env:`) — vědomě odlišný vzor, ne nekonzistence.
+
+## Index.html v3.28 — Vizuální štítek „❓ Neověřeno" na kartě — 9. 8. 2026
+### Přidáno
+- Malý tlumený štítek **„❓ Neověřeno"** hned vedle 📍 místa na kartě akce — zobrazí se vždy, když má akce stav `neověřeno` a prázdné URL (bez ohledu na datum, na rozdíl od chipu z v3.27). Styl sdílí tlumení s políčkem N/A u počasí (`opacity: .45; font-style: italic`).
+- Refaktor: `jeNeoverenaBezUrl_` (v3.27, filtruje podle data) teď staví na nové `jeNeoverena_` (jen stav+URL, bez data) — tu používá i štítek na kartě, ať se zobrazí i pro vzácnou výjimku starého ★/✓ záznamu mimo běžné okno.
+- Node testy 236 → 240 (+4 pro `jeNeoverena_`).
+
 ## Index.html v3.27 — Chip „❓ Neověřeno" — 9. 8. 2026
 ### Přidáno
 - Nový filtrovací chip **„❓ Neověřeno"** vedle ★ Oblíbené / ✓ Navštívené — po kliknutí ukáže jen budoucí akce se stavem `neověřeno` a prázdným URL. V běžném zobrazení se tyhle akce teď skrývají (`jeNeoverenaBezUrl_`), stejný princip jako dnes „proběhlo". Kategorie zůstávají viditelné na kartě i uvnitř tohoto pohledu — žádné backendové změny (`kulturni_radar.gs` beze změny, `apiEvents` už dnes vrací vše a filtruje se v UI, žádný dopad na cache klíč).
