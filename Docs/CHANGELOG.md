@@ -1,5 +1,12 @@
 # Changelog
 
+## Index.html v3.27 — Chip „❓ Neověřeno" — 9. 8. 2026
+### Přidáno
+- Nový filtrovací chip **„❓ Neověřeno"** vedle ★ Oblíbené / ✓ Navštívené — po kliknutí ukáže jen budoucí akce se stavem `neověřeno` a prázdným URL. V běžném zobrazení se tyhle akce teď skrývají (`jeNeoverenaBezUrl_`), stejný princip jako dnes „proběhlo". Kategorie zůstávají viditelné na kartě i uvnitř tohoto pohledu — žádné backendové změny (`kulturni_radar.gs` beze změny, `apiEvents` už dnes vrací vše a filtruje se v UI, žádný dopad na cache klíč).
+- Datum se kontroluje samostatně na klientovi (`datumOd >= dnes`), ne jen stav+URL — jinak by se přes výjimku `zahrnoutOznacene` (★/✓ mimo běžné okno) mohly vloudit dávno proběhlé neověřené akce.
+- Zjištěno při implementaci: AI prompt (`callAnthropic_`) má stav natvrdo `"potvrzeno"` — `neověřeno` tedy není systematický jev, jen ojedinělá výjimka (aktuálně 1 případ v produkci, Festival Špilberk).
+- Node testy 227 → 236 (frontend 61 → 70: +9 pro `jeNeoverenaBezUrl_`). RF: nový test „Chip Neověřeno filtruje bez zápisu do tabulky" (stejný bezpečný vzor jako u Oblíbené).
+
 ## v3.23 (backend) + v3.26 (frontend) — Zrychlení přihlášení: cache apiEvents + spinner — 8. 8. 2026
 ### Přidáno
 - **Krátkodobá cache `apiEvents`** (`CacheService`, TTL 45 s) — diagnostikou zjištěno, že `apiEvents` je dominantní část 6–10s čekání při přihlášení (čte 4 listy: AKCE/OZNAČENÍ/SOUŘADNICE/POČASÍ při každém volání). Klíč cache zahrnuje verzi (kvůli invalidaci), profil, uživatele i `zahrnoutOznacene`, ať se nesmíchají data různých lidí/měst. **Fail-open**: jakákoli chyba CacheService (výpadek, kvóta, moc velká položka) spadne zpět na normální čtení ze Sheets — cache nikdy nesmí shodit `apiEvents`.
