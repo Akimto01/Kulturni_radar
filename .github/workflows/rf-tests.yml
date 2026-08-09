@@ -25,6 +25,9 @@ jobs:
 
       - name: Frontend E2E
         if: always()
+        env:
+          RF_TEST_USER_ID: ${{ secrets.RF_TEST_USER_ID }}
+          RF_TEST_PIN: ${{ secrets.RF_TEST_PIN }}
         run: robot --variable BASE_URL:${{ secrets.RADAR_URL }} --outputdir vysledky/frontend tests/robot/frontend.robot
 
       - name: Uložit reporty
