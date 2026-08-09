@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.24 (10. 8. 2026) – Kontaktní formulář (apiKontakt_, e-mail přes MailApp)
- * (předchozí: 3.23 – zrychlení přihlášení, krátkodobá cache apiEvents)
+ * Verze: 3.25 (10. 8. 2026) – Kontaktní formulář: volitelný e-mail pro odpověď (replyTo)
+ * (předchozí: 3.24 – kontaktní formulář, e-mail přes MailApp)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -65,7 +65,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.24';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.25';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -183,7 +183,7 @@ function routePost_(body, ss) {
   if (akce === 'toggle') return apiToggle_(ss, body.id, body.typ, body.uzivatelId);
   if (akce === 'filtry') return apiSetFiltry_(ss, body.uzivatelId, body.filtry);
   if (akce === 'najdi')  return apiNajdiProUzivatele_(ss, body.uzivatelId, body.token);
-  if (akce === 'kontakt') return apiKontakt_(body.jmeno, body.zprava, body.uzivatelId);
+  if (akce === 'kontakt') return apiKontakt_(body.jmeno, body.zprava, body.email, body.uzivatelId);
   return { ok: false, error: 'Neznámá akce.' };
 }
 
@@ -432,8 +432,8 @@ function apiSetFiltry(uzivatelId, filtryObj) {
   return apiSetFiltry_(SpreadsheetApp.getActiveSpreadsheet(), uzivatelId, filtryObj);
 }
 /** Odešle zprávu z kontaktního formuláře – dostupné i bez přihlášení. */
-function apiKontakt(jmeno, zprava, uzivatelId) {
-  return apiKontakt_(jmeno, zprava, uzivatelId);
+function apiKontakt(jmeno, zprava, email, uzivatelId) {
+  return apiKontakt_(jmeno, zprava, email, uzivatelId);
 }
 /** Spustí AI hledání s osobními kritérii uživatelského profilu (na vyžádání, token chrání). */
 function apiNajdiProUzivatele(uzivatelId, tok) {
@@ -1291,8 +1291,12 @@ function apiSetFiltry_(ss, uzivatelId, filtryObj) {
  *  tip) – uzivatelId je jen kontext do těla zprávy, ne podmínka. Jednoduchý
  *  globální cooldown proti spamu, stejný duch jako spustKontroluCore_/
  *  WEB_COOLDOWN_MS. Cooldown se nastaví, až když se e-mail skutečně podaří
- *  odeslat – neúspěšný pokus (výpadek MailApp) nemá blokovat opakování. */
-function apiKontakt_(jmeno, zprava, uzivatelId) {
+ *  odeslat – neúspěšný pokus (výpadek MailApp) nemá blokovat opakování.
+ *  `email` je nepovinný kontakt pro odpověď (bez validace formátu) – jde do
+ *  `replyTo`, protože MailApp.sendEmail() odesílá jako vlastní Google účet
+ *  provozovatele, takže by jinak nešlo poznat, komu odpovědět (ověřeno
+ *  naostro 10. 8. 2026). */
+function apiKontakt_(jmeno, zprava, email, uzivatelId) {
   const zpravaOrez = String(zprava || '').trim();
   if (!zpravaOrez) return { ok: false, error: 'Napiš prosím nějakou zprávu.' };
   if (zpravaOrez.length > KONTAKT_ZPRAVA_MAX) {
@@ -1309,16 +1313,23 @@ function apiKontakt_(jmeno, zprava, uzivatelId) {
   }
 
   const jmenoOrez = String(jmeno || '').trim();
+  const emailOrez = String(email || '').trim();
   const telo = [
     'Jméno: ' + (jmenoOrez || '(neuvedeno)'),
+    'Email pro odpověď: ' + (emailOrez || '(neuveden)'),
     'Uživatelský profil: ' + (uzivatelId || '(anonymní)'),
     'Odesláno: ' + formatDate_(new Date()),
     '',
     zpravaOrez,
   ].join('\n');
+  const predmet = '[Kulturní radar] Zpráva od ' + (jmenoOrez || 'anonym');
 
   try {
-    MailApp.sendEmail(KONTAKT_EMAIL, '[Kulturní radar] Zpráva od ' + (jmenoOrez || 'anonym'), telo);
+    if (emailOrez) {
+      MailApp.sendEmail(KONTAKT_EMAIL, predmet, telo, { replyTo: emailOrez });
+    } else {
+      MailApp.sendEmail(KONTAKT_EMAIL, predmet, telo);
+    }
   } catch (e) {
     return { ok: false, error: 'Odeslání selhalo, zkus to prosím později.' };
   }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.29 – Kontaktní formulář (tlačítko "Kontakt" + modal + patička) -->
+<!-- Kulturní radar Index.html v3.30 – Kontaktní formulář: volitelný e-mail pro odpověď -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -526,6 +526,8 @@
     <h2>Kontakt</h2>
     <label for="kontakt-jmeno">Jméno (nepovinné)</label>
     <input id="kontakt-jmeno" type="text" placeholder="Jak se jmenuješ?" maxlength="80">
+    <label for="kontakt-email">E-mail pro odpověď (nepovinné)</label>
+    <input id="kontakt-email" type="email" placeholder="kam vám máme odpovědět?" maxlength="120">
     <label for="kontakt-zprava">Zpráva</label>
     <textarea id="kontakt-zprava" rows="4" maxlength="2000" placeholder="Tip na akci, připomínka…"></textarea>
     <div id="kontakt-chyba"></div>
@@ -603,7 +605,7 @@
       case 'apiSpustKontrolu':
         return { metoda: 'POST', url: execUrl, telo: { akce: 'run', token: a[0] } };
       case 'apiKontakt':
-        return { metoda: 'POST', url: execUrl, telo: { akce: 'kontakt', jmeno: a[0], zprava: a[1], uzivatelId: a[2] } };
+        return { metoda: 'POST', url: execUrl, telo: { akce: 'kontakt', jmeno: a[0], zprava: a[1], email: a[2], uzivatelId: a[3] } };
       default:
         return null;
     }
@@ -1799,6 +1801,7 @@
   // ── v3.24: Kontaktní formulář – dostupný i bez přihlášení ──
   document.getElementById('kontakt-btn').addEventListener('click', () => {
     document.getElementById('kontakt-jmeno').value = prihlasenyUzivatel ? prihlasenyUzivatel.jmeno : '';
+    document.getElementById('kontakt-email').value = '';
     document.getElementById('kontakt-zprava').value = '';
     const chyba = document.getElementById('kontakt-chyba');
     chyba.textContent = '';
@@ -1812,6 +1815,7 @@
 
   document.getElementById('kontakt-odeslat').addEventListener('click', async () => {
     const jmeno = document.getElementById('kontakt-jmeno').value.trim();
+    const email = document.getElementById('kontakt-email').value.trim();
     const zprava = document.getElementById('kontakt-zprava').value.trim();
     const chyba = document.getElementById('kontakt-chyba');
     if (!zprava) { chyba.textContent = 'Napiš prosím nějakou zprávu.'; return; }
@@ -1820,7 +1824,7 @@
     btn.disabled = true;
     chyba.textContent = '';
     try {
-      const d = await gsr('apiKontakt', jmeno, zprava, prihlasenyUzivatel ? prihlasenyUzivatel.id : '');
+      const d = await gsr('apiKontakt', jmeno, zprava, email, prihlasenyUzivatel ? prihlasenyUzivatel.id : '');
       if (d && d.ok) {
         chyba.classList.add('uspech');
         chyba.textContent = 'Díky, ozveme se!';
