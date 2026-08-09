@@ -1192,6 +1192,82 @@ test('v3.20: apiToggle_ bez uzivatelId vrací ok:false (přihlášení je povinn
   assert.match(vysledek.error, /profil/);
 });
 
+// ---------------------------------------------------------------------------
+// v3.24: apiKontakt_ – kontaktní formulář (dostupný i bez přihlášení)
+// ---------------------------------------------------------------------------
+
+test('v3.24: apiKontakt_ – prázdná zpráva (i jen bílé znaky) vrací ok:false, e-mail se neodešle', () => {
+  const ctx = nactiRadar();
+  assert.equal(ctx.apiKontakt_('Vojta', '', 'vojta').ok, false);
+  assert.equal(ctx.apiKontakt_('Vojta', '   ', 'vojta').ok, false);
+  assert.equal(ctx.__odeslaneEmaily.length, 0);
+});
+
+test('v3.24: apiKontakt_ – zpráva nad limit délky vrací ok:false, e-mail se neodešle', () => {
+  const ctx = nactiRadar();
+  const dlouha = 'a'.repeat(2001);
+  const vysledek = ctx.apiKontakt_('Vojta', dlouha, 'vojta');
+  assert.equal(vysledek.ok, false);
+  assert.match(vysledek.error, /dlouhá/);
+  assert.equal(ctx.__odeslaneEmaily.length, 0);
+});
+
+test('v3.24: apiKontakt_ – zpráva přesně na limitu (2000 znaků) ještě projde', () => {
+  const ctx = nactiRadar();
+  const naLimitu = 'a'.repeat(2000);
+  const vysledek = ctx.apiKontakt_('Vojta', naLimitu, 'vojta');
+  assert.equal(vysledek.ok, true);
+  assert.equal(ctx.__odeslaneEmaily.length, 1);
+});
+
+test('v3.24: apiKontakt_ – OK případ pošle e-mail na info@kulturniradar.cz s jménem, profilem a zprávou v těle', () => {
+  const ctx = nactiRadar();
+  const vysledek = ctx.apiKontakt_('Vojta', 'Tip: přidejte akci XY.', 'vojta');
+  assert.equal(vysledek.ok, true);
+  assert.equal(ctx.__odeslaneEmaily.length, 1);
+  const mail = ctx.__odeslaneEmaily[0];
+  assert.equal(mail.komu, 'info@kulturniradar.cz');
+  assert.equal(mail.predmet, '[Kulturní radar] Zpráva od Vojta', 'předmět musí nést jméno, ať je zpráva poznat v Gmailu bez otevírání');
+  assert.match(mail.telo, /Jméno: Vojta/);
+  assert.match(mail.telo, /Uživatelský profil: vojta/);
+  assert.match(mail.telo, /Tip: přidejte akci XY\./);
+});
+
+test('v3.24: apiKontakt_ – funguje i bez přihlášení (prázdné jméno i uzivatelId)', () => {
+  const ctx = nactiRadar();
+  const vysledek = ctx.apiKontakt_('', 'Anonymní tip na akci.', '');
+  assert.equal(vysledek.ok, true);
+  const mail = ctx.__odeslaneEmaily[0];
+  assert.equal(mail.predmet, '[Kulturní radar] Zpráva od anonym');
+  assert.match(mail.telo, /Jméno: \(neuvedeno\)/);
+  assert.match(mail.telo, /Uživatelský profil: \(anonymní\)/);
+});
+
+test('v3.24: apiKontakt_ – druhé odeslání hned po prvním narazí na cooldown', () => {
+  const ctx = nactiRadar();
+  const prvni = ctx.apiKontakt_('Vojta', 'První zpráva.', 'vojta');
+  const druhy = ctx.apiKontakt_('Vojta', 'Druhá zpráva hned potom.', 'vojta');
+  assert.equal(prvni.ok, true);
+  assert.equal(druhy.ok, false);
+  assert.match(druhy.error, /rodiny/, 'hláška má vysvětlit, že "poslední" odeslání mohl spustit kdokoli jiný z rodiny');
+  assert.equal(ctx.__odeslaneEmaily.length, 1, 'druhý pokus se vůbec neodeslal');
+});
+
+test('v3.24: apiKontakt_ – selhání MailApp.sendEmail vrátí ok:false a nenastaví cooldown', () => {
+  const ctx = nactiRadar();
+  ctx.MailApp.sendEmail = () => { throw new Error('kvóta vyčerpána'); };
+  const selhany = ctx.apiKontakt_('Vojta', 'Zpráva, co neprojde.', 'vojta');
+  assert.equal(selhany.ok, false);
+  assert.match(selhany.error, /později/);
+
+  // Cooldown se nesmí nastavit na neúspěšném pokusu – hned další volání
+  // (tentokrát s funkčním MailApp) musí projít, ne narazit na "zkus to za chvíli".
+  ctx.MailApp.sendEmail = (komu, predmet, telo) => ctx.__odeslaneEmaily.push({ komu, predmet, telo });
+  const dalsi = ctx.apiKontakt_('Vojta', 'Zkouším to znovu.', 'vojta');
+  assert.equal(dalsi.ok, true);
+  assert.equal(ctx.__odeslaneEmaily.length, 1);
+});
+
 test('v3.20: apiPrihlaseniUzivatele_ – správný PIN vrací jméno a filtry, nikdy pinHash', () => {
   const ctx = nactiRadar();
   const hash = ctx.hashPin_('1234', 'sul-x');

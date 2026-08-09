@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.28 – Vizuální štítek "❓ Neověřeno" na kartě akce -->
+<!-- Kulturní radar Index.html v3.29 – Kontaktní formulář (tlačítko "Kontakt" + modal + patička) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -363,13 +363,41 @@
   }
   #login-chyba { color: var(--accent); font-size: .82rem; min-height: 1.2em; }
 
-  /* v3.13: badge přihlášeného uživatele v hlavičce */
-  #uzivatel-badge {
+  /* v3.13: badge přihlášeného uživatele v hlavičce; v3.24: sdílí styl s Kontakt */
+  #uzivatel-badge, #kontakt-btn {
     background: transparent; border: 1px solid rgba(255,255,255,.5);
     border-radius: 999px; padding: 4px 12px;
     color: inherit; font-family: var(--sans); font-size: .78rem;
     cursor: pointer; white-space: nowrap;
   }
+
+  /* v3.24: Kontaktní formulář – sdílí vzhled s token dialogem */
+  #kontakt-dialog {
+    display: none; position: fixed; inset: 0;
+    background: rgba(26,26,46,.6); z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  #kontakt-dialog.open { display: flex; }
+  #kontakt-box {
+    background: var(--card); border-radius: var(--radius);
+    padding: 28px 24px; width: min(380px, 92vw);
+  }
+  #kontakt-box h2 { font-size: 1rem; margin-bottom: 12px; }
+  #kontakt-box label { display: block; font-size: .78rem; color: var(--ink-2); margin: 10px 0 4px; }
+  #kontakt-box input, #kontakt-box textarea {
+    width: 100%; padding: 9px 12px;
+    border: 1.5px solid #d0cdc6; border-radius: 6px;
+    font-family: var(--sans); font-size: .85rem; resize: vertical;
+  }
+  #kontakt-chyba { color: var(--accent); font-size: .82rem; min-height: 1.2em; margin-top: 8px; }
+  #kontakt-chyba.uspech { color: #27ae60; }
+
+  /* v3.24: patička s kontaktní zmínkou – tlumený styl jako #meta-info */
+  #patka {
+    text-align: center; font-size: .75rem; color: var(--ink-3);
+    font-family: var(--sans); padding: 16px 20px 90px;
+  }
+  #patka a { color: inherit; }
 
   /* v3.13: dialog osobních filtrů (sdílí vzhled s token dialogem) */
   #filtry-dialog {
@@ -409,6 +437,7 @@
   <h1>🎭 Kulturní radar</h1>
   <span id="meta-info">načítám…</span>
   <button id="uzivatel-badge" title="Přihlásit se k osobnímu profilu">Přihlásit se</button>
+  <button id="kontakt-btn" title="Poslat tip na akci nebo připomínku">Kontakt</button>
 </header>
 
 <div id="controls">
@@ -435,6 +464,11 @@
 <main id="main">
   <div id="status">Načítám akce…</div>
 </main>
+
+<footer id="patka">
+  Máte tip na další akci nebo jiné připomínky? Ozvěte se nám na
+  <a href="mailto:info@kulturniradar.cz">info@kulturniradar.cz</a>
+</footer>
 
 <button id="fab" title="Spustit vyhledávání nových akcí">Spustit kontrolu</button>
 
@@ -482,6 +516,22 @@
     <div class="dialog-btns">
       <button class="btn-cancel" id="token-cancel">Zrušit</button>
       <button class="btn-ok" id="token-ok">Spustit</button>
+    </div>
+  </div>
+</div>
+
+<!-- v3.24: Kontaktní formulář – dostupný i bez přihlášení -->
+<div id="kontakt-dialog" role="dialog" aria-modal="true" aria-label="Kontaktní formulář">
+  <div id="kontakt-box">
+    <h2>Kontakt</h2>
+    <label for="kontakt-jmeno">Jméno (nepovinné)</label>
+    <input id="kontakt-jmeno" type="text" placeholder="Jak se jmenuješ?" maxlength="80">
+    <label for="kontakt-zprava">Zpráva</label>
+    <textarea id="kontakt-zprava" rows="4" maxlength="2000" placeholder="Tip na akci, připomínka…"></textarea>
+    <div id="kontakt-chyba"></div>
+    <div class="dialog-btns">
+      <button class="btn-cancel" id="kontakt-zrusit">Zrušit</button>
+      <button class="btn-ok" id="kontakt-odeslat">Odeslat</button>
     </div>
   </div>
 </div>
@@ -552,6 +602,8 @@
         return { metoda: 'POST', url: execUrl, telo: { akce: 'najdi', uzivatelId: a[0], token: a[1] } };
       case 'apiSpustKontrolu':
         return { metoda: 'POST', url: execUrl, telo: { akce: 'run', token: a[0] } };
+      case 'apiKontakt':
+        return { metoda: 'POST', url: execUrl, telo: { akce: 'kontakt', jmeno: a[0], zprava: a[1], uzivatelId: a[2] } };
       default:
         return null;
     }
@@ -1743,6 +1795,47 @@
       fab.textContent = 'Spustit kontrolu';
     }
   }
+
+  // ── v3.24: Kontaktní formulář – dostupný i bez přihlášení ──
+  document.getElementById('kontakt-btn').addEventListener('click', () => {
+    document.getElementById('kontakt-jmeno').value = prihlasenyUzivatel ? prihlasenyUzivatel.jmeno : '';
+    document.getElementById('kontakt-zprava').value = '';
+    const chyba = document.getElementById('kontakt-chyba');
+    chyba.textContent = '';
+    chyba.classList.remove('uspech');
+    document.getElementById('kontakt-dialog').classList.add('open');
+  });
+
+  document.getElementById('kontakt-zrusit').addEventListener('click', () => {
+    document.getElementById('kontakt-dialog').classList.remove('open');
+  });
+
+  document.getElementById('kontakt-odeslat').addEventListener('click', async () => {
+    const jmeno = document.getElementById('kontakt-jmeno').value.trim();
+    const zprava = document.getElementById('kontakt-zprava').value.trim();
+    const chyba = document.getElementById('kontakt-chyba');
+    if (!zprava) { chyba.textContent = 'Napiš prosím nějakou zprávu.'; return; }
+
+    const btn = document.getElementById('kontakt-odeslat');
+    btn.disabled = true;
+    chyba.textContent = '';
+    try {
+      const d = await gsr('apiKontakt', jmeno, zprava, prihlasenyUzivatel ? prihlasenyUzivatel.id : '');
+      if (d && d.ok) {
+        chyba.classList.add('uspech');
+        chyba.textContent = 'Díky, ozveme se!';
+        setTimeout(() => document.getElementById('kontakt-dialog').classList.remove('open'), 1200);
+      } else {
+        chyba.classList.remove('uspech');
+        chyba.textContent = (d && d.error) || 'Odeslání selhalo, zkus to prosím později.';
+      }
+    } catch (e) {
+      chyba.classList.remove('uspech');
+      chyba.textContent = 'Odeslání selhalo, zkus to prosím později.';
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   // ── Start ─────────────────────────────────────────────────
   // v3.14: appka startuje rovnou v plně funkčním anonymním režimu

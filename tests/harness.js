@@ -60,6 +60,7 @@ function nactiRadar(volby = {}) {
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: (k) => (k in props ? props[k] : null),
+        setProperty: (k, v) => { props[k] = v; },
       }),
     },
     MailApp: {
