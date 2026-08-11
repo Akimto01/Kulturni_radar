@@ -174,6 +174,30 @@ z BACKLOG.md (co ještě čeká), každá s hrubým časovým odhadem (např.
 zbývajícího času případně pokračující session, bez nutnosti znovu
 procházet celý BACKLOG.md ručně.
 
+### Explicitní hranice session (Start/End)
+Kromě automatického rozpoznání farewell frází platí i explicitní
+anglická klíčová slova, protože v jedné dlouhé konverzaci může dojít
+k příchodu a odchodu od práce vícekrát:
+
+- **"Start"** (samostatně, na začátku zprávy) - explicitní hranice:
+  od této chvíle se počítá nová session pro účely závěrečného
+  shrnutí. Vše řečené/udělané před touto hranicí (i v témže dni) se
+  do příštího shrnutí nezahrnuje. Pokud "Start" zazní znovu bez
+  předchozího "End", jen se hranice posune dopředu - předchozí
+  neuzavřený úsek zůstává nezahrnutý do budoucích shrnutí.
+- **"End"** - explicitní vyžádání závěrečného shrnutí + výčtu
+  plánovaných bodů s časovými odhady (stejné chování jako farewell
+  fráze), zároveň uzavírá aktuální okno session.
+
+Doplňkově, kvůli prevenci zapomnění:
+- Pri pozdravu ("Ahoj", "Dobré ráno", "Dobré odpoledne", "Zdravím"
+  apod.) se zeptej: "Chceš tímto začít novou session? Napiš 'Start'
+  pro potvrzení." Bez potvrzení "Start" se žádná hranice nenastavuje.
+- Pri rozloučení ("Dobrou noc", "Zatím ahoj", "končím na dnešek"
+  apod.) se zeptej: "Ukončujeme tím aktuální session? Napiš 'End' pro
+  potvrzení a shrnutí." Bez potvrzení "End" se shrnutí negeneruje
+  automaticky.
+
 ## Referenční vzorce pro psaní nových testů (harness)
 
 Backend (`tests/harness.js`, `nactiRadar(volby)`):
