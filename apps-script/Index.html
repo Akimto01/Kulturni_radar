@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.35 – Redesign fáze 3: vestavěná mapa + oprava fázování kalendáře -->
+<!-- Kulturní radar Index.html v3.36 – Fáze 3 doladění: layout u levého okraje, větší flexibilní mapa -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -509,15 +509,20 @@
 
   /* v3.31: široká obrazovka – kategorie-chipy jako postranní panel
      vlevo, karty akcí ve vícesloupcové mřížce (fáze 1 redesignu,
-     jen restrukturalizace existujících prvků, žádná nová funkce) */
+     jen restrukturalizace existujících prvků, žádná nová funkce).
+     Sdíleno oběma desktop pásmy (900–1279px i ≥1280px) – rozdíl mezi
+     nimi je jen v tom, KAM se vejde #mapa-panel (viz níže). */
   @media (min-width: 900px) {
     #layout {
       display: flex;
       align-items: flex-start;
       gap: 24px;
-      max-width: 1600px;
-      margin: 0 auto;
+      max-width: 2400px;   /* v3.36: pojistka proti běhu mřížky do extrému na
+                               4K+/ultrawide (7+ tenkých sloupců); pod touto
+                               šířkou strop vůbec nezasahuje */
       padding: 0 24px;
+      /* v3.36: margin:0 auto (centrování) záměrně odstraněno – sidebar
+         zůstává u levého okraje, ne symetrická prázdná mezera po stranách */
     }
     #kat-sidebar {
       order: 1;
@@ -534,6 +539,7 @@
     main {
       order: 2;
       flex: 1;
+      min-width: 320px;
       max-width: none;
       margin: 0;
       padding: 20px 0 80px;
@@ -554,21 +560,38 @@
     #kalendar-panel { display: block; }
     #kalendar-toggle { display: none; }
 
-    /* v3.35: mapa jako 3. sloupec vpravo (order 3) – v DOM je mezi
-       sidebarem a #main (kvůli pořadí na mobilu), tady ji flex `order`
-       přesune vizuálně za mřížku karet. */
+    #mapa-panel { order: 3; }
+    #mapa { height: 480px; }   /* v3.36: bylo 350px, na širokém displeji víc místa na piny */
+  }
+
+  /* v3.36: úzký desktop (900–1279px) – mapa jako postranní panel by tu
+     ukrajovala sloupce karet oproti stavu BEZ mapy (viz přepočet v3.36).
+     Řešení: sidebar+main zůstanou 2sloupcé jako předtím, mapa se posune
+     pod ně na celou šířku (flex-basis 100% ji na `flex-wrap: wrap`
+     kontejneru vynutí na vlastní řádek). main navíc omezen na max. 2
+     sloupce (656px = 2×320px + gap) – bez stropu by kolem 1264px main
+     sám od sebe naskočil na 3 sloupce a hned na hranici 1280px zase
+     spadl zpět na 2 (širokému pásmu tam totiž mapa ukrajuje místo) –
+     strop drží počet sloupců plynulý až do přechodu na široké pásmo. */
+  @media (min-width: 900px) and (max-width: 1279px) {
+    #layout { flex-wrap: wrap; }
+    #mapa-panel { flex: 1 1 100%; padding: 20px 0 0; }
+    main { max-width: 656px; }
+  }
+
+  /* v3.36: široký desktop (≥1280px) – dnešní návrh: mapa jako 3. trvalý
+     sloupec vpravo, šířka roste s obrazovkou (25vw), floor 280px
+     (dřívější pevná šířka) až strop 600px. Hranice 1280px (ne 1200px):
+     při 1200px dá 25vw jen 300px a main klesne pod 656px potřebných pro
+     2 sloupce – propad by trval až do ~1290px. Při 1280px už 25vw=320px
+     dá main přesně 664px, 2 sloupce se tak vejdou hned na hranici. */
+  @media (min-width: 1280px) {
     #mapa-panel {
-      order: 3;
-      flex: 0 0 280px;
+      flex: 0 0 clamp(280px, 25vw, 600px);
       padding: 20px 0 0;
       position: sticky;
       top: 16px;
     }
-  }
-
-  /* v3.34: velmi široké monitory – další sloupec v mřížce karet. */
-  @media (min-width: 1600px) {
-    #layout { max-width: 1900px; }
   }
 </style>
 </head>
