@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.33 – Redesign fáze 2: kalendářní pohled -->
+<!-- Kulturní radar Index.html v3.34 – Fix: mřížka karet nevyužívala prostor na velmi širokých monitorech -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -492,7 +492,7 @@
       display: flex;
       align-items: flex-start;
       gap: 24px;
-      max-width: 1400px;
+      max-width: 1600px;
       margin: 0 auto;
       padding: 0 24px;
     }
@@ -528,6 +528,13 @@
        zbytečný (žádný collapse na širokém displeji) */
     #kalendar-panel { display: block; }
     #kalendar-toggle { display: none; }
+  }
+
+  /* v3.34: velmi široké monitory – další sloupec v mřížce karet.
+     Mezikrok před fází 3: až přibude natrvalo mapa jako 3. panel v #layout,
+     tenhle rozpočet šířky (i ten výše) se přepočítá s ohledem na 3 sloupce. */
+  @media (min-width: 1600px) {
+    #layout { max-width: 1900px; }
   }
 </style>
 </head>
