@@ -1,5 +1,12 @@
 # Changelog
 
+## Index.html v3.38 — Fáze 3 doplněk: tooltip v kalendáři + seskupené piny — 18. 8. 2026
+### Přidáno
+- **Tooltip v kalendáři** — najetí myší (desktop hover) na den s tečkou zobrazí jména všech akcí toho dne, jeden název na řádek. Mobil beze změny (žádný hover, klik dál jen odscrolluje na seznam). Sdílený `#kalendar-tooltip` element s `position: fixed`, přepočítanou z `getBoundingClientRect()` konkrétní buňky — ne native `title` atribut (potřeba víc řádků a kontrola vzhledu).
+- Nová čistá funkce `akceDnePodleData_` (Mapa ISO den → pole názvů viditelných akcí toho dne); `dnySAkcemi_` z ní teď odvozená (`new Set(...keys())`) místo paralelní implementace — stejný kontrakt, jeden zdroj pravdy.
+- **Seskupené piny na mapě** — akce se souřadnicemi zaokrouhlenými na 5 desetinných míst (~1m přesnost) na stejnou hodnotu dostanou jeden pin místo překryvu. Popup takového pinu vypíše všechny akce na místě, každou s vlastním tlačítkem „Zobrazit v seznamu" (volá existující `zvyraznitAkci_`). Nová čistá funkce `seskupitPodleSouradnic_`, volaná až po `akceProMapu_` (skupinuje už vyfiltrovaná data). `sestavPopupMapy_` sjednocena ze signatury `(a)` na `(akce)` — funguje jednotně pro 1 i víc akcí na místě.
+- Node testy 277 → 289 (+12: `akceDnePodleData_` — víc akcí stejný den, proběhlé/neověřené vyloučené, nevalidní datum; `seskupitPodleSouradnic_` — identické souřadnice, rozdíl na 4. vs. jen za 5. desetinným místem, prázdné vstupy).
+
 ## Index.html v3.37 — Fáze 3 doladění: mapa podle šířky i výšky okna — 17. 8. 2026
 ### Přidáno
 - Mapa na širokém desktopu roste s velikostí okna v obou rozměrech: šířka `clamp(280px, 30vw, 800px)` (dřív `clamp(280px, 25vw, 600px)`), výška `clamp(480px, 45vh, 650px)` (dřív pevných 480px) — využívá volný prostor kolem sebe místo pevné velikosti.
