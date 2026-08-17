@@ -1,5 +1,13 @@
 # Changelog
 
+## Index.html v3.31 — Redesign fáze 1: barvy + responzivní layout — 17. 8. 2026
+### Přidáno
+- Nová barevná paleta (schváleno 17. 8. 2026, Vojta + Claude, bez dcery — záložní plán místo designového večera): `--accent` terakotová `#d85a30` (bylo `#c0392b`, „červená jako divadelní opona"), `--paper` krémová `#faf8f5` (bylo `#f7f6f2`), `--accent-2` jemná terakotová `#faece7` (bylo `#e8d5b0` pergamen) — kategorie na kartě (`.kat-badge`) teď jemný štítek místo solid pergamenové výplně, text `#993c1d` pro čitelnost. Navazující doladění: `.chip.active/:hover` border-color přepnut z pevného `#c8a870` na `var(--accent)`, ať sedí k nové paletě.
+- Responzivní breakpoint `900px`: pod hranicí beze změny (kategorie-chipy nad seznamem, jednosloupcový seznam karet). Nad hranicí se kategorie-chipy strukturálně přesunou z `#controls` do nového `<aside id="kat-sidebar">` (sticky, vlevo), `#main` přepne na CSS grid (`auto-fill, minmax(320px,1fr)`) — vícesloupcová mřížka karet. Nový obalový `<div id="layout">` kolem sidebaru a `#main`; všechna ID zůstala stejná, JS ani RF selektory (`#kat-chips .chip`) se neměnily.
+- Header (tmavě navy, bílý text) vědomě beze změny — „divadelnost" appky byla hlavně v červeném akcentu a pergamenové výplni, ne v tmavé hlavičce; zjemnění zváženo v pozdější iteraci, až bude zbytek palety vidět naživo.
+- Node testy beze změny (251/251) — jen HTML/CSS, žádná JS funkce se nezměnila.
+- Fáze 1 ze 3 většího redesignu UI. Kalendářní pohled (fáze 2) a vestavěná mapa (fáze 3) budou navazovat samostatně.
+
 ## v3.25 (backend) + Index.html v3.30 — Kontaktní formulář: e-mail pro odpověď — 10. 8. 2026
 ### Přidáno
 - Nové nepovinné pole **„E-mail pro odpověď"** v kontaktním formuláři, mezi Jménem a Zprávou. Důvod: naostro ověřeno, že `MailApp.sendEmail()` odesílá jako vlastní Google účet provozovatele, takže bez tohoto pole nešlo poznat, komu na tip/připomínku odpovědět.
