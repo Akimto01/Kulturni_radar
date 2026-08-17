@@ -1,5 +1,12 @@
 # Changelog
 
+## Index.html v3.37 — Fáze 3 doladění: mapa podle šířky i výšky okna — 17. 8. 2026
+### Přidáno
+- Mapa na širokém desktopu roste s velikostí okna v obou rozměrech: šířka `clamp(280px, 30vw, 800px)` (dřív `clamp(280px, 25vw, 600px)`), výška `clamp(480px, 45vh, 650px)` (dřív pevných 480px) — využívá volný prostor kolem sebe místo pevné velikosti.
+- Hranice širokého pásma posunuta z `1280px` na `1360px` — při 30vw by na 1280px dala mapa 384px a main by klesl na 600px, pod 656px potřebných pro 2 sloupce (cliff, stejný typ problému jako při zavádění 1280px v předchozí verzi). Na 1360px vychází main přesně na 656px, kontinuita s úzkým pásmem (900–1359px, tam beze změny) zachována — ověřeno přepočtem pro 1359/1360/1600/1920/2560px, žádný skok v počtu sloupců.
+- Floor výšky zvednut z původně navrhovaných 400px na **480px** — na nízkých oknech (typicky notebooky, výška okna prohlížeče 700–900px po odečtení lišt) by 45vh s floorem 400px dalo mapu menší než dřívější pevná hodnota, což by bylo proti smyslu zadání „zvětšit mapu"; s floorem 480px se mapa nikdy nezmenší oproti v3.36.
+- Node testy beze změny (277/277) — jen CSS.
+
 ## Index.html v3.36 — Fáze 3 doladění: layout u levého okraje, větší mapa — 17. 8. 2026
 ### Opraveno/Přidáno
 - `#layout` na `≥900px` ztratil `max-width: 1600px` + `margin: 0 auto` (centrování) — sidebar teď začíná blízko levého okraje místo symetrické prázdné mezery po stranách. Nová pojistka `max-width: 2400px` jen proti běhu mřížky do extrému na 4K+/ultrawide monitorech (bez ní by šlo až na 7 tenkých sloupců); pod touto šířkou strop vůbec nezasahuje.
