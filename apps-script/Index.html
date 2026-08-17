@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.37 – Fáze 3 doladění: větší mapa na širokém desktopu (šířka i výška) -->
+<!-- Kulturní radar Index.html v3.38 – Fáze 3 doplněk: tooltipy v kalendáři + seskupené piny na mapě -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -128,6 +128,24 @@
     margin: 2px auto 0;
   }
 
+  /* v3.38: hover tooltip se jmény akcí – jeden sdílený element, position
+     přepočítaná JS podle konkrétní buňky (viz zobrazitTooltipKalendare_) */
+  #kalendar-tooltip {
+    display: none;
+    position: fixed;
+    z-index: 150;
+    max-width: 240px;
+    background: var(--ink);
+    color: #fff;
+    font-size: .75rem;
+    line-height: 1.4;
+    padding: 6px 10px;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.2);
+    pointer-events: none;
+  }
+  #kalendar-tooltip.zobrazeno { display: block; }
+
   /* v3.35: vestavěná mapa (redesign fáze 3) – mobil: vždy vidět (na
      rozdíl od kalendáře se neskládá), pevná výška; ≥900px: viz media
      query níže (sloupec vpravo přes #layout, order). */
@@ -146,6 +164,9 @@
     font-family: var(--sans);
   }
   .mapa-popup-btn:hover { background: var(--accent-2); color: var(--ink); }
+  .mapa-popup hr {   /* v3.38: oddělovač mezi akcemi seskupenými do 1 pinu */
+    margin: 6px 0; border: none; border-top: 1px solid #e0ddd6;
+  }
 
   #controls-oznaceni {
     padding: 8px 20px 10px;
@@ -648,6 +669,10 @@
       </div>
       <div id="kalendar-mrizka"></div>
     </div>
+
+    <!-- v3.38: tooltip se jmény akcí při hoveru na den s tečkou (desktop);
+         position:fixed přepočítaná JS, viz zobrazitTooltipKalendare_ -->
+    <div id="kalendar-tooltip"></div>
   </aside>
 
   <!-- v3.35: vestavěná mapa (redesign fáze 3). V DOM mezi sidebarem a
@@ -1489,20 +1514,29 @@
     return String(d.getFullYear()) + '-' + pad2_(d.getMonth() + 1) + '-' + pad2_(d.getDate());
   }
 
-  /** Množina ISO dnů, kdy má aspoň jedna VIDITELNÁ akce (jeViditelnaVSeznamu_
-   *  – stejný filtr jako výchozí seznam „Vše") datumOd v ten den. Kategorie-
-   *  filtr sem záměrně nepatří – řeší ho volající (vykreslitKalendar) přes
-   *  filtrovatKategorii_ PŘED voláním této funkce (v3.35 oprava fázování:
-   *  dřív tečky ignorovaly kategorie-chip úplně, teď respektují). `dnes`
-   *  injektované, stejný vzor jako jeNeoverenaBezUrl_. */
-  function dnySAkcemi_(akce, dnes) {
-    const out = new Set();
+  /** Mapa ISO den → pole názvů VIDITELNÝCH akcí toho dne (jeViditelnaVSeznamu_
+   *  – stejný filtr jako výchozí seznam „Vše"). Kategorie-filtr sem záměrně
+   *  nepatří – řeší ho volající (vykreslitKalendar) přes filtrovatKategorii_
+   *  PŘED voláním této funkce. Základ jak pro tečky v kalendáři (dnySAkcemi_
+   *  níže), tak pro tooltip se jmény akcí (v3.38). `dnes` injektované,
+   *  stejný vzor jako jeNeoverenaBezUrl_. */
+  function akceDnePodleData_(akce, dnes) {
+    const out = new Map();
     (akce || []).forEach(a => {
       if (!jeViditelnaVSeznamu_(a, dnes)) return;
       const d = parseCeskeDatum(a.datumOd);
-      if (d) out.add(isoDatum_(d));
+      if (!d) return;
+      const iso = isoDatum_(d);
+      if (!out.has(iso)) out.set(iso, []);
+      out.get(iso).push(a.nazev || '');
     });
     return out;
+  }
+
+  /** Množina ISO dnů, kdy má aspoň jedna VIDITELNÁ akce datumOd v ten den –
+   *  odvozeno z akceDnePodleData_ (v3.38), stejný kontrakt jako dřív. */
+  function dnySAkcemi_(akce, dnes) {
+    return new Set(akceDnePodleData_(akce, dnes).keys());
   }
 
   /** Sestaví mřížku měsíce (Po–Ne): prázdné buňky před 1. dnem, pak dny
@@ -1529,15 +1563,16 @@
 
   /** Přerenderuje mřížku aktuálně zvoleného měsíce podle vsechnaAkce.
    *  v3.35: tečky respektují aktivní kategorie-filtr (dřív vždy „Vše",
-   *  bez ohledu na zvolenou kategorii – oprava fázování). */
+   *  bez ohledu na zvolenou kategorii – oprava fázování). v3.38: dny
+   *  s tečkou mají navíc hover tooltip se jmény akcí (desktop). */
   function vykreslitKalendar() {
     document.getElementById('kalendar-nazev-mesice').textContent =
       NAZVY_MESICU_[kalendarMesic] + ' ' + kalendarRok;
 
     const dnes = new Date();
     dnes.setHours(0, 0, 0, 0);
-    const dny = dnySAkcemi_(filtrovatKategorii_(vsechnaAkce, aktKategorie), dnes);
-    const bunky = sestavKalendarMrizku_(kalendarRok, kalendarMesic, dny);
+    const podleDne = akceDnePodleData_(filtrovatKategorii_(vsechnaAkce, aktKategorie), dnes);
+    const bunky = sestavKalendarMrizku_(kalendarRok, kalendarMesic, new Set(podleDne.keys()));
 
     const mrizka = document.getElementById('kalendar-mrizka');
     mrizka.innerHTML = '';
@@ -1548,7 +1583,10 @@
       cell.textContent = b.den;
       if (b.maAkce) {
         cell.classList.add('ma-akce');
-        cell.addEventListener('click', () => skocitNaDen_(b.iso));
+        const nazvy = podleDne.get(b.iso) || [];
+        cell.addEventListener('click', () => { skrytTooltipKalendare_(); skocitNaDen_(b.iso); });
+        cell.addEventListener('mouseenter', () => zobrazitTooltipKalendare_(cell, nazvy));
+        cell.addEventListener('mouseleave', skrytTooltipKalendare_);
       } else {
         cell.classList.add('bez-akce');
       }
@@ -1574,6 +1612,28 @@
     if (cil) cil.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  /** v3.38: hover tooltip u dnů s tečkou – jeden sdílený element (ne jeden
+   *  na buňku), position:fixed přepočítaný z getBoundingClientRect() dané
+   *  buňky. Jména akcí přes textContent (ne HTML string) – nazev je
+   *  nedůvěryhodný AI-extrahovaný text, stejný důvod jako u popupu mapy. */
+  function zobrazitTooltipKalendare_(cell, nazvy) {
+    const el = document.getElementById('kalendar-tooltip');
+    el.innerHTML = '';
+    (nazvy || []).forEach(n => {
+      const radek = document.createElement('div');
+      radek.textContent = n;
+      el.appendChild(radek);
+    });
+    const rect = cell.getBoundingClientRect();
+    el.style.left = rect.left + 'px';
+    el.style.top = (rect.bottom + 4) + 'px';
+    el.classList.add('zobrazeno');
+  }
+
+  function skrytTooltipKalendare_() {
+    document.getElementById('kalendar-tooltip').classList.remove('zobrazeno');
+  }
+
   // ── v3.35: Vestavěná mapa (redesign fáze 3) ──────────────────────────
   /** PURE: akce vhodné pro pin na mapě – stejný filtr jako seznam „Vše"
    *  (jeViditelnaVSeznamu_) a stejný kategorie-filtr jako kalendář
@@ -1581,6 +1641,22 @@
   function akceProMapu_(akce, aktKategorieSet, dnes) {
     return filtrovatKategorii_(akce || [], aktKategorieSet).filter(a =>
       typeof a.lat === 'number' && typeof a.lng === 'number' && jeViditelnaVSeznamu_(a, dnes));
+  }
+
+  /** PURE: seskupí už vyfiltrované akce (akceProMapu_) podle souřadnic
+   *  zaokrouhlených na 5 desetinných míst (~1m přesnost) – akce na
+   *  (prakticky) stejném místě dostanou jeden pin místo překryvu. Pin se
+   *  vykreslí na souřadnicích první akce ve skupině (v rámci ~1m je to
+   *  vizuálně nerozeznatelné). Volat AŽ PO akceProMapu_ – předpokládá
+   *  platná číselná lat/lng, žádná defenzivní kontrola navíc (v3.38). */
+  function seskupitPodleSouradnic_(akce) {
+    const skupiny = new Map();
+    (akce || []).forEach(a => {
+      const klic = a.lat.toFixed(5) + ',' + a.lng.toFixed(5);
+      if (!skupiny.has(klic)) skupiny.set(klic, { lat: a.lat, lng: a.lng, akce: [] });
+      skupiny.get(klic).akce.push(a);
+    });
+    return [...skupiny.values()];
   }
 
   let mapaLeaflet = null;
@@ -1599,35 +1675,42 @@
     mapaVrstvaPinu = L.layerGroup().addTo(mapaLeaflet);
   }
 
-  /** Obsah popupu pinu – stavěno přes DOM API (ne HTML string): a.nazev
-   *  pochází z AI extrakce webového obsahu (nedůvěryhodný text), takže by
-   *  sestavení jako raw HTML bylo XSS riziko. Tlačítko volá zvyraznitAkci_
-   *  (existující funkce pro scroll+zvýraznění karty ze sdíleného odkazu). */
-  function sestavPopupMapy_(a) {
+  /** Obsah popupu pinu – jedna nebo víc akcí na (prakticky) stejném místě
+   *  (seskupitPodleSouradnic_, v3.38). Stavěno přes DOM API (ne HTML
+   *  string): a.nazev pochází z AI extrakce webového obsahu (nedůvěryhodný
+   *  text), sestavení jako raw HTML by bylo XSS riziko. Každá akce má
+   *  vlastní tlačítko volající zvyraznitAkci_ (existující funkce pro
+   *  scroll+zvýraznění karty ze sdíleného odkazu). */
+  function sestavPopupMapy_(akce) {
     const wrap = document.createElement('div');
     wrap.className = 'mapa-popup';
-    const nazev = document.createElement('strong');
-    nazev.textContent = a.nazev || '';
-    wrap.appendChild(nazev);
-    wrap.appendChild(document.createElement('br'));
-    const btn = document.createElement('button');
-    btn.className = 'mapa-popup-btn';
-    btn.textContent = 'Zobrazit v seznamu';
-    btn.addEventListener('click', () => zvyraznitAkci_(a.id));
-    wrap.appendChild(btn);
+    akce.forEach((a, i) => {
+      if (i > 0) wrap.appendChild(document.createElement('hr'));
+      const nazev = document.createElement('strong');
+      nazev.textContent = a.nazev || '';
+      wrap.appendChild(nazev);
+      wrap.appendChild(document.createElement('br'));
+      const btn = document.createElement('button');
+      btn.className = 'mapa-popup-btn';
+      btn.textContent = 'Zobrazit v seznamu';
+      btn.addEventListener('click', () => zvyraznitAkci_(a.id));
+      wrap.appendChild(btn);
+    });
     return wrap;
   }
 
   /** Přerenderuje piny podle vsechnaAkce + aktivního kategorie-filtru
-   *  (stejné vstupy jako vykreslitKalendar). No-op, pokud se mapa
+   *  (stejné vstupy jako vykreslitKalendar), akce na stejném místě
+   *  seskupené do jednoho pinu (v3.38). No-op, pokud se mapa
    *  neinicializovala (viz inicializovatMapu_). */
   function vykreslitMapu() {
     if (!mapaLeaflet) return;
     const dnes = new Date();
     dnes.setHours(0, 0, 0, 0);
     mapaVrstvaPinu.clearLayers();
-    akceProMapu_(vsechnaAkce, aktKategorie, dnes).forEach(a => {
-      L.marker([a.lat, a.lng]).addTo(mapaVrstvaPinu).bindPopup(sestavPopupMapy_(a));
+    const skupiny = seskupitPodleSouradnic_(akceProMapu_(vsechnaAkce, aktKategorie, dnes));
+    skupiny.forEach(s => {
+      L.marker([s.lat, s.lng]).addTo(mapaVrstvaPinu).bindPopup(sestavPopupMapy_(s.akce));
     });
   }
 

@@ -17,6 +17,7 @@ const f = nactiFrontendFunkce([
   'weathercodeEmoji_', 'pocasiZobrazeni_',
   'isoDatum_', 'dnySAkcemi_', 'sestavKalendarMrizku_',
   'jeViditelnaVSeznamu_', 'filtrovatKategorii_', 'akceProMapu_',
+  'akceDnePodleData_', 'seskupitPodleSouradnic_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -714,4 +715,93 @@ test('akceProMapu_: akce, co projde vším, se vrátí beze změny', () => {
 test('akceProMapu_: prázdné/chybějící pole akcí nespadne', () => {
   assert.equal(f.akceProMapu_([], new Set(), KAL_DNES).length, 0);
   assert.equal(f.akceProMapu_(undefined, new Set(), KAL_DNES).length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// v3.38: akceDnePodleData_ (tooltip v kalendáři) a seskupitPodleSouradnic_
+// (seskupené piny na mapě).
+// ---------------------------------------------------------------------------
+
+test('akceDnePodleData_: jedna akce → mapa s jedním dnem a jedním názvem', () => {
+  const m = f.akceDnePodleData_([{ stav: 'potvrzeno', datumOd: '15. 8. 2026', url: '', nazev: 'Koncert' }], KAL_DNES);
+  shodneNapricRealmy([...m.keys()], ['2026-08-15']);
+  shodneNapricRealmy(m.get('2026-08-15'), ['Koncert']);
+});
+
+test('akceDnePodleData_: víc akcí stejný den → pole víc názvů, pořadí podle vstupu', () => {
+  const m = f.akceDnePodleData_([
+    { stav: 'potvrzeno', datumOd: '15. 8. 2026', url: '', nazev: 'Koncert' },
+    { stav: 'potvrzeno', datumOd: '15. 8. 2026', url: '', nazev: 'Festival' },
+  ], KAL_DNES);
+  shodneNapricRealmy(m.get('2026-08-15'), ['Koncert', 'Festival']);
+});
+
+test('akceDnePodleData_: stav "proběhlo" se vynechá (stejný filtr jako dnySAkcemi_)', () => {
+  const m = f.akceDnePodleData_([{ stav: 'proběhlo', datumOd: '15. 8. 2026', url: '', nazev: 'X' }], KAL_DNES);
+  assert.equal(m.size, 0);
+});
+
+test('akceDnePodleData_: neověřená bez URL a budoucí datum se vynechá', () => {
+  const m = f.akceDnePodleData_([{ stav: 'neověřeno', datumOd: '20. 8. 2026', url: '', nazev: 'X' }], KAL_DNES);
+  assert.equal(m.size, 0);
+});
+
+test('akceDnePodleData_: nevalidní/chybějící datumOd se přeskočí bez pádu', () => {
+  const m = f.akceDnePodleData_([{ stav: 'potvrzeno', datumOd: '', url: '', nazev: 'X' }], KAL_DNES);
+  assert.equal(m.size, 0);
+});
+
+test('akceDnePodleData_: prázdné/chybějící pole akcí nespadne', () => {
+  assert.equal(f.akceDnePodleData_([], KAL_DNES).size, 0);
+  assert.equal(f.akceDnePodleData_(undefined, KAL_DNES).size, 0);
+});
+
+test('dnySAkcemi_ a akceDnePodleData_ dávají konzistentní dny (odvozeno v3.38)', () => {
+  const akce = [
+    { stav: 'potvrzeno', datumOd: '15. 8. 2026', url: '', nazev: 'A' },
+    { stav: 'proběhlo', datumOd: '10. 8. 2026', url: '', nazev: 'B' },
+  ];
+  const dny = f.dnySAkcemi_(akce, KAL_DNES);
+  const podleDne = f.akceDnePodleData_(akce, KAL_DNES);
+  shodneNapricRealmy([...dny], [...podleDne.keys()]);
+});
+
+function akceMisto(over) {
+  return Object.assign({ id: 'a', nazev: 'Akce', lat: 49.2, lng: 16.6 }, over);
+}
+
+test('seskupitPodleSouradnic_: dvě akce na identických souřadnicích → jedna skupina, 2 akce', () => {
+  const skupiny = f.seskupitPodleSouradnic_([akceMisto({ id: 'a' }), akceMisto({ id: 'b' })]);
+  assert.equal(skupiny.length, 1);
+  assert.equal(skupiny[0].akce.length, 2);
+});
+
+test('seskupitPodleSouradnic_: rozdíl na 4. desetinném místě (~11m) → dvě skupiny', () => {
+  const skupiny = f.seskupitPodleSouradnic_([
+    akceMisto({ id: 'a', lat: 49.1000, lng: 16.6000 }),
+    akceMisto({ id: 'b', lat: 49.1001, lng: 16.6000 }),
+  ]);
+  assert.equal(skupiny.length, 2);
+});
+
+test('seskupitPodleSouradnic_: rozdíl jen za 5. desetinným místem → stejná skupina (zaokrouhlení ~1m)', () => {
+  const skupiny = f.seskupitPodleSouradnic_([
+    akceMisto({ id: 'a', lat: 49.123451, lng: 16.654321 }),
+    akceMisto({ id: 'b', lat: 49.123454, lng: 16.654324 }),
+  ]);
+  assert.equal(skupiny.length, 1);
+  assert.equal(skupiny[0].akce.length, 2);
+});
+
+test('seskupitPodleSouradnic_: jedna akce → jedna skupina s polem o délce 1', () => {
+  const skupiny = f.seskupitPodleSouradnic_([akceMisto({})]);
+  assert.equal(skupiny.length, 1);
+  assert.equal(skupiny[0].akce.length, 1);
+  assert.equal(skupiny[0].lat, 49.2);
+  assert.equal(skupiny[0].lng, 16.6);
+});
+
+test('seskupitPodleSouradnic_: prázdné/chybějící pole akcí nespadne', () => {
+  assert.equal(f.seskupitPodleSouradnic_([]).length, 0);
+  assert.equal(f.seskupitPodleSouradnic_(undefined).length, 0);
 });
