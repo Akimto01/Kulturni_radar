@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.32 – Redesign fáze 1 doladění: výraznější datumové/skupinové nadpisy -->
+<!-- Kulturní radar Index.html v3.33 – Redesign fáze 2: kalendářní pohled -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -82,6 +82,48 @@
     background: var(--card);
     border-bottom: 1px solid #e0ddd6;
   }
+
+  /* v3.33: kalendářní pohled (redesign fáze 2) – mobil: skládací panel,
+     výchozí zavřeno (viz #kalendar-toggle); ≥900px: viz media query níže */
+  #kalendar-panel { display: none; margin-top: 10px; }
+  #kalendar-panel.otevreno { display: block; }
+  #kalendar-hlavicka {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  #kalendar-nazev-mesice {
+    font-size: .82rem; font-weight: 600; color: var(--ink);
+    text-transform: capitalize;
+  }
+  #kalendar-predchozi, #kalendar-dalsi {
+    background: transparent; border: 1px solid #d0cdc6; border-radius: 6px;
+    color: var(--ink-2); font-family: var(--sans); font-size: .85rem;
+    padding: 2px 8px; cursor: pointer; line-height: 1.4;
+  }
+  #kalendar-predchozi:hover, #kalendar-dalsi:hover { background: var(--accent-2); color: var(--ink); }
+  #kalendar-dny-tydne, #kalendar-mrizka {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+  }
+  #kalendar-dny-tydne {
+    font-size: .68rem; color: var(--ink-3); text-align: center;
+    margin-bottom: 2px;
+  }
+  .kalendar-den {
+    text-align: center; font-size: .78rem; padding: 5px 0;
+    color: var(--ink-3); border-radius: 6px;
+  }
+  .kalendar-den.bez-akce { color: var(--ink-2); }
+  .kalendar-den.ma-akce {
+    color: var(--ink); font-weight: 600; cursor: pointer;
+    position: relative;
+  }
+  .kalendar-den.ma-akce:hover { background: var(--accent-2); }
+  .kalendar-den.ma-akce::after {
+    content: ''; display: block; width: 4px; height: 4px;
+    border-radius: 50%; background: var(--accent);
+    margin: 2px auto 0;
+  }
+
   #controls-oznaceni {
     padding: 8px 20px 10px;
     background: var(--card);
@@ -374,8 +416,9 @@
   }
   #login-chyba { color: var(--accent); font-size: .82rem; min-height: 1.2em; }
 
-  /* v3.13: badge přihlášeného uživatele v hlavičce; v3.24: sdílí styl s Kontakt */
-  #uzivatel-badge, #kontakt-btn {
+  /* v3.13: badge přihlášeného uživatele v hlavičce; v3.24: sdílí styl s Kontakt;
+     v3.33: i toggle kalendáře */
+  #uzivatel-badge, #kontakt-btn, #kalendar-toggle {
     background: transparent; border: 1px solid rgba(255,255,255,.5);
     border-radius: 999px; padding: 4px 12px;
     color: inherit; font-family: var(--sans); font-size: .78rem;
@@ -480,6 +523,11 @@
       grid-column: 1 / -1;
     }
     main .karta { margin-bottom: 0; }
+
+    /* v3.33: kalendář trvale vidět pod kategoriemi, toggle v hlavičce
+       zbytečný (žádný collapse na širokém displeji) */
+    #kalendar-panel { display: block; }
+    #kalendar-toggle { display: none; }
   }
 </style>
 </head>
@@ -490,6 +538,7 @@
   <span id="meta-info">načítám…</span>
   <button id="uzivatel-badge" title="Přihlásit se k osobnímu profilu">Přihlásit se</button>
   <button id="kontakt-btn" title="Poslat tip na akci nebo připomínku">Kontakt</button>
+  <button id="kalendar-toggle" title="Zobrazit/skrýt kalendář">📅</button>
 </header>
 
 <div id="controls">
@@ -517,6 +566,21 @@
 <div id="layout">
   <aside id="kat-sidebar">
     <div class="chips" id="kat-chips"></div>
+
+    <!-- v3.33: kalendářní pohled (redesign fáze 2) – na mobilu skládací
+         panel (výchozí zavřeno, otevírá #kalendar-toggle v hlavičce),
+         na širokých obrazovkách trvale vidět pod kategoriemi -->
+    <div id="kalendar-panel">
+      <div id="kalendar-hlavicka">
+        <button id="kalendar-predchozi" aria-label="Předchozí měsíc">‹</button>
+        <span id="kalendar-nazev-mesice"></span>
+        <button id="kalendar-dalsi" aria-label="Další měsíc">›</button>
+      </div>
+      <div id="kalendar-dny-tydne">
+        <span>Po</span><span>Út</span><span>St</span><span>Čt</span><span>Pá</span><span>So</span><span>Ne</span>
+      </div>
+      <div id="kalendar-mrizka"></div>
+    </div>
   </aside>
 
   <main id="main">
@@ -1008,6 +1072,13 @@
           obdobiNavstivene = e.target.value;
           prekreslit();
         });
+        // v3.33: kalendář (fáze 2 redesignu) – navigace měsíců + mobilní collapse
+        document.getElementById('kalendar-predchozi').addEventListener('click', () => posunoutMesic_(-1));
+        document.getElementById('kalendar-dalsi').addEventListener('click', () => posunoutMesic_(1));
+        document.getElementById('kalendar-toggle').addEventListener('click', () => {
+          document.getElementById('kalendar-panel').classList.toggle('otevreno');
+        });
+        vykreslitKalendar();
         posluchaceStatickychPrvkuNastaveny = true;
       }
 
@@ -1071,6 +1142,7 @@
       const data = await api('events', profil ? 'profil=' + encodeURIComponent(profil) : '');
       vsechnaAkce = data.akce || [];
       prekreslit();
+      vykreslitKalendar();   // v3.33: tečky podle nově načtených akcí
       if (data.generovano) {
         document.getElementById('meta-info').textContent = 'načteno: ' + data.generovano;
       }
@@ -1141,6 +1213,8 @@
       const h = document.createElement('div');
       h.className = 'den-hlavicka';
       h.textContent = den;
+      const d = parseCeskeDatum(den);
+      if (d) h.id = 'den-' + isoDatum_(d);   // v3.33: cíl pro skok z kalendáře
       fragment.appendChild(h);
       akce.forEach(a => fragment.appendChild(vytvorKartu(a)));
     });
@@ -1334,6 +1408,94 @@
   }
 
   function pad2_(n) { return String(n).padStart(2, '0'); }
+
+  // ── v3.33: Kalendářní pohled (redesign fáze 2) ───────────────────────
+  /** Datum → 'YYYY-MM-DD' (ISO klíč dne, pro spárování s id .den-hlavicka). */
+  function isoDatum_(d) {
+    return String(d.getFullYear()) + '-' + pad2_(d.getMonth() + 1) + '-' + pad2_(d.getDate());
+  }
+
+  /** Množina ISO dnů, kdy má aspoň jedna VIDITELNÁ akce (stejný filtr jako
+   *  výchozí seznam „Vše" – bez proběhlých a bez neověřených-bez-URL, viz
+   *  renderAkce) datumOd v ten den. Nezávisí na kategorie-filtru (rozhodnutí
+   *  17. 8. 2026) – proto tečka v kalendáři vždy odpovídá existující
+   *  .den-hlavicka, na kterou lze skočit (pokud ji zrovna neskryje aktivní
+   *  kategorie-chip – to je vědomá výjimka). `dnes` injektované, stejný vzor
+   *  jako jeNeoverenaBezUrl_/filtrovatNavstivenaPodleObdobi_. */
+  function dnySAkcemi_(akce, dnes) {
+    const out = new Set();
+    (akce || []).forEach(a => {
+      if (a.stav === 'proběhlo' || jeNeoverenaBezUrl_(a, dnes)) return;
+      const d = parseCeskeDatum(a.datumOd);
+      if (d) out.add(isoDatum_(d));
+    });
+    return out;
+  }
+
+  /** Sestaví mřížku měsíce (Po–Ne): prázdné buňky před 1. dnem, pak dny
+   *  1..N s příznakem maAkce. Bez přesahu do sousedních měsíců (jednoduše). */
+  function sestavKalendarMrizku_(rok, mesicIndex0, dnySAkcemiSet) {
+    const prvniDen = new Date(rok, mesicIndex0, 1);
+    const pocetPredchozich = (prvniDen.getDay() + 6) % 7;   // Po=0 .. Ne=6
+    const pocetDni = new Date(rok, mesicIndex0 + 1, 0).getDate();
+
+    const bunky = [];
+    for (let i = 0; i < pocetPredchozich; i++) bunky.push({ den: null, iso: null, maAkce: false });
+    for (let den = 1; den <= pocetDni; den++) {
+      const iso = String(rok) + '-' + pad2_(mesicIndex0 + 1) + '-' + pad2_(den);
+      bunky.push({ den, iso, maAkce: dnySAkcemiSet.has(iso) });
+    }
+    return bunky;
+  }
+
+  const NAZVY_MESICU_ = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
+    'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
+
+  let kalendarRok = new Date().getFullYear();
+  let kalendarMesic = new Date().getMonth();   // index0, výchozí = aktuální měsíc
+
+  /** Přerenderuje mřížku aktuálně zvoleného měsíce podle vsechnaAkce. */
+  function vykreslitKalendar() {
+    document.getElementById('kalendar-nazev-mesice').textContent =
+      NAZVY_MESICU_[kalendarMesic] + ' ' + kalendarRok;
+
+    const dnes = new Date();
+    dnes.setHours(0, 0, 0, 0);
+    const dny = dnySAkcemi_(vsechnaAkce, dnes);
+    const bunky = sestavKalendarMrizku_(kalendarRok, kalendarMesic, dny);
+
+    const mrizka = document.getElementById('kalendar-mrizka');
+    mrizka.innerHTML = '';
+    bunky.forEach(b => {
+      const cell = document.createElement('div');
+      cell.className = 'kalendar-den';
+      if (b.den == null) { mrizka.appendChild(cell); return; }
+      cell.textContent = b.den;
+      if (b.maAkce) {
+        cell.classList.add('ma-akce');
+        cell.addEventListener('click', () => skocitNaDen_(b.iso));
+      } else {
+        cell.classList.add('bez-akce');
+      }
+      mrizka.appendChild(cell);
+    });
+  }
+
+  function posunoutMesic_(delta) {
+    kalendarMesic += delta;
+    if (kalendarMesic < 0) { kalendarMesic = 11; kalendarRok--; }
+    else if (kalendarMesic > 11) { kalendarMesic = 0; kalendarRok++; }
+    vykreslitKalendar();
+  }
+
+  /** Klik na den s akcí v kalendáři → odscrolluje na odpovídající skupinu
+   *  v seznamu (kalendář je navigační pomůcka, ne filtr – seznam se
+   *  neschovává). Cíl nemusí existovat (den skrytý aktivním kategorie-
+   *  chipem) – pak se tiše nic nestane. */
+  function skocitNaDen_(iso) {
+    const cil = document.getElementById('den-' + iso);
+    if (cil) cil.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   // ── v3.25: Počasí u akce – malé políčko vedle data ───────────────────
 

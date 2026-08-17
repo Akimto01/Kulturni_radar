@@ -15,6 +15,7 @@ const f = nactiFrontendFunkce([
   'sestavOdkazNaAkci_', 'parsovatOdkazNaAkci_',
   'sestavOdkazNaVyber_', 'parsovatOdkazNaVyber_',
   'weathercodeEmoji_', 'pocasiZobrazeni_',
+  'isoDatum_', 'dnySAkcemi_', 'sestavKalendarMrizku_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -541,4 +542,99 @@ test('v3.25: pocasiZobrazeni_ – stav CHYBA bez jakékoli předchozí hodnoty �
 test('v3.25: pocasiZobrazeni_ – chybějící pocasi objekt (akce ještě nezpracována triggerem) → N/A', () => {
   assert.equal(f.pocasiZobrazeni_(undefined).text, 'N/A');
   assert.equal(f.pocasiZobrazeni_(null).text, 'N/A');
+});
+
+// ---------------------------------------------------------------------------
+// v3.33: Kalendářní pohled (redesign fáze 2) – isoDatum_, dnySAkcemi_,
+// sestavKalendarMrizku_. Referenční data ověřena přímo přes new Date().getDay()
+// (ne odhadem): 1. 8. 2026 = sobota, 1. 2. 2026 = neděle, 1. 9. 2026 = úterý.
+// ---------------------------------------------------------------------------
+
+test('isoDatum_: formátuje datum na YYYY-MM-DD s nulami zleva', () => {
+  assert.equal(f.isoDatum_(new Date(2026, 0, 5)), '2026-01-05');
+  assert.equal(f.isoDatum_(new Date(2026, 10, 23)), '2026-11-23');
+});
+
+test('sestavKalendarMrizku_: srpen 2026 (1. 8. = sobota) – 5 prázdných buněk, pak 1.–31.', () => {
+  const bunky = f.sestavKalendarMrizku_(2026, 7, new Set());
+  assert.equal(bunky.length, 36);   // 5 prázdných + 31 dní
+  for (let i = 0; i < 5; i++) assert.equal(bunky[i].den, null);
+  assert.equal(bunky[5].den, 1);
+  assert.equal(bunky[5].iso, '2026-08-01');
+  assert.equal(bunky[bunky.length - 1].den, 31);
+  assert.equal(bunky[bunky.length - 1].iso, '2026-08-31');
+});
+
+test('sestavKalendarMrizku_: únor 2026 (1. 2. = neděle, 28 dní) – 6 prázdných buněk', () => {
+  const bunky = f.sestavKalendarMrizku_(2026, 1, new Set());
+  assert.equal(bunky.length, 34);   // 6 prázdných + 28 dní
+  for (let i = 0; i < 6; i++) assert.equal(bunky[i].den, null);
+  assert.equal(bunky[6].den, 1);
+  assert.equal(bunky[bunky.length - 1].den, 28);
+});
+
+test('sestavKalendarMrizku_: září 2026 (1. 9. = úterý) – jen 1 prázdná buňka na začátku', () => {
+  const bunky = f.sestavKalendarMrizku_(2026, 8, new Set());
+  assert.equal(bunky[0].den, null);
+  assert.equal(bunky[1].den, 1);
+  assert.equal(bunky[1].iso, '2026-09-01');
+});
+
+test('sestavKalendarMrizku_: maAkce se nastaví přesně podle předané množiny, jinak false', () => {
+  const bunky = f.sestavKalendarMrizku_(2026, 7, new Set(['2026-08-15', '2026-08-01']));
+  const podleDne = {};
+  bunky.forEach(b => { if (b.den != null) podleDne[b.den] = b.maAkce; });
+  assert.equal(podleDne[1], true);
+  assert.equal(podleDne[15], true);
+  assert.equal(podleDne[2], false);
+  assert.equal(podleDne[31], false);
+});
+
+const KAL_DNES = new Date(2026, 7, 10);   // „dnes" pro dnySAkcemi_ testy, injektované
+
+test('dnySAkcemi_: platná budoucí akce se propíše do množiny jako YYYY-MM-DD', () => {
+  const dny = f.dnySAkcemi_([{ stav: 'potvrzeno', datumOd: '15. 8. 2026', url: '' }], KAL_DNES);
+  assert.equal(dny.has('2026-08-15'), true);
+  assert.equal(dny.size, 1);
+});
+
+test('dnySAkcemi_: dvě akce stejný den → jeden záznam v množině (Set dedup)', () => {
+  const dny = f.dnySAkcemi_([
+    { stav: 'potvrzeno', datumOd: '15. 8. 2026', url: '' },
+    { stav: 'potvrzeno', datumOd: '15. 8. 2026', url: '' },
+  ], KAL_DNES);
+  assert.equal(dny.size, 1);
+});
+
+test('dnySAkcemi_: stav "proběhlo" se vynechá, i když má platné datum (stejný filtr jako seznam "Vše")', () => {
+  const dny = f.dnySAkcemi_([{ stav: 'proběhlo', datumOd: '15. 8. 2026', url: '' }], KAL_DNES);
+  assert.equal(dny.size, 0);
+});
+
+test('dnySAkcemi_: neověřená akce bez URL a datum v budoucnu se vynechá (nemá .den-hlavicka v seznamu "Vše")', () => {
+  const dny = f.dnySAkcemi_([{ stav: 'neověřeno', datumOd: '20. 8. 2026', url: '' }], KAL_DNES);
+  assert.equal(dny.size, 0);
+});
+
+test('dnySAkcemi_: neověřená akce bez URL, ale datum v minulosti, se NEVYNECHÁ (jeNeoverenaBezUrl_ platí jen pro budoucí)', () => {
+  const dny = f.dnySAkcemi_([{ stav: 'neověřeno', datumOd: '1. 8. 2026', url: '' }], KAL_DNES);
+  assert.equal(dny.has('2026-08-01'), true);
+});
+
+test('dnySAkcemi_: neověřená akce S URL se nevynechává (jeNeoverena_ vyžaduje prázdné URL)', () => {
+  const dny = f.dnySAkcemi_([{ stav: 'neověřeno', datumOd: '20. 8. 2026', url: 'https://example.com' }], KAL_DNES);
+  assert.equal(dny.has('2026-08-20'), true);
+});
+
+test('dnySAkcemi_: nevalidní/chybějící datumOd se přeskočí bez pádu', () => {
+  const dny = f.dnySAkcemi_([
+    { stav: 'potvrzeno', datumOd: '', url: '' },
+    { stav: 'potvrzeno', datumOd: 'Probíhá / dlouhodobé', url: '' },
+  ], KAL_DNES);
+  assert.equal(dny.size, 0);
+});
+
+test('dnySAkcemi_: prázdné/chybějící pole akcí nespadne, vrátí prázdnou množinu', () => {
+  assert.equal(f.dnySAkcemi_([], KAL_DNES).size, 0);
+  assert.equal(f.dnySAkcemi_(undefined, KAL_DNES).size, 0);
 });
