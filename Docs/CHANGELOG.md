@@ -1,5 +1,14 @@
 # Changelog
 
+## Index.html v3.32 + v3.33 — Redesign fáze 2: kalendářní pohled — 17. 8. 2026
+### Přidáno
+- **v3.32** doladění fáze 1 podle zpětné vazby rodiny (manželka): datumové/skupinové nadpisy (`.den-hlavicka`) výraznější — `font-size` `.72rem`→`.85rem`, `font-weight: 700` (dřív bez explicitní hodnoty), barva `var(--ink-3)`→`var(--ink)`, nová terakotová značka `border-left: 3px solid var(--accent)`. Sdíleno třemi typy nadpisů (datumové oddělovače, „Probíhá / dlouhodobé", nadpisy typu místa v „Stálých místech") — dopad na všechny tři vědomý a žádoucí kvůli konzistenci.
+- **v3.33** kalendářní pohled (fáze 2 ze 3 většího redesignu, schváleno 17. 8. 2026): měsíční mřížka (Po–Ne) jako navigační pomůcka, ne filtr — klik na den s tečkou odscrolluje na odpovídající `.den-hlavicka` v existujícím seznamu, seznam se neschovává. Tečka „má akce" vychází ze stejné množiny akcí jako výchozí seznam „Vše" (bez `proběhlo`, bez neověřených-bez-URL v budoucnu) — nezávisí na kategorii-filtru; pokud aktivní kategorie-chip odfiltruje jediný cíl dne, klik tiše no-opne (vědomé rozhodnutí, ne bug).
+- Umístění: na `≥900px` trvale pod kategoriemi v `#kat-sidebar`; na mobilu skládací panel (`#kalendar-panel`), výchozí zavřeno, otevírá `#kalendar-toggle` v hlavičce (ikona 📅 vedle „Kontakt").
+- Nové čisté funkce (`isoDatum_`, `dnySAkcemi_`, `sestavKalendarMrizku_`) testované izolovaně přes `frontend-harness.js` — žádný přesah mřížky do sousedních měsíců (jen prázdné buňky před 1. dnem), bez expanze vícedenních akcí (tečka jen na `datumOd`).
+- Node testy 251 → 264 (+13: reálné dny v týdnu ověřené přes `Date.getDay()`, ne odhadem; filtrační shoda `dnySAkcemi_` se seznamem „Vše"; dedup; edge-case minulost/budoucnost u neověřených bez URL).
+- Fáze 2 ze 3. Zbývá fáze 3 — vestavěná mapa.
+
 ## Index.html v3.31 — Redesign fáze 1: barvy + responzivní layout — 17. 8. 2026
 ### Přidáno
 - Nová barevná paleta (schváleno 17. 8. 2026, Vojta + Claude, bez dcery — záložní plán místo designového večera): `--accent` terakotová `#d85a30` (bylo `#c0392b`, „červená jako divadelní opona"), `--paper` krémová `#faf8f5` (bylo `#f7f6f2`), `--accent-2` jemná terakotová `#faece7` (bylo `#e8d5b0` pergamen) — kategorie na kartě (`.kat-badge`) teď jemný štítek místo solid pergamenové výplně, text `#993c1d` pro čitelnost. Navazující doladění: `.chip.active/:hover` border-color přepnut z pevného `#c8a870` na `var(--accent)`, ať sedí k nové paletě.
