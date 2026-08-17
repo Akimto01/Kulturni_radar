@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.36 – Fáze 3 doladění: layout u levého okraje, větší flexibilní mapa -->
+<!-- Kulturní radar Index.html v3.37 – Fáze 3 doladění: větší mapa na širokém desktopu (šířka i výška) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -561,37 +561,40 @@
     #kalendar-toggle { display: none; }
 
     #mapa-panel { order: 3; }
-    #mapa { height: 480px; }   /* v3.36: bylo 350px, na širokém displeji víc místa na piny */
+    #mapa { height: 480px; }   /* v3.36: bylo 350px; přebito na širokém desktopu níže (v3.37) */
   }
 
-  /* v3.36: úzký desktop (900–1279px) – mapa jako postranní panel by tu
+  /* v3.36/v3.37: úzký desktop (900–1359px) – mapa jako postranní panel by tu
      ukrajovala sloupce karet oproti stavu BEZ mapy (viz přepočet v3.36).
      Řešení: sidebar+main zůstanou 2sloupcé jako předtím, mapa se posune
      pod ně na celou šířku (flex-basis 100% ji na `flex-wrap: wrap`
      kontejneru vynutí na vlastní řádek). main navíc omezen na max. 2
-     sloupce (656px = 2×320px + gap) – bez stropu by kolem 1264px main
-     sám od sebe naskočil na 3 sloupce a hned na hranici 1280px zase
-     spadl zpět na 2 (širokému pásmu tam totiž mapa ukrajuje místo) –
-     strop drží počet sloupců plynulý až do přechodu na široké pásmo. */
-  @media (min-width: 900px) and (max-width: 1279px) {
+     sloupce (656px = 2×320px + gap) – bez stropu by main sám od sebe
+     naskočil na 3 sloupce dřív, než končí tohle pásmo, a hned na
+     hranici širokého pásma zase spadl zpět na 2 (tam totiž mapa vedle
+     mřížky ukrajuje místo) – strop drží počet sloupců plynulý. */
+  @media (min-width: 900px) and (max-width: 1359px) {
     #layout { flex-wrap: wrap; }
     #mapa-panel { flex: 1 1 100%; padding: 20px 0 0; }
     main { max-width: 656px; }
   }
 
-  /* v3.36: široký desktop (≥1280px) – dnešní návrh: mapa jako 3. trvalý
-     sloupec vpravo, šířka roste s obrazovkou (25vw), floor 280px
-     (dřívější pevná šířka) až strop 600px. Hranice 1280px (ne 1200px):
-     při 1200px dá 25vw jen 300px a main klesne pod 656px potřebných pro
-     2 sloupce – propad by trval až do ~1290px. Při 1280px už 25vw=320px
-     dá main přesně 664px, 2 sloupce se tak vejdou hned na hranici. */
-  @media (min-width: 1280px) {
+  /* v3.37: široký desktop (≥1360px) – mapa jako 3. trvalý sloupec vpravo,
+     šířka roste s obrazovkou (30vw), floor 280px (dřívější pevná šířka)
+     až strop 800px. Hranice 1360px (ne 1280px jako v v3.36): při 30vw by
+     na 1280px dala mapa 384px a main by klesl na 600px – pod 656px
+     potřebných pro 2 sloupce (cliff). Na 1360px vychází main přesně na
+     656px, 2 sloupce navazují plynule na úzké pásmo. Výška roste s
+     výškou okna (45vh), floor 480px (nikdy méně než dřívější pevná
+     hodnota, i na nízkých oknech notebooků) až strop 650px. */
+  @media (min-width: 1360px) {
     #mapa-panel {
-      flex: 0 0 clamp(280px, 25vw, 600px);
+      flex: 0 0 clamp(280px, 30vw, 800px);
       padding: 20px 0 0;
       position: sticky;
       top: 16px;
     }
+    #mapa { height: clamp(480px, 45vh, 650px); }
   }
 </style>
 </head>
