@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.30 – Kontaktní formulář: volitelný e-mail pro odpověď -->
+<!-- Kulturní radar Index.html v3.31 – Redesign fáze 1: terakotová paleta + responzivní sidebar/mřížka -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -11,10 +11,10 @@
     --ink:      #1a1a2e;
     --ink-2:    #4a4a6a;
     --ink-3:    #8888aa;
-    --paper:    #f7f6f2;
+    --paper:    #faf8f5;
     --card:     #ffffff;
-    --accent:   #c0392b;   /* červená jako divadelní opona */
-    --accent-2: #e8d5b0;   /* pergamen – pro chipy kategorií */
+    --accent:   #d85a30;   /* terakotová (redesign 17. 8. 2026, fáze 1) */
+    --accent-2: #faece7;   /* jemná terakotová – pro chipy kategorií */
     --radius:   10px;
     --mono:     'JetBrains Mono', 'Courier New', monospace;
     --sans:     'Inter', system-ui, sans-serif;
@@ -74,6 +74,14 @@
     cursor: pointer;
   }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* v3.31: kategorie-chipy – na úzké obrazovce vodorovný pruh nad
+     seznamem (stejný vzhled jako dřív, kdy byly součástí #controls) */
+  #kat-sidebar {
+    padding: 10px 20px 12px;
+    background: var(--card);
+    border-bottom: 1px solid #e0ddd6;
+  }
   #controls-oznaceni {
     padding: 8px 20px 10px;
     background: var(--card);
@@ -97,7 +105,7 @@
   }
   .chip.active, .chip:hover {
     background: var(--accent-2);
-    border-color: #c8a870;
+    border-color: var(--accent);
     color: var(--ink);
   }
   .chip-special.active {
@@ -203,7 +211,7 @@
   .kat-badge {
     font-size: .68rem;
     background: var(--accent-2);
-    color: #7a5c2e;
+    color: #993c1d;
     padding: 1px 7px;
     border-radius: 20px;
     font-weight: 500;
@@ -429,6 +437,47 @@
     main { padding: 12px 10px 80px; }
     #controls { padding: 10px 14px; }
   }
+
+  /* v3.31: široká obrazovka – kategorie-chipy jako postranní panel
+     vlevo, karty akcí ve vícesloupcové mřížce (fáze 1 redesignu,
+     jen restrukturalizace existujících prvků, žádná nová funkce) */
+  @media (min-width: 900px) {
+    #layout {
+      display: flex;
+      align-items: flex-start;
+      gap: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    #kat-sidebar {
+      flex: 0 0 200px;
+      padding: 20px 12px 20px 0;
+      background: transparent;
+      border-bottom: none;
+      border-right: 1px solid #e0ddd6;
+      position: sticky;
+      top: 16px;
+    }
+    #kat-sidebar .chips { flex-direction: column; align-items: stretch; }
+    #kat-sidebar .chip { text-align: left; }
+    main {
+      flex: 1;
+      max-width: none;
+      margin: 0;
+      padding: 20px 0 80px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      align-content: start;
+      gap: 8px 16px;
+    }
+    main .den-hlavicka,
+    main #status,
+    main #mista-sekce {
+      grid-column: 1 / -1;
+    }
+    main .karta { margin-bottom: 0; }
+  }
 </style>
 </head>
 <body>
@@ -442,7 +491,6 @@
 
 <div id="controls">
   <select id="profil-select" title="Aktivní profil"></select>
-  <div class="chips" id="kat-chips"></div>
 </div>
 
 <div id="controls-oznaceni">
@@ -461,9 +509,17 @@
   </select>
 </div>
 
-<main id="main">
-  <div id="status">Načítám akce…</div>
-</main>
+<!-- v3.31: kategorie-chipy a seznam akcí obaleny v #layout, aby na
+     širokých obrazovkách šly rozložit vedle sebe (sidebar + mřížka) -->
+<div id="layout">
+  <aside id="kat-sidebar">
+    <div class="chips" id="kat-chips"></div>
+  </aside>
+
+  <main id="main">
+    <div id="status">Načítám akce…</div>
+  </main>
+</div>
 
 <footer id="patka">
   Máte tip na další akci nebo jiné připomínky? Ozvěte se nám na
