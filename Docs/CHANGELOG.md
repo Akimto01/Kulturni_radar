@@ -1,5 +1,12 @@
 # Changelog
 
+## Index.html v3.34 — Fix: mřížka karet na velmi širokých monitorech — 17. 8. 2026
+### Opraveno
+- Na monitorech 2500px+ zůstávala mřížka karet na 2 sloupcích, i když `grid-template-columns: repeat(auto-fill, minmax(320px, 1fr))` měl prostor na víc. Příčina: `#layout` (fáze 1, `Index.html`) měl pevný `max-width: 1400px` — nad touto šířkou zůstal obsah vycentrovaný s prázdným prostorem po stranách bez ohledu na skutečnou šířku obrazovky.
+- Základní strop zvýšen `1400px → 1600px`; nový breakpoint `@media (min-width: 1600px)` strop dál zvedá na `1900px` pro velmi široké monitory.
+- Obě hodnoty okomentované jako **mezikrok před fází 3** — až přibude natrvalo mapa jako 3. panel v `#layout`, rozpočet šířky (sidebar/main-mřížka/mapa) se přepočítá znovu s ohledem na 3 sloupce, ne jen na dnešní sidebar+main.
+- Node testy beze změny (264/264) — jen CSS.
+
 ## Index.html v3.32 + v3.33 — Redesign fáze 2: kalendářní pohled — 17. 8. 2026
 ### Přidáno
 - **v3.32** doladění fáze 1 podle zpětné vazby rodiny (manželka): datumové/skupinové nadpisy (`.den-hlavicka`) výraznější — `font-size` `.72rem`→`.85rem`, `font-weight: 700` (dřív bez explicitní hodnoty), barva `var(--ink-3)`→`var(--ink)`, nová terakotová značka `border-left: 3px solid var(--accent)`. Sdíleno třemi typy nadpisů (datumové oddělovače, „Probíhá / dlouhodobé", nadpisy typu místa v „Stálých místech") — dopad na všechny tři vědomý a žádoucí kvůli konzistenci.
