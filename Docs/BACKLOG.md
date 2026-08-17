@@ -7,9 +7,11 @@ na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 Zohledňuje závislosti mezi položkami a paralelizaci čekacích dob
 (Google Play schvalování běží mimo aktivní práci), stanoveno 8. 8. 2026:
 
-1. **Design večer s dcerou** (rozvržení, ikony/branding appky) —
-   odemyká Android submission a snižuje riziko předělávek u
-   kalendářního pohledu
+1. **Design večer s dcerou** (rozvržení, ikony/branding appky; CSS
+   tokeny v `:root`) — odemyká Android submission a snižuje riziko
+   předělávek u kalendářního pohledu. Rodina appku už aktivně
+   používá (4 profily vyzkoušené 7.–8. 8.), takže na designu záleží
+   i mimo původní účel
 2. **Android appka — start submission** (~3–4 h aktivní práce) —
    spustit hned po designu, schvalovací proces v Google Play trvá
    dny a běží na pozadí, ať se nečeká zbytečně
@@ -35,9 +37,6 @@ změně BACKLOGu.
 ## K ověření
 - iPad: ověřit, jestli window.open() (v3.7 Index.html) vyřešil otevírání „Více info"/„Do kalendáře" v nové záložce — dcera se ještě nevrátila s iPadem. (Dojezd v km u nově nalezených akcí ověřen 7. 8. jako OK, položka odstraněna.)
 - „Festival Špilberk" (ID `2026-08-17-festival-spilberk`, profil Brno) — AI ho našla jako neověřenou akci bez URL, teď se zobrazuje přes chip „❓ Neověřeno" (v3.27). Potřeba ručně dohledat spolehlivý zdroj/URL (web pořadatele, Brno.cz) a buď označit jako potvrzeno, nebo smazat, pokud zdroj neexistuje.
-
-## Nejvyšší priorita
-- Předat `Index.html` dceři k designu (CSS tokeny v `:root`). (Rodina appku už používá – 4 profily aktivně vyzkoušené 7.–8. 8., položka „poslat URL rodině" splněna a odstraněna.)
 
 ## Zpětná vazba syna — 5. 8. 2026
 ### Design/rozvržení (patří do dceřina designového večera, ne bodová oprava)
