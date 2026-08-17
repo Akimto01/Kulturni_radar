@@ -1,5 +1,15 @@
 # Changelog
 
+## Index.html v3.36 — Fáze 3 doladění: layout u levého okraje, větší mapa — 17. 8. 2026
+### Opraveno/Přidáno
+- `#layout` na `≥900px` ztratil `max-width: 1600px` + `margin: 0 auto` (centrování) — sidebar teď začíná blízko levého okraje místo symetrické prázdné mezery po stranách. Nová pojistka `max-width: 2400px` jen proti běhu mřížky do extrému na 4K+/ultrawide monitorech (bez ní by šlo až na 7 tenkých sloupců); pod touto šířkou strop vůbec nezasahuje.
+- Mapa dostala flexibilní šířku `clamp(280px, 25vw, 600px)` (dřív pevných 280px) a výšku `480px` na širokém desktopu (dřív 350px; mobil zůstává na 350px).
+- **Tři layoutová pásma místo dvou**, aby nikde nevznikl skokový propad počtu sloupců mřížky karet oproti stavu bez mapy: `<900px` mobil beze změny (mapa nad seznamem); `900–1279px` úzký desktop — sidebar+seznam vedle sebe (2 sloupce), mapa POD nimi na celou šířku (`flex-basis: 100%` + `flex-wrap: wrap` na `#layout`); `≥1280px` široký desktop — dnešní návrh, mapa jako trvalý 3. sloupec vpravo (`position: sticky`).
+- V úzkém pásmu (900–1279px) main navíc omezen na `max-width: 656px` (přesně 2 sloupce) — bez stropu by kolem 1264px main sám naskočil na 3 sloupce a hned na hranici 1280px zase spadl zpět na 2, protože v širokém pásmu mapa vedle mřížky ukrajuje místo. Strop drží počet sloupců plynulý přes celý přechod.
+- Hranice širokého pásma zvolena na `1280px`, ne `1200px` — při 1200px by `25vw` dalo mapě jen 300px a main by klesl pod 656px potřebných pro 2 sloupce (propad by trval až do ~1290px). Při 1280px dá `25vw` už 320px, main vychází přesně na 664px — 2 sloupce se vejdou hned na hranici, žádný skok.
+- Ověřeno přepočtem pro 7 referenčních šířek (900/1100/1279/1280/1600/1920/2400px) — žádný cliff v počtu sloupců napříč celým rozsahem.
+- Node testy beze změny (277/277) — jen CSS.
+
 ## Index.html v3.35 — Redesign fáze 3: vestavěná mapa + oprava fázování kalendáře — 17. 8. 2026
 ### Přidáno
 - **Vestavěná mapa** (fáze 3 ze 3 většího redesignu, dokončení) — Leaflet 1.9.4 přes unpkg + dlaždice OpenStreetMap (bez API klíče), první externí JS závislost appky. Piny z existujících `lat`/`lng` polí v `apiEvents` (v3.14) — žádné nové geokódování, žádná změna backendu.
