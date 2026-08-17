@@ -1,5 +1,16 @@
 # Changelog
 
+## Index.html v3.35 — Redesign fáze 3: vestavěná mapa + oprava fázování kalendáře — 17. 8. 2026
+### Přidáno
+- **Vestavěná mapa** (fáze 3 ze 3 většího redesignu, dokončení) — Leaflet 1.9.4 přes unpkg + dlaždice OpenStreetMap (bez API klíče), první externí JS závislost appky. Piny z existujících `lat`/`lng` polí v `apiEvents` (v3.14) — žádné nové geokódování, žádná změna backendu.
+- Piny respektují stejnou množinu akcí jako seznam „Vše" (bez proběhlých, bez neověřených-bez-URL v budoucnu) i aktivní kategorie-filtr — přes novou čistou funkci `akceProMapu_`.
+- Klik na pin → popup se jménem akce (stavěný přes DOM API, ne HTML string — `a.nazev` pochází z AI extrakce webového obsahu, takže sestavení jako raw HTML by bylo XSS riziko) + tlačítko „Zobrazit v seznamu", které využívá existující `zvyraznitAkci_()` (scroll + zvýraznění karty, dřív jen pro sdílené odkazy) — žádný nový `id` atribut na kartách nebyl potřeba.
+- Umístění: `≥900px` trvalý 3. sloupec vpravo v `#layout` (280px, `position: sticky`) přes CSS `order` (v DOM je mapa mezi sidebarem a `#main`, aby na mobilu vyšla v přirozeném pořadí nad seznamem); na mobilu vždy viditelná (na rozdíl od kalendáře se neskládá), pevná výška 350px na obou breakpointech. Existující odkaz „📍 Mapa" na kartě (`mapsUrl_`, externí Google Maps pro 1 akci) beze změny — nesouvisí.
+- **Oprava fázování kalendáře** (doplnění fáze 2): tečky v kalendáři dřív vždy ukazovaly všechny akce bez ohledu na aktivní kategorie-chip. Teď respektují stejný kategorie-filtr jako seznam — `vykreslitKalendar()` filtruje přes `filtrovatKategorii_()` před voláním `dnySAkcemi_` (ta zůstala beze změny signatury/chování). `vykreslitKalendar()`/`vykreslitMapu()` sjednoceny do centrálního `prekreslit()` místo roztroušených volání.
+- Drobný refaktor: nová sdílená čistá funkce `jeViditelnaVSeznamu_` (dřív inline v `renderAkce`/`dnySAkcemi_`) — jeden zdroj pravdy pro „co je vidět v seznamu Vše" mezi `renderAkce`, `dnySAkcemi_` a `akceProMapu_`.
+- Node testy 264 → 277 (+13 pro `jeViditelnaVSeznamu_`, `filtrovatKategorii_`, `akceProMapu_`) — nejdřív ověřeno, že refaktor nerozbil žádný z existujících testů.
+- **Fáze 3 ze 3 — redesign UI dokončen.**
+
 ## Index.html v3.34 — Fix: mřížka karet na velmi širokých monitorech — 17. 8. 2026
 ### Opraveno
 - Na monitorech 2500px+ zůstávala mřížka karet na 2 sloupcích, i když `grid-template-columns: repeat(auto-fill, minmax(320px, 1fr))` měl prostor na víc. Příčina: `#layout` (fáze 1, `Index.html`) měl pevný `max-width: 1400px` — nad touto šířkou zůstal obsah vycentrovaný s prázdným prostorem po stranách bez ohledu na skutečnou šířku obrazovky.
