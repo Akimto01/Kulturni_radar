@@ -16,6 +16,7 @@ const f = nactiFrontendFunkce([
   'sestavOdkazNaVyber_', 'parsovatOdkazNaVyber_',
   'weathercodeEmoji_', 'pocasiZobrazeni_',
   'isoDatum_', 'dnySAkcemi_', 'sestavKalendarMrizku_',
+  'jeViditelnaVSeznamu_', 'filtrovatKategorii_', 'akceProMapu_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -637,4 +638,80 @@ test('dnySAkcemi_: nevalidní/chybějící datumOd se přeskočí bez pádu', ()
 test('dnySAkcemi_: prázdné/chybějící pole akcí nespadne, vrátí prázdnou množinu', () => {
   assert.equal(f.dnySAkcemi_([], KAL_DNES).size, 0);
   assert.equal(f.dnySAkcemi_(undefined, KAL_DNES).size, 0);
+});
+
+// ---------------------------------------------------------------------------
+// v3.35: Redesign fáze 3 – jeViditelnaVSeznamu_, filtrovatKategorii_,
+// akceProMapu_ (mapa + oprava fázování kalendáře, aby respektovalo
+// kategorie-chip stejně jako seznam „Vše").
+// ---------------------------------------------------------------------------
+
+test('jeViditelnaVSeznamu_: potvrzená budoucí akce je viditelná', () => {
+  assert.equal(f.jeViditelnaVSeznamu_({ stav: 'potvrzeno', datumOd: '15. 8. 2026', url: '' }, KAL_DNES), true);
+});
+
+test('jeViditelnaVSeznamu_: stav "proběhlo" není viditelný', () => {
+  assert.equal(f.jeViditelnaVSeznamu_({ stav: 'proběhlo', datumOd: '15. 8. 2026', url: '' }, KAL_DNES), false);
+});
+
+test('jeViditelnaVSeznamu_: neověřená bez URL a budoucí datum není viditelná', () => {
+  assert.equal(f.jeViditelnaVSeznamu_({ stav: 'neověřeno', datumOd: '20. 8. 2026', url: '' }, KAL_DNES), false);
+});
+
+test('jeViditelnaVSeznamu_: neověřená bez URL, ale minulé datum, JE viditelná', () => {
+  assert.equal(f.jeViditelnaVSeznamu_({ stav: 'neověřeno', datumOd: '1. 8. 2026', url: '' }, KAL_DNES), true);
+});
+
+test('jeViditelnaVSeznamu_: neověřená S URL je viditelná i v budoucnu', () => {
+  assert.equal(f.jeViditelnaVSeznamu_({ stav: 'neověřeno', datumOd: '20. 8. 2026', url: 'https://example.com' }, KAL_DNES), true);
+});
+
+function akceKat(kategorie) { return { kategorie }; }
+
+test('filtrovatKategorii_: prázdná/chybějící množina vrátí pole beze změny', () => {
+  const akce = [akceKat(['koncerty']), akceKat(['divadlo'])];
+  assert.equal(f.filtrovatKategorii_(akce, new Set()), akce);
+  assert.equal(f.filtrovatKategorii_(akce, null), akce);
+});
+
+test('filtrovatKategorii_: neprázdná množina ponechá jen akce s průnikem', () => {
+  const akce = [akceKat(['koncerty']), akceKat(['divadlo']), akceKat(['koncerty', 'festivaly'])];
+  const vysledek = f.filtrovatKategorii_(akce, new Set(['koncerty']));
+  assert.equal(vysledek.length, 2);
+});
+
+test('filtrovatKategorii_: žádná akce nesedí → prázdné pole', () => {
+  const akce = [akceKat(['divadlo'])];
+  assert.equal(f.filtrovatKategorii_(akce, new Set(['koncerty'])).length, 0);
+});
+
+function akceMapa(over) {
+  return Object.assign({ stav: 'potvrzeno', datumOd: '15. 8. 2026', url: '', kategorie: ['koncerty'], lat: 49.2, lng: 16.6 }, over);
+}
+
+test('akceProMapu_: akce bez souřadnic se vynechá, i když je jinak v pořádku', () => {
+  const vysledek = f.akceProMapu_([akceMapa({ lat: undefined, lng: undefined })], new Set(), KAL_DNES);
+  assert.equal(vysledek.length, 0);
+});
+
+test('akceProMapu_: proběhlá akce se souřadnicemi se vynechá (stejný filtr jako seznam)', () => {
+  const vysledek = f.akceProMapu_([akceMapa({ stav: 'proběhlo' })], new Set(), KAL_DNES);
+  assert.equal(vysledek.length, 0);
+});
+
+test('akceProMapu_: aktivní kategorie-filtr akci bez shody vynechá', () => {
+  const vysledek = f.akceProMapu_([akceMapa({ kategorie: ['divadlo'] })], new Set(['koncerty']), KAL_DNES);
+  assert.equal(vysledek.length, 0);
+});
+
+test('akceProMapu_: akce, co projde vším, se vrátí beze změny', () => {
+  const a = akceMapa({});
+  const vysledek = f.akceProMapu_([a], new Set(), KAL_DNES);
+  assert.equal(vysledek.length, 1);
+  assert.equal(vysledek[0], a);
+});
+
+test('akceProMapu_: prázdné/chybějící pole akcí nespadne', () => {
+  assert.equal(f.akceProMapu_([], new Set(), KAL_DNES).length, 0);
+  assert.equal(f.akceProMapu_(undefined, new Set(), KAL_DNES).length, 0);
 });

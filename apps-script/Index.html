@@ -1,10 +1,14 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.34 – Fix: mřížka karet nevyužívala prostor na velmi širokých monitorech -->
+<!-- Kulturní radar Index.html v3.35 – Redesign fáze 3: vestavěná mapa + oprava fázování kalendáře -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kulturní radar</title>
+<!-- v3.35: Leaflet – vestavěná mapa (redesign fáze 3), první externí JS
+     závislost appky. Bez API klíče (OpenStreetMap dlaždice). -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   /* ── Tokeny ─────────────────────────────────────────────── */
   :root {
@@ -123,6 +127,25 @@
     border-radius: 50%; background: var(--accent);
     margin: 2px auto 0;
   }
+
+  /* v3.35: vestavěná mapa (redesign fáze 3) – mobil: vždy vidět (na
+     rozdíl od kalendáře se neskládá), pevná výška; ≥900px: viz media
+     query níže (sloupec vpravo přes #layout, order). */
+  #mapa-panel { padding: 10px 16px 0; }
+  #mapa {
+    height: 350px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--card);   /* placeholder barva, než se Leaflet/dlaždice načtou */
+  }
+  .mapa-popup { font-family: var(--sans); font-size: .85rem; }
+  .mapa-popup-btn {
+    margin-top: 6px; font-size: .75rem; padding: 4px 10px;
+    border-radius: 6px; border: 1px solid #d0cdc6;
+    background: var(--paper); color: var(--ink-2); cursor: pointer;
+    font-family: var(--sans);
+  }
+  .mapa-popup-btn:hover { background: var(--accent-2); color: var(--ink); }
 
   #controls-oznaceni {
     padding: 8px 20px 10px;
@@ -497,6 +520,7 @@
       padding: 0 24px;
     }
     #kat-sidebar {
+      order: 1;
       flex: 0 0 200px;
       padding: 20px 12px 20px 0;
       background: transparent;
@@ -508,6 +532,7 @@
     #kat-sidebar .chips { flex-direction: column; align-items: stretch; }
     #kat-sidebar .chip { text-align: left; }
     main {
+      order: 2;
       flex: 1;
       max-width: none;
       margin: 0;
@@ -528,11 +553,20 @@
        zbytečný (žádný collapse na širokém displeji) */
     #kalendar-panel { display: block; }
     #kalendar-toggle { display: none; }
+
+    /* v3.35: mapa jako 3. sloupec vpravo (order 3) – v DOM je mezi
+       sidebarem a #main (kvůli pořadí na mobilu), tady ji flex `order`
+       přesune vizuálně za mřížku karet. */
+    #mapa-panel {
+      order: 3;
+      flex: 0 0 280px;
+      padding: 20px 0 0;
+      position: sticky;
+      top: 16px;
+    }
   }
 
-  /* v3.34: velmi široké monitory – další sloupec v mřížce karet.
-     Mezikrok před fází 3: až přibude natrvalo mapa jako 3. panel v #layout,
-     tenhle rozpočet šířky (i ten výše) se přepočítá s ohledem na 3 sloupce. */
+  /* v3.34: velmi široké monitory – další sloupec v mřížce karet. */
   @media (min-width: 1600px) {
     #layout { max-width: 1900px; }
   }
@@ -589,6 +623,13 @@
       <div id="kalendar-mrizka"></div>
     </div>
   </aside>
+
+  <!-- v3.35: vestavěná mapa (redesign fáze 3). V DOM mezi sidebarem a
+       #main, ať na mobilu (blokové řazení) přirozeně vyjde nad seznam;
+       na širokých obrazovkách ji CSS `order` přesune vizuálně vpravo. -->
+  <div id="mapa-panel">
+    <div id="mapa"></div>
+  </div>
 
   <main id="main">
     <div id="status">Načítám akce…</div>
@@ -1086,6 +1127,9 @@
           document.getElementById('kalendar-panel').classList.toggle('otevreno');
         });
         vykreslitKalendar();
+        // v3.35: mapa (fáze 3 redesignu) – jednorázová inicializace Leaflet
+        inicializovatMapu_();
+        vykreslitMapu();
         posluchaceStatickychPrvkuNastaveny = true;
       }
 
@@ -1149,7 +1193,6 @@
       const data = await api('events', profil ? 'profil=' + encodeURIComponent(profil) : '');
       vsechnaAkce = data.akce || [];
       prekreslit();
-      vykreslitKalendar();   // v3.33: tečky podle nově načtených akcí
       if (data.generovano) {
         document.getElementById('meta-info').textContent = 'načteno: ' + data.generovano;
       }
@@ -1178,10 +1221,8 @@
     // Proběhlé akce se v běžném pohledu neukazují – ty patří jen do „✓ Navštívené“
     // (server je vrací navíc jen proto, aby tam mohly být zobrazeny jako inspirace).
     // Stejně tak budoucí "neověřeno" bez URL – ty patří jen do „❓ Neověřeno“ (9. 8. 2026).
-    const bezProbehlych = vsechnaAkce.filter(a => a.stav !== 'proběhlo' && !jeNeoverenaBezUrl_(a, dnes));
-    const filtrovane = aktKategorie.size === 0
-      ? bezProbehlych
-      : bezProbehlych.filter(a => a.kategorie.some(k => aktKategorie.has(k)));
+    const bezProbehlych = vsechnaAkce.filter(a => jeViditelnaVSeznamu_(a, dnes));
+    const filtrovane = filtrovatKategorii_(bezProbehlych, aktKategorie);
 
     // Odstranit staré akce (ne místa)
     [...main.children].forEach(ch => {
@@ -1422,17 +1463,16 @@
     return String(d.getFullYear()) + '-' + pad2_(d.getMonth() + 1) + '-' + pad2_(d.getDate());
   }
 
-  /** Množina ISO dnů, kdy má aspoň jedna VIDITELNÁ akce (stejný filtr jako
-   *  výchozí seznam „Vše" – bez proběhlých a bez neověřených-bez-URL, viz
-   *  renderAkce) datumOd v ten den. Nezávisí na kategorie-filtru (rozhodnutí
-   *  17. 8. 2026) – proto tečka v kalendáři vždy odpovídá existující
-   *  .den-hlavicka, na kterou lze skočit (pokud ji zrovna neskryje aktivní
-   *  kategorie-chip – to je vědomá výjimka). `dnes` injektované, stejný vzor
-   *  jako jeNeoverenaBezUrl_/filtrovatNavstivenaPodleObdobi_. */
+  /** Množina ISO dnů, kdy má aspoň jedna VIDITELNÁ akce (jeViditelnaVSeznamu_
+   *  – stejný filtr jako výchozí seznam „Vše") datumOd v ten den. Kategorie-
+   *  filtr sem záměrně nepatří – řeší ho volající (vykreslitKalendar) přes
+   *  filtrovatKategorii_ PŘED voláním této funkce (v3.35 oprava fázování:
+   *  dřív tečky ignorovaly kategorie-chip úplně, teď respektují). `dnes`
+   *  injektované, stejný vzor jako jeNeoverenaBezUrl_. */
   function dnySAkcemi_(akce, dnes) {
     const out = new Set();
     (akce || []).forEach(a => {
-      if (a.stav === 'proběhlo' || jeNeoverenaBezUrl_(a, dnes)) return;
+      if (!jeViditelnaVSeznamu_(a, dnes)) return;
       const d = parseCeskeDatum(a.datumOd);
       if (d) out.add(isoDatum_(d));
     });
@@ -1461,14 +1501,16 @@
   let kalendarRok = new Date().getFullYear();
   let kalendarMesic = new Date().getMonth();   // index0, výchozí = aktuální měsíc
 
-  /** Přerenderuje mřížku aktuálně zvoleného měsíce podle vsechnaAkce. */
+  /** Přerenderuje mřížku aktuálně zvoleného měsíce podle vsechnaAkce.
+   *  v3.35: tečky respektují aktivní kategorie-filtr (dřív vždy „Vše",
+   *  bez ohledu na zvolenou kategorii – oprava fázování). */
   function vykreslitKalendar() {
     document.getElementById('kalendar-nazev-mesice').textContent =
       NAZVY_MESICU_[kalendarMesic] + ' ' + kalendarRok;
 
     const dnes = new Date();
     dnes.setHours(0, 0, 0, 0);
-    const dny = dnySAkcemi_(vsechnaAkce, dnes);
+    const dny = dnySAkcemi_(filtrovatKategorii_(vsechnaAkce, aktKategorie), dnes);
     const bunky = sestavKalendarMrizku_(kalendarRok, kalendarMesic, dny);
 
     const mrizka = document.getElementById('kalendar-mrizka');
@@ -1497,11 +1539,70 @@
 
   /** Klik na den s akcí v kalendáři → odscrolluje na odpovídající skupinu
    *  v seznamu (kalendář je navigační pomůcka, ne filtr – seznam se
-   *  neschovává). Cíl nemusí existovat (den skrytý aktivním kategorie-
-   *  chipem) – pak se tiše nic nestane. */
+   *  neschovává). Cíl nemusí existovat – např. akce spadá do sekce
+   *  „Probíhá / dlouhodobé" (začala v minulosti, bez vlastní .den-hlavicka)
+   *  – pak se tiše nic nestane. Od v3.35 už NENÍ důvodem aktivní kategorie-
+   *  chip (dřív ano, tečky teď filtr respektují stejně jako seznam). */
   function skocitNaDen_(iso) {
     const cil = document.getElementById('den-' + iso);
     if (cil) cil.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ── v3.35: Vestavěná mapa (redesign fáze 3) ──────────────────────────
+  /** PURE: akce vhodné pro pin na mapě – stejný filtr jako seznam „Vše"
+   *  (jeViditelnaVSeznamu_) a stejný kategorie-filtr jako kalendář
+   *  (filtrovatKategorii_), navíc jen akce s platnými souřadnicemi. */
+  function akceProMapu_(akce, aktKategorieSet, dnes) {
+    return filtrovatKategorii_(akce || [], aktKategorieSet).filter(a =>
+      typeof a.lat === 'number' && typeof a.lng === 'number' && jeViditelnaVSeznamu_(a, dnes));
+  }
+
+  let mapaLeaflet = null;
+  let mapaVrstvaPinu = null;
+
+  /** Jednorázová inicializace Leaflet mapy (střed ČR). Pokud se CDN
+   *  nenačetlo (výpadek/blokace), `L` neexistuje – appka běží dál beze
+   *  mapy, stejná filozofie jako u nactiMista ("bonus, ne kritické"). */
+  function inicializovatMapu_() {
+    if (typeof L === 'undefined') return;
+    mapaLeaflet = L.map('mapa').setView([49.75, 15.5], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(mapaLeaflet);
+    mapaVrstvaPinu = L.layerGroup().addTo(mapaLeaflet);
+  }
+
+  /** Obsah popupu pinu – stavěno přes DOM API (ne HTML string): a.nazev
+   *  pochází z AI extrakce webového obsahu (nedůvěryhodný text), takže by
+   *  sestavení jako raw HTML bylo XSS riziko. Tlačítko volá zvyraznitAkci_
+   *  (existující funkce pro scroll+zvýraznění karty ze sdíleného odkazu). */
+  function sestavPopupMapy_(a) {
+    const wrap = document.createElement('div');
+    wrap.className = 'mapa-popup';
+    const nazev = document.createElement('strong');
+    nazev.textContent = a.nazev || '';
+    wrap.appendChild(nazev);
+    wrap.appendChild(document.createElement('br'));
+    const btn = document.createElement('button');
+    btn.className = 'mapa-popup-btn';
+    btn.textContent = 'Zobrazit v seznamu';
+    btn.addEventListener('click', () => zvyraznitAkci_(a.id));
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
+  /** Přerenderuje piny podle vsechnaAkce + aktivního kategorie-filtru
+   *  (stejné vstupy jako vykreslitKalendar). No-op, pokud se mapa
+   *  neinicializovala (viz inicializovatMapu_). */
+  function vykreslitMapu() {
+    if (!mapaLeaflet) return;
+    const dnes = new Date();
+    dnes.setHours(0, 0, 0, 0);
+    mapaVrstvaPinu.clearLayers();
+    akceProMapu_(vsechnaAkce, aktKategorie, dnes).forEach(a => {
+      L.marker([a.lat, a.lng]).addTo(mapaVrstvaPinu).bindPopup(sestavPopupMapy_(a));
+    });
   }
 
   // ── v3.25: Počasí u akce – malé políčko vedle data ───────────────────
@@ -1886,6 +1987,22 @@
     return !!od && od >= dnes;
   }
 
+  /** PURE: true, pokud akce patří do běžného seznamu „Vše" – bez proběhlých,
+   *  bez budoucích neověřených-bez-URL. Sdíleno mezi renderAkce, dnySAkcemi_
+   *  (kalendář) a akceProMapu_ (mapa, v3.35), ať se filtr „co je vidět"
+   *  nedefinuje na třech místech zvlášť. */
+  function jeViditelnaVSeznamu_(a, dnes) {
+    return a.stav !== 'proběhlo' && !jeNeoverenaBezUrl_(a, dnes);
+  }
+
+  /** PURE: akce podle aktivního kategorie-filtru (prázdná množina = žádný
+   *  filtr, vrátí vše beze změny). Sdíleno mezi renderAkce, vykreslitKalendar
+   *  a akceProMapu_ (v3.35), stejná logika jako dřív inline v renderAkce. */
+  function filtrovatKategorii_(akce, aktKategorieSet) {
+    if (!aktKategorieSet || aktKategorieSet.size === 0) return akce;
+    return akce.filter(a => a.kategorie.some(k => aktKategorieSet.has(k)));
+  }
+
   /** Centrální překreslení podle aktuálního režimu (Vše / Oblíbené / Navštívené / Neověřeno). */
   function prekreslit() {
     syncChipy();
@@ -1908,6 +2025,8 @@
     } else {
       renderAkce();
     }
+    vykreslitKalendar();   // v3.33/v3.35: tečky podle aktuálních akcí + kategorie-filtru
+    vykreslitMapu();       // v3.35: piny podle aktuálních akcí + kategorie-filtru
   }
 
   /** Bezpečný časový klíč z českého data pro řazení; neparsovatelné jde na konec. */
