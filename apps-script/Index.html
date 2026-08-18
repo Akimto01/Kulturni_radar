@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.41 – vyber pinu na mape (dlazdice + seznam mist), vyssi strop mapy -->
+<!-- Kulturní radar Index.html v3.42 – sticky header a filtry, mapa az k pravemu okraji na sirokych obrazovkach -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -22,6 +22,11 @@
     --radius:   10px;
     --mono:     'JetBrains Mono', 'Courier New', monospace;
     --sans:     'Inter', system-ui, sans-serif;
+    /* v3.42: skutečné výšky sticky header/lišt – fallback, přepsáno JS
+       při startu (viz aktualizovatStickyOffsety_) na skutečné rozměry. */
+    --h-header:   58px;
+    --h-controls: 55px;
+    --h-oznaceni: 45px;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -43,6 +48,12 @@
     align-items: baseline;
     gap: 12px;
     flex-wrap: wrap;
+    /* v3.42: sticky – neprůhledné pozadí má už dnes (var(--ink)), stín na
+       spodní hraně odděluje od obsahu, co se pod ní posouvá při scrollu. */
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
   }
   header h1 {
     font-size: 1.15rem;
@@ -66,6 +77,10 @@
     gap: 10px;
     flex-wrap: wrap;
     align-items: center;
+    /* v3.42: sticky hned pod headerem (viz --h-header, aktualizovatStickyOffsety_) */
+    position: sticky;
+    top: var(--h-header);
+    z-index: 59;
   }
   #profil-select {
     font-family: var(--sans);
@@ -194,6 +209,12 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;   /* zpětná vazba 4. 8. 2026: doprava, ne doleva */
+    /* v3.42: poslední lišta ve sticky stacku (header → #controls →
+       #controls-oznaceni) – stín odděluje od obsahu pod ní při scrollu. */
+    position: sticky;
+    top: calc(var(--h-header) + var(--h-controls));
+    z-index: 58;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
   }
   .chip {
     font-size: .78rem;
@@ -581,7 +602,9 @@
       border-bottom: none;
       border-right: 1px solid #e0ddd6;
       position: sticky;
-      top: 16px;
+      /* v3.42: navazuje pod celý sticky stack (header + #controls +
+         #controls-oznaceni), dřív napevno 16px */
+      top: calc(var(--h-header) + var(--h-controls) + var(--h-oznaceni) + 16px);
     }
     #kat-sidebar .chips { flex-direction: column; align-items: stretch; }
     #kat-sidebar .chip { text-align: left; }
@@ -655,11 +678,25 @@
      650px – zvětšeno v3.41, ať zbývá míň nevyužitého prostoru pod mapou
      na vysokých monitorech). */
   @media (min-width: 1360px) {
+    /* v3.42: na tomto nejširším pásmu ať #layout (a tedy i mapa, poslední
+       flex položka) dosáhne až k pravému okraji viewportu – 2400px strop
+       z 900px bloku výše (proti běhu mřížky do extrému) tu přebit, pro
+       užší pásma (900–1359px) beze změny. padding-right: 0 jen na pravé
+       straně, padding-left (24px, z 900px bloku) zůstává – stejný princip
+       jako u sidebaru vlevo od v3.36 (blízko okraje, ne nalepené). */
+    #layout {
+      max-width: none;
+      padding-right: 0;
+    }
     #mapa-panel {
       flex: 0 0 clamp(280px, 30vw, 800px);
-      padding: 20px 0 0;
+      /* v3.42: padding-right 20px (dřív 0) – zarovnává pravý okraj mapy
+         (a #mapa-mista) přesně s pravým okrajem obsahu #controls-oznaceni
+         (to má padding-right 20px); #layout samo má padding-right: 0. */
+      padding: 20px 20px 0 0;
       position: sticky;
-      top: 16px;
+      /* v3.42: navazuje pod celý sticky stack, dřív napevno 16px */
+      top: calc(var(--h-header) + var(--h-controls) + var(--h-oznaceni) + 16px);
     }
     #mapa { height: clamp(480px, 50vh, 850px); }
   }
@@ -2490,6 +2527,30 @@
     } finally {
       btn.disabled = false;
     }
+  });
+
+  // ── v3.42: sticky header/lišty – CSS proměnné pro jejich skutečnou výšku ──
+  /** Změří výšky header/#controls/#controls-oznaceni a zapíše je jako CSS
+   *  custom properties na :root (--h-header/--h-controls/--h-oznaceni), ať
+   *  #controls/#controls-oznaceni/#kat-sidebar/#mapa-panel (position:
+   *  sticky) navazují přesně pod sebou bez magických čísel v CSS – výšky
+   *  se mění se zalomením obsahu na užších šířkách. Volané jednou při
+   *  startu (elementy jsou statický HTML, existují dřív než tenhle
+   *  <script> blok) a znovu při resize (debounced, viz níže). */
+  function aktualizovatStickyOffsety_() {
+    const hHeader = document.querySelector('header').offsetHeight;
+    const hControls = document.getElementById('controls').offsetHeight;
+    const hOznaceni = document.getElementById('controls-oznaceni').offsetHeight;
+    const root = document.documentElement.style;
+    root.setProperty('--h-header', hHeader + 'px');
+    root.setProperty('--h-controls', hControls + 'px');
+    root.setProperty('--h-oznaceni', hOznaceni + 'px');
+  }
+  aktualizovatStickyOffsety_();
+  let stickyOffsetyResizeTimeout_ = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(stickyOffsetyResizeTimeout_);
+    stickyOffsetyResizeTimeout_ = setTimeout(aktualizovatStickyOffsety_, 150);
   });
 
   // ── Start ─────────────────────────────────────────────────

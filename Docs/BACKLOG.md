@@ -38,11 +38,6 @@ změně BACKLOGu.
 - iPad: ověřit, jestli window.open() (v3.7 Index.html) vyřešil otevírání „Více info"/„Do kalendáře" v nové záložce — dcera se ještě nevrátila s iPadem. (Dojezd v km u nově nalezených akcí ověřen 7. 8. jako OK, položka odstraněna.)
 - „Festival Špilberk" (ID `2026-08-17-festival-spilberk`, profil Brno) — AI ho našla jako neověřenou akci bez URL, teď se zobrazuje přes chip „❓ Neověřeno" (v3.27). Potřeba ručně dohledat spolehlivý zdroj/URL (web pořadatele, Brno.cz) a buď označit jako potvrzeno, nebo smazat, pokud zdroj neexistuje.
 
-### Ze živého testování fáze 3 (v3.35–v3.38), 18. 8. 2026 v noci — k řešení příště
-- Horní tmavá lišta (`<header>`: nadpis appky, profil, kontakt) by měla být `position: sticky; top: 0` při scrollování — dnes odjíždí z obrazovky.
-- Druhá lišta pod ní (`#controls-oznaceni`: dropdown výběru města + chipy ★ Oblíbené/✓ Navštívené/❓ Neověřeno/📤 Sdílet výběr) by měla být sticky taky — dvouvrstvý sticky header, potřeba sladit s existujícím sticky chováním `#kat-sidebar` a `#mapa-panel` (v3.36/v3.37), ať se navzájem nepřekrývají.
-- Mapa (`#mapa-panel`, ≥1360px) by měla sahat až k pravému okraji stránky bez paddingu — stejný princip, jaký už od v3.36 platí pro sidebar vlevo.
-
 ## Zpětná vazba syna — 5. 8. 2026
 ### Design/rozvržení (patří do dceřina designového večera, ne bodová oprava)
 - Příliš mnoho textu bez struktury — zvážit boční osnovu/navigaci stránky
