@@ -1,5 +1,10 @@
 # Changelog
 
+## Index.html v3.39 — Fix: tooltip v kalendáři překrytý Leaflet mapou — 18. 8. 2026
+### Opraveno
+- `#kalendar-tooltip` (v3.38) měl `z-index: 150`, což bylo pod interními "panes" Leafletu (marker/popup pane, z-index až ~700, generováno JS knihovnou, mimo naše CSS) — na produkci se tooltip při setkání kalendáře a mapy v layoutu schoval pod mapu. Zvýšeno na `z-index: 1000`.
+- Node testy beze změny (289/289) — jen CSS.
+
 ## Index.html v3.38 — Fáze 3 doplněk: tooltip v kalendáři + seskupené piny — 18. 8. 2026
 ### Přidáno
 - **Tooltip v kalendáři** — najetí myší (desktop hover) na den s tečkou zobrazí jména všech akcí toho dne, jeden název na řádek. Mobil beze změny (žádný hover, klik dál jen odscrolluje na seznam). Sdílený `#kalendar-tooltip` element s `position: fixed`, přepočítanou z `getBoundingClientRect()` konkrétní buňky — ne native `title` atribut (potřeba víc řádků a kontrola vzhledu).
