@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.38 – Fáze 3 doplněk: tooltipy v kalendáři + seskupené piny na mapě -->
+<!-- Kulturní radar Index.html v3.39 – oprava z-index tooltipu kalendáře nad Leaflet panes -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -133,7 +133,7 @@
   #kalendar-tooltip {
     display: none;
     position: fixed;
-    z-index: 150;
+    z-index: 1000;   /* nad Leaflet panes (max ~700: marker/popup) */
     max-width: 240px;
     background: var(--ink);
     color: #fff;
