@@ -12,6 +12,17 @@ Zohledňuje závislosti mezi položkami a paralelizaci čekacích dob
    předělávek u kalendářního pohledu. Rodina appku už aktivně
    používá (4 profily vyzkoušené 7.–8. 8.), takže na designu záleží
    i mimo původní účel
+   - Aktualizace 18.–19. 8. 2026: dcera má několik dní prázdniny,
+     není jasné, jestli bude včas k dispozici. Záložní varianta:
+     Vojta + Claude společně, s omezením — Claude umí navrhnout
+     koncept (barevné varianty, styl ikony, návrhy layoutu, mockupy
+     v chatu), ale finální produkčně použitelnou grafiku pro Google
+     Play (adaptive icon ve více vrstvách/rozlišeních přesných
+     rozměrů, feature graphic, screenshoty) je lepší dělat ve
+     specializovaném nástroji (Figma/Illustrator) člověkem se
+     zkušeností — dcera, nebo Vojta sám s podobným nástrojem. Claude
+     může připravit koncept a přesné specifikace (rozměry, formáty)
+     k exportu v libovolném nástroji.
 2. **Android appka — start submission** (~3–4 h aktivní práce) —
    spustit hned po designu, schvalovací proces v Google Play trvá
    dny a běží na pozadí, ať se nečeká zbytečně
@@ -80,6 +91,7 @@ změně BACKLOGu.
 - **Cesta B zrychlení přihlášení** (~1–2 h, volitelné, vyšší riziko): omezit `apiEvents` čtení jen na relevantní profil místo plných čtení celých listů (AKCE/OZNAČENÍ/SOUŘADNICE/POČASÍ) — alternativa/doplněk k už hotové cache (v3.23); vyšší riziko regrese ve filtrovací logice než cache řešení.
 - **Mini předpověď počasí (P, v3.45) — zvážit Cestu B** (~2–3 h, volitelné): dnešní implementace běží Cestou A (frontend volá Open-Meteo přímo, `fetch`, cache jen v paměti běhu stránky, žádný backend zásah) — záměrně nejmenší možný zásah. Pokud by se v budoucnu ukázalo, že tohle zatěžuje Open-Meteo rate limit, je pomalé, nebo bychom chtěli víc než 3 dny/přesnější souřadnice města (dnes odvozené jen z první geokódované akce ve výběru, ne ze skutečného středu města), zvážit migraci na Cestu B: nový backend endpoint `apiPocasiMesto` s `CacheService` cachováním, viz rozsah v diskuzi 18. 8. 2026 (CHANGELOG.md v3.45).
 - **Notifikace o akcích** (nápad, 10. 8. 2026; odhad neurčen, závisí na zvoleném kanálu a rozsahu) — možnost přihlásit se k odběru notifikací o akcích, nejspíš týdenní/víkendový souhrn (podobně jako existující „Víkendové tipy" digest pro manželku, ale jako obecná volitelná funkce pro všechny uživatele/profily). Detaily zatím neurčené a k doladění až při rozpracování: kanál (email vs. push notifikace), frekvence (týdenní/víkendová, nebo konfigurovatelná), filtrování podle kategorie/profilu/města.
+- **Oblíbená místa + filtr podle nich** (~4–6 h): možnost označit MÍSTO konání (ne jednotlivou akci) jako oblíbené, např. „Špilberk", a filtrovat zobrazené akce jen na ta, co se konají na některém z uložených oblíbených míst. Návrh řešení (z diskuze 18.–19. 8. 2026): rozšířit OZNAČENÍ sheet o nový typ (např. `oblibene_misto`), klíčovaný přes `klicSouradnic_` (stejný klíč, co dnes používá výběr pinů na mapě, v3.41) nebo název místa. Nové tlačítko/ikona pro označení místa (na kartě, v seznamu míst pod mapou `#mapa-mista`, nebo přímo na pinu) + nový filtr chip podobný ★ Oblíbené/✓ Navštívené/❓ Neověřeno. Odhad zahrnuje UI na víc místech (karta i seznam míst), ne jen jedno tlačítko.
 
 ## Plán rozvoje — schváleno 4. 8. 2026, aktualizováno 8. 8. 2026
 1. ~~**Rodinné profily**~~ — **HOTOVO 7.–8. 8. 2026** (backend v3.20, frontend
