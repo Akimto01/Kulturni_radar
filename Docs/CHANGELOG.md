@@ -1,5 +1,15 @@
 # Changelog
 
+## Index.html v3.43 — Legenda seznamu míst, RF testy pro redesign (smoke + interakce) — 18. 8. 2026
+### Přidáno
+- **L) Legenda s miniaturou pinu u seznamu míst (`#mapa-mista`)** — každý řádek má před názvem malou CSS značku (kapka, `border-radius: 50% 50% 50% 0` + rotace, barva přibližně odpovídá výchozímu modrému Leaflet markeru), u vybraného řádku (`.vybrano`) se mění na kruh ve stejném odstínu jako `.pin-vybrany` na mapě — dva stavy jedné miniatury místo textu navíc. Řádek dostal `title="Klikněte pro zobrazení na mapě"`. `vykreslitSeznamMist_` teď staví `.mapa-misto-leva` wrapper (miniatura + název) místo přímého `nazev` span — nutné, protože `justify-content: space-between` na řádku by s třetí položkou rozházelo rozložení „název vlevo, počet vpravo".
+- **M) RF smoke testy redesignu** (`tests/robot/frontend.robot`) — nová sekce s 5 testy: stránka bez JS chyby v konzoli (`Get Page Errors` + `Get Console Log` filtr `type=error`); kalendář/mapa toggle na mobilním viewportu (nová keyword `Otevřít radar na mobilním viewportu`, `New Context` 375×800, protože `#kalendar-toggle`/`#mapa-toggle` jsou na desktopu `display:none`); mapa se vykreslí (`.leaflet-container`); seznam míst obsahuje řádky, podmíněně na existenci pinů (stejný vzor jako existující „Sekce stálých míst").
+- **N) RF testy klíčových interakcí** — klik na titulek karty (`.nazev-klikatelna`) i na řádek `#mapa-mista` přepne výběr pinu (`.pin-vybrany` na mapě, `.vybrano` na titulku/řádku), druhý klik zruší výběr (`detached`); header + `#controls-oznaceni` zůstávají na stejné Y pozici po scrollu (`Get BoundingBox key=y` před/po `Scroll By`) — bez testu přesného K zarovnání (viz nová BACKLOG položka).
+### Poznámky k implementaci
+- `Close Context` v Browser library po dokumentaci obnoví kontext aktivní před ním — mobilní testy tak po `[Teardown] Close Context CURRENT` automaticky vrátí desktopový kontext ze Suite Setup, bez ruční správy ID.
+- `Wait For Elements State` (Browser library) nepodporuje pojmenovaný argument `msg=` (past ze SKILL.md, sekce 2) — odhaleno `--dryrun` kontrolou před spuštěním, opraveno přesunem vysvětlení do komentářů.
+- Node testy beze změny (301/301) — L je čistě vizuální. RF: `--dryrun` (syntax/keyword kontrola) 33/33 (25 → 33, +8 nových). Reálné spuštění nechané na CI (lokálně chybí `RF_TEST_USER_ID`/`PIN` i nainstalované Playwright prohlížeče).
+
 ## Index.html v3.42 — Sticky header a filtry, mapa až k pravému okraji na širokých obrazovkách — 18. 8. 2026
 ### Přidáno
 - **H) Horní tmavá lišta (`<header>`) sticky** — `position: sticky; top: 0;`, `z-index: 60`, jemný `box-shadow` na spodní hraně pro vizuální oddělení od obsahu, co se pod ní posouvá při scrollu. Neprůhledné pozadí (`var(--ink)`) beze změny.

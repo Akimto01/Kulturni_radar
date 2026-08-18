@@ -379,6 +379,150 @@ Tlačítko Spustit kontrolu otevře token dialog (bez spuštění)
     Click    ${FRAME} \#token-cancel
     Wait For Elements State    ${FRAME} \#token-dialog.open    detached    timeout=5s
 
+# ── v3.43: RF pokrytí redesignu (fáze 1–3, v3.31–v3.42) ─────────────────
+# M) smoke testy, N) klíčové interakce střední úrovně. Záměrně BEZ testů
+# na přesné pixelové zarovnání (bod K, sticky offsety) – viz BACKLOG.md,
+# odloženo jako nejkřehčí kategorie (manuální/vizuální kontrola je pro
+# tohle spolehlivější a levnější než automatizace na pixel).
+
+Stránka se načte bez JS chyby v konzoli
+    [Documentation]    M) Smoke test: appka se má načíst bez neošetřené JS
+    ...    výjimky (Get Page Errors – neodchycené throw) a bez
+    ...    console.error() volání (Get Console Log, filtr type=error).
+    ...    Vlastní nezávislá stránka, ať se chytí i chyby ze samotného
+    ...    startu (init(), inicializovatMapu_ atd.), ne jen z pozdější
+    ...    interakce na sdílené stránce.
+    New Page    ${SITE_URL}
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
+    ${chyby_stranky}=    Get Page Errors    full=True
+    Should Be Empty    ${chyby_stranky}
+    ...    msg=Stránka vyhodila neošetřenou JS výjimku: ${chyby_stranky}
+    ${log}=    Get Console Log    full=True
+    ${console_chyby}=    Evaluate    [m for m in $log if m['type'] == 'error']
+    Should Be Empty    ${console_chyby}
+    ...    msg=Konzole obsahuje console.error() zprávy: ${console_chyby}
+    Close Page
+
+Kalendář lze otevřít a zavřít přes #kalendar-toggle (mobil)
+    [Documentation]    M) #kalendar-panel je na mobilu (<900px) skládací,
+    ...    výchozí zavřeno – #kalendar-toggle v hlavičce ho otevírá/zavírá
+    ...    (v3.33). Na desktopu (Suite Setup, viewport 1280×900) je
+    ...    #kalendar-toggle schovaný (display:none) – proto vlastní
+    ...    mobilní Context, ne sdílená stránka.
+    [Teardown]    Close Context    CURRENT
+    Otevřít radar na mobilním viewportu
+    ${otevreno_na_startu}=    Get Element Count    ${FRAME} \#kalendar-panel.otevreno
+    Should Be Equal As Integers    ${otevreno_na_startu}    0
+    ...    msg=Kalendář má být na mobilu na startu zavřený
+    Click    ${FRAME} \#kalendar-toggle
+    Wait For Elements State    ${FRAME} \#kalendar-panel.otevreno    visible    timeout=5s
+    Click    ${FRAME} \#kalendar-toggle
+    Wait For Elements State    ${FRAME} \#kalendar-panel.otevreno    detached    timeout=5s
+
+Mapa lze otevřít a zavřít přes #mapa-toggle (mobil)
+    [Documentation]    M) Stejný sbalitelný vzor jako kalendář (v3.40,
+    ...    test výš), nezávislý na kalendáři – vlastní třída .otevreno na
+    ...    #mapa-panel.
+    [Teardown]    Close Context    CURRENT
+    Otevřít radar na mobilním viewportu
+    ${otevreno_na_startu}=    Get Element Count    ${FRAME} \#mapa-panel.otevreno
+    Should Be Equal As Integers    ${otevreno_na_startu}    0
+    ...    msg=Mapa má být na mobilu na startu zavřená
+    Click    ${FRAME} \#mapa-toggle
+    Wait For Elements State    ${FRAME} \#mapa-panel.otevreno    visible    timeout=5s
+    Click    ${FRAME} \#mapa-toggle
+    Wait For Elements State    ${FRAME} \#mapa-panel.otevreno    detached    timeout=5s
+
+Mapa se vykreslí (Leaflet)
+    [Documentation]    M) #mapa je bonus prvek (inicializovatMapu_ v
+    ...    Index.html je no-op, pokud se Leaflet CDN nenačte) – test čeká
+    ...    na vlastní Leaflet kontejner uvnitř #mapa, ne jen na prázdný
+    ...    div. Běží na desktopové sdílené stránce (Suite Setup), kde je
+    ...    #mapa-panel vždy vidět (≥900px, v3.35/v3.40).
+    Wait For Elements State    ${FRAME} \#mapa .leaflet-container    visible    timeout=20s
+
+Seznam míst pod mapou obsahuje řádky, pokud existují akce se souřadnicemi
+    [Documentation]    M) F) #mapa-mista (v3.41) je viditelné jen na
+    ...    desktopu (≥900px) a naplňuje se JEN pokud aktuálně filtrované
+    ...    akce mají platné souřadnice (viz akceProMapu_/sestavSeznamMist_
+    ...    v Index.html) – nedeterministické vůči datům (ne každá akce má
+    ...    hotové geokódování), proto podmíněné na existenci pinů na
+    ...    mapě, stejný vzor jako „Sekce stálých míst"/„Chip typu stálého
+    ...    místa" výš.
+    Wait For Elements State    ${FRAME} \#mapa .leaflet-container    visible    timeout=20s
+    ${pocet_pinu}=    Get Element Count    ${FRAME} \#mapa .leaflet-marker-icon
+    IF    ${pocet_pinu} >= 1
+        Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto >> nth=0    visible    timeout=10s
+        ${pocet_mist}=    Get Element Count    ${FRAME} \#mapa-mista .mapa-misto
+        Should Be True    ${pocet_mist} >= 1
+    ELSE
+        Log    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice) – seznam míst nemá co ověřit v tomto běhu.    level=WARN
+    END
+
+Klik na titulek karty vybere pin na mapě
+    [Documentation]    N) D/E) klik na .nazev-klikatelna (v3.41) přepne
+    ...    výběr pinu – ověřeno přes .nazev.vybrano na titulku
+    ...    (vybratPin_ sesynchronizuje vizuální stav) a existenci
+    ...    .pin-vybrany ikony na mapě. Druhý klik ověřuje i opačný směr
+    ...    (zrušení výběru, detached). Podmíněné na existenci
+    ...    klikatelného titulku – ne všechny akce mají geokódování hotové.
+    ${pocet}=    Get Element Count    ${FRAME} .nazev-klikatelna
+    IF    ${pocet} == 0
+        Log    Žádná viditelná karta nemá souřadnice (.nazev-klikatelna) – test nemá co ověřit v tomto běhu.    level=WARN
+    ELSE
+        Click    ${FRAME} .nazev-klikatelna >> nth=0
+        Wait For Elements State    ${FRAME} .nazev-klikatelna.vybrano >> nth=0    visible    timeout=5s
+        ${pin_vybrany}=    Get Element Count    ${FRAME} \#mapa .pin-vybrany
+        Should Be True    ${pin_vybrany} >= 1
+        ...    msg=Po výběru titulku by měl mít odpovídající pin na mapě třídu .pin-vybrany
+        # Druhý klik na stejný titulek má výběr zrušit (toggle zpět) – Wait
+        # For Elements State (Browser lib.) nepodporuje named msg=, viz
+        # SKILL.md; „detached" samo o sobě selže se srozumitelnou hláškou.
+        Click    ${FRAME} .nazev-klikatelna.vybrano >> nth=0
+        Wait For Elements State    ${FRAME} .nazev-klikatelna.vybrano    detached    timeout=5s
+    END
+
+Klik na řádek v seznamu míst vybere pin na mapě
+    [Documentation]    N) D/F) klik na .mapa-misto (v3.41/v3.43) přepne
+    ...    výběr stejným sdíleným mechanismem (vybratPin_) jako titulek
+    ...    karty (test výš) – ověřeno přes .mapa-misto.vybrano a
+    ...    .pin-vybrany na mapě, včetně zrušení druhým klikem. Podmíněné
+    ...    na existenci aspoň jednoho řádku (viz M – seznam míst).
+    Wait For Elements State    ${FRAME} \#mapa .leaflet-container    visible    timeout=20s
+    ${pocet}=    Get Element Count    ${FRAME} \#mapa-mista .mapa-misto
+    IF    ${pocet} == 0
+        Log    Seznam míst je prázdný (žádná akce se souřadnicemi) – test nemá co ověřit v tomto běhu.    level=WARN
+    ELSE
+        Click    ${FRAME} \#mapa-mista .mapa-misto >> nth=0
+        Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto.vybrano >> nth=0    visible    timeout=5s
+        ${pin_vybrany}=    Get Element Count    ${FRAME} \#mapa .pin-vybrany
+        Should Be True    ${pin_vybrany} >= 1
+        ...    msg=Po výběru řádku v seznamu míst by měl mít odpovídající pin na mapě třídu .pin-vybrany
+        # Druhý klik na stejný řádek má výběr zrušit (toggle zpět) – viz
+        # poznámka o Wait For Elements State/msg= v testu titulku karty výš.
+        Click    ${FRAME} \#mapa-mista .mapa-misto.vybrano >> nth=0
+        Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto.vybrano    detached    timeout=5s
+    END
+
+Header a #controls-oznaceni zůstávají viditelné po scrollu (sticky)
+    [Documentation]    N) H/I) header i #controls-oznaceni mají
+    ...    position: sticky (v3.42) – po scrollu stránky dolů mají zůstat
+    ...    na stejné Y pozici ve viewportu (na rozdíl od běžného static
+    ...    obsahu, co odjíždí pryč). Neověřuje přesné pixelové zarovnání
+    ...    mezi prvky navzájem (bod K, viz dokumentace na začátku sekce
+    ...    a BACKLOG.md) – jen že KAŽDÝ prvek zůstává na svém místě.
+    ${header_y_pred}=    Get BoundingBox    ${FRAME} header    key=y
+    ${oznaceni_y_pred}=    Get BoundingBox    ${FRAME} \#controls-oznaceni    key=y
+    Scroll By    ${FRAME} body    vertical=2000
+    Sleep    200ms
+    ${header_y_po}=    Get BoundingBox    ${FRAME} header    key=y
+    ${oznaceni_y_po}=    Get BoundingBox    ${FRAME} \#controls-oznaceni    key=y
+    Scroll To    ${FRAME} body
+    Should Be True    abs(${header_y_po} - ${header_y_pred}) <= 1
+    ...    msg=Header (sticky) změnil Y pozici po scrollu: ${header_y_pred} → ${header_y_po}
+    Should Be True    abs(${oznaceni_y_po} - ${oznaceni_y_pred}) <= 1
+    ...    msg=#controls-oznaceni (sticky) změnilo Y pozici po scrollu: ${oznaceni_y_pred} → ${oznaceni_y_po}
+
 *** Keywords ***
 Zjistit je-li ikona první karty aktivní
     [Arguments]    ${trida_ikony}
@@ -495,3 +639,18 @@ Přihlásit se do radaru
     Fill Text    ${FRAME} \#login-pin    ${pin}
     Click    ${FRAME} \#login-potvrdit
     Wait For Elements State    ${FRAME} \#login-overlay    hidden    timeout=15s
+
+Otevřít radar na mobilním viewportu
+    [Documentation]    v3.43 (M): pomocná keyword pro testy prvků
+    ...    viditelných jen pod 900px (#kalendar-toggle/#mapa-toggle jsou
+    ...    display:none na ≥900px, viz Index.html) – Suite Setup má pevný
+    ...    desktopový Context (1280×900), viewport jde nastavit jen při
+    ...    `New Context`, proto vlastní Context tady. Volající test musí
+    ...    mít `[Teardown]    Close Context    CURRENT` – dokumentace
+    ...    `Close Context` v Browser library: "Active context is set to
+    ...    the context that was active before this one", takže se tím
+    ...    zpátky obnoví desktopový Context ze Suite Setup pro další testy
+    ...    v sadě, bez ruční správy ID.
+    New Context    viewport={'width': 375, 'height': 800}
+    New Page    ${SITE_URL}
+    Wait For Elements State    ${FRAME} header h1    visible    timeout=20s

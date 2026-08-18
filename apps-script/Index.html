@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.42 – sticky header a filtry, mapa az k pravemu okraji na sirokych obrazovkach -->
+<!-- Kulturní radar Index.html v3.43 – legenda seznamu mist, RF testy pro redesign (smoke + interakce) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -648,6 +648,27 @@
     .mapa-misto.vybrano {
       background: color-mix(in srgb, var(--ink) 10%, var(--card));
       color: var(--ink); font-weight: 600; text-decoration: underline;
+    }
+    /* v3.43 (L): levá skupina (miniatura pinu + název) jako vlastní flex
+       kontejner – s justify-content: space-between přímo na .mapa-misto
+       by 3. položka (miniatura) rozbila rozložení „název vlevo, počet
+       vpravo" (space-between by je rozprostřel rovnoměrně, ne po dvou). */
+    .mapa-misto-leva { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    /* Miniatura připomínající výchozí modrý Leaflet pin (kapka) – čistě
+       CSS tvar (kruh s jedním pravým úhlem + rotace 45°), ne skutečná
+       Leaflet ikona. Barva ~ výchozí marker-icon.png Leafletu. Vybraný
+       stav (.vybrano) přebarví na kruh ve stejném odstínu jako
+       .pin-vybrany na mapě, ať jsou oba signály vizuálně provázané. */
+    .mapa-misto-znacka {
+      display: inline-block; width: 10px; height: 10px; flex-shrink: 0;
+      border-radius: 50% 50% 50% 0;
+      background: #3388ff;
+      transform: rotate(-45deg);
+    }
+    .mapa-misto.vybrano .mapa-misto-znacka {
+      border-radius: 50%;
+      background: var(--ink);
+      transform: none;
     }
     .mapa-misto-pocet { font-family: var(--mono); font-size: .72rem; color: var(--ink-3); flex-shrink: 0; }
   }
@@ -1909,7 +1930,9 @@
 
   /** v3.41 (F): vykreslí seznam míst pod mapou (#mapa-mista, jen desktop
    *  přes CSS) – DOM only, logika (řazení, počty) je v sestavSeznamMist_.
-   *  Volané z vykreslitMapu(), ať je vždy v sync s piny. */
+   *  Volané z vykreslitMapu(), ať je vždy v sync s piny. v3.43 (L): každý
+   *  řádek má miniaturu pinu (viz CSS .mapa-misto-znacka) a title
+   *  atribut, ať je zjevné, že řádek je klikatelný. */
   function vykreslitSeznamMist_(akceMapa) {
     const el = document.getElementById('mapa-mista');
     if (!el) return;
@@ -1917,12 +1940,23 @@
     sestavSeznamMist_(akceMapa).forEach(m => {
       const radek = document.createElement('div');
       radek.className = 'mapa-misto' + (vybranePiny_.has(m.klic) ? ' vybrano' : '');
+      radek.title = 'Klikněte pro zobrazení na mapě';
+
+      const leva = document.createElement('span');
+      leva.className = 'mapa-misto-leva';
+      const znacka = document.createElement('span');
+      znacka.className = 'mapa-misto-znacka';
+      znacka.setAttribute('aria-hidden', 'true');
       const nazev = document.createElement('span');
       nazev.textContent = m.nazev;
+      leva.appendChild(znacka);
+      leva.appendChild(nazev);
+
       const pocet = document.createElement('span');
       pocet.className = 'mapa-misto-pocet';
       pocet.textContent = m.pocet;
-      radek.appendChild(nazev);
+
+      radek.appendChild(leva);
       radek.appendChild(pocet);
       radek.addEventListener('click', () => vybratPin_(m.klic));
       el.appendChild(radek);
