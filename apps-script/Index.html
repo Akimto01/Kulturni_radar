@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.43 – legenda seznamu mist, RF testy pro redesign (smoke + interakce) -->
+<!-- Kulturní radar Index.html v3.45 – mini predpoved pocasi pro vyber (P), Cesta A - frontend Open-Meteo primo -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -199,6 +199,27 @@
   /* v3.41: seznam míst pod mapou (F) – jen desktop, viz media query
      (min-width: 900px) níže. */
   #mapa-mista { display: none; }
+
+  /* v3.44: mini statistika výběru (O) – jen desktop, viz media query níže. */
+  #mapa-statistika { display: none; }
+
+  /* v3.45: mini předpověď počasí (P) – jen desktop, viz media query níže.
+     Prázdný kontejner (žádná akce se souřadnicemi ve výběru, nebo fetch
+     ještě neproběhl/selhal) nemá žádné potomky → vizuálně nezabírá místo,
+     stejný princip jako #mapa-mista bez řádků. */
+  #mapa-pocasi { display: none; }
+
+  /* v3.44: reset výběru pinů (Q) – skryté i na desktopu, dokud není
+     vybraný aspoň jeden pin (.viditelne přidává/odebírá
+     aktualizovatTlacitkoResetVyberu_ podle vybranePiny_.size). */
+  #btn-zobrazit-vse-na-mape {
+    display: none;
+    width: 100%; margin-top: 10px;
+    padding: 8px 10px; border-radius: 6px; border: 1px solid var(--accent);
+    background: transparent; color: var(--accent); cursor: pointer;
+    font-family: var(--sans); font-size: .8rem; font-weight: 600;
+  }
+  #btn-zobrazit-vse-na-mape:hover { background: var(--accent-2); }
 
   #controls-oznaceni {
     padding: 8px 20px 10px;
@@ -671,6 +692,28 @@
       transform: none;
     }
     .mapa-misto-pocet { font-family: var(--mono); font-size: .72rem; color: var(--ink-3); flex-shrink: 0; }
+
+    /* v3.44 (O): mini statistika výběru – 3 čísla vedle sebe, terakotová
+       paleta appky (var(--accent) na číslech, ne generická barva). */
+    #mapa-statistika { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+    .mapa-stat {
+      background: var(--card); border: 1px solid #e0ddd6; border-radius: var(--radius);
+      padding: 10px 6px; text-align: center;
+    }
+    .mapa-stat-cislo { font-family: var(--mono); font-size: 1.3rem; font-weight: 700; color: var(--accent); }
+    .mapa-stat-popisek {
+      font-size: .68rem; color: var(--ink-2); text-transform: uppercase;
+      letter-spacing: .04em; margin-top: 2px;
+    }
+
+    /* v3.45 (P): mini předpověď počasí – stejná mřížka/vzhled jako
+       #mapa-statistika (.mapa-stat), buňky navíc sdílené s ní. */
+    #mapa-pocasi { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+
+    /* v3.44 (Q): tlačítko reset výběru – zobrazí se jen na desktopu A
+       zároveň jen když je vybraný aspoň jeden pin (obě podmínky musí
+       platit zároveň, proto kombinace media query + třída .viditelne). */
+    #btn-zobrazit-vse-na-mape.viditelne { display: block; }
   }
 
   /* v3.36/v3.37: úzký desktop (900–1359px) – mapa jako postranní panel by tu
@@ -790,6 +833,17 @@
     <div id="mapa"></div>
     <!-- v3.41: seznam míst pod mapou (F), jen desktop – viz vykreslitSeznamMist_ -->
     <div id="mapa-mista"></div>
+    <!-- v3.44: mini statistika výběru (O) – viz vykreslitStatistikuVyberu_ -->
+    <div id="mapa-statistika"></div>
+    <!-- v3.45 (P): mini předpověď počasí pro přibližnou polohu výběru,
+         Cesta A (frontend → Open-Meteo přímo) – viz vykreslitPocasiVyberu_.
+         title/aria-label static, přežije el.innerHTML='' při překreslení. -->
+    <div id="mapa-pocasi"
+         title="Orientační předpověď počasí pro přibližnou polohu aktuálního výběru (ne přesné město)"
+         aria-label="Orientační předpověď počasí pro přibližnou polohu aktuálního výběru (ne přesné město)"></div>
+    <!-- v3.44: reset výběru pinů (Q) – viz aktualizovatTlacitkoResetVyberu_,
+         viditelné jen když je vybraný aspoň jeden pin (třída .viditelne) -->
+    <button id="btn-zobrazit-vse-na-mape" type="button">Zobrazit vše na mapě</button>
   </div>
 
   <main id="main">
@@ -1300,6 +1354,13 @@
             // změně display.
             setTimeout(() => mapaLeaflet.invalidateSize(), 0);
           }
+        });
+        // v3.44 (Q): hromadný reset výběru pinů – stejný vzor jako
+        // vybratPin_, jen bez konkrétního klíče (vyprázdní celou sadu).
+        document.getElementById('btn-zobrazit-vse-na-mape').addEventListener('click', () => {
+          vycistitVyberPinu_(vybranePiny_);
+          document.querySelectorAll('#main .nazev.vybrano').forEach(el => el.classList.remove('vybrano'));
+          vykreslitMapu();
         });
         vykreslitKalendar();
         // v3.35: mapa (fáze 3 redesignu) – jednorázová inicializace Leaflet
@@ -1912,8 +1973,11 @@
    *  (stejné vstupy jako vykreslitKalendar), akce na stejném místě
    *  seskupené do jednoho pinu (v3.38); piny s klíčem ve `vybranePiny_`
    *  dostanou odlišnou ikonu (v3.41). Na konci i vykreslitSeznamMist_
-   *  (F) – stejná vstupní data, ať jsou piny a seznam míst vždy v sync.
-   *  No-op, pokud se mapa neinicializovala (viz inicializovatMapu_). */
+   *  (F), vykreslitStatistikuVyberu_ (O, v3.44), vykreslitPocasiVyberu_
+   *  (P, v3.45) a aktualizovatTlacitkoResetVyberu_ (Q, v3.44) – stejná
+   *  vstupní data, ať jsou piny a všechny navazující bloky pod mapou
+   *  vždy v sync. No-op, pokud se mapa neinicializovala (viz
+   *  inicializovatMapu_). */
   function vykreslitMapu() {
     if (!mapaLeaflet) return;
     const dnes = new Date();
@@ -1926,6 +1990,9 @@
       L.marker([s.lat, s.lng], volby).addTo(mapaVrstvaPinu).bindPopup(sestavPopupMapy_(s.akce));
     });
     vykreslitSeznamMist_(akceMapa);
+    vykreslitStatistikuVyberu_(akceMapa);
+    vykreslitPocasiVyberu_(akceMapa);
+    aktualizovatTlacitkoResetVyberu_();
   }
 
   /** v3.41 (F): vykreslí seznam míst pod mapou (#mapa-mista, jen desktop
@@ -1961,6 +2028,149 @@
       radek.addEventListener('click', () => vybratPin_(m.klic));
       el.appendChild(radek);
     });
+  }
+
+  /** PURE (O, v3.44): mini statistika aktuálního výběru pro mapu – ze
+   *  stejných dat, co dostává #mapa-mista (akceProMapu_ výstup). Počet
+   *  míst = počet unikátních skupin podle souřadnic, stejný klíč jako
+   *  seskupitPodleSouradnic_/sestavSeznamMist_ (jeden zdroj pravdy).
+   *  Počet kategorií = unikátní hodnoty napříč poli `kategorie` všech
+   *  akcí (pole může být i prázdné, viz filtrovatKategorii_). */
+  function spocitejStatistikuVyberu_(akce) {
+    const bezpecne = akce || [];
+    const mista = new Set(bezpecne.map(a => klicSouradnic_(a.lat, a.lng)));
+    const kategorie = new Set();
+    bezpecne.forEach(a => (a.kategorie || []).forEach(k => kategorie.add(k)));
+    return { pocetAkci: bezpecne.length, pocetMist: mista.size, pocetKategorii: kategorie.size };
+  }
+
+  /** v3.44 (O): vykreslí mini statistiku pod seznamem míst (#mapa-statistika,
+   *  jen desktop přes CSS) – DOM only, výpočet je ve
+   *  spocitejStatistikuVyberu_. Volané z vykreslitMapu(), ať je vždy v sync
+   *  s piny/seznamem míst. */
+  function vykreslitStatistikuVyberu_(akceMapa) {
+    const el = document.getElementById('mapa-statistika');
+    if (!el) return;
+    el.innerHTML = '';
+    const s = spocitejStatistikuVyberu_(akceMapa);
+    [
+      { hodnota: s.pocetAkci, popisek: 'akcí' },
+      { hodnota: s.pocetMist, popisek: 'míst' },
+      { hodnota: s.pocetKategorii, popisek: 'kategorií' },
+    ].forEach(polozka => {
+      const bunka = document.createElement('div');
+      bunka.className = 'mapa-stat';
+      const cislo = document.createElement('div');
+      cislo.className = 'mapa-stat-cislo';
+      cislo.textContent = polozka.hodnota;
+      const popisek = document.createElement('div');
+      popisek.className = 'mapa-stat-popisek';
+      popisek.textContent = polozka.popisek;
+      bunka.appendChild(cislo);
+      bunka.appendChild(popisek);
+      el.appendChild(bunka);
+    });
+  }
+
+  // ── v3.45 (P): mini předpověď počasí pro výběr – Cesta A, frontend
+  // volá Open-Meteo přímo (žádný nový backend endpoint, žádný
+  // CacheService). Cache jen v paměti běhu stránky (per session/reload) –
+  // pokud by se v budoucnu ukázalo, že tohle zatěžuje Open-Meteo rate
+  // limit nebo je pomalé, zvážit Cestu B (backend endpoint s trvalou
+  // cache), viz BACKLOG.md.
+  let cachePocasiVyberu_ = null;          // { klic, dny: [{kod, teplota}, ...] | null } | null
+  // Set (ne jedna proměnná!) – klíče, na které PRÁVĚ BĚŽÍ fetch. Rychlé
+  // přepnutí výběru A → B → zpět na A dřív, než doběhne fetch A, by s
+  // jedinou sdílenou proměnnou mohlo vést k tomu, že start fetche B
+  // přepíše "probíhá A" na "probíhá B" a finally bloku fetche A pak
+  // omylem smaže i cizí (B) marker – Set drží stav KAŽDÉHO klíče zvlášť,
+  // takže dokončení jednoho fetche nikdy neovlivní dedup jiného.
+  const fetchPocasiVyberuProbihaKlice_ = new Set();
+
+  /** Stáhne 3denní Open-Meteo předpověď pro dané souřadnice (žádný
+   *  geocoding – souřadnice už máme přímo z akce, na rozdíl od
+   *  weatherFor_ v .gs, který geokóduje podle jména obce). Chyba
+   *  (síť/API nedostupné) se uloží jako `dny: null` – blok pak zůstane
+   *  tiše prázdný, appka nespadne ani nic neblokuje (stejná filozofie
+   *  jako inicializovatMapu_ při výpadku Leaflet CDN). Po dokončení
+   *  (úspěch i chyba) překreslí mapu, ať se nová data hned promítnou –
+   *  vykreslitPocasiVyberu_ v ní znovu porovná cachePocasiVyberu_.klic
+   *  s AKTUÁLNÍM výběrem, takže i data z fetche pro mezitím opuštěné
+   *  místo se nikdy nezobrazí jako počasí pro jiné (viz race condition
+   *  poznámka výš). */
+  async function nacistPocasiVyberu_(lat, lng, klic) {
+    if (fetchPocasiVyberuProbihaKlice_.has(klic)) return;
+    fetchPocasiVyberuProbihaKlice_.add(klic);
+    try {
+      const res = await fetch(
+        'https://api.open-meteo.com/v1/forecast?daily=weather_code,temperature_2m_max' +
+        '&timezone=Europe%2FPrague&forecast_days=3&latitude=' + lat + '&longitude=' + lng);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      const dny = (d.daily && d.daily.time || []).map((iso, i) => ({
+        kod: d.daily.weather_code[i],
+        teplota: d.daily.temperature_2m_max[i],
+      }));
+      cachePocasiVyberu_ = { klic, dny };
+    } catch (e) {
+      cachePocasiVyberu_ = { klic, dny: null };
+    } finally {
+      fetchPocasiVyberuProbihaKlice_.delete(klic);
+      vykreslitMapu();
+    }
+  }
+
+  /** v3.45 (P): vykreslí mini předpověď (#mapa-pocasi, jen desktop přes
+   *  CSS) pro přibližnou polohu výběru – souřadnice první akce z
+   *  akceMapa (stejný vstup jako #mapa-mista/#mapa-statistika). Žádná
+   *  akce se souřadnicemi ve výběru → blok zůstane prázdný, stejně jako
+   *  #mapa-mista dnes. Ikony/text sdílené s kartami (weathercodeEmoji_/
+   *  pocasiZobrazeni_), ať jsou vizuálně konzistentní, ne vlastní systém. */
+  function vykreslitPocasiVyberu_(akceMapa) {
+    const el = document.getElementById('mapa-pocasi');
+    if (!el) return;
+    el.innerHTML = '';
+    const akce = (akceMapa || [])[0];
+    if (!akce) return;
+    const klic = klicSouradnic_(akce.lat, akce.lng);
+    if (!cachePocasiVyberu_ || cachePocasiVyberu_.klic !== klic) {
+      nacistPocasiVyberu_(akce.lat, akce.lng, klic);   // async – dokreslí se samo po dokončení
+      return;
+    }
+    if (!cachePocasiVyberu_.dny) return;   // fetch selhal – tiše nic
+    const DNY_LABELY = ['Dnes', 'Zítra', 'Pozítří'];
+    cachePocasiVyberu_.dny.slice(0, 3).forEach((den, i) => {
+      const zobrazeni = pocasiZobrazeni_({ kod: den.kod, teplota: den.teplota });
+      const bunka = document.createElement('div');
+      bunka.className = 'mapa-stat';
+      const text = document.createElement('div');
+      text.className = 'mapa-stat-cislo ' + zobrazeni.trida;
+      text.textContent = zobrazeni.text;
+      const popisek = document.createElement('div');
+      popisek.className = 'mapa-stat-popisek';
+      popisek.textContent = DNY_LABELY[i] || '';
+      bunka.appendChild(text);
+      bunka.appendChild(popisek);
+      el.appendChild(bunka);
+    });
+  }
+
+  /** PURE (Q, v3.44): vyprázdní sadu vybraných pinů – jen sada.clear(),
+   *  ale jako pojmenovaná funkce kvůli konzistenci se stylem malých pure
+   *  funkcí v souboru (viz prepnoutVyberPinu_ – sada jako explicitní
+   *  parametr kvůli testovatelnosti bez DOM). */
+  function vycistitVyberPinu_(sada) {
+    sada.clear();
+  }
+
+  /** v3.44 (Q): zobrazí/skryje tlačítko „Zobrazit vše na mapě" podle
+   *  toho, jestli je aktuálně vybraný aspoň jeden pin – CSS (media query
+   *  min-width:900px) se stará o to, aby bylo vidět jen na desktopu,
+   *  tahle třída jen o tom, jestli má vůbec smysl (viz #btn-zobrazit-vse-na-mape.viditelne). */
+  function aktualizovatTlacitkoResetVyberu_() {
+    const btn = document.getElementById('btn-zobrazit-vse-na-mape');
+    if (!btn) return;
+    btn.classList.toggle('viditelne', vybranePiny_.size > 0);
   }
 
   /** v3.41: sdílený handler kliku na titulek karty (E) i řádek seznamu

@@ -20,6 +20,7 @@ const f = nactiFrontendFunkce([
   'akceDnePodleData_', 'seskupitPodleSouradnic_',
   'vypocitejPoziciTooltipuKalendare_',
   'klicSouradnic_', 'sestavSeznamMist_', 'prepnoutVyberPinu_',
+  'spocitejStatistikuVyberu_', 'vycistitVyberPinu_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -909,4 +910,63 @@ test('prepnoutVyberPinu_: ostatní klíče v sadě zůstanou nedotčené', () =>
   f.prepnoutVyberPinu_(sada, 'novy-klic');
   assert.equal(sada.has('jiny-klic'), true);
   assert.equal(sada.has('novy-klic'), true);
+});
+
+// ---------------------------------------------------------------------------
+// v3.44: spocitejStatistikuVyberu_ (O – mini statistika pod mapou)
+// ---------------------------------------------------------------------------
+
+test('spocitejStatistikuVyberu_: jedna akce → 1 akce, 1 místo, počet kategorií podle pole', () => {
+  const s = f.spocitejStatistikuVyberu_([akceMisto({ kategorie: ['koncerty', 'festivaly'] })]);
+  assert.equal(s.pocetAkci, 1);
+  assert.equal(s.pocetMist, 1);
+  assert.equal(s.pocetKategorii, 2);
+});
+
+test('spocitejStatistikuVyberu_: víc akcí na stejném místě → pocetMist počítá unikátně (stejný klíč jako sestavSeznamMist_)', () => {
+  const s = f.spocitejStatistikuVyberu_([
+    akceMisto({ id: 'a', kategorie: ['koncerty'] }),
+    akceMisto({ id: 'b', kategorie: ['divadlo'] }),
+  ]);
+  assert.equal(s.pocetAkci, 2);
+  assert.equal(s.pocetMist, 1);
+});
+
+test('spocitejStatistikuVyberu_: kategorie se deduplikují napříč akcemi', () => {
+  const s = f.spocitejStatistikuVyberu_([
+    akceMisto({ id: 'a', lat: 49.10, lng: 16.60, kategorie: ['koncerty', 'festivaly'] }),
+    akceMisto({ id: 'b', lat: 49.20, lng: 16.70, kategorie: ['festivaly'] }),
+  ]);
+  assert.equal(s.pocetMist, 2);
+  assert.equal(s.pocetKategorii, 2);
+});
+
+test('spocitejStatistikuVyberu_: chybějící/prázdné pole kategorie nespadne', () => {
+  const s = f.spocitejStatistikuVyberu_([akceMisto({ kategorie: undefined }), akceMisto({ id: 'b', kategorie: [] })]);
+  assert.equal(s.pocetKategorii, 0);
+});
+
+test('spocitejStatistikuVyberu_: prázdné/chybějící pole akcí nespadne', () => {
+  const prazdne = f.spocitejStatistikuVyberu_([]);
+  assert.equal(prazdne.pocetAkci, 0);
+  assert.equal(prazdne.pocetMist, 0);
+  assert.equal(prazdne.pocetKategorii, 0);
+  const chybejici = f.spocitejStatistikuVyberu_(undefined);
+  assert.equal(chybejici.pocetAkci, 0);
+});
+
+// ---------------------------------------------------------------------------
+// v3.44: vycistitVyberPinu_ (Q – reset výběru pinů)
+// ---------------------------------------------------------------------------
+
+test('vycistitVyberPinu_: vyprázdní neprázdnou sadu', () => {
+  const sada = new Set(['a', 'b', 'c']);
+  f.vycistitVyberPinu_(sada);
+  assert.equal(sada.size, 0);
+});
+
+test('vycistitVyberPinu_: na prázdné sadě je no-op, nespadne', () => {
+  const sada = new Set();
+  f.vycistitVyberPinu_(sada);
+  assert.equal(sada.size, 0);
 });
