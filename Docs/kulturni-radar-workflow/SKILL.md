@@ -174,6 +174,12 @@ z BACKLOG.md (co ještě čeká), každá s hrubým časovým odhadem (např.
 zbývajícího času případně pokračující session, bez nutnosti znovu
 procházet celý BACKLOG.md ručně.
 
+Kromě shrnutí co se udělalo, na konci session (i) zkontrolovat, jestli
+se v jejím průběhu objevil nový poznatek/vzorec/gotcha hodný zapsání
+do SKILL.md (nová automatizace, nový diagnostický postup, zastaralá
+informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
+úpravu ke schválení, ne ji jen zmínit mimochodem.
+
 ### Explicitní hranice session (Start/End)
 Kromě automatického rozpoznání farewell frází platí i explicitní
 anglická klíčová slova, protože v jedné dlouhé konverzaci může dojít
@@ -287,10 +293,28 @@ znovu celý cyklus A+B. To je v pořádku a čekané, ne known-issue — raději
 rychlé malé iterace s ověřením v produkci než snaha odhadnout formát
 napoprvé dokonale.
 
-## 6. Automatizace nasazení do Apps Script (clasp) — prozkoumáno, zatím NEzapojeno
+## 6. Automatizace nasazení do Apps Script (clasp) — aktivně používáno od 8. 8. 2026
 
-Zkoumáno 8. 8. 2026 jako reakce na to, že krok 5 výše (ruční nasazení)
-byl jediný krok v celém release cyklu, který nešel automatizovat.
+Zavedeno 8. 8. 2026 jako náhrada za ruční nasazení (krok 5 v sekci 5) —
+dřív jediný neautomatizovaný krok release cyklu. **Ověřeno v praxi
+8.–18. 8. 2026, opakovaně, bez incidentu** — jen 18. 8. samotného sedm
+nasazení za sebou (v3.39 → v3.45), vždy stejný vzorec: `clasp push -f`
+→ `clasp deploy -i <ID> --description "vX"` → ověření `?api=meta`.
+
+### Aktuální stav
+Clasp běží na Vojtově stroji přes Claude Code (ne v tomhle hlavním
+chatu — tohle prostředí má síťový přístup omezený na povolený seznam
+domén, `script.google.com`/`accounts.google.com` v něm nejsou, takže
+`clasp login`/`push`/`deploy` odsud spustit nejde). Na Vojtově stroji:
+- `clasp` nainstalovaný (`npm install -g @google/clasp`) a přihlášený
+  (`clasp login`, token v `~/.clasprc.json` — v `.gitignore`, nikdy
+  necommitovat).
+- OAuth souhlas obsahuje přesně tři potřebné scopy (`script.projects`,
+  `script.deployments`, `script.webapp.deploy` — viz sekce níže), bez
+  širšího přístupu k Disku.
+- `.clasp.json` napojený na existující Apps Script projekt "Kulturní
+  radar" (`scriptId`), `apps-script/appsscript.json` existuje lokálně
+  i v repu (commitnuto).
 
 ### Zjištění
 - `clasp` (`google/clasp` na GitHubu) je oficiální CLI od Googlu pro
@@ -379,37 +403,6 @@ přes skript), ne v interaktivním terminálu — známý RF bug, nesouvisí
 s appkou. Obchvat: před spuštěním RF sady takhle nastavit
 `$env:PYTHONIOENCODING = "utf-8"` jen pro daný běh.
 
-### Proč to NEJDE spustit odsud (Claude v tomhle chatu)
-Síťový přístup z tohoto prostředí je omezený na povolený seznam domén
-(GitHub, npm, PyPI apod.) — `script.google.com` ani `accounts.google.com`
-v seznamu nejsou. I kdyby se `clasp` nainstaloval přes npm (to by šlo),
-samotné `clasp login`/`clasp push` by selhalo na síťovém blokování.
-**Tohle není řešitelné odsud, jen z prostředí, kde `clasp` reálně běží.**
-
-### Reálná cesta, pokud by Vojta chtěl pokračovat
-Jde to udělat přes **Claude Code na jeho vlastním počítači** (plný síťový
-přístup, jeho vlastní Google účet už přihlášený v prohlížeči):
-1. `npm install -g @google/clasp`
-2. Povolit Google Apps Script API v nastavení Google účtu (jednorázově,
-   přes web).
-3. `clasp login` — otevře prohlížeč, OAuth souhlas, uloží token do
-   `~/.clasprc.json`.
-4. `clasp clone <scriptId>` NEBO ruční `.clasp.json` se stávajícím
-   `scriptId` (Apps Script projekt "Kulturní radar" už existuje, jen se
-   k němu clasp musí napojit, ne založit nový).
-5. **`~/.clasprc.json` obsahuje access i refresh token** — nikdy
-   necommitovat, přidat do `.gitignore` (pravděpodobně tam analogicky
-   jako `playwright-log.txt`).
-6. Vyzkoušet `clasp push -f` a `clasp deploy --description "vXX"` ručně
-   napřed, než se to zapojí do promptu/CI.
-
-### Doporučení
-**Zatím nezavádět bez výslovného rozhodnutí Vojty** — vyžaduje to OAuth
-souhlas s jeho Google účtem (citlivé oprávnění, ne něco, co se zapojí
-"mimochodem"). Až/pokud se Vojta rozhodne pokračovat, je tohle hotový
-podklad k tomu, aby to šlo rovnou technicky realizovat, ne znovu zkoumat
-od nuly.
-
 ### Přenos textových souborů s diakritikou do Claude Code
 Ověřeno 8. 8. 2026 (SKILL.md samotný): vkládání textového souboru s
 českou diakritikou jako přílohy přímo do promptu (ať už přes kopírování
@@ -419,4 +412,65 @@ bez ohledu na zdroj/formát přílohy. Spolehlivé řešení: uložit soubor
 ručně přímo na disk do repa (mimo chat, mimo přílohy) a požádat Claude
 Code, ať ho přečte přímo ze souborového systému (svým file/read
 nástrojem), ne z přílohy zprávy.
+
+## 7. Diagnostika přes claude-in-chrome (živé ověření na produkci)
+
+Vytěženo ze session 18. 8. 2026 (redesign v3.39–v3.45), kde Claude
+v hlavním chatu (ne Claude Code) opakovaně použil claude-in-chrome MCP
+tool k živému ověřování přímo na `kulturniradar.cz` — kontrola nasazené
+verze, zjišťování z-index/stacking-context řetězce, přesné pixelové
+měření zarovnání prvků, ověření sticky chování po scrollu.
+
+**Dělá tohle Claude v hlavním chatu** (má přístup k claude-in-chrome),
+**ne Claude Code** — ten pracuje jen v terminálu/editoru na Vojtově
+stroji a žádný prohlížeč k dispozici nemá.
+
+### Kdy použít
+- Ověření, že nasazený deploy skutečně odpovídá poslednímu commitu
+  (ne uložená stará verze v cache prohlížeče).
+- Podezření na z-index/stacking-context kolizi (proč se prvek
+  s vyšším z-index přesto schovává pod jiným).
+- Přesné pixelové zarovnání dvou prvků layoutu (dřív, než se to
+  potvrdí/vyvrátí ručně přepočtem CSS).
+
+### Snippety pro opakované použití
+
+```javascript
+// Ověření nasazené verze (z HTML komentáře na začátku Index.html)
+const it = document.createNodeIterator(document, NodeFilter.SHOW_COMMENT);
+let n, first = null;
+while ((n = it.nextNode())) { if (!first) first = n.textContent; }
+first;
+
+// Zjištění z-index/stacking-context řetězce (transform/filter na
+// ancestor elementech může "polapit" position:fixed potomky)
+function stackingInfo(el) {
+  const chain = [];
+  let node = el;
+  while (node && node !== document.documentElement) {
+    const cs = getComputedStyle(node);
+    chain.push({ tag: node.tagName, id: node.id, position: cs.position,
+      zIndex: cs.zIndex, transform: cs.transform, overflow: cs.overflow });
+    node = node.parentElement;
+  }
+  return chain;
+}
+
+// Přesné pixelové zarovnání dvou prvků (right/left okraje)
+document.getElementById('A').getBoundingClientRect().right ===
+document.getElementById('B').getBoundingClientRect().right;
+```
+
+### Gotcha: resize_window nespolehlivě simuluje mobilní viewport
+Ověřeno 18. 8. 2026: nastavení užšího viewportu přes claude-in-chrome
+`resize_window` (zkoušeno 375×812) neovlivnilo skutečné
+`window.innerWidth` stránky, které zůstalo přes 900px — mobilní CSS
+breakpointy se tak nikdy nespustily. `resize_window` v tomhle vzdáleném
+browser prostředí tedy nespolehlivě zužuje skutečný viewport. Mobilní
+vizuální ověření (sbalitelná mapa/kalendář apod.) dělat na reálném
+zařízení (Vojtův Android telefon), nebo přes Vojtův vlastní Chrome
+DevTools (Ctrl+Shift+M) — ne přes claude-in-chrome `resize_window`.
+RF testy tohle omezení nemají (vlastní `New Context` s `viewport`
+parametrem, viz sekce M/N testů v `tests/robot/frontend.robot`) a
+fungují spolehlivě.
 
