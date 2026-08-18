@@ -1,5 +1,14 @@
 # Changelog
 
+## Index.html v3.41 — Výběr pinů na mapě (dlaždice + seznam míst), vyšší strop mapy — 18. 8. 2026
+### Přidáno
+- **D) Sdílený mechanismus „vybrané piny"** — modulový `vybranePiny_` (Set klíčů souřadnic), nová pure funkce `prepnoutVyberPinu_(sada, klic)` (toggle, Set jako explicitní parametr kvůli izolované testovatelnosti přes frontend-harness). Nová sdílená pure `klicSouradnic_(lat, lng)` (refaktor z `seskupitPodleSouradnic_`, teď i vrací `klic` na skupině), ať tři místa (piny, titulek karty, seznam míst) počítají identický klíč. Vybraný pin dostane vlastní Leaflet `divIcon` (`.pin-vybrany`, tmavý puntík) — záměrně jiná barva než terakotový pulz `.karta.zvyrazneno` (sdílený odkaz `?akce=ID`), ať se dva různé signály nepletou. Sdílený orchestrátor `vybratPin_(klic)`: toggle → překreslí piny i seznam míst → sesynchronizuje `.vybrano` na titulcích karet se stejným klíčem → při PŘIDÁNÍ do výběru `flyTo` na dané místo (zoom min. 15, nezmenšuje už bližší přiblížení).
+- **E) Klik na titulek karty** — `vytvorKartu` přidá klikací handler jen na `.nazev` (ne na celou kartu, ať nekoliduje s tlačítky Více info/Do kalendáře/Mapa/Sdílet/★/✓), jen u akcí s platnými souřadnicemi. Vizuální feedback `.nazev.vybrano` (podtržení + tmavé pozadí).
+- **F) Seznam míst pod mapou** — nová sekce `#mapa-mista` v `#mapa-panel`, viditelná jen na desktopu (`≥900px`). Nová pure funkce `sestavSeznamMist_(akce)` → `[{klic, nazev, pocet}]`, seřazeno sestupně podle počtu akcí (chybějící `a.misto` → „Neznámé místo"). `vykreslitSeznamMist_()` vykresluje řádky (klikatelné, volají `vybratPin_`), volané automaticky z `vykreslitMapu()`, ať je seznam vždy v sync s piny.
+### Změněno
+- **G) Výškový strop mapy zvýšen** (`≥1360px`) — `clamp(480px, 45vh, 650px)` → `clamp(480px, 50vh, 850px)`, ať zbývá míň nevyužitého prostoru pod mapou na vysokých monitorech.
+- Node testy 292 → 301 (+9: `prepnoutVyberPinu_` – select/deselect/opakovaný toggle/nedotčené ostatní klíče; `sestavSeznamMist_` – seskupení, řazení sestupně, chybějící `misto`, prázdný vstup; `seskupitPodleSouradnic_` – klíč skupiny odpovídá `klicSouradnic_`). Leaflet-závislé vykreslování (barva pinu, `flyTo`) a media queries netestovatelné mimo prohlížeč, ověřeno ručně.
+
 ## Index.html v3.40 — Fáze 3 doladění po živé kontrole: tooltip, popup mapy, sbalitelná mapa na mobilu — 18. 8. 2026
 ### Opraveno
 - **A) Tooltip kalendáře přesahoval mimo sidebar** — `#kalendar-tooltip` (v3.38/v3.39) se pozicoval jen podle buňky dne, takže na užších sidebarech mohl přesáhnout do mřížky karet vpravo. Nová čistá funkce `vypocitejPoziciTooltipuKalendare_` oklampuje `left` přes `Math.min`/`Math.max` podle `#kat-sidebar.getBoundingClientRect()` (konstanta `SIRKA_TOOLTIP_KALENDARE_ = 240`, musí odpovídat CSS `max-width`) — tooltip se při přetečení zarovná k pravému okraji sidebaru místo přesahu, a nikdy nejde ani pod jeho levý okraj.

@@ -42,7 +42,6 @@ změně BACKLOGu.
 - Horní tmavá lišta (`<header>`: nadpis appky, profil, kontakt) by měla být `position: sticky; top: 0` při scrollování — dnes odjíždí z obrazovky.
 - Druhá lišta pod ní (`#controls-oznaceni`: dropdown výběru města + chipy ★ Oblíbené/✓ Navštívené/❓ Neověřeno/📤 Sdílet výběr) by měla být sticky taky — dvouvrstvý sticky header, potřeba sladit s existujícím sticky chováním `#kat-sidebar` a `#mapa-panel` (v3.36/v3.37), ať se navzájem nepřekrývají.
 - Mapa (`#mapa-panel`, ≥1360px) by měla sahat až k pravému okraji stránky bez paddingu — stejný princip, jaký už od v3.36 platí pro sidebar vlevo.
-- Pod mapou zůstává na širokém/vysokém monitoru nevyužitý prostor (mapa má dnes výškový strop 650px, v3.37) — zvážit např. textový seznam míst pod mapou, nebo uvolnit výškový strop dál.
 
 ## Zpětná vazba syna — 5. 8. 2026
 ### Design/rozvržení (patří do dceřina designového večera, ne bodová oprava)
@@ -77,7 +76,7 @@ změně BACKLOGu.
 
 ## Větší témata
 - ~~Plnohodnotná interaktivní mapa akcí (víc pinů najednou)~~ — **HOTOVO 17.–18. 8. 2026** (fáze 3 redesignu, Index.html v3.35–v3.38, viz CHANGELOG.md): vestavěná Leaflet mapa se všemi piny najednou, akce na stejném místě seskupené do jednoho pinu, popup s odkazem zpět do seznamu. Odkaz „📍 Mapa" na kartě (v3.10, jedna akce, garantovaný pin díky souřadnicím z Nominatim) zůstává beze změny vedle ní — dvě různé věci.
-- **Klik na akci → přidat na mapu jako „vybranou"** (nápad, 18. 8. 2026 v noci, ze živého testování fáze 3; odhad neurčen, potřebuje vlastní diskuzi) — klik na dlaždici/nadpis akce by ji přidal do „vybraných" zobrazených na mapě, jiná funkce než dnešní automatické zobrazení podle filtru (`akceProMapu_`). Otevřená otázka: nahradí auto-zobrazení, nebo poběží vedle něj (přepínač „vše" vs. „jen vybrané")? Zatím jen nápad, ne rozhodnutí.
+- ~~Klik na akci → přidat na mapu jako „vybranou"~~ — **HOTOVO 18. 8. 2026** (Index.html v3.41, viz CHANGELOG.md): klik na titulek akce v seznamu i řádek nového seznamu míst pod mapou přepíná výběr pinu (sdílený mechanismus `vybranePiny_`/`prepnoutVyberPinu_`), vybraný pin dostane odlišnou ikonu a mapa se na něj přiblíží. Otevřená otázka z nápadu (nahradí auto-zobrazení, nebo poběží vedle něj) vyřešena: běží vedle něj – výběr je čistě vizuální zvýraznění nad existujícím auto-zobrazením podle filtru, nefiltruje piny.
 - Strukturované časy `cas_od`/`cas_do` — přesnější „Do kalendáře" (dnes celodenní), řazení akcí v rámci dne.
 - Případná Android aplikace (výukový projekt) — cesta: PWA → Trusted Web Activity → Google Play. Frontendový večer (podmínka vlastní domény) hotov 8. 8. 2026.
 - **API credit optimalizace** (~0,5–1 h): v konzoli Anthropic snížit Monthly spend limit (~$15) + e-mailové notifikace, zvážit auto-reload s malým prahem; v kódu `MAX_WEB_SEARCHES` už je 3 (ověřeno dříve); experiment: denní kontrolu zkusit na Haiku, Sonnet jen pro mimořádné a měsíční místa (týden měření kvality úlovků před rozhodnutím).

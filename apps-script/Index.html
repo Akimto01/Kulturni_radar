@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.40 – tooltip v hranicích sidebaru, zavírání mapy popup při pohybu, sbalitelná mapa na mobilu -->
+<!-- Kulturní radar Index.html v3.41 – vyber pinu na mape (dlazdice + seznam mist), vyssi strop mapy -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -170,6 +170,21 @@
     margin: 6px 0; border: none; border-top: 1px solid #e0ddd6;
   }
 
+  /* v3.41: „vybraný pin" – vlastní Leaflet divIcon (viz ikonaVybranehoPinu_),
+     tmavý puntík místo výchozí modré značky. Záměrně jiná barva/tvar než
+     .karta.zvyrazneno (terakotový pulz u sdíleného odkazu ?akce=ID) – jde
+     o dva různé signály (dočasné zvýraznění vs. trvalý výběr), nesmí se
+     vizuálně plést. */
+  .leaflet-div-icon.pin-vybrany {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--ink); border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,.35);
+  }
+
+  /* v3.41: seznam míst pod mapou (F) – jen desktop, viz media query
+     (min-width: 900px) níže. */
+  #mapa-mista { display: none; }
+
   #controls-oznaceni {
     padding: 8px 20px 10px;
     background: var(--card);
@@ -263,6 +278,17 @@
 
   .karta-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
   .nazev { font-size: 1rem; font-weight: 600; line-height: 1.35; }
+  /* v3.41: titulek akcí se souřadnicemi je klikatelný – přepíná výběr
+     pinu na mapě (viz vybratPin_). Podtržení + tmavé pozadí při výběru –
+     záměrně jiný vzhled než .karta.zvyrazneno (terakotový pulz), ať se
+     „vybráno pro mapu" neplete s „dočasně zvýrazněno ze sdíleného odkazu". */
+  .nazev-klikatelna { cursor: pointer; }
+  .nazev-klikatelna:hover { text-decoration: underline; }
+  .nazev.vybrano {
+    text-decoration: underline;
+    background: color-mix(in srgb, var(--ink) 10%, var(--card));
+    border-radius: 4px; padding: 0 4px; margin: 0 -4px;
+  }
   .karta-top-vpravo { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .skore {
     font-family: var(--mono);
@@ -586,6 +612,21 @@
 
     #mapa-panel { display: block; order: 3; }
     #mapa { height: 480px; }   /* v3.36: bylo 350px; přebito na širokém desktopu níže (v3.37) */
+
+    /* v3.41: seznam míst pod mapou (F) – jen na desktopu, kde je mapa
+       trvale vidět a je pod ní/vedle ní místo. */
+    #mapa-mista { display: block; margin-top: 10px; }
+    .mapa-misto {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer;
+      font-size: .82rem; color: var(--ink-2);
+    }
+    .mapa-misto:hover { background: var(--accent-2); color: var(--ink); }
+    .mapa-misto.vybrano {
+      background: color-mix(in srgb, var(--ink) 10%, var(--card));
+      color: var(--ink); font-weight: 600; text-decoration: underline;
+    }
+    .mapa-misto-pocet { font-family: var(--mono); font-size: .72rem; color: var(--ink-3); flex-shrink: 0; }
   }
 
   /* v3.36/v3.37: úzký desktop (900–1359px) – mapa jako postranní panel by tu
@@ -609,8 +650,10 @@
      na 1280px dala mapa 384px a main by klesl na 600px – pod 656px
      potřebných pro 2 sloupce (cliff). Na 1360px vychází main přesně na
      656px, 2 sloupce navazují plynule na úzké pásmo. Výška roste s
-     výškou okna (45vh), floor 480px (nikdy méně než dřívější pevná
-     hodnota, i na nízkých oknech notebooků) až strop 650px. */
+     výškou okna (50vh, v3.37 45vh), floor 480px (nikdy méně než dřívější
+     pevná hodnota, i na nízkých oknech notebooků) až strop 850px (v3.37
+     650px – zvětšeno v3.41, ať zbývá míň nevyužitého prostoru pod mapou
+     na vysokých monitorech). */
   @media (min-width: 1360px) {
     #mapa-panel {
       flex: 0 0 clamp(280px, 30vw, 800px);
@@ -618,7 +661,7 @@
       position: sticky;
       top: 16px;
     }
-    #mapa { height: clamp(480px, 45vh, 650px); }
+    #mapa { height: clamp(480px, 50vh, 850px); }
   }
 </style>
 </head>
@@ -687,6 +730,8 @@
        výše pro stejný vzor. -->
   <div id="mapa-panel">
     <div id="mapa"></div>
+    <!-- v3.41: seznam míst pod mapou (F), jen desktop – viz vykreslitSeznamMist_ -->
+    <div id="mapa-mista"></div>
   </div>
 
   <main id="main">
@@ -1385,6 +1430,17 @@
     const nazev = document.createElement('div');
     nazev.className = 'nazev';
     nazev.textContent = a.nazev;
+    // v3.41 (E): klik na titulek přepne výběr pinu na mapě – jen u akcí
+    // s platnými souřadnicemi (bez nich pin neexistuje). Handler jen na
+    // titulku, ne na celé kartě, ať nekoliduje s tlačítky uvnitř (Více
+    // info, Do kalendáře, Mapa, Sdílet, ★/✓).
+    if (typeof a.lat === 'number' && typeof a.lng === 'number') {
+      const klic = klicSouradnic_(a.lat, a.lng);
+      nazev.dataset.klic = klic;
+      nazev.classList.add('nazev-klikatelna');
+      if (vybranePiny_.has(klic)) nazev.classList.add('vybrano');
+      nazev.addEventListener('click', () => vybratPin_(klic));
+    }
 
     const vpravo = document.createElement('div');
     vpravo.className = 'karta-top-vpravo';
@@ -1683,6 +1739,14 @@
       typeof a.lat === 'number' && typeof a.lng === 'number' && jeViditelnaVSeznamu_(a, dnes));
   }
 
+  /** PURE: klíč pro seskupení/párování podle souřadnic (~1m přesnost, 5
+   *  desetinných míst) – sdílený mezi seskupitPodleSouradnic_ (piny),
+   *  vytvorKartu (klik na titulek, v3.41) a sestavSeznamMist_ (v3.41),
+   *  aby všechna tři místa počítala identický klíč jednoho pinu. */
+  function klicSouradnic_(lat, lng) {
+    return lat.toFixed(5) + ',' + lng.toFixed(5);
+  }
+
   /** PURE: seskupí už vyfiltrované akce (akceProMapu_) podle souřadnic
    *  zaokrouhlených na 5 desetinných míst (~1m přesnost) – akce na
    *  (prakticky) stejném místě dostanou jeden pin místo překryvu. Pin se
@@ -1692,11 +1756,45 @@
   function seskupitPodleSouradnic_(akce) {
     const skupiny = new Map();
     (akce || []).forEach(a => {
-      const klic = a.lat.toFixed(5) + ',' + a.lng.toFixed(5);
-      if (!skupiny.has(klic)) skupiny.set(klic, { lat: a.lat, lng: a.lng, akce: [] });
+      const klic = klicSouradnic_(a.lat, a.lng);
+      if (!skupiny.has(klic)) skupiny.set(klic, { klic, lat: a.lat, lng: a.lng, akce: [] });
       skupiny.get(klic).akce.push(a);
     });
     return [...skupiny.values()];
+  }
+
+  /** PURE: seznam míst (unikátní souřadnice) z akceProMapu_ výstupu, pro
+   *  seznam pod mapou (F, v3.41) – sdílí klíč s klicSouradnic_, ať klik na
+   *  řádek trefí stejný pin jako mapa/titulek karty. Řazeno podle počtu
+   *  akcí sestupně (nejvytíženější místa nahoře). Volat AŽ PO akceProMapu_
+   *  – stejný předpoklad platných lat/lng jako seskupitPodleSouradnic_. */
+  function sestavSeznamMist_(akce) {
+    const mista = new Map();
+    (akce || []).forEach(a => {
+      const klic = klicSouradnic_(a.lat, a.lng);
+      if (!mista.has(klic)) mista.set(klic, { klic, nazev: a.misto || 'Neznámé místo', pocet: 0 });
+      mista.get(klic).pocet++;
+    });
+    return [...mista.values()].sort((a, b) => b.pocet - a.pocet);
+  }
+
+  // v3.41: „vybrané piny" – sdílený mechanismus mezi mapou (D), titulkem
+  // karty (E) a seznamem míst pod mapou (F). Klíč = stejný formát jako
+  // klicSouradnic_.
+  let vybranePiny_ = new Set();
+
+  /** PURE: přepne klíč ve „sadě" (vybranePiny_ za běhu appky, izolovaný
+   *  Set v testech) – pokud tam je, odebere (deselect), jinak přidá
+   *  (select). Vrací nový stav (true = právě vybráno). Set jako explicitní
+   *  parametr (ne modulová `vybranePiny_` přímo) kvůli testovatelnosti bez
+   *  DOM – volající (vybratPin_) předává skutečnou modulovou sadu. */
+  function prepnoutVyberPinu_(sada, klic) {
+    if (sada.has(klic)) {
+      sada.delete(klic);
+      return false;
+    }
+    sada.add(klic);
+    return true;
   }
 
   let mapaLeaflet = null;
@@ -1744,19 +1842,71 @@
     return wrap;
   }
 
+  /** v3.41: Leaflet divIcon pro vybraný pin (viz CSS `.pin-vybrany`) –
+   *  vizuálně jasně odlišná od výchozí modré značky i od terakotového
+   *  pulzu karet (.karta.zvyrazneno), ať uživatel nepoplete dva různé
+   *  signály (trvalý výběr vs. dočasné zvýraznění ze sdíleného odkazu). */
+  function ikonaVybranehoPinu_() {
+    return L.divIcon({ className: 'pin-vybrany', iconSize: [22, 22], iconAnchor: [11, 11] });
+  }
+
   /** Přerenderuje piny podle vsechnaAkce + aktivního kategorie-filtru
    *  (stejné vstupy jako vykreslitKalendar), akce na stejném místě
-   *  seskupené do jednoho pinu (v3.38). No-op, pokud se mapa
-   *  neinicializovala (viz inicializovatMapu_). */
+   *  seskupené do jednoho pinu (v3.38); piny s klíčem ve `vybranePiny_`
+   *  dostanou odlišnou ikonu (v3.41). Na konci i vykreslitSeznamMist_
+   *  (F) – stejná vstupní data, ať jsou piny a seznam míst vždy v sync.
+   *  No-op, pokud se mapa neinicializovala (viz inicializovatMapu_). */
   function vykreslitMapu() {
     if (!mapaLeaflet) return;
     const dnes = new Date();
     dnes.setHours(0, 0, 0, 0);
+    const akceMapa = akceProMapu_(vsechnaAkce, aktKategorie, dnes);
     mapaVrstvaPinu.clearLayers();
-    const skupiny = seskupitPodleSouradnic_(akceProMapu_(vsechnaAkce, aktKategorie, dnes));
+    const skupiny = seskupitPodleSouradnic_(akceMapa);
     skupiny.forEach(s => {
-      L.marker([s.lat, s.lng]).addTo(mapaVrstvaPinu).bindPopup(sestavPopupMapy_(s.akce));
+      const volby = vybranePiny_.has(s.klic) ? { icon: ikonaVybranehoPinu_() } : undefined;
+      L.marker([s.lat, s.lng], volby).addTo(mapaVrstvaPinu).bindPopup(sestavPopupMapy_(s.akce));
     });
+    vykreslitSeznamMist_(akceMapa);
+  }
+
+  /** v3.41 (F): vykreslí seznam míst pod mapou (#mapa-mista, jen desktop
+   *  přes CSS) – DOM only, logika (řazení, počty) je v sestavSeznamMist_.
+   *  Volané z vykreslitMapu(), ať je vždy v sync s piny. */
+  function vykreslitSeznamMist_(akceMapa) {
+    const el = document.getElementById('mapa-mista');
+    if (!el) return;
+    el.innerHTML = '';
+    sestavSeznamMist_(akceMapa).forEach(m => {
+      const radek = document.createElement('div');
+      radek.className = 'mapa-misto' + (vybranePiny_.has(m.klic) ? ' vybrano' : '');
+      const nazev = document.createElement('span');
+      nazev.textContent = m.nazev;
+      const pocet = document.createElement('span');
+      pocet.className = 'mapa-misto-pocet';
+      pocet.textContent = m.pocet;
+      radek.appendChild(nazev);
+      radek.appendChild(pocet);
+      radek.addEventListener('click', () => vybratPin_(m.klic));
+      el.appendChild(radek);
+    });
+  }
+
+  /** v3.41: sdílený handler kliku na titulek karty (E) i řádek seznamu
+   *  míst (F) – přepne výběr, překreslí piny+seznam míst (D), sesynchronizuje
+   *  vizuální stav titulků karet v seznamu (mohou se stejným klíčem
+   *  vyskytnout víckrát – víc akcí na stejném místě) a při PŘIDÁNÍ do
+   *  výběru (ne při odebrání) mapu přiblíží na dané místo. */
+  function vybratPin_(klic) {
+    const vybrano = prepnoutVyberPinu_(vybranePiny_, klic);
+    vykreslitMapu();
+    document.querySelectorAll('#main .nazev[data-klic="' + klic + '"]').forEach(el => {
+      el.classList.toggle('vybrano', vybrano);
+    });
+    if (vybrano && mapaLeaflet) {
+      const [lat, lng] = klic.split(',').map(Number);
+      mapaLeaflet.flyTo([lat, lng], Math.max(mapaLeaflet.getZoom(), 15));
+    }
   }
 
   // ── v3.25: Počasí u akce – malé políčko vedle data ───────────────────

@@ -19,6 +19,7 @@ const f = nactiFrontendFunkce([
   'jeViditelnaVSeznamu_', 'filtrovatKategorii_', 'akceProMapu_',
   'akceDnePodleData_', 'seskupitPodleSouradnic_',
   'vypocitejPoziciTooltipuKalendare_',
+  'klicSouradnic_', 'sestavSeznamMist_', 'prepnoutVyberPinu_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -832,4 +833,80 @@ test('seskupitPodleSouradnic_: jedna akce → jedna skupina s polem o délce 1',
 test('seskupitPodleSouradnic_: prázdné/chybějící pole akcí nespadne', () => {
   assert.equal(f.seskupitPodleSouradnic_([]).length, 0);
   assert.equal(f.seskupitPodleSouradnic_(undefined).length, 0);
+});
+
+test('seskupitPodleSouradnic_: klíč skupiny odpovídá klicSouradnic_ (v3.41 – sdílený s výběrem pinů)', () => {
+  const skupiny = f.seskupitPodleSouradnic_([akceMisto({})]);
+  assert.equal(skupiny[0].klic, f.klicSouradnic_(49.2, 16.6));
+});
+
+// ---------------------------------------------------------------------------
+// v3.41: sestavSeznamMist_ (F – seznam míst pod mapou)
+// ---------------------------------------------------------------------------
+
+test('sestavSeznamMist_: víc akcí na stejném místě → jeden řádek, pocet = počet akcí', () => {
+  const mista = f.sestavSeznamMist_([
+    akceMisto({ id: 'a', misto: 'Stadion' }),
+    akceMisto({ id: 'b', misto: 'Stadion' }),
+  ]);
+  assert.equal(mista.length, 1);
+  assert.equal(mista[0].nazev, 'Stadion');
+  assert.equal(mista[0].pocet, 2);
+  assert.equal(mista[0].klic, f.klicSouradnic_(49.2, 16.6));
+});
+
+test('sestavSeznamMist_: různá místa → víc řádků, seřazeno podle počtu akcí sestupně', () => {
+  const mista = f.sestavSeznamMist_([
+    akceMisto({ id: 'a', lat: 49.10, lng: 16.60, misto: 'Málo akcí' }),
+    akceMisto({ id: 'b', lat: 49.20, lng: 16.70, misto: 'Hodně akcí' }),
+    akceMisto({ id: 'c', lat: 49.20, lng: 16.70, misto: 'Hodně akcí' }),
+  ]);
+  assert.equal(mista.length, 2);
+  assert.equal(mista[0].nazev, 'Hodně akcí');
+  assert.equal(mista[0].pocet, 2);
+  assert.equal(mista[1].nazev, 'Málo akcí');
+  assert.equal(mista[1].pocet, 1);
+});
+
+test('sestavSeznamMist_: chybějící a.misto → pojmenováno "Neznámé místo"', () => {
+  const mista = f.sestavSeznamMist_([akceMisto({ misto: undefined })]);
+  assert.equal(mista[0].nazev, 'Neznámé místo');
+});
+
+test('sestavSeznamMist_: prázdné/chybějící pole akcí nespadne', () => {
+  assert.equal(f.sestavSeznamMist_([]).length, 0);
+  assert.equal(f.sestavSeznamMist_(undefined).length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// v3.41: prepnoutVyberPinu_ (D – sdílený mechanismus "vybrané piny")
+// ---------------------------------------------------------------------------
+
+test('prepnoutVyberPinu_: klíč není v sadě → přidá ho, vrátí true', () => {
+  const sada = new Set();
+  const vysledek = f.prepnoutVyberPinu_(sada, 'a,b');
+  assert.equal(vysledek, true);
+  assert.equal(sada.has('a,b'), true);
+});
+
+test('prepnoutVyberPinu_: klíč už v sadě je → odebere ho, vrátí false', () => {
+  const sada = new Set(['a,b']);
+  const vysledek = f.prepnoutVyberPinu_(sada, 'a,b');
+  assert.equal(vysledek, false);
+  assert.equal(sada.has('a,b'), false);
+});
+
+test('prepnoutVyberPinu_: opakovaný toggle stejného klíče se chová konzistentně (select/deselect/select)', () => {
+  const sada = new Set();
+  assert.equal(f.prepnoutVyberPinu_(sada, 'x'), true);
+  assert.equal(f.prepnoutVyberPinu_(sada, 'x'), false);
+  assert.equal(f.prepnoutVyberPinu_(sada, 'x'), true);
+  assert.equal(sada.size, 1);
+});
+
+test('prepnoutVyberPinu_: ostatní klíče v sadě zůstanou nedotčené', () => {
+  const sada = new Set(['jiny-klic']);
+  f.prepnoutVyberPinu_(sada, 'novy-klic');
+  assert.equal(sada.has('jiny-klic'), true);
+  assert.equal(sada.has('novy-klic'), true);
 });
