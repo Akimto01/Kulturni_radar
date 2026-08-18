@@ -1193,6 +1193,56 @@ test('v3.20: apiToggle_ bez uzivatelId vrací ok:false (přihlášení je povinn
 });
 
 // ---------------------------------------------------------------------------
+// v3.26: Oblíbená místa – oblibenaMistaSety_, apiToggleMisto_
+// ---------------------------------------------------------------------------
+
+test('v3.26: oblibenaMistaSety_ vrátí Set klíčů míst typu oblibene_misto, ignoruje jiné typy', () => {
+  const sada = r.oblibenaMistaSety_([
+    { id: r.klicSouradnic_('Špilberk', 'Brno'), typ: 'oblibene_misto', datum: '', nazev: '', misto: '', uzivatel: 'vojta' },
+    { id: '42', typ: 'oblibene', datum: '', nazev: '', misto: '', uzivatel: 'vojta' },
+  ]);
+  assert.equal(sada.size, 1);
+  assert.equal(sada.has(r.klicSouradnic_('Špilberk', 'Brno')), true);
+  assert.equal(sada.has(r.klicSouradnic_('špilberk', 'BRNO')), true, 'klíč je normalizovaný, case-insensitive');
+});
+
+test('v3.26: oblibenaMistaSety_ na prázdném poli vrací prázdný Set', () => {
+  assert.equal(r.oblibenaMistaSety_([]).size, 0);
+});
+
+test('v3.26: apiToggleMisto_ bez místa/uzivatelId vrací ok:false', () => {
+  const bezMista = r.apiToggleMisto_({ getSheetByName: () => null }, '', 'Brno', 'vojta');
+  assert.equal(bezMista.ok, false);
+  assert.match(bezMista.error, /místo/);
+
+  const bezUzivatele = r.apiToggleMisto_({ getSheetByName: () => null }, 'Špilberk', 'Brno', '');
+  assert.equal(bezUzivatele.ok, false);
+  assert.match(bezUzivatele.error, /profil/);
+});
+
+test('v3.26: apiToggleMisto_ přidá a znovu odebere oblíbené místo (plný cyklus přes fake Sheets)', () => {
+  // fakeSpreadsheet/MemSheet definované níže (v3.22 sekce) – function/class
+  // deklarace na modulové úrovni se vykonají dřív, než node:test spustí
+  // callback tohoto testu, takže jsou tu dostupné i přes pořadí v souboru.
+  const ss = fakeSpreadsheet({});
+  const prvni = r.apiToggleMisto_(ss, 'Špilberk', 'Brno', 'vojta');
+  assert.equal(prvni.ok, true);
+  assert.equal(prvni.oblibene, true);
+
+  const oznaceniSheet = ss.__sheets['OZNAČENÍ'];
+  assert.equal(oznaceniSheet.getLastRow(), 2, 'hlavička + jeden nový řádek');
+  const zapsanyRadek = oznaceniSheet.getRange(2, 1, 1, 6).getValues()[0];
+  assert.equal(zapsanyRadek[0], r.klicSouradnic_('Špilberk', 'Brno'), 'sloupec "ID akce" nese klíč místa');
+  assert.equal(zapsanyRadek[1], 'oblibene_misto');
+  assert.equal(zapsanyRadek[3], 'Špilberk (Brno)', 'sloupec "Název" čitelný pro člověka');
+  assert.equal(zapsanyRadek[4], 'Špilberk (Brno)', 'sloupec "Místo" duplicitně stejný, ne prázdný');
+
+  const druhy = r.apiToggleMisto_(ss, 'Špilberk', 'Brno', 'vojta');
+  assert.equal(druhy.ok, true);
+  assert.equal(druhy.oblibene, false, 'druhé volání je toggle off');
+});
+
+// ---------------------------------------------------------------------------
 // v3.24/v3.25: apiKontakt_ – kontaktní formulář (dostupný i bez přihlášení)
 // Signatura: apiKontakt_(jmeno, zprava, email, uzivatelId)
 // ---------------------------------------------------------------------------

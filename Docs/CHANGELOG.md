@@ -1,5 +1,18 @@
 # Changelog
 
+## Backend v3.26 + Index.html v3.46 — Oblíbená místa: základ (backend + ikona na kartě) — 19. 8. 2026
+### Přidáno
+- **A) `apiToggleMisto_`/`apiToggleMisto`** — nová funkce pro přepnutí „oblíbené MÍSTO" (ne jednotlivou akci) PRO PŘIHLÁŠENÝ profil. Na rozdíl od `apiToggle_` nebere ID akce (místo nemá jedno konkrétní ID akce) — identita místa se odvozuje přímo z `misto`+`obec` přes existující `klicSouradnic_` (stejný normalizovaný `misto|obec` klíč, který `readEventsApi_` už dnes používá pro lookup do SOUŘADNICE). Klíč se ukládá do sloupce „ID akce" v OZNAČENÍ (přepoužití sloupce u typu `oblibene_misto`); sloupec „Místo" dostává stejnou hodnotu jako „Název" (ne prázdno) — u tohoto typu pole „Místo konání" ztrácí původní význam, prázdná buňka by v Sheetu vypadala jako chybějící data. Zaroutováno v `routePost_` (`akce: 'toggle-misto'`), stejný toggle mechanismus (přidá/smaže řádek) jako `toggleOznaceni_`.
+- **B) `oblibenaMistaSety_(rows)`** — nová pure funkce analogická `oznaceniMapy_`: pole řádků OZNAČENÍ (jednoho uživatele) → `Set` klíčů míst označených `oblibene_misto`. Node testy stejným stylem jako `oznaceniMapy_`/`toggleOznaceni_`, včetně plného cyklu přidání+odebrání přes `fakeSpreadsheet`.
+- **C) `readEventsApi_` rozšíření** — každá akce v `apiEvents` teď nese nové pole `mistoOblibene: boolean`, lookup přes stejný `klicSouradnic_(row[5], row[6])`, co se už dnes počítá pro SOUŘADNICE. `oblibene`/`navstivenoDne` beze změny.
+- **D) Wrapper `apiToggleMisto`** pro `google.script.run`, + routing v `sestavFetchPozadavek_` (Index.html) pro statický frontend mimo Apps Script (kulturniradar.cz), stejný vzor jako `apiToggle`.
+- **E) Ikona 🏛 na kartě akce** — nové tlačítko v `karta-top-vpravo` vedle ★/✓, jen u akcí se známým místem. Klik volá `prepniOznaceniMista(a)` (optimistická odezva stejným vzorem jako `prepniOznaceni`), barevný stav `.ikona-oznaceni.aktivni.misto` (modrá, odlišná od zlaté ★ a zelené ✓).
+### Poznámka k architektuře
+- Backend `VERZE` (3.25 → 3.26) a `Index.html` verze (3.45 → 3.46) se dnes mění spolu — první backend změna po delší době, kdy se měnil jen frontend (poslední backend bump byl v3.25, 10. 8.).
+- Záměrně mimo dnešní rozsah (viz BACKLOG.md, navazující položka): **F** filtr chip pro oblíbená místa, **G** sync stavu napříč `#mapa-mista`/piny na mapě (dnes se aktualizuje jen konkrétní karta, ne ostatní karty/seznam se stejným místem), **H/I** Node testy pro E a RF test plného cyklu.
+- Node testy 308 → 312 (+4: `oblibenaMistaSety_` typová filtrace a prázdné pole, `apiToggleMisto_` validace vstupu a plný cyklus přes `fakeSpreadsheet`). E (DOM) netestováno mimo prohlížeč, stejně jako ostatní ikony ★/✓.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.26"`), ověřeno `?api=meta` → `"verze":"3.26"`.
+
 ## Diagnostika (bez bump verze) — Uzavření zjištění k výkonu — 19. 8. 2026
 ### Zjištěno
 - Ruční ověření přes claude-in-chrome na produkci (kulturniradar.cz): `api=meta` 2409 ms, `api=events` (Brno, 15 kB, cachovaná) 2858 ms, opakovaně 1397–2040 ms, `api=places` 1617 ms.

@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.25 (10. 8. 2026) – Kontaktní formulář: volitelný e-mail pro odpověď (replyTo)
- * (předchozí: 3.24 – kontaktní formulář, e-mail přes MailApp)
+ * Verze: 3.26 (19. 8. 2026) – Oblíbená místa: základ (backend + ikona na kartě), filtr a plné UI příští session
+ * (předchozí: 3.25 – kontaktní formulář, volitelný e-mail pro odpověď (replyTo))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -65,7 +65,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.25';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.26';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
@@ -181,6 +181,7 @@ function routePost_(body, ss) {
   if (akce === 'run')    return spustKontroluCore_(body.token);
   if (akce === 'login')  return apiPrihlaseniUzivatele_(ss, body.uzivatelId, body.pin);
   if (akce === 'toggle') return apiToggle_(ss, body.id, body.typ, body.uzivatelId);
+  if (akce === 'toggle-misto') return apiToggleMisto_(ss, body.misto, body.obec, body.uzivatelId);
   if (akce === 'filtry') return apiSetFiltry_(ss, body.uzivatelId, body.filtry);
   if (akce === 'najdi')  return apiNajdiProUzivatele_(ss, body.uzivatelId, body.token);
   if (akce === 'kontakt') return apiKontakt_(body.jmeno, body.zprava, body.email, body.uzivatelId);
@@ -319,6 +320,7 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
   const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
   const rowsTohotoUzivatele = uzivatelId ? readOznaceni_(ss).filter(r => r.uzivatel === uzivatelId) : [];
   const oznaceniMapa = oznaceniMapy_(rowsTohotoUzivatele);
+  const mistaOblibenaSada = oblibenaMistaSety_(rowsTohotoUzivatele);   // v3.26
   const souradniceMapa = souradniceMapy_(readSouradnice_(ss));
   const pocasiMapa = pocasiMapy_(readPocasi_(ss));
   const akce = [];
@@ -331,7 +333,8 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
     const stav = norm_(row[13]);
     const datumOd = parseCzDate_(row[1]);
     if (!zahrnoutAkciDoVysledku_(stav, datumOd, dnes, zahrnoutOznacene, jeOznaceno)) return;
-    const souradnice = souradniceMapa.get(klicSouradnic_(row[5], row[6])) || null;
+    const klicMista = klicSouradnic_(row[5], row[6]);
+    const souradnice = souradniceMapa.get(klicMista) || null;
     const pocasi = pocasiMapa.get(id);
     akce.push({
       id,
@@ -350,6 +353,7 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
       url: String(row[19] || ''),
       oblibene: oznaceni.oblibene,
       navstivenoDne: oznaceni.navstivenoDne || '',
+      mistoOblibene: mistaOblibenaSada.has(klicMista),   // v3.26
       lat: souradnice ? souradnice.lat : null,
       lng: souradnice ? souradnice.lng : null,
       pocasi: pocasi ? { stav: pocasi.stav, kod: pocasi.kod, teplota: pocasi.teplota } : { stav: 'NA', kod: '', teplota: '' },
@@ -417,6 +421,12 @@ function apiSpustKontrolu(tok)  { return spustKontroluCore_(tok); }
  *  profil; vrací aktuální stav obou příznaků TOHOTO profilu. */
 function apiToggle(id, typ, uzivatelId) {
   return apiToggle_(SpreadsheetApp.getActiveSpreadsheet(), id, typ, uzivatelId);
+}
+
+/** v3.26: přepne „oblíbené místo" (misto+obec, ne ID akce) PRO PŘIHLÁŠENÝ
+ *  uživatelský profil. */
+function apiToggleMisto(misto, obec, uzivatelId) {
+  return apiToggleMisto_(SpreadsheetApp.getActiveSpreadsheet(), misto, obec, uzivatelId);
 }
 
 /** Přihlášení uživatelského profilu (ID + PIN) – volané z přihlašovací obrazovky. */
@@ -1165,6 +1175,15 @@ function oznaceniMapy_(rows) {
   return mapa;
 }
 
+/** PURE (v3.26): pole řádků OZNAČENÍ (jednoho uživatele – volající musí
+ *  předfiltrovat) → Set klíčů míst (`klicSouradnic_(misto, obec)`, tj.
+ *  normalizovaný `misto|obec`) označených typem 'oblibene_misto'. */
+function oblibenaMistaSety_(rows) {
+  const sada = new Set();
+  rows.forEach(r => { if (r.typ === 'oblibene_misto') sada.add(r.id); });
+  return sada;
+}
+
 /** PURE: přepne typ u dané akce PRO DANÉHO UŽIVATELE v poli řádků OZNAČENÍ
  *  (přidá, nebo smaže existující řádek). Vrací { rows: novéPole, aktivni: bool }. */
 function toggleOznaceni_(rows, id, typ, kdyText, nazev, misto, uzivatelId) {
@@ -1212,6 +1231,31 @@ function apiToggle_(ss, id, typ, uzivatelId) {
   const rowsTohotoUzivatele = vysledek.rows.filter(r => r.uzivatel === uzivatelId);
   const stavPoTom = oznaceniMapy_(rowsTohotoUzivatele).get(id) || { oblibene: false, navstivenoDne: null };
   return { ok: true, id, oblibene: stavPoTom.oblibene, navstivenoDne: stavPoTom.navstivenoDne || '' };
+}
+
+/** v3.26: přepne „oblíbené MÍSTO" (ne jednotlivou akci) PRO KONKRÉTNÍHO
+ *  uživatelského profilu. Na rozdíl od apiToggle_ nebere ID akce (misto
+ *  nemá jedno konkrétní ID akce, na kterém by šlo záznam pověsit) –
+ *  identita místa se odvozuje přímo z misto+obec, stejným klíčem
+ *  (`klicSouradnic_`), jaký readEventsApi_ už dnes používá pro lookup
+ *  do SOUŘADNICE. Ten klíč se uloží do sloupce "ID akce" v OZNAČENÍ
+ *  (přepoužití sloupce – u typu 'oblibene_misto' nedrží ID akce, ale
+ *  identitu místa). Sloupec "Místo" dostane stejnou hodnotu jako
+ *  "Název" (ne prázdno) – pole u tohoto typu ztrácí svůj původní
+ *  význam (místo KONÁNÍ akce), takže prázdná buňka by v Sheetu
+ *  vypadala jako chybějící data; duplicitní hodnota je čitelnější. */
+function apiToggleMisto_(ss, misto, obec, uzivatelId) {
+  if (!misto) return { ok: false, error: 'chybí místo' };
+  if (!uzivatelId) return { ok: false, error: 'chybí uživatelský profil – přihlas se prosím znovu' };
+
+  const klic = klicSouradnic_(misto, obec);
+  const nazev = obec ? (misto + ' (' + obec + ')') : misto;
+  const rows = readOznaceni_(ss);
+  const vysledek = toggleOznaceni_(rows, klic, 'oblibene_misto', formatDateOnly_(new Date()), nazev, nazev, uzivatelId);
+  zapsatOznaceni_(ss, vysledek.rows);
+  invalidovatCacheEventu_();   // OZNAČENÍ se změnilo – ovlivňuje apiEvents (mistoOblibene)
+
+  return { ok: true, misto, obec, oblibene: vysledek.aktivni };
 }
 
 // ---------------------------------------------------------------------------

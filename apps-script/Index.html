@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.45 – mini predpoved pocasi pro vyber (P), Cesta A - frontend Open-Meteo primo -->
+<!-- Kulturní radar Index.html v3.46 – oblibena mista - zaklad (backend + ikona na karte), filtr a plne UI pristi session -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -355,6 +355,7 @@
   .ikona-oznaceni:hover { color: var(--ink-2); }
   .ikona-oznaceni.aktivni.hvezda { color: #d4a017; }
   .ikona-oznaceni.aktivni.fajfka { color: #27ae60; }
+  .ikona-oznaceni.aktivni.misto { color: #2471a3; }
   .ikona-oznaceni.ukladani { opacity: .35; pointer-events: none; }
   .navstiveno-info { color: #27ae60 !important; }
   .meta {
@@ -984,6 +985,8 @@
         return { metoda: 'POST', url: execUrl, telo: { akce: 'login', uzivatelId: a[0], pin: a[1] } };
       case 'apiToggle':
         return { metoda: 'POST', url: execUrl, telo: { akce: 'toggle', id: a[0], typ: a[1], uzivatelId: a[2] } };
+      case 'apiToggleMisto':
+        return { metoda: 'POST', url: execUrl, telo: { akce: 'toggle-misto', misto: a[0], obec: a[1], uzivatelId: a[2] } };
       case 'apiSetFiltry':
         return { metoda: 'POST', url: execUrl, telo: { akce: 'filtry', uzivatelId: a[0], filtry: a[1] } };
       case 'apiNajdiProUzivatele':
@@ -1585,9 +1588,26 @@
     btnNavstiveno.textContent = a.navstivenoDne ? '✓' : '○';
     btnNavstiveno.addEventListener('click', () => prepniOznaceni(a.id, 'navstiveno'));
 
+    // v3.26 (E): ikona pro oblíbené MÍSTO konání (ne akci) – jen u akcí se
+    // známým místem, ať se netváří klikatelně bez smyslu. Odlišný glyf od
+    // ★ (akce), ať se dva různé signály nepletou.
+    const btnMisto = document.createElement('button');
+    if (a.misto) {
+      btnMisto.className = 'ikona-oznaceni misto'
+        + (a.mistoOblibene ? ' aktivni' : '')
+        + (probihaUkladani.has(a.misto + '|' + a.obec + ':misto') ? ' ukladani' : '');
+      btnMisto.type = 'button';
+      btnMisto.title = a.mistoOblibene
+        ? 'Odebrat „' + a.misto + '" z oblíbených míst'
+        : 'Přidat „' + a.misto + '" mezi oblíbená místa';
+      btnMisto.textContent = '🏛';
+      btnMisto.addEventListener('click', () => prepniOznaceniMista(a));
+    }
+
     vpravo.appendChild(skore);
     vpravo.appendChild(btnOblibene);
     vpravo.appendChild(btnNavstiveno);
+    if (a.misto) vpravo.appendChild(btnMisto);
     top.appendChild(nazev);
     top.appendChild(vpravo);
     el.appendChild(top);
@@ -2672,6 +2692,35 @@
       alert('Chyba: ' + e.message);
     } finally {
       probihaUkladani.delete(id + ':' + typ);
+      prekreslit();
+    }
+  }
+
+  // ── v3.26: 🏛 Oblíbené MÍSTO (jen tahle karta – sync napříč seznamem
+  // míst/piny na mapě je odložen na příště, viz BACKLOG.md) ──────────
+  async function prepniOznaceniMista(a) {
+    if (!prihlasenyUzivatel) {
+      otevritLogin('Pro ukládání oblíbených míst se prosím přihlas.');
+      return;
+    }
+    const klic = a.misto + '|' + a.obec + ':misto';
+    const puvodni = a.mistoOblibene;
+    a.mistoOblibene = !a.mistoOblibene;
+    probihaUkladani.add(klic);
+    prekreslit();
+    try {
+      const res = await gsr('apiToggleMisto', a.misto, a.obec, prihlasenyUzivatel ? prihlasenyUzivatel.id : '');
+      if (res && res.ok) {
+        a.mistoOblibene = res.oblibene;
+      } else {
+        a.mistoOblibene = puvodni;
+        alert((res && res.error) || 'Označení místa se nepodařilo uložit.');
+      }
+    } catch (e) {
+      a.mistoOblibene = puvodni;
+      alert('Chyba: ' + e.message);
+    } finally {
+      probihaUkladani.delete(klic);
       prekreslit();
     }
   }
