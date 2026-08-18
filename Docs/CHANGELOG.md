@@ -1,5 +1,12 @@
 # Changelog
 
+## Diagnostika (bez bump verze) — Uzavření zjištění k výkonu — 19. 8. 2026
+### Zjištěno
+- Ruční ověření přes claude-in-chrome na produkci (kulturniradar.cz): `api=meta` 2409 ms, `api=events` (Brno, 15 kB, cachovaná) 2858 ms, opakovaně 1397–2040 ms, `api=places` 1617 ms.
+- Anomálie z 17.–18. 8. (4,3–6,5 s, jednou HTTP 404) odezněla — potvrzena hypotéza „dočasná zátěž z opakovaných nasazení" (viz BACKLOG.md, položka „Testovací dluh"). Zbylá ~1,4–2,9 s/request odpovídá základní režii Apps Script platformy (i cachovaná data z `CacheService` trvají podobně) — není to regrese ani něco jednoduše zoptimalizovatelného v našem kódu.
+- Jediná reálná páka zjištěná měřením: appka při startu dělá 3 requesty (`meta`+`events`+`places`), což drží uživatele na „Načítám…" ~3–5 s celkem — případná budoucí optimalizace by cílila na počet/paralelizaci startovních requestů, ne na backend logiku.
+- Rozhodnutí: automatizovaný výkonnostní test se nezavádí (viz BACKLOG.md) — přirozená variabilita (±50 %) baseline by u pevného prahu spíš generovala falešné poplachy.
+
 ## Index.html v3.45 — Statistika, mini předpověď počasí a reset výběru pod mapou — 18. 8. 2026
 ### Přidáno
 - **O) Mini statistika aktuálního výběru** — nová sekce `#mapa-statistika` pod seznamem míst, jen desktop. Nová pure funkce `spocitejStatistikuVyberu_(akce)` → `{pocetAkci, pocetMist, pocetKategorii}` ze stejných dat, co dostává `#mapa-mista` (`akceProMapu_` výstup); počet míst sdílí klíč (`klicSouradnic_`) se `sestavSeznamMist_`/`seskupitPodleSouradnic_`, počet kategorií = unikátní hodnoty napříč poli `kategorie` všech akcí. Mřížka 3 čísel, terakotová paleta (`var(--accent)` na číslech).
