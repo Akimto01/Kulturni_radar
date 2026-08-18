@@ -1,5 +1,13 @@
 # Changelog
 
+## Index.html v3.40 — Fáze 3 doladění po živé kontrole: tooltip, popup mapy, sbalitelná mapa na mobilu — 18. 8. 2026
+### Opraveno
+- **A) Tooltip kalendáře přesahoval mimo sidebar** — `#kalendar-tooltip` (v3.38/v3.39) se pozicoval jen podle buňky dne, takže na užších sidebarech mohl přesáhnout do mřížky karet vpravo. Nová čistá funkce `vypocitejPoziciTooltipuKalendare_` oklampuje `left` přes `Math.min`/`Math.max` podle `#kat-sidebar.getBoundingClientRect()` (konstanta `SIRKA_TOOLTIP_KALENDARE_ = 240`, musí odpovídat CSS `max-width`) — tooltip se při přetečení zarovná k pravému okraji sidebaru místo přesahu, a nikdy nejde ani pod jeho levý okraj.
+- **B) Popup na mapě se ořezával při zoomu/posunu** — `#mapa` má `overflow: hidden` (zaoblené rohy); otevřený Leaflet popup, který uživatel po otevření odzoomoval/posunul blízko okraje kontejneru, se oříznul. `inicializovatMapu_()` teď na `movestart zoomstart` zavře libovolný otevřený popup hned na začátku gesta; po dokončení jde otevřít znovu (Leaflet `autoPan` zajistí, že nový popup je vždy celý v kontejneru).
+### Změněno
+- **C) Mapa na mobilu (`<900px`) teď sbalitelná stejně jako kalendář** — dřív vždy viditelná, teď výchozí stav zavřeno, vlastní tlačítko `#mapa-toggle` (🗺️) v hlavičce vedle `#kalendar-toggle`, otevírání nezávislé na kalendáři (vlastní třída `otevreno` na `#mapa-panel`). Na `≥900px` beze změny — mapa trvale viditelná, toggle tlačítko skryté (zrcadlí existující chování `#kalendar-panel`/`#kalendar-toggle`). Listener navíc volá `mapaLeaflet.invalidateSize()` (přes `setTimeout 0` kvůli reflow) při každém otevření — Leaflet měří kontejner při inicializaci, kdy byl na mobilu ještě `display: none`, bez toho by po otevření zůstaly špatně spočítané rozměry dlaždic.
+- Node testy 289 → 292 (+3 pro `vypocitejPoziciTooltipuKalendare_`). B a C nejdou testovat mimo prohlížeč (Leaflet, media queries) — jen A má pokrytí.
+
 ## Index.html v3.39 — Fix: tooltip v kalendáři překrytý Leaflet mapou — 18. 8. 2026
 ### Opraveno
 - `#kalendar-tooltip` (v3.38) měl `z-index: 150`, což bylo pod interními "panes" Leafletu (marker/popup pane, z-index až ~700, generováno JS knihovnou, mimo naše CSS) — na produkci se tooltip při setkání kalendáře a mapy v layoutu schoval pod mapu. Zvýšeno na `z-index: 1000`.

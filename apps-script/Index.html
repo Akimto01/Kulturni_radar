@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.39 – oprava z-index tooltipu kalendáře nad Leaflet panes -->
+<!-- Kulturní radar Index.html v3.40 – tooltip v hranicích sidebaru, zavírání mapy popup při pohybu, sbalitelná mapa na mobilu -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -146,10 +146,12 @@
   }
   #kalendar-tooltip.zobrazeno { display: block; }
 
-  /* v3.35: vestavěná mapa (redesign fáze 3) – mobil: vždy vidět (na
-     rozdíl od kalendáře se neskládá), pevná výška; ≥900px: viz media
-     query níže (sloupec vpravo přes #layout, order). */
-  #mapa-panel { padding: 10px 16px 0; }
+  /* v3.35: vestavěná mapa (redesign fáze 3), pevná výška; ≥900px: viz media
+     query níže (sloupec vpravo přes #layout, order). v3.40: na mobilu
+     stejné skládací chování jako #kalendar-panel – výchozí zavřeno,
+     otevírá #mapa-toggle v hlavičce, nezávisle na kalendáři. */
+  #mapa-panel { display: none; padding: 10px 16px 0; }
+  #mapa-panel.otevreno { display: block; }
   #mapa {
     height: 350px;
     border-radius: var(--radius);
@@ -461,8 +463,8 @@
   #login-chyba { color: var(--accent); font-size: .82rem; min-height: 1.2em; }
 
   /* v3.13: badge přihlášeného uživatele v hlavičce; v3.24: sdílí styl s Kontakt;
-     v3.33: i toggle kalendáře */
-  #uzivatel-badge, #kontakt-btn, #kalendar-toggle {
+     v3.33: i toggle kalendáře; v3.40: i toggle mapy */
+  #uzivatel-badge, #kontakt-btn, #kalendar-toggle, #mapa-toggle {
     background: transparent; border: 1px solid rgba(255,255,255,.5);
     border-radius: 999px; padding: 4px 12px;
     color: inherit; font-family: var(--sans); font-size: .78rem;
@@ -577,11 +579,12 @@
     main .karta { margin-bottom: 0; }
 
     /* v3.33: kalendář trvale vidět pod kategoriemi, toggle v hlavičce
-       zbytečný (žádný collapse na širokém displeji) */
+       zbytečný (žádný collapse na širokém displeji); v3.40: totéž pro mapu */
     #kalendar-panel { display: block; }
     #kalendar-toggle { display: none; }
+    #mapa-toggle { display: none; }
 
-    #mapa-panel { order: 3; }
+    #mapa-panel { display: block; order: 3; }
     #mapa { height: 480px; }   /* v3.36: bylo 350px; přebito na širokém desktopu níže (v3.37) */
   }
 
@@ -627,6 +630,7 @@
   <button id="uzivatel-badge" title="Přihlásit se k osobnímu profilu">Přihlásit se</button>
   <button id="kontakt-btn" title="Poslat tip na akci nebo připomínku">Kontakt</button>
   <button id="kalendar-toggle" title="Zobrazit/skrýt kalendář">📅</button>
+  <button id="mapa-toggle" title="Zobrazit/skrýt mapu">🗺️</button>
 </header>
 
 <div id="controls">
@@ -677,7 +681,10 @@
 
   <!-- v3.35: vestavěná mapa (redesign fáze 3). V DOM mezi sidebarem a
        #main, ať na mobilu (blokové řazení) přirozeně vyjde nad seznam;
-       na širokých obrazovkách ji CSS `order` přesune vizuálně vpravo. -->
+       na širokých obrazovkách ji CSS `order` přesune vizuálně vpravo.
+       v3.40: na mobilu skládací panel (výchozí zavřeno, otevírá
+       #mapa-toggle v hlavičce), nezávisle na kalendáři – viz #kalendar-panel
+       výše pro stejný vzor. -->
   <div id="mapa-panel">
     <div id="mapa"></div>
   </div>
@@ -1177,6 +1184,20 @@
         document.getElementById('kalendar-toggle').addEventListener('click', () => {
           document.getElementById('kalendar-panel').classList.toggle('otevreno');
         });
+        // v3.40: mapa má na mobilu stejné skládací chování jako kalendář,
+        // ale nezávislé – vlastní toggle, vlastní třída 'otevreno'.
+        document.getElementById('mapa-toggle').addEventListener('click', () => {
+          const panel = document.getElementById('mapa-panel');
+          panel.classList.toggle('otevreno');
+          if (panel.classList.contains('otevreno')) {
+            // Leaflet si měří kontejner při inicializaci; ten byl skrytý
+            // (display:none) do prvního otevření na mobilu → bez invalidateSize
+            // by mapa po otevření zůstala se špatně spočítanými rozměry
+            // (rozjeté/šedé dlaždice). setTimeout 0 = počkat na reflow po
+            // změně display.
+            setTimeout(() => mapaLeaflet.invalidateSize(), 0);
+          }
+        });
         vykreslitKalendar();
         // v3.35: mapa (fáze 3 redesignu) – jednorázová inicializace Leaflet
         inicializovatMapu_();
@@ -1612,10 +1633,27 @@
     if (cil) cil.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // v3.40: musí odpovídat CSS `#kalendar-tooltip { max-width: 240px }`
+  const SIRKA_TOOLTIP_KALENDARE_ = 240;
+
+  /** PURE: pozice tooltipu kalendáře (position:fixed left/top v px) tak,
+   *  aby zůstal vždy uvnitř hranic sidebarRect (#kat-sidebar) – pravý
+   *  okraj tooltipu nikdy nepřesáhne pravý okraj sidebaru (přeteče-li,
+   *  zarovná se k pravému okraji sidebaru místo přesahu do mřížky karet
+   *  vpravo), levý okraj nikdy nepřesáhne levý okraj sidebaru. */
+  function vypocitejPoziciTooltipuKalendare_(cellRect, sidebarRect, sirkaTooltipu) {
+    let left = Math.min(cellRect.left, sidebarRect.right - sirkaTooltipu);
+    left = Math.max(left, sidebarRect.left);
+    return { left, top: cellRect.bottom + 4 };
+  }
+
   /** v3.38: hover tooltip u dnů s tečkou – jeden sdílený element (ne jeden
    *  na buňku), position:fixed přepočítaný z getBoundingClientRect() dané
    *  buňky. Jména akcí přes textContent (ne HTML string) – nazev je
-   *  nedůvěryhodný AI-extrahovaný text, stejný důvod jako u popupu mapy. */
+   *  nedůvěryhodný AI-extrahovaný text, stejný důvod jako u popupu mapy.
+   *  v3.40: pozice oklampovaná na hranice #kat-sidebar (viz
+   *  vypocitejPoziciTooltipuKalendare_), aby tooltip nezasahoval do
+   *  mřížky karet vpravo. */
   function zobrazitTooltipKalendare_(cell, nazvy) {
     const el = document.getElementById('kalendar-tooltip');
     el.innerHTML = '';
@@ -1625,8 +1663,10 @@
       el.appendChild(radek);
     });
     const rect = cell.getBoundingClientRect();
-    el.style.left = rect.left + 'px';
-    el.style.top = (rect.bottom + 4) + 'px';
+    const sidebarRect = document.getElementById('kat-sidebar').getBoundingClientRect();
+    const pozice = vypocitejPoziciTooltipuKalendare_(rect, sidebarRect, SIRKA_TOOLTIP_KALENDARE_);
+    el.style.left = pozice.left + 'px';
+    el.style.top = pozice.top + 'px';
     el.classList.add('zobrazeno');
   }
 
@@ -1673,6 +1713,11 @@
       maxZoom: 19,
     }).addTo(mapaLeaflet);
     mapaVrstvaPinu = L.layerGroup().addTo(mapaLeaflet);
+    // v3.40: #mapa má overflow:hidden (zaoblené rohy) – otevřený popup by
+    // se při zoomu/posunu mohl ocitnout u okraje kontejneru a oříznout se.
+    // Zavřít ho hned na začátku gesta; po dokončení jde otevřít znovu
+    // (Leaflet autoPan pak zajistí, že je celý v kontejneru).
+    mapaLeaflet.on('movestart zoomstart', () => mapaLeaflet.closePopup());
   }
 
   /** Obsah popupu pinu – jedna nebo víc akcí na (prakticky) stejném místě

@@ -18,6 +18,7 @@ const f = nactiFrontendFunkce([
   'isoDatum_', 'dnySAkcemi_', 'sestavKalendarMrizku_',
   'jeViditelnaVSeznamu_', 'filtrovatKategorii_', 'akceProMapu_',
   'akceDnePodleData_', 'seskupitPodleSouradnic_',
+  'vypocitejPoziciTooltipuKalendare_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -764,6 +765,33 @@ test('dnySAkcemi_ a akceDnePodleData_ dávají konzistentní dny (odvozeno v3.38
   const dny = f.dnySAkcemi_(akce, KAL_DNES);
   const podleDne = f.akceDnePodleData_(akce, KAL_DNES);
   shodneNapricRealmy([...dny], [...podleDne.keys()]);
+});
+
+// ---------------------------------------------------------------------------
+// v3.40: vypocitejPoziciTooltipuKalendare_ (tooltip v hranicích #kat-sidebar)
+// ---------------------------------------------------------------------------
+
+test('vypocitejPoziciTooltipuKalendare_: dost místa vpravo → left = levý okraj buňky', () => {
+  const cellRect = { left: 20, bottom: 100 };
+  const sidebarRect = { left: 0, right: 300 };
+  const pozice = f.vypocitejPoziciTooltipuKalendare_(cellRect, sidebarRect, 240);
+  assert.equal(pozice.left, 20);
+  assert.equal(pozice.top, 104);
+});
+
+test('vypocitejPoziciTooltipuKalendare_: buňka u pravého okraje sidebaru → zarovná se k pravému okraji sidebaru (žádný přesah)', () => {
+  const cellRect = { left: 280, bottom: 200 };
+  const sidebarRect = { left: 0, right: 300 };
+  const pozice = f.vypocitejPoziciTooltipuKalendare_(cellRect, sidebarRect, 240);
+  assert.equal(pozice.left, 300 - 240);
+  assert.ok(pozice.left + 240 <= sidebarRect.right);
+});
+
+test('vypocitejPoziciTooltipuKalendare_: sidebar užší než tooltip → left nikdy pod levý okraj sidebaru', () => {
+  const cellRect = { left: 10, bottom: 50 };
+  const sidebarRect = { left: 0, right: 168 };   // typický ≥900px sidebar (200px - padding)
+  const pozice = f.vypocitejPoziciTooltipuKalendare_(cellRect, sidebarRect, 240);
+  assert.equal(pozice.left, 0);
 });
 
 function akceMisto(over) {
