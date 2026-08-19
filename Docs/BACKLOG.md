@@ -100,6 +100,7 @@ změně BACKLOGu.
   1. Ověřit, jestli aktualizujAkce_ (AI web search pipeline) objevbrno.cz měsíční články už zachytává — pokud ne, zvážit přidání 'objevbrno.cz' jako doporučeného zdroje do promptu pro AI (nápověda k prohledání, ne pevný scraper).
   2. Stejný princip zkusit i pro DALŠÍ sledovaná města (SLEDOVANÁ MĚSTA sheet) — najít, jestli mají podobné lokální kulturní magazíny/weby (analogie ke Kam v Brně) s obdobně čitelnými redakčními přehledovými články, a případně je taky přidat jako nápovědu do AI promptu.
   3. Obecnější poznámka k budoucímu zvážení: při hledání nových zdrojů preferovat běžné HTML weby s articles/redakčním obsahem před PDF/flipbook/JS-heavy kalendáři — ty první jsou pro AI web search spolehlivě dostupné, ty druhé prakticky ne.
+  AKTUALIZACE 20. 8. 2026: krok 1 dokončen — objevbrno.cz přidán jako řádek do listu ZDROJE (typ: agregátor, priorita: střední, profil: Brno, URL: https://www.objevbrno.cz/cs/udalosti), ruční úprava přímo v Google Sheetu (Claude v hlavním chatu, claude-in-chrome). Projeví se při příští kontrole akcí. Krok 2 (stejný princip pro další sledovaná města) zůstává otevřený.
 
 ## Plán rozvoje — schváleno 4. 8. 2026, aktualizováno 8. 8. 2026
 1. ~~**Rodinné profily**~~ — **HOTOVO 7.–8. 8. 2026** (backend v3.20, frontend
