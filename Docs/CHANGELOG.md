@@ -1,5 +1,15 @@
 # Changelog
 
+## Backend v3.27 — Haiku experiment pro denní kontrolu — 20. 8. 2026
+### Přidáno
+- **Podmíněný výběr modelu podle typu běhu** — nová konstanta `ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5'` vedle `ANTHROPIC_MODEL` (`'claude-sonnet-4-6'`) a nová pure funkce `vyberModelProKontrolu_(typKontroly)`: `'denní kontrola'` (automatický ranní trigger, `dailyCheck`) → Haiku, všechno ostatní (mimořádné běhy z menu/webu, osobní hledání, sledovaná města, měsíční kontrola stálých míst) → beze změny na Sonnetu. Použito v `callAnthropic_` (hlavní požadavek i záchranné formátovací dovolání) a předáváno do `logKontrola_`, aby sloupec K v listu KONTROLY zaznamenal skutečně použitý model daného běhu, ne globální konstantu.
+- 7 nových Node testů: `vyberModelProKontrolu_` (denní kontrola vs. ostatní typy), `callAnthropic_` posílá správný `model` v payloadu (nový stub zachytávající `options.payload`, ne jen URL), `logKontrola_` zapisuje předaný model do KONTROLY. Testovací harness (`MemSheet`) rozšířen o `getValue()`/`setValue()` (singulární varianty vedle existujících `getValues()`/`setValues()`) — `logKontrola_` je používá pro hlavičku sloupce „Vykonavatel", dřív to žádný test nepotřeboval.
+### Poznámka k architektuře
+- **Měření kvality běží 20.–27. 8. 2026** — po týdnu srovnat úlovky denní kontroly (Haiku) se zbytkem běhů (Sonnet) přes sloupec K v listu KONTROLY (nově obsahuje skutečný model, ne jen konstantu) a rozhodnout, jestli Haiku pro tenhle typ běhu trvale stačí. Termín rozhodnutí: 27. 8. 2026.
+- `callAnthropicPlaces_` (měsíční kontrola stálých míst) se záměrně nemění — zůstává natvrdo na `ANTHROPIC_MODEL` (Sonnet), mimo rozsah experimentu.
+- Node testy 321 → 328 (+7).
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.27"`), ověřeno `?api=meta` → `"verze":"3.27"`.
+
 ## RF testy (bez bump verze) — Oblíbená místa: plný cyklus + filtr (I) — 19. 8. 2026
 ### Přidáno
 - **I) `🏛 Oblíbené místo: lze označit i odznačit (obojí ověřeno reloadem)`** (`tests/robot/frontend.robot`) — stejný scénář jako u ★/✓, jen pro ikonu 🏛 (typ `misto`), reuse sdíleného keywordu `Ověřit plný cyklus označení (přidat i odebrat) s reloadem`. Defensive `Skip If` pro případ, že by první karta aktivního profilu neměla `a.misto`, `[Teardown]` vrací původní stav.

@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.26 (19. 8. 2026) – Oblíbená místa: základ (backend + ikona na kartě), filtr a plné UI příští session
- * (předchozí: 3.25 – kontaktní formulář, volitelný e-mail pro odpověď (replyTo))
+ * Verze: 3.27 (20. 8. 2026) – Haiku experiment pro denní kontrolu (měření kvality 20.–27. 8. 2026)
+ * (předchozí: 3.26 – Oblíbená místa: základ (backend + ikona na kartě), filtr a plné UI příští session)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -65,8 +65,9 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.26';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.27';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
+const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
 const MAX_WEB_SEARCHES = 3;  // v3.6: úspora kreditů (bývalo 5)
@@ -654,7 +655,7 @@ function runCheck_(typKontroly) {
     const stats = upsertEvents_(ss, cfg, events);
     zajistitSouradniceProAkce_(ss, events);
 
-    logKontrola_(ss, typKontroly, cfg, stats, zdroje.length);
+    logKontrola_(ss, typKontroly, cfg, stats, zdroje.length, vyberModelProKontrolu_(typKontroly));
     updateLokalita_(ss, cfg.profil, new Date());
 
     const now = new Date();
@@ -728,9 +729,20 @@ function readSources_(ss, profil) {
 // ANTHROPIC API
 // ---------------------------------------------------------------------------
 
+/** v3.27: Haiku experiment (měření kvality 20.–27. 8. 2026) – jen 'denní
+ *  kontrola' (automatický ranní trigger) běží na Haiku, všechno ostatní
+ *  (mimořádné běhy, osobní hledání, sledovaná města, měsíční místa) zůstává
+ *  na Sonnetu. Sdílené mezi callAnthropic_ (posílá požadavek) a voláními
+ *  logKontrola_ (zapisuje, který model se skutečně použil), ať se logika
+ *  nerozjede na dvou místech. */
+function vyberModelProKontrolu_(typKontroly) {
+  return typKontroly === 'denní kontrola' ? ANTHROPIC_MODEL_HAIKU : ANTHROPIC_MODEL;
+}
+
 function callAnthropic_(cfg, zdroje, typKontroly) {
   const apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('Chybí Script Property ANTHROPIC_API_KEY.');
+  const model = vyberModelProKontrolu_(typKontroly);
 
   const sourcesList = zdroje
     .map(z => '- ' + z.nazev + (z.priorita ? ' [' + z.priorita + ']' : '') + ': ' + z.url)
@@ -779,7 +791,7 @@ function callAnthropic_(cfg, zdroje, typKontroly) {
   ].join('\n');
 
   const basePayload = {
-    model: ANTHROPIC_MODEL,
+    model: model,
     max_tokens: 16000,
     system: system,
     tools: [
@@ -856,7 +868,7 @@ function callAnthropic_(cfg, zdroje, typKontroly) {
       contentType: 'application/json',
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       payload: JSON.stringify({
-        model: ANTHROPIC_MODEL,
+        model: model,
         max_tokens: 16000,
         system: 'Vrať VÝHRADNĚ platné JSON pole. Žádný jiný text.',
         messages: [{ role: 'user', content:
@@ -1414,7 +1426,7 @@ function apiNajdiProUzivatele_(ss, uzivatelId, tok) {
     const events = callAnthropic_(cfg, zdroje, typKontroly);
     const stats = upsertEvents_(ss, cfg, events);
     zajistitSouradniceProAkce_(ss, events);
-    logKontrola_(ss, typKontroly, cfg, stats, zdroje.length);
+    logKontrola_(ss, typKontroly, cfg, stats, zdroje.length, vyberModelProKontrolu_(typKontroly));
 
     return { ok: true, jmeno: uzivatel.jmeno, nove: stats.nove || 0, aktualizovano: stats.aktualizovano || 0 };
   } finally {
@@ -1850,7 +1862,7 @@ function zpracovatSledovanaMesta() {
         const events = callAnthropic_(cfg, zdroje, 'sledované město');
         const stats = upsertEvents_(ss, cfg, events);
         zajistitSouradniceProAkce_(ss, events);
-        logKontrola_(ss, 'sledované město', cfg, stats, zdroje.length);
+        logKontrola_(ss, 'sledované město', cfg, stats, zdroje.length, vyberModelProKontrolu_('sledované město'));
         updateLokalita_(ss, mesto, new Date());
         zpracovano++;
       } catch (e) {
@@ -2527,7 +2539,7 @@ function updateLokalita_(ss, profil, when) {
   } catch (e) { Logger.log('Aktualizace LOKALIT selhala: ' + e); }
 }
 
-function logKontrola_(ss, typ, cfg, stats, pocetZdroju) {
+function logKontrola_(ss, typ, cfg, stats, pocetZdroju, model) {
   const sh = ss.getSheetByName(SHEET.KONTROLY);
 
   // zajistit sloupec "Vykonavatel" (L)
@@ -2546,7 +2558,7 @@ function logKontrola_(ss, typ, cfg, stats, pocetZdroju) {
     0,
     stats.bezZmeny,
     pocetZdroju,
-    'Automatický běh přes Anthropic API (' + ANTHROPIC_MODEL + ').',
+    'Automatický běh přes Anthropic API (' + (model || ANTHROPIC_MODEL) + ').',
     'Apps Script automatizace',
   ]);
 }

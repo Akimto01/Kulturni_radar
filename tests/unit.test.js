@@ -1043,6 +1043,61 @@ test('callAnthropic_: prázdný seznam akcí ([]) je platný výsledek, ne chyba
 });
 
 // ---------------------------------------------------------------------------
+// v3.27: Haiku experiment (měření kvality 20.–27. 8. 2026) – jen 'denní
+// kontrola' běží na Haiku, všechno ostatní zůstává na Sonnetu.
+// ---------------------------------------------------------------------------
+
+test('vyberModelProKontrolu_: "denní kontrola" → Haiku, vše ostatní → Sonnet', () => {
+  const ctx = nactiRadar({});
+  assert.equal(ctx.vyberModelProKontrolu_('denní kontrola'), 'claude-haiku-4-5');
+  assert.equal(ctx.vyberModelProKontrolu_('mimořádná kontrola'), 'claude-sonnet-4-6');
+  assert.equal(ctx.vyberModelProKontrolu_('mimořádná kontrola (menu)'), 'claude-sonnet-4-6');
+  assert.equal(ctx.vyberModelProKontrolu_('sledované město'), 'claude-sonnet-4-6');
+  assert.equal(ctx.vyberModelProKontrolu_('osobní hledání (Vojta)'), 'claude-sonnet-4-6');
+});
+
+function frontaFetchuSPayloadem(fronta, payloady = []) {
+  return (url, options) => {
+    payloady.push(JSON.parse(options.payload));
+    const dalsi = fronta.shift();
+    if (dalsi === undefined) throw new Error('Stub: fronta odpovědí je prázdná');
+    return { getResponseCode: () => dalsi.code, getContentText: () => JSON.stringify(dalsi.body) };
+  };
+}
+
+test('callAnthropic_: "denní kontrola" pošle v payloadu model claude-haiku-4-5', () => {
+  const resp = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [AKCE_REPORT] } }],
+  });
+  const payloady = [];
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchuSPayloadem([resp], payloady) });
+  ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');
+  assert.equal(payloady[0].model, 'claude-haiku-4-5');
+});
+
+test('callAnthropic_: "mimořádná kontrola" pošle v payloadu model claude-sonnet-4-6 (nezměněno)', () => {
+  const resp = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [AKCE_REPORT] } }],
+  });
+  const payloady = [];
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchuSPayloadem([resp], payloady) });
+  ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'mimořádná kontrola');
+  assert.equal(payloady[0].model, 'claude-sonnet-4-6');
+});
+
+test('logKontrola_: zapíše skutečně použitý model, ne globální konstantu', () => {
+  const ss = fakeSpreadsheet({ KONTROLY: [[]] });
+  const stats = { total: 5, nove: 1, zmenene: 0, zrusene: 0, bezZmeny: 4 };
+  const ctx = nactiRadar({});
+  ctx.logKontrola_(ss, 'denní kontrola', CFG_TEST, stats, 2, 'claude-haiku-4-5');
+  const kontroly = ss.getSheetByName('KONTROLY');
+  assert.match(kontroly.rows[1][10], /claude-haiku-4-5/);
+  assert.doesNotMatch(kontroly.rows[1][10], /claude-sonnet-4-6/);
+});
+
+// ---------------------------------------------------------------------------
 // v3.16: Sledovaná města – tiché doplnění dat pro města mimo domácí profil
 // ---------------------------------------------------------------------------
 
@@ -1546,6 +1601,8 @@ class MemSheet {
         }
         return out;
       },
+      getValue() { return this.getValues()[0][0]; },
+      setValue(v) { return this.setValues([[v]]); },
       setValues(vals) {
         vals.forEach((line, r) => {
           const rowIdx = row - 1 + r;
