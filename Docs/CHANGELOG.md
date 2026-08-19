@@ -1,5 +1,14 @@
 # Changelog
 
+## Index.html v3.51 — Oprava: folklorní podkategorie se nepletla do filtru jiných kategorií — 20. 8. 2026
+### Opraveno
+- **`dostupnePodkategorie_`** — akce s kombinací kategorií folklor+jiná (např. „Vavřinecké hody v Komíně", folklor+koncerty) nabízela svůj folklorní region (`folklorniRegion_`, backend v3.28) jako podkategorii-chip i pod filtrem té JINÉ kategorie (zjištěno živým ověřením na produkci 20. 8. 2026: zvolený chip „koncerty" nabízel „Slovácko/Podluží" jako podkategorii, ačkoli region s koncertem věcně nesouvisí). Oprava: akce s kategorií „folklor" mezi svými kategoriemi teď přispívá svou podkategorií do nabídky jen tehdy, když je „folklor" i mezi aktivně vybranými hlavními kategoriemi. Akce samotná se v seznamu pod jinou kategorií (zde koncerty) dál zobrazuje normálně beze změny — omezuje se jen nabídka podkategorie-chipů.
+- 1 nový Node test (`dostupnePodkategorie_` – kombinovaná akce folklor+koncerty: podkategorie se neobjeví pod „koncerty", jen pod „folklor").
+### Poznámka k architektuře
+- `filtrovatPodkategorii_` beze změny — tam problém nebyl, filtrování podle už zvoleného chipu funguje správně i pro kombinované akce.
+- Node testy 351 → 352 (+1).
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.51"`), ověřeno `?api=meta` → HTTP 200 (backend `VERZE` beze změny, 3.28 — opravoval se jen Index.html).
+
 ## Backend v3.28 + Index.html v3.50 — Filtr žánrů/podkategorie — 20. 8. 2026
 ### Přidáno
 - **Slovník podkategorií** (`PODKATEGORIE_SLOVNIK`) — 8 hlavních kategorií (koncerty, divadlo, festivaly, výstavy, historické slavnosti, vinařské/gastro kulturní akce, jarmarky, netradiční kulturní akce), každá s 3–5 podkategoriemi. Jediný zdroj pravdy pro `enum` v `REPORT_TOOL.podkategorie` i pro text instrukce v system promptu (`callAnthropic_`) — žádná ručně sync-ovaná druhá kopie.
@@ -13,7 +22,7 @@
 - Zvažováno a zamítnuto: odeslání `PODKATEGORIE_SLOVNIK` přes `?api=meta` pro frontend (dřívější plán) — nahrazeno jednodušším odvozením z dat, viz výše. Frontend tak nemusí znát rozdíl mezi „běžnou" podkategorií a folklorním regionem vůbec.
 - RF test pro druhou úroveň chipů záměrně neověřuje konkrétní počet/obsah podkategorie-chipů po výběru kategorie (produkční data je budou mít prázdné, dokud neproběhne re-kontrola) — jen strukturální chování (prázdný kontejner bez výběru hlavní kategorie, zase prázdný po návratu na „Vše").
 - Node testy 328 → 351 (+23, z toho 2 pro `eventToRow_`).
-- **Nasazeno**: čeká na potvrzení (`clasp push` + `clasp deploy`), viz konec konverzace.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.28"`, implementace @76), ověřeno `?api=meta` → `"verze":"3.28"`. Commit `9aab4fd`.
 
 ## Backend v3.27 — Haiku experiment pro denní kontrolu — 20. 8. 2026
 ### Přidáno

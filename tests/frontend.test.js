@@ -836,6 +836,12 @@ test('dostupnePodkategorie_: akce bez pole podkategorie nespadne (chybějící =
   shodneNapricRealmy(f.dostupnePodkategorie_(akce, new Set(['koncerty'])), []);
 });
 
+test('dostupnePodkategorie_: v3.51 – folklorní region kombinované akce (folklor+koncerty) se nenabídne pod jinou kategorií, jen pod folklorem', () => {
+  const akce = [akceKatPodkat(['koncerty', 'folklor'], ['Slovácko/Podluží'])];
+  shodneNapricRealmy(f.dostupnePodkategorie_(akce, new Set(['koncerty'])), []);
+  shodneNapricRealmy(f.dostupnePodkategorie_(akce, new Set(['folklor'])), ['Slovácko/Podluží']);
+});
+
 test('dostupnePodkategorie_: prázdné/chybějící pole akcí nespadne', () => {
   shodneNapricRealmy(f.dostupnePodkategorie_([], new Set(['koncerty'])), []);
   shodneNapricRealmy(f.dostupnePodkategorie_(undefined, new Set(['koncerty'])), []);

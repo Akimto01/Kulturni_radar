@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.50 – druha uroven filtru: podkategorie/zanry (krok C) -->
+<!-- Kulturní radar Index.html v3.51 – oprava - folklorni podkategorie se neplete do filtru jinych kategorii -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -2714,6 +2714,14 @@
     const sada = new Set();
     (akce || []).forEach(a => {
       if (!(a.kategorie || []).some(k => aktKategorieSet.has(k))) return;
+      // v3.51: akce s kategorií "folklor" má podkategorii vždy jen folklorní
+      // region (viz backend v3.28, vypoctiPodkategorii_) – i u kombinovaných
+      // akcí (folklor+koncerty apod.). Ten region patří pod filtr "folklor",
+      // ne pod jinou kategorii, kterou akce taky má – jinak by se region
+      // nabízel jako chip i pod filtrem, se kterým věcně nesouvisí (akce
+      // samotná se přitom v seznamu pod tou jinou kategorií dál zobrazuje
+      // normálně, tohle omezuje jen nabídku podkategorie-chipů).
+      if ((a.kategorie || []).includes('folklor') && !aktKategorieSet.has('folklor')) return;
       (a.podkategorie || []).forEach(p => sada.add(p));
     });
     return [...sada].sort((x, y) => x.localeCompare(y, 'cs'));
