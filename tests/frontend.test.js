@@ -18,6 +18,7 @@ const f = nactiFrontendFunkce([
   'weathercodeEmoji_', 'pocasiZobrazeni_',
   'isoDatum_', 'dnySAkcemi_', 'sestavKalendarMrizku_',
   'jeViditelnaVSeznamu_', 'filtrovatKategorii_', 'filtrovatOblibenaMista_', 'akceProMapu_',
+  'dostupnePodkategorie_', 'filtrovatPodkategorii_',
   'akceDnePodleData_', 'seskupitPodleSouradnic_',
   'vypocitejPoziciTooltipuKalendare_',
   'klicSouradnic_', 'sestavSeznamMist_', 'prepnoutVyberPinu_',
@@ -806,6 +807,64 @@ test('akceProMapu_: aktivní filtr oblíbených míst + kategorie-filtr se kombi
   const vysledek = f.akceProMapu_(akce, new Set(['koncerty']), KAL_DNES, true);
   assert.equal(vysledek.length, 1);
   assert.equal(vysledek[0].mistoOblibene, true);
+});
+
+// ---------------------------------------------------------------------------
+// v3.50: druhá úroveň filtru – dostupnePodkategorie_, filtrovatPodkategorii_
+// ---------------------------------------------------------------------------
+
+function akceKatPodkat(kategorie, podkategorie) { return { kategorie, podkategorie }; }
+
+test('dostupnePodkategorie_: prázdný výběr hlavní kategorie ("Vše") → []', () => {
+  const akce = [akceKatPodkat(['koncerty'], ['jazz/blues'])];
+  shodneNapricRealmy(f.dostupnePodkategorie_(akce, new Set()), []);
+  shodneNapricRealmy(f.dostupnePodkategorie_(akce, null), []);
+});
+
+test('dostupnePodkategorie_: sjednotí podkategorie jen z akcí patřících do vybrané hlavní kategorie', () => {
+  const akce = [
+    akceKatPodkat(['koncerty'], ['jazz/blues']),
+    akceKatPodkat(['koncerty'], ['klasika', 'jazz/blues']),
+    akceKatPodkat(['divadlo'], ['činohra']),
+  ];
+  const vysledek = f.dostupnePodkategorie_(akce, new Set(['koncerty']));
+  shodneNapricRealmy(vysledek, ['jazz/blues', 'klasika']);   // unikátní, řazené
+});
+
+test('dostupnePodkategorie_: akce bez pole podkategorie nespadne (chybějící = žádný příspěvek)', () => {
+  const akce = [{ kategorie: ['koncerty'] }];
+  shodneNapricRealmy(f.dostupnePodkategorie_(akce, new Set(['koncerty'])), []);
+});
+
+test('dostupnePodkategorie_: prázdné/chybějící pole akcí nespadne', () => {
+  shodneNapricRealmy(f.dostupnePodkategorie_([], new Set(['koncerty'])), []);
+  shodneNapricRealmy(f.dostupnePodkategorie_(undefined, new Set(['koncerty'])), []);
+});
+
+test('filtrovatPodkategorii_: prázdná/chybějící množina vrátí pole beze změny', () => {
+  const akce = [akceKatPodkat(['koncerty'], ['jazz/blues'])];
+  assert.equal(f.filtrovatPodkategorii_(akce, new Set()), akce);
+  assert.equal(f.filtrovatPodkategorii_(akce, null), akce);
+});
+
+test('filtrovatPodkategorii_: neprázdná množina ponechá jen akce s průnikem', () => {
+  const akce = [
+    akceKatPodkat(['koncerty'], ['jazz/blues']),
+    akceKatPodkat(['koncerty'], ['klasika']),
+  ];
+  const vysledek = f.filtrovatPodkategorii_(akce, new Set(['jazz/blues']));
+  assert.equal(vysledek.length, 1);
+});
+
+test('akceProMapu_: chybějící 5. argument (podkategorie-filtr) = beze změny, jako dřív', () => {
+  const a = akceMapa({ podkategorie: ['jazz/blues'] });
+  assert.equal(f.akceProMapu_([a], new Set(), KAL_DNES, false).length, 1);
+});
+
+test('akceProMapu_: aktivní podkategorie-filtr akci bez shody vynechá', () => {
+  const vysledek = f.akceProMapu_(
+    [akceMapa({ podkategorie: ['klasika'] })], new Set(), KAL_DNES, false, new Set(['jazz/blues']));
+  assert.equal(vysledek.length, 0);
 });
 
 // ---------------------------------------------------------------------------

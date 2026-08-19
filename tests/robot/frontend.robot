@@ -177,6 +177,25 @@ Filtr kategorie omezí karty a Vše je vrátí
     ${zpet}=    Get Element Count    ${FRAME} .karta
     Should Be Equal As Integers    ${zpet}    ${vsech}
 
+Druhá úroveň filtru (podkategorie) se zobrazí a zase skryje podle hlavní kategorie
+    [Documentation]    v3.50: \#podkat-chips je prázdný, dokud není vybraná
+    ...    žádná hlavní kategorie ("Vše"); po výběru kategorie kontejner
+    ...    zůstane funkční (nespadne), i když aktuální produkční data ještě
+    ...    nemají žádnou platnou podkategorii (staré akce čekají na
+    ...    re-kontrolu AI s novým promptem, viz BACKLOG.md) – test proto
+    ...    neověřuje KONKRÉTNÍ počet chipů po výběru kategorie, jen že se
+    ...    kontejner chová správně (prázdný bez výběru, zase prázdný po
+    ...    návratu na "Vše").
+    Click    ${FRAME} \#kat-chips .chip >> text=Vše
+    ${pred}=    Get Element Count    ${FRAME} \#podkat-chips .chip
+    Should Be Equal As Integers    ${pred}    0    msg=Bez vybrané hlavní kategorie žádné podkategorie-chipy
+    Click    ${FRAME} \#kat-chips .chip >> text=koncerty
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
+    Click    ${FRAME} \#kat-chips .chip >> text=Vše
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
+    ${po}=    Get Element Count    ${FRAME} \#podkat-chips .chip
+    Should Be Equal As Integers    ${po}    0    msg=Po návratu na Vše se podkategorie-chipy zase vyprázdní
+
 Sekce stálých míst existuje
     Wait For Elements State    ${FRAME} \#mista-sekce .misto-karta >> nth=0    visible    timeout=15s
     ${mist}=    Get Element Count    ${FRAME} .misto-karta

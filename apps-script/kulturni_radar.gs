@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.27 (20. 8. 2026) – Haiku experiment pro denní kontrolu (měření kvality 20.–27. 8. 2026)
- * (předchozí: 3.26 – Oblíbená místa: základ (backend + ikona na kartě), filtr a plné UI příští session)
+ * Verze: 3.28 (20. 8. 2026) – Podkategorie: slovník + AI prompt/schema, folklor programově (krok A)
+ * (předchozí: 3.27 – Haiku experiment pro denní kontrolu (měření kvality 20.–27. 8. 2026))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -65,7 +65,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.27';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.28';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -75,6 +75,30 @@ const MAX_WEB_SEARCHES = 3;  // v3.6: úspora kreditů (bývalo 5)
 const KONTAKT_EMAIL = 'info@kulturniradar.cz';
 const KONTAKT_ZPRAVA_MAX = 2000;        // znaků – proti zneužití formuláře
 const KONTAKT_COOLDOWN_MS = 30 * 1000;  // stejný duch jako WEB_COOLDOWN_MS, jen kratší (kontaktní formulář, ne AI dotaz)
+
+/** v3.28: Slovník podkategorií per hlavní kategorie – jediný zdroj pravdy,
+ *  ze kterého se skládá jak `enum` v REPORT_TOOL, tak text instrukce pro AI
+ *  (viz callAnthropic_). Frontend tenhle slovník nepotřebuje – druhou úroveň
+ *  chipů skládá přímo z `podkategorie` polí už validovaných/vrácených akcí
+ *  (viz readEventsApi_), ne z vlastní kopie seznamu.
+ *  "folklor" je záměrně vynechaný – jeho podkategorie (folklorní region) se
+ *  neurčuje přes AI, ale programově z profilu (viz folklorniRegion_). */
+const PODKATEGORIE_SLOVNIK = {
+  'koncerty': ['klasika', 'pop/rock', 'jazz/blues', 'dechovka/lidovka', 'elektronika/DJ'],
+  'divadlo': ['činohra', 'loutky', 'muzikál/opereta', 'tanec/balet'],
+  'festivaly': ['hudební', 'filmový', 'gastro', 'dětský'],
+  'výstavy': ['malba/socha', 'fotografie', 'historie/technika', 'multimédia/interaktivní'],
+  'historické slavnosti': ['řemesla', 'bitvy/rekonstrukce', 'noční prohlídky'],
+  'vinařské/gastro kulturní akce': ['víno', 'pivo', 'farmářské trhy'],
+  'jarmarky': ['vánoční/velikonoční', 'řemeslné', 'farmářské'],
+  'netradiční kulturní akce': ['street art', 'experimentální', 'jiné'],
+};
+
+/** PURE: plochý seznam všech povolených podkategorií napříč PODKATEGORIE_SLOVNIK
+ *  (pro `enum` v REPORT_TOOL a pro validaci při čtení – viz readEventsApi_). */
+function vsechnyPodkategorie_() {
+  return Object.keys(PODKATEGORIE_SLOVNIK).reduce((acc, k) => acc.concat(PODKATEGORIE_SLOVNIK[k]), []);
+}
 
 /** Nástroj, kterým model odevzdává výsledky – API garantuje validní strukturu. */
 const REPORT_TOOL = {
@@ -91,7 +115,8 @@ const REPORT_TOOL = {
             id: { type: 'string' }, datum_od: { type: 'string' }, datum_do: { type: 'string' },
             cas: { type: 'string' }, nazev: { type: 'string' }, misto: { type: 'string' },
             obec: { type: 'string' }, dojezd: { type: 'string' }, kategorie: { type: 'string' },
-            podkategorie: { type: 'string' }, cena: { type: 'string' }, popis: { type: 'string' },
+            podkategorie: { type: 'array', items: { type: 'string', enum: vsechnyPodkategorie_() } },
+            cena: { type: 'string' }, popis: { type: 'string' },
             skore: { type: 'number' }, stav: { type: 'string' }, primarni_zdroj: { type: 'string' },
             url: { type: 'string' }, dalsi_zdroj: { type: 'string' }, poznamka: { type: 'string' },
           },
@@ -227,6 +252,31 @@ function cellText_(v) {
   return String(v == null ? '' : v).trim();
 }
 
+/** v3.28: PURE – folklorní region se u kategorie "folklor" neurčuje přes AI
+ *  (kulturně-geografický pojem, který appka odvodí spolehlivěji z profilu
+ *  než by AI odhadla), ale programově z aktivního profilu hledání. */
+function folklorniRegion_(profil) {
+  const p = norm_(profil);
+  if (p === 'brno') return 'Slovácko/Podluží';
+  if (p === 'zlín') return 'Valašsko/Luhačovicko';
+  if (p === 'olomouc') return 'Haná';
+  return 'jiný region';
+}
+
+/** v3.28: PURE – sestaví pole podkategorií pro jednu akci. U kategorie
+ *  "folklor" ignoruje sloupec J úplně (AI ho pro folklor vůbec neřeší, viz
+ *  callAnthropic_) a použije folklorniRegion_ místo něj – i pro akce
+ *  kombinující folklor s jinou kategorií (vědomé zjednodušení, viz diskuze
+ *  k v3.28: kombinace je řídká a AI stejně není instruovaná, aby v takovém
+ *  případě vybírala podkategorie správně). Pro ostatní akce filtruje
+ *  hodnoty ze sloupce J proti PODKATEGORIE_SLOVNIK – stará/nekonzistentní
+ *  data (volný text bez instrukce, viz ověření 20. 8. 2026) se tiše zahodí. */
+function vypoctiPodkategorii_(kategoriePole, podkategorieText, profil) {
+  if ((kategoriePole || []).indexOf('folklor') !== -1) return [folklorniRegion_(profil)];
+  const povolene = new Set(vsechnyPodkategorie_());
+  return String(podkategorieText || '').split(';').map(s => s.trim()).filter(s => s && povolene.has(s));
+}
+
 /** PURE: rozhodne, zda akce patří do výsledku apiEvents. Normální okno = ne
  *  proběhlé, ne staré (mimo „zrušeno", které se ukazuje vždy jako info).
  *  Označené akce (oblibene/navstiveno) smí projít i mimo toto okno, ale JEN
@@ -337,6 +387,7 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
     const klicMista = klicSouradnic_(row[5], row[6]);
     const souradnice = souradniceMapa.get(klicMista) || null;
     const pocasi = pocasiMapa.get(id);
+    const kategoriePole = String(row[8] || '').split(';').map(k => k.trim()).filter(Boolean);
     akce.push({
       id,
       nazev: String(row[4] || ''),
@@ -345,7 +396,8 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
       cas: cellText_(row[3]),
       misto: String(row[5] || ''),
       obec: String(row[6] || ''),
-      kategorie: String(row[8] || '').split(';').map(k => k.trim()).filter(Boolean),
+      kategorie: kategoriePole,
+      podkategorie: vypoctiPodkategorii_(kategoriePole, row[9], profil),   // v3.28
       cena: String(row[10] || ''),
       popis: String(row[11] || ''),
       skore: Number(row[12]) || 0,
@@ -754,6 +806,9 @@ function callAnthropic_(cfg, zdroje, typKontroly) {
     'PRÁVĚ JEDNÍM zavoláním nástroje report_events (parametr events = seznam akcí).',
     'Formáty hodnot: id = RRRR-MM-DD-slug-nazvu; datum_od/datum_do = "D. M. RRRR" (datum_do může být "");',
     'dojezd = text VŽDY s časem i vzdáleností (např. "cca 30–40 min, ~35 km"); kategorie = středníkem oddělené;',
+    'podkategorie = pole 0–3 hodnot, VÝHRADNĚ z tohoto seznamu podle hlavní kategorie akce (jinou hodnotu nepiš):',
+    Object.keys(PODKATEGORIE_SLOVNIK).map(k => '  ' + k + ': ' + PODKATEGORIE_SLOVNIK[k].join(', ')).join('\n'),
+    'U kategorie "folklor" podkategorii vůbec neurčuj – nech pole prázdné, appka si ji dopočítá sama.',
     'skore = číslo 1–10, rodinná atraktivita podle této rubriky:',
     '  9–10 = jedinečná/festivalová akce, kterou by škoda propásnout (výjimečný headliner, ojedinělý formát, silná lokální tradice);',
     '  6–8 = solidní rodinný výlet, dobrý program, ale ne zcela ojedinělý;',
@@ -1038,7 +1093,7 @@ function eventToRow_(ev, today) {
     ev.obec || '',          // G
     ev.dojezd || '',        // H
     ev.kategorie || '',     // I
-    ev.podkategorie || '',  // J
+    Array.isArray(ev.podkategorie) ? ev.podkategorie.join(';') : (ev.podkategorie || ''), // J
     ev.cena || '',          // K
     ev.popis || '',         // L
     ev.skore || '',         // M

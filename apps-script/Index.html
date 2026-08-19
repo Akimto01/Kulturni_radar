@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.49 – sync stavu oblibeneho mista napric vsemi kartami po kliknuti (G) -->
+<!-- Kulturní radar Index.html v3.50 – druha uroven filtru: podkategorie/zanry (krok C) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -93,6 +93,13 @@
     cursor: pointer;
   }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* v3.50: druhá úroveň (podkategorie) – vizuálně podřazená první úrovni;
+     :empty (žádná hlavní kategorie vybraná/žádná dostupná podkategorie)
+     nesmí přidávat mezeru navíc, viz vykreslitPodkatChipy_. */
+  #podkat-chips { margin-top: 8px; }
+  #podkat-chips:empty { margin-top: 0; }
+  #podkat-chips .chip { font-size: .8rem; opacity: .85; }
 
   /* v3.31: kategorie-chipy – na úzké obrazovce vodorovný pruh nad
      seznamem (stejný vzhled jako dřív, kdy byly součástí #controls) */
@@ -804,6 +811,9 @@
 <div id="layout">
   <aside id="kat-sidebar">
     <div class="chips" id="kat-chips"></div>
+    <!-- v3.50: druhá úroveň – podkategorie (žánry), viditelná jen po zvolení
+         konkrétní hlavní kategorie, viz vykreslitPodkatChipy_ -->
+    <div class="chips" id="podkat-chips"></div>
 
     <!-- v3.33: kalendářní pohled (redesign fáze 2) – na mobilu skládací
          panel (výchozí zavřeno, otevírá #kalendar-toggle v hlavičce),
@@ -930,6 +940,7 @@
   // ── Stav ──────────────────────────────────────────────────
   let vsechnaAkce = [];
   let aktKategorie = new Set();
+  let aktPodkategorie = new Set();   // v3.50: druhá úroveň filtru, viz vykreslitPodkatChipy_
   let aktivniProfil = '';
   let token = localStorage.getItem('radar_token') || '';
   let rezimZobrazeni = 'vse';       // 'vse' | 'oblibene' | 'navstivene' | 'neoverene'
@@ -1114,6 +1125,7 @@
         const sel = document.getElementById('profil-select');
         await nactiAkce((sel && sel.value) || aktivniProfil);
         nacistChipyProfil_();   // v3.16: obnovit uložený výběr kategorií tohoto profilu
+        nacistPodkatProfil_();  // v3.50: obnovit uložený výběr podkategorií tohoto profilu
         zavritLogin();
         const badge = document.getElementById('uzivatel-badge');
         badge.textContent = '👤 ' + res.jmeno;
@@ -1151,6 +1163,7 @@
     // TOHOTO profilu, po odhlášení by neměl "prosakovat" do anonymního
     // prohlížení ani do dalšího profilu, co se případně přihlásí.
     aktKategorie.clear();
+    aktPodkategorie.clear();   // v3.50: stejný důvod jako u aktKategorie výše
     syncChipy();
 
     const badge = document.getElementById('uzivatel-badge');
@@ -1470,7 +1483,8 @@
     // (server je vrací navíc jen proto, aby tam mohly být zobrazeny jako inspirace).
     // Stejně tak budoucí "neověřeno" bez URL – ty patří jen do „❓ Neověřeno“ (9. 8. 2026).
     const bezProbehlych = vsechnaAkce.filter(a => jeViditelnaVSeznamu_(a, dnes));
-    const filtrovane = filtrovatOblibenaMista_(filtrovatKategorii_(bezProbehlych, aktKategorie), filtrOblibenaMista);
+    const filtrovane = filtrovatOblibenaMista_(
+      filtrovatPodkategorii_(filtrovatKategorii_(bezProbehlych, aktKategorie), aktPodkategorie), filtrOblibenaMista);
 
     // Odstranit staré akce (ne místa)
     [...main.children].forEach(ch => {
@@ -1812,7 +1826,8 @@
     const dnes = new Date();
     dnes.setHours(0, 0, 0, 0);
     const podleDne = akceDnePodleData_(
-      filtrovatOblibenaMista_(filtrovatKategorii_(vsechnaAkce, aktKategorie), filtrOblibenaMista), dnes);
+      filtrovatOblibenaMista_(
+        filtrovatPodkategorii_(filtrovatKategorii_(vsechnaAkce, aktKategorie), aktPodkategorie), filtrOblibenaMista), dnes);
     const bunky = sestavKalendarMrizku_(kalendarRok, kalendarMesic, new Set(podleDne.keys()));
 
     const mrizka = document.getElementById('kalendar-mrizka');
@@ -1899,11 +1914,13 @@
    *  (jeViditelnaVSeznamu_), stejný kategorie-filtr jako kalendář
    *  (filtrovatKategorii_) a stejný filtr „🏛 Oblíbená místa" jako seznam
    *  (filtrovatOblibenaMista_, F, v3.47), navíc jen akce s platnými
-   *  souřadnicemi. `aktivniOblibenaMista` volitelný (chybí = beze změny),
-   *  ať staré volání/testy bez 4. argumentu dál fungují beze změny chování. */
-  function akceProMapu_(akce, aktKategorieSet, dnes, aktivniOblibenaMista) {
-    return filtrovatOblibenaMista_(filtrovatKategorii_(akce || [], aktKategorieSet), aktivniOblibenaMista).filter(a =>
-      typeof a.lat === 'number' && typeof a.lng === 'number' && jeViditelnaVSeznamu_(a, dnes));
+   *  souřadnicemi. `aktivniOblibenaMista` a `aktPodkategorieSet` volitelné
+   *  (chybí = beze změny), ať staré volání/testy bez 4.–5. argumentu dál
+   *  fungují beze změny chování. */
+  function akceProMapu_(akce, aktKategorieSet, dnes, aktivniOblibenaMista, aktPodkategorieSet) {
+    return filtrovatOblibenaMista_(
+      filtrovatPodkategorii_(filtrovatKategorii_(akce || [], aktKategorieSet), aktPodkategorieSet), aktivniOblibenaMista)
+      .filter(a => typeof a.lat === 'number' && typeof a.lng === 'number' && jeViditelnaVSeznamu_(a, dnes));
   }
 
   /** PURE: klíč pro seskupení/párování podle souřadnic (~1m přesnost, 5
@@ -2030,7 +2047,7 @@
     if (!mapaLeaflet) return;
     const dnes = new Date();
     dnes.setHours(0, 0, 0, 0);
-    const akceMapa = akceProMapu_(vsechnaAkce, aktKategorie, dnes, filtrOblibenaMista);
+    const akceMapa = akceProMapu_(vsechnaAkce, aktKategorie, dnes, filtrOblibenaMista, aktPodkategorie);
     mapaVrstvaPinu.clearLayers();
     const skupiny = seskupitPodleSouradnic_(akceMapa);
     skupiny.forEach(s => {
@@ -2592,6 +2609,55 @@
     });
   }
 
+  // ── v3.50: druhá úroveň chipů – podkategorie (žánry) ────────────────
+  // Na rozdíl od kat-chips (statický seznam z KRITÉRIÍ, sestaven jednou
+  // v init()) se podkat-chips musí přestavět při KAŽDÉM překreslení – obsah
+  // závisí na aktuálně vybraných hlavních kategoriích i na načtených datech
+  // (dostupnePodkategorie_). Volá se z prekreslit(), stejný vzor persistence
+  // jako u aktKategorie (klicUlozenychChipu_/serializovatKategorie_).
+
+  /** PURE: localStorage klíč pro uložené podkategorie-chipy daného profilu. */
+  function klicUlozenychPodkategorii_(uzivatelId) {
+    return 'radar_podkat_chipy:' + uzivatelId;
+  }
+
+  /** Uloží aktuální výběr podkategorií pro přihlášený profil. */
+  function ulozitPodkatProfil_() {
+    if (!prihlasenyUzivatel) return;
+    localStorage.setItem(klicUlozenychPodkategorii_(prihlasenyUzivatel.id), serializovatKategorie_(aktPodkategorie));
+  }
+
+  /** Načte a aplikuje uložený výběr podkategorií po přihlášení. */
+  function nacistPodkatProfil_() {
+    if (!prihlasenyUzivatel) return;
+    const ulozene = deserializovatKategorie_(localStorage.getItem(klicUlozenychPodkategorii_(prihlasenyUzivatel.id)));
+    if (!ulozene.length) return;
+    aktPodkategorie = new Set(ulozene);
+    prekreslit();
+  }
+
+  function togglePodkat(k) {
+    if (aktPodkategorie.has(k)) aktPodkategorie.delete(k);
+    else aktPodkategorie.add(k);
+    ulozitPodkatProfil_();
+    prekreslit();
+  }
+
+  /** Přestaví obsah #podkat-chips podle aktuálně vybraných hlavních kategorií
+   *  a dat v vsechnaAkce; zahodí (bez uložení) volby podkategorií, co už
+   *  nejsou dostupné (např. po odškrtnutí hlavní kategorie). */
+  function vykreslitPodkatChipy_() {
+    const dostupne = dostupnePodkategorie_(vsechnaAkce, aktKategorie);
+    aktPodkategorie = new Set([...aktPodkategorie].filter(p => dostupne.includes(p)));
+    const cont = document.getElementById('podkat-chips');
+    cont.innerHTML = '';
+    dostupne.forEach(p => {
+      const ch = vytvorChip(p, aktPodkategorie.has(p));
+      ch.addEventListener('click', () => togglePodkat(p));
+      cont.appendChild(ch);
+    });
+  }
+
   function syncSpecialChipy() {
     document.getElementById('chip-oblibene').classList.toggle('active', rezimZobrazeni === 'oblibene');
     document.getElementById('chip-navstivene').classList.toggle('active', rezimZobrazeni === 'navstivene');
@@ -2637,6 +2703,30 @@
     return akce.filter(a => a.kategorie.some(k => aktKategorieSet.has(k)));
   }
 
+  /** v3.50: PURE – sjednocené podkategorie napříč akcemi, co
+   *  patří do aktuálně vybraných hlavních kategorií. Prázdný výběr hlavní
+   *  kategorie ("Vše") → [] (druhá úroveň chipů se neukazuje, dokud uživatel
+   *  nezvolí konkrétní hlavní kategorii) – žádný samostatný slovník na
+   *  frontendu, jen odvození z už načtených/validovaných dat (viz backend
+   *  v3.28, readEventsApi_/vypoctiPodkategorii_). */
+  function dostupnePodkategorie_(akce, aktKategorieSet) {
+    if (!aktKategorieSet || aktKategorieSet.size === 0) return [];
+    const sada = new Set();
+    (akce || []).forEach(a => {
+      if (!(a.kategorie || []).some(k => aktKategorieSet.has(k))) return;
+      (a.podkategorie || []).forEach(p => sada.add(p));
+    });
+    return [...sada].sort((x, y) => x.localeCompare(y, 'cs'));
+  }
+
+  /** v3.50: PURE – akce podle aktivního podkategorie-filtru
+   *  (prázdná množina = žádný filtr, vrátí vše beze změny). Stejný vzor
+   *  jako filtrovatKategorii_, aplikuje se za ním v pipeline. */
+  function filtrovatPodkategorii_(akce, aktPodkategorieSet) {
+    if (!aktPodkategorieSet || aktPodkategorieSet.size === 0) return akce;
+    return akce.filter(a => (a.podkategorie || []).some(p => aktPodkategorieSet.has(p)));
+  }
+
   /** PURE: akce podle aktivního filtru „🏛 Oblíbená místa" (F, v3.47) –
    *  neaktivní = beze změny, aktivní = jen akce na místě z apiToggleMisto_
    *  (a.mistoOblibene === true, viz backend v3.26 / frontend v3.46). Stejný
@@ -2649,6 +2739,7 @@
 
   /** Centrální překreslení podle aktuálního režimu (Vše / Oblíbené / Navštívené / Neověřeno). */
   function prekreslit() {
+    vykreslitPodkatChipy_();   // v3.50: musí běžet PŘED filtrováním níž (může prořezat aktPodkategorie)
     syncChipy();
     syncSpecialChipy();
     if (rezimZobrazeni === 'oblibene') {

@@ -12,6 +12,13 @@ const { nactiRadar } = require('./harness');
 
 const r = nactiRadar();
 
+/** Cross-realm porovnání: pole/objekty z vm sandboxu (harness.js) nejsou
+ *  referenčně shodné s objekty testu i při identickém obsahu – deepEqual
+ *  by padlo (viz SKILL.md, gotcha zapsaná 20. 8. 2026). Porovnáváme přes JSON. */
+function shodneNapricRealmy(skutecne, ocekavane, zprava) {
+  assert.equal(JSON.stringify(skutecne), JSON.stringify(ocekavane), zprava);
+}
+
 // ---------------------------------------------------------------------------
 // parseEvents_ – záložní textový parser (primární cesta je tool use)
 // ---------------------------------------------------------------------------
@@ -833,6 +840,74 @@ test('eventToRow_: nová akce vždy start "NE"/"NE" pro Novinka/Změna (upsert j
   const row = r.eventToRow_({ id: 'x' }, '4. 8. 2026');
   assert.equal(row[14], 'NE');
   assert.equal(row[15], 'NE');
+});
+
+test('eventToRow_: pole podkategorií (nový AI výstup) se do sloupce J spojí středníkem', () => {
+  const row = r.eventToRow_({ id: 'x', podkategorie: ['jazz/blues', 'klasika'] }, '4. 8. 2026');
+  assert.equal(row[9], 'jazz/blues;klasika');
+});
+
+test('eventToRow_: prázdné pole podkategorií → prázdný sloupec J', () => {
+  const row = r.eventToRow_({ id: 'x', podkategorie: [] }, '4. 8. 2026');
+  assert.equal(row[9], '');
+});
+
+// ---------------------------------------------------------------------------
+// v3.28: Podkategorie – folklorniRegion_ (programový region) a
+// vypoctiPodkategorii_ (validace sloupce J proti PODKATEGORIE_SLOVNIK)
+// ---------------------------------------------------------------------------
+
+test('folklorniRegion_: Brno → Slovácko/Podluží', () => {
+  assert.equal(r.folklorniRegion_('Brno'), 'Slovácko/Podluží');
+});
+
+test('folklorniRegion_: Zlín → Valašsko/Luhačovicko', () => {
+  assert.equal(r.folklorniRegion_('Zlín'), 'Valašsko/Luhačovicko');
+});
+
+test('folklorniRegion_: Olomouc → Haná', () => {
+  assert.equal(r.folklorniRegion_('Olomouc'), 'Haná');
+});
+
+test('folklorniRegion_: neznámý/prázdný profil → "jiný region"', () => {
+  assert.equal(r.folklorniRegion_('Znojmo'), 'jiný region');
+  assert.equal(r.folklorniRegion_(''), 'jiný region');
+});
+
+test('folklorniRegion_: case-insensitive a netrimované mezery (norm_)', () => {
+  assert.equal(r.folklorniRegion_('brno'), 'Slovácko/Podluží');
+  assert.equal(r.folklorniRegion_('  ZLÍN  '), 'Valašsko/Luhačovicko');
+});
+
+test('vypoctiPodkategorii_: platné hodnoty ze sloupce J (středníkem oddělené) projdou', () => {
+  const out = r.vypoctiPodkategorii_(['koncerty'], 'jazz/blues; klasika', 'Praha');
+  shodneNapricRealmy(out.sort(), ['jazz/blues', 'klasika']);
+});
+
+test('vypoctiPodkategorii_: legacy volný text mimo slovník (ověření 20. 8. 2026) se tiše zahodí', () => {
+  const out = r.vypoctiPodkategorii_(
+    ['festivaly'], 'brazilský karneval, samba, capoeira, gastronomie, taneční show', 'Brno');
+  shodneNapricRealmy(out, []);
+});
+
+test('vypoctiPodkategorii_: částečně platný text – jen platné hodnoty projdou, zbytek se zahodí', () => {
+  const out = r.vypoctiPodkategorii_(['koncerty'], 'klasika;Trautenberk;MIG 21', 'Brno');
+  shodneNapricRealmy(out, ['klasika']);
+});
+
+test('vypoctiPodkategorii_: prázdný/chybějící sloupec J → prázdné pole', () => {
+  shodneNapricRealmy(r.vypoctiPodkategorii_(['divadlo'], '', 'Praha'), []);
+  shodneNapricRealmy(r.vypoctiPodkategorii_(['divadlo'], undefined, 'Praha'), []);
+});
+
+test('vypoctiPodkategorii_: kategorie "folklor" → programový region, sloupec J se ignoruje úplně', () => {
+  const out = r.vypoctiPodkategorii_(['folklor'], 'cokoliv v J', 'Olomouc');
+  shodneNapricRealmy(out, ['Haná']);
+});
+
+test('vypoctiPodkategorii_: kombinace folklor + jiná kategorie → jen region (rozhodnutí 20. 8. 2026, ne sjednocení s J)', () => {
+  const out = r.vypoctiPodkategorii_(['folklor', 'festivaly'], 'hudební', 'Brno');
+  shodneNapricRealmy(out, ['Slovácko/Podluží']);
 });
 
 // ---------------------------------------------------------------------------
@@ -1885,4 +1960,34 @@ test('v3.26: readEventsApi_ – funguje i s nedostupným CacheService (fail-open
   const druhy = ctx.readEventsApi_(ss, 'Brno', false, '');
   assert.equal(druhy.akce.length, 1);
   assert.equal(akceSheet.pocetGetRange, 2, 'bez funkční cache se AKCE čte při každém volání znovu – správně, ne pád');
+});
+
+// ---------------------------------------------------------------------------
+// v3.28: readEventsApi_ – podkategorie v odpovědi (sloupec J → pole `podkategorie`)
+// ---------------------------------------------------------------------------
+
+test('v3.28: readEventsApi_ – validní podkategorie ze sloupce J se objeví v odpovědi', () => {
+  const zitra = pridatDny_(new Date(), 1);
+  const akceSheet = new MemSheet([
+    [],
+    ['ev-1', czDatum_(zitra), '', '', 'Koncert', 'Sál', 'Brno', '', 'koncerty', 'jazz/blues;klasika',
+      '', '', '', 'potvrzeno', '', '', '', '', '', '', '', '', '', '', 'Brno'],
+  ]);
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ AKCE: akceSheet });
+  const vysledek = ctx.readEventsApi_(ss, 'Brno', false, '');
+  shodneNapricRealmy(vysledek.akce[0].podkategorie.sort(), ['jazz/blues', 'klasika']);
+});
+
+test('v3.28: readEventsApi_ – kategorie folklor: sloupec J se ignoruje, použije se folklorniRegion_(profil)', () => {
+  const zitra = pridatDny_(new Date(), 1);
+  const akceSheet = new MemSheet([
+    [],
+    ['ev-2', czDatum_(zitra), '', '', 'Slavnost', 'Náměstí', 'Olomouc', '', 'folklor', 'text, co tam AI nemela psat',
+      '', '', '', 'potvrzeno', '', '', '', '', '', '', '', '', '', '', 'Olomouc'],
+  ]);
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ AKCE: akceSheet });
+  const vysledek = ctx.readEventsApi_(ss, 'Olomouc', false, '');
+  shodneNapricRealmy(vysledek.akce[0].podkategorie, ['Haná']);
 });

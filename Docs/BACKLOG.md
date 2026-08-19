@@ -1,6 +1,6 @@
 # Backlog — Kulturní radar
 
-Poslední aktualizace: 8. 8. 2026. Neplánované nápady a rozpracované položky —
+Poslední aktualizace: 20. 8. 2026. Neplánované nápady a rozpracované položky —
 na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 
 ## Doporučené pořadí
@@ -28,8 +28,8 @@ Zohledňuje závislosti mezi položkami a paralelizaci čekacích dob
    dny a běží na pozadí, ať se nečeká zbytečně
 3. **API credit optimalizace** (~0,5–1 h) — rychlý nezávislý win,
    kdykoli mezi ostatním
-4. **Filtr žánrů/podkategorie** (~2–4 h) — nezávislý, nejdřív ověřit
-   kvalitu dat v poli podkategorie (~30 min)
+4. ~~**Filtr žánrů/podkategorie**~~ — **HOTOVO 20. 8. 2026** (backend
+   v3.28 + Index.html v3.50, viz CHANGELOG.md), čeká na nasazení/commit
 5. **Roční přehled** + **Doporučení podle historie** (~2–3 h + 2–3 h) —
    spárováno, obě staví na stejných datech (OZNAČENÍ)
 6. **Mapa akcí** — vědomě odložená budoucí varianta (viz Větší
@@ -62,12 +62,12 @@ změně BACKLOGu.
 
 ### Nové funkce k prozkoumání
 - Kalendářní pohled s proklikem na akce v daném termínu (~4–6 h, odhad nejistý bez detailního rozvržení)
-- Filtr podle vystupujících/žánrů (taneční, hudební…) — pole `podkategorie` v datech existuje, ale nepoužívá se nikde ve frontendu; nejdřív ověřit, jestli pole reálně obsahuje užitečné hodnoty, než slibovat rozsah (~2–4 h, z toho ~30 min na ověření, jestli pole obsahuje užitečné hodnoty)
 - UX: rozlišit „0 akcí, nikdy neprohledáno" od „0 akcí, prohledáno, nic nenalezeno" (jasnější stav pro neaktivní profily v dropdownu)
 
 ## Ke kontrole
 
 ## Testovací dluh
+- **RF pokrytí obsahu podkategorie-chipů** (nápad, 20. 8. 2026) — dnešní RF test pro `#podkat-chips` (v3.50) ověřuje jen strukturální chování (prázdný kontejner bez výběru hlavní kategorie), ne konkrétní obsah po výběru kategorie, protože produkční data v tuhle chvíli nemají žádnou platnou podkategorii (čekají na re-kontrolu AI s novým promptem, viz CHANGELOG.md). Až proběhne dost kontrol s novým promptem a produkční data budou mít reálné podkategorie, zvážit rozšíření testu o ověření, že klik na konkrétní podkategorie-chip skutečně zúží seznam karet.
 - RF test na opakované přepnutí profilu v dropdownu — regresní pojistka na bug v3.12 (#status mizel z DOM).
 - RF test na opakované spuštění zpracovatSledovanaMesta — regresní pojistka na bug v3.18 (chybějící skip logika).
 - ~~Automatizovaný výkonnostní test~~ — UZAVŘENO 19. 8. 2026: ruční ověření (viz CHANGELOG.md) potvrdilo, že anomálie z 17.–18. 8. (4,3–6,5 s) byla dočasná zátěž z opakovaných nasazení, ne regrese. Baseline ~1,4–2,9 s/request je daná Apps Script platformou samotnou (i cachovaná data trvají podobně) — pevný práh pro automatizovaný test by při týhle přirozené variabilitě (±50 %) spíš generoval falešné poplachy, proto se automatizace nezavádí. Případná budoucí optimalizace: zvážit paralelizaci/sloučení tří startovních requestů (meta+events+places) — jediná reálná páka, kterou měření ukázalo.

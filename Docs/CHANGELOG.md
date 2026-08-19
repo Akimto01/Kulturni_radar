@@ -1,5 +1,20 @@
 # Changelog
 
+## Backend v3.28 + Index.html v3.50 — Filtr žánrů/podkategorie — 20. 8. 2026
+### Přidáno
+- **Slovník podkategorií** (`PODKATEGORIE_SLOVNIK`) — 8 hlavních kategorií (koncerty, divadlo, festivaly, výstavy, historické slavnosti, vinařské/gastro kulturní akce, jarmarky, netradiční kulturní akce), každá s 3–5 podkategoriemi. Jediný zdroj pravdy pro `enum` v `REPORT_TOOL.podkategorie` i pro text instrukce v system promptu (`callAnthropic_`) — žádná ručně sync-ovaná druhá kopie.
+- **AI teď dostává explicitní instrukci pro pole `podkategorie`** (dřív bylo v tool schématu, ale bez jakékoli instrukce v promptu → AI ho vyplňovala volným nekonzistentním textem, ověřeno na produkčních datech 20. 8. 2026: od jednoslovných tagů po výčty jmen kapel). `podkategorie` v `REPORT_TOOL` změněno ze `string` na `array` s `enum` (plochý seznam přes `vsechnyPodkategorie_()`).
+- **`readEventsApi_` čte a validuje sloupec J** (`vypoctiPodkategorii_`) — hodnoty mimo schválený slovník (starý volný text z dob bez instrukce) se tiše zahodí, žádná migrace. `eventToRow_` spojuje nové pole podkategorií středníkem při zápisu (konzistentní s `kategorie`).
+- **Folklor: speciální případ** — podkategorie se u kategorie „folklor" neurčuje přes AI (kulturně-geografický pojem), ale programově novou funkcí `folklorniRegion_(profil)` (Brno → Slovácko/Podluží, Zlín → Valašsko/Luhačovicko, Olomouc → Haná, jinak „jiný region"). AI folklor v promptu/enum vůbec nedostává, sloupec J se pro tyto akce ignoruje úplně — i u kombinace folklor + jiná kategorie (vědomé zjednodušení, AI stejně není pro kombinaci instruovaná).
+- **Frontend: druhá úroveň chipů** (`#podkat-chips`) — viditelná jen po zvolení konkrétní hlavní kategorie v sidebaru, kombinovatelná s hlavní kategorií i ostatními filtry (mapa, kalendář, seznam). Žádný samostatný slovník na frontendu — `dostupnePodkategorie_` odvozuje nabídku chipů přímo z už načtených/validovaných dat (`a.podkategorie`), takže folklorní region funguje beze změny stejným mechanismem jako běžné podkategorie. Vlastní localStorage persistence (`radar_podkat_chipy:`) stejným vzorem jako hlavní kategorie, s automatickým prořezáním neplatných voleb při odškrtnutí hlavní kategorie.
+- 21 nových Node testů (`folklorniRegion_`, `vypoctiPodkategorii_`, `eventToRow_` s polem podkategorií, `readEventsApi_` integrace, `dostupnePodkategorie_`, `filtrovatPodkategorii_`) + 1 nový RF test (zobrazení/skrytí druhé úrovně chipů podle hlavní kategorie).
+### Poznámka k architektuře
+- **Žádná migrace starých dat** — existující akce v AKCE mají sloupec J plný nekonzistentního volného textu; ten se při čtení prostě zahodí (mimo slovník), akce zůstanou bez podkategorie, dokud je nepřepíše příští AI kontrola s novým promptem.
+- Zvažováno a zamítnuto: odeslání `PODKATEGORIE_SLOVNIK` přes `?api=meta` pro frontend (dřívější plán) — nahrazeno jednodušším odvozením z dat, viz výše. Frontend tak nemusí znát rozdíl mezi „běžnou" podkategorií a folklorním regionem vůbec.
+- RF test pro druhou úroveň chipů záměrně neověřuje konkrétní počet/obsah podkategorie-chipů po výběru kategorie (produkční data je budou mít prázdné, dokud neproběhne re-kontrola) — jen strukturální chování (prázdný kontejner bez výběru hlavní kategorie, zase prázdný po návratu na „Vše").
+- Node testy 328 → 351 (+23, z toho 2 pro `eventToRow_`).
+- **Nasazeno**: čeká na potvrzení (`clasp push` + `clasp deploy`), viz konec konverzace.
+
 ## Backend v3.27 — Haiku experiment pro denní kontrolu — 20. 8. 2026
 ### Přidáno
 - **Podmíněný výběr modelu podle typu běhu** — nová konstanta `ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5'` vedle `ANTHROPIC_MODEL` (`'claude-sonnet-4-6'`) a nová pure funkce `vyberModelProKontrolu_(typKontroly)`: `'denní kontrola'` (automatický ranní trigger, `dailyCheck`) → Haiku, všechno ostatní (mimořádné běhy z menu/webu, osobní hledání, sledovaná města, měsíční kontrola stálých míst) → beze změny na Sonnetu. Použito v `callAnthropic_` (hlavní požadavek i záchranné formátovací dovolání) a předáváno do `logKontrola_`, aby sloupec K v listu KONTROLY zaznamenal skutečně použitý model daného běhu, ne globální konstantu.
