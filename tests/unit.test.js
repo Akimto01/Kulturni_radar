@@ -175,6 +175,32 @@ test('v2.8: notifyOk_ seskupuje podle kategorií (česky abecedně) + odkaz', ()
   assert.match(telo, /Kompletní přehled: https:\/\/sheet\.example\/test/);
 });
 
+const STATS_PRAZDNE_TEST = { total: 0, nove: 0, zmenene: 0, zrusene: 0, bezZmeny: 0, noveNazvy: [], zmeneneNazvy: [], zruseneNazvy: [], bezZmenyNazvy: [] };
+const CFG_NOTIFY_TEST = { profil: 'Brno', rozsah: '7. 8.–9. 8. 2026', dojezd: '90 min', horizont: '2 týdny' };
+
+test('v3.29: notifyOk_ – s emailTipyStats (celkem > 0) přidá sekci s rozpisem', () => {
+  const ctx = nactiRadar({ properties: { NOTIFY_EMAIL: 'test@example.com' } });
+  ctx.notifyOk_('denní kontrola', CFG_NOTIFY_TEST, STATS_PRAZDNE_TEST, new Date(2026, 7, 1, 8, 0),
+    { celkem: 3, ok: 1, chyba: 1, nelzeOverit: 1 });
+  const telo = ctx.__odeslaneEmaily[0].telo;
+  assert.match(telo, /E-mailové tipy: 3 přišlo \(1 zpracováno, 1 nešlo ověřit, 1 chyba\)/);
+});
+
+test('v3.29: notifyOk_ – s emailTipyStats (celkem === 0) ukáže "0 přišlo" bez rozpisu v závorce', () => {
+  const ctx = nactiRadar({ properties: { NOTIFY_EMAIL: 'test@example.com' } });
+  ctx.notifyOk_('denní kontrola', CFG_NOTIFY_TEST, STATS_PRAZDNE_TEST, new Date(2026, 7, 1, 8, 0),
+    { celkem: 0, ok: 0, chyba: 0, nelzeOverit: 0 });
+  const telo = ctx.__odeslaneEmaily[0].telo;
+  assert.match(telo, /E-mailové tipy: 0 přišlo$/m);
+});
+
+test('v3.29: notifyOk_ – bez emailTipyStats (mimořádná kontrola, sledované město…) sekci vůbec nepřidá', () => {
+  const ctx = nactiRadar({ properties: { NOTIFY_EMAIL: 'test@example.com' } });
+  ctx.notifyOk_('mimořádná kontrola', CFG_NOTIFY_TEST, STATS_PRAZDNE_TEST, new Date(2026, 7, 1, 8, 0));
+  const telo = ctx.__odeslaneEmaily[0].telo;
+  assert.doesNotMatch(telo, /E-mailové tipy/);
+});
+
 // ---------------------------------------------------------------------------
 // v2.9: detektor vycpávkových názvů (datová hygiena)
 // ---------------------------------------------------------------------------
@@ -1173,6 +1199,66 @@ test('logKontrola_: zapíše skutečně použitý model, ne globální konstantu
 });
 
 // ---------------------------------------------------------------------------
+// v3.29: callAnthropicEmailTip_ – ověření jednoho e-mailového tipu (jiný
+// prompt než callAnthropic_, ale sdílená retry smyčka volatAnthropicSTool_)
+// ---------------------------------------------------------------------------
+
+const EMAIL_TIP_TEXT_TEST = 'Zítra je v parku jarmark od 10 do 18 hodin.';
+
+test('callAnthropicEmailTip_: chybí ANTHROPIC_API_KEY → chyba hned, žádný síťový dotaz', () => {
+  const volane = [];
+  const ctx = nactiRadar({ properties: {}, urlFetch: frontaFetchu([], volane) });
+  assert.throws(() => ctx.callAnthropicEmailTip_(EMAIL_TIP_TEXT_TEST), /ANTHROPIC_API_KEY/);
+  assert.equal(volane.length, 0);
+});
+
+test('callAnthropicEmailTip_: vždy pošle Sonnet, i když by "denní kontrola" jinak použila Haiku', () => {
+  const resp = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [AKCE_REPORT] } }],
+  });
+  const payloady = [];
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchuSPayloadem([resp], payloady) });
+  ctx.callAnthropicEmailTip_(EMAIL_TIP_TEXT_TEST);
+  assert.equal(payloady[0].model, 'claude-sonnet-4-6');
+});
+
+test('callAnthropicEmailTip_: model rovnou zavolá report_events → akce se vrátí přímo', () => {
+  const resp = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [AKCE_REPORT] } }],
+  });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([resp]) });
+  const events = ctx.callAnthropicEmailTip_(EMAIL_TIP_TEXT_TEST);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].nazev, 'Test');
+});
+
+test('callAnthropicEmailTip_: prázdný seznam (events: []) je platný výsledek – "nešlo ověřit", ne chyba', () => {
+  const resp = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [] } }],
+  });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([resp]) });
+  const events = ctx.callAnthropicEmailTip_(EMAIL_TIP_TEXT_TEST);
+  assert.ok(Array.isArray(events));
+  assert.equal(events.length, 0);
+});
+
+test('callAnthropicEmailTip_: system prompt posílá syrový text tipu a instrukci k folkloru/podkategoriím', () => {
+  const resp = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [] } }],
+  });
+  const payloady = [];
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchuSPayloadem([resp], payloady) });
+  ctx.callAnthropicEmailTip_(EMAIL_TIP_TEXT_TEST);
+  assert.match(payloady[0].system, /folklor.*neurčuj/s);
+  assert.match(payloady[0].system, /jazz\/blues/);   // slovník podkategorií je součástí promptu
+  assert.match(payloady[0].messages[0].content, new RegExp(EMAIL_TIP_TEXT_TEST.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+// ---------------------------------------------------------------------------
 // v3.16: Sledovaná města – tiché doplnění dat pro města mimo domácí profil
 // ---------------------------------------------------------------------------
 
@@ -1707,7 +1793,10 @@ function fakeSpreadsheet(pocatecni) {
     const hodnota = pocatecni[n];
     // v3.26: umožní předat i už sestavený (např. počítající) sheet objekt,
     // ne jen syrová data – zpětně kompatibilní s dřívějším voláním.
-    sheets[n] = (hodnota instanceof MemSheet) ? hodnota : new MemSheet(hodnota);
+    // v3.29: rozšířeno z instanceof MemSheet na obecnou duck-type kontrolu
+    // (getRange existuje), ať jde předat i jiné minimální fake sheety, např.
+    // fakeKriteria_ (čte přes A1 adresy, ne přes numerický getRange).
+    sheets[n] = (hodnota && typeof hodnota.getRange === 'function') ? hodnota : new MemSheet(hodnota);
   });
   return {
     getSheetByName: (n) => sheets[n] || null,
@@ -1990,4 +2079,246 @@ test('v3.28: readEventsApi_ – kategorie folklor: sloupec J se ignoruje, použi
   const ss = fakeSpreadsheet({ AKCE: akceSheet });
   const vysledek = ctx.readEventsApi_(ss, 'Olomouc', false, '');
   shodneNapricRealmy(vysledek.akce[0].podkategorie, ['Haná']);
+});
+
+// ---------------------------------------------------------------------------
+// v3.29: EMAIL_TIPY – ensureEmailTipySheet_, apiEmailTip_ (webhook příjem)
+// ---------------------------------------------------------------------------
+
+test('v3.29: ensureEmailTipySheet_ – vytvoří list s hlavičkou, pokud chybí', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({});
+  const sh = ctx.ensureEmailTipySheet_(ss);
+  // Pozn.: top-level `const EMAIL_TIPY_HLAVICKA` není v cross-realm ctx
+  // dosažitelná (jen function-deklarace jsou vlastnostmi globálu, viz
+  // SKILL.md) – očekávaná hlavička je proto vypsaná doslova, ne přes ctx.
+  shodneNapricRealmy(sh.getRange(1, 1, 1, 9).getValues()[0],
+    ['ID', 'Přijato', 'Odesílatel', 'Předmět', 'Text', 'Stav', 'ID akce', 'Zpracováno kdy', 'Poznámka']);
+});
+
+test('v3.29: ensureEmailTipySheet_ – existující list se znovu nevytváří (data zůstanou)', () => {
+  const ctx = nactiRadar();
+  const existujici = new MemSheet([['ID', 'Přijato', 'Odesílatel', 'Předmět', 'Text', 'Stav', 'ID akce', 'Zpracováno kdy', 'Poznámka'], ['x', '', '', '', '', '', '', '', '']]);
+  const ss = fakeSpreadsheet({ EMAIL_TIPY: existujici });
+  const sh = ctx.ensureEmailTipySheet_(ss);
+  assert.equal(sh.getLastRow(), 2, 'existující řádek se nesmí ztratit');
+});
+
+test('v3.29: apiEmailTip_ – chybí nastavený token na appce → ok:false, žádný zápis', () => {
+  const ctx = nactiRadar();   // bez properties = EMAIL_WEBHOOK_TOKEN není nastaven
+  const ss = fakeSpreadsheet({});
+  const vysledek = ctx.apiEmailTip_(ss, 'cokoliv', 'a@b.cz', 'Předmět', 'Text tipu.');
+  assert.equal(vysledek.ok, false);
+  assert.equal(ss.getSheetByName('EMAIL_TIPY'), null, 'list se nemá vytvořit, když se rovnou zamítne na tokenu');
+});
+
+test('v3.29: apiEmailTip_ – špatný token → ok:false', () => {
+  const ctx = nactiRadar({ properties: { EMAIL_WEBHOOK_TOKEN: 'spravny-token' } });
+  const ss = fakeSpreadsheet({});
+  const vysledek = ctx.apiEmailTip_(ss, 'spatny-token', 'a@b.cz', 'Předmět', 'Text tipu.');
+  assert.equal(vysledek.ok, false);
+  assert.match(vysledek.error, /token/i);
+});
+
+test('v3.29: apiEmailTip_ – prázdný text (i jen bílé znaky) → ok:false', () => {
+  const ctx = nactiRadar({ properties: { EMAIL_WEBHOOK_TOKEN: 'tok' } });
+  const ss = fakeSpreadsheet({});
+  assert.equal(ctx.apiEmailTip_(ss, 'tok', 'a@b.cz', 'X', '').ok, false);
+  assert.equal(ctx.apiEmailTip_(ss, 'tok', 'a@b.cz', 'X', '   ').ok, false);
+});
+
+test('v3.29: apiEmailTip_ – text nad limit délky (5000 znaků) → ok:false, žádný zápis', () => {
+  const ctx = nactiRadar({ properties: { EMAIL_WEBHOOK_TOKEN: 'tok' } });
+  const ss = fakeSpreadsheet({});
+  const dlouhy = 'a'.repeat(5001);
+  const vysledek = ctx.apiEmailTip_(ss, 'tok', 'a@b.cz', 'X', dlouhy);
+  assert.equal(vysledek.ok, false);
+  assert.equal(ss.getSheetByName('EMAIL_TIPY'), null);
+});
+
+test('v3.29: apiEmailTip_ – text přesně na limitu (5000 znaků) ještě projde', () => {
+  const ctx = nactiRadar({ properties: { EMAIL_WEBHOOK_TOKEN: 'tok' } });
+  const ss = fakeSpreadsheet({});
+  const naLimitu = 'a'.repeat(5000);
+  const vysledek = ctx.apiEmailTip_(ss, 'tok', 'a@b.cz', 'X', naLimitu);
+  assert.equal(vysledek.ok, true);
+});
+
+test('v3.29: apiEmailTip_ – OK případ zapíše řádek se stavem "nové" a vrátí id', () => {
+  const ctx = nactiRadar({ properties: { EMAIL_WEBHOOK_TOKEN: 'tajny-token' } });
+  const ss = fakeSpreadsheet({});
+  const vysledek = ctx.apiEmailTip_(ss, 'tajny-token', 'pratele@example.com', 'Tip na akci', 'Zítra je v parku jarmark.');
+  assert.equal(vysledek.ok, true);
+  assert.equal(typeof vysledek.id, 'string');
+  assert.ok(vysledek.id.length > 0);
+
+  const sh = ss.getSheetByName('EMAIL_TIPY');
+  const radek = sh.getRange(2, 1, 1, 9).getValues()[0];
+  assert.equal(radek[0], vysledek.id);          // ID
+  assert.equal(radek[2], 'pratele@example.com'); // Odesílatel
+  assert.equal(radek[3], 'Tip na akci');         // Předmět
+  assert.equal(radek[4], 'Zítra je v parku jarmark.'); // Text
+  assert.equal(radek[5], 'nové');                // Stav
+  assert.equal(radek[6], '');                    // ID akce – zatím prázdné
+});
+
+test('v3.29: apiEmailTip_ – from/subject se ořežou o bílé znaky, chybějící pole nespadnou', () => {
+  const ctx = nactiRadar({ properties: { EMAIL_WEBHOOK_TOKEN: 'tok' } });
+  const ss = fakeSpreadsheet({});
+  const vysledek = ctx.apiEmailTip_(ss, 'tok', '  a@b.cz  ', undefined, 'Text.');
+  assert.equal(vysledek.ok, true);
+  const radek = ss.getSheetByName('EMAIL_TIPY').getRange(2, 1, 1, 9).getValues()[0];
+  assert.equal(radek[2], 'a@b.cz');
+  assert.equal(radek[3], '');
+});
+
+test('v3.29: routePost_ – akce "email-tip" se routuje na apiEmailTip_', () => {
+  const ctx = nactiRadar({ properties: { EMAIL_WEBHOOK_TOKEN: 'tok' } });
+  const ss = fakeSpreadsheet({});
+  const vysledek = ctx.routePost_({ akce: 'email-tip', token: 'tok', from: 'a@b.cz', subject: 'X', text: 'Text tipu.' }, ss);
+  assert.equal(vysledek.ok, true);
+  assert.equal(ss.getSheetByName('EMAIL_TIPY').getLastRow(), 2);
+});
+
+// ---------------------------------------------------------------------------
+// v3.29: nazvyProfiluLokalit_, zpracovatEmailTipy_ – zpracování fronty
+// EMAIL_TIPY (AI ověření webem + zápis do AKCE, viz krok B)
+// ---------------------------------------------------------------------------
+
+test('nazvyProfiluLokalit_: seznam názvů ze sloupce B, prázdné řádky vynechá', () => {
+  const lok = new MemSheet([[], ['id1', 'Brno'], ['id2', ''], ['id3', 'Znojmo']]);
+  const ss = fakeSpreadsheet({ LOKALITY: lok });
+  const ctx = nactiRadar();
+  shodneNapricRealmy(ctx.nazvyProfiluLokalit_(ss), ['Brno', 'Znojmo']);
+});
+
+test('nazvyProfiluLokalit_: chybějící list LOKALITY → prázdné pole, nespadne', () => {
+  const ss = fakeSpreadsheet({});
+  const ctx = nactiRadar();
+  shodneNapricRealmy(ctx.nazvyProfiluLokalit_(ss), []);
+});
+
+/** Minimální fake KRITÉRIA sheet pro readCriteria_ (čte přes A1 adresy a
+ *  getDisplayValue, ne přes numerické getRange jako MemSheet). */
+function fakeKriteria_(cells) {
+  return { getRange: (a1) => ({ getDisplayValue: () => String((cells && cells[a1]) || '') }) };
+}
+
+const EMAIL_TIPY_HLAVICKA_TEST = ['ID', 'Přijato', 'Odesílatel', 'Předmět', 'Text', 'Stav', 'ID akce', 'Zpracováno kdy', 'Poznámka'];
+
+/** Sestaví jeden řádek EMAIL_TIPY ve zvoleném stavu (výchozí "nové"). */
+function emailTipRadek_(id, text, stav) {
+  return [id, '19. 8. 2026 10:00', 'pratele@example.com', 'Tip', text, stav || 'nové', '', '', ''];
+}
+
+function zakladniSs_(emailTipyRows, akceRows) {
+  return fakeSpreadsheet({
+    EMAIL_TIPY: new MemSheet([EMAIL_TIPY_HLAVICKA_TEST].concat(emailTipyRows)),
+    LOKALITY: new MemSheet([[], ['id1', 'Brno'], ['id2', 'Olomouc']]),
+    'KRITÉRIA': fakeKriteria_({ B2: 'Brno', B3: '90 min', B4: '2', B5: 'vše', B6: 'ano', B7: 'ano' }),
+    AKCE: new MemSheet(akceRows || [[]]),
+    KONTROLY: new MemSheet([[]]),
+  });
+}
+
+const EMAIL_TIP_EVENT = { id: 'et-jarmark', datum_od: '10. 8. 2026', nazev: 'Jarmark', misto: 'Park', obec: 'Brno', kategorie: 'jarmarky', stav: 'potvrzeno' };
+
+test('zpracovatEmailTipy_: chybějící list EMAIL_TIPY → nulové stats, žádný pád', () => {
+  const ss = fakeSpreadsheet({});
+  const ctx = nactiRadar();
+  const stats = ctx.zpracovatEmailTipy_(ss);
+  shodneNapricRealmy(stats, { celkem: 0, ok: 0, chyba: 0, nelzeOverit: 0 });
+});
+
+test('zpracovatEmailTipy_: prázdný EMAIL_TIPY (jen hlavička) → nulové stats', () => {
+  const ss = zakladniSs_([]);
+  const ctx = nactiRadar();
+  const stats = ctx.zpracovatEmailTipy_(ss);
+  shodneNapricRealmy(stats, { celkem: 0, ok: 0, chyba: 0, nelzeOverit: 0 });
+});
+
+test('zpracovatEmailTipy_: řádky mimo stav "nové" se přeskočí beze změny', () => {
+  const ss = zakladniSs_([
+    emailTipRadek_('a', 'text a', 'zpracováno-ok'),
+    emailTipRadek_('b', 'text b', 'zpracováno-chyba'),
+  ]);
+  const ctx = nactiRadar();
+  const stats = ctx.zpracovatEmailTipy_(ss);
+  shodneNapricRealmy(stats, { celkem: 0, ok: 0, chyba: 0, nelzeOverit: 0 });
+  const radky = ss.getSheetByName('EMAIL_TIPY').getRange(2, 1, 2, 9).getValues();
+  assert.equal(radky[0][5], 'zpracováno-ok', 'stav se nemá přepsat');
+});
+
+test('zpracovatEmailTipy_: AI nenajde/neověří akci (prázdné events) → "nelze-ověřit"', () => {
+  const ss = zakladniSs_([emailTipRadek_('a', 'nesmyslný text')]);
+  const resp = anthropicResp({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'report_events', input: { events: [] } }] });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([resp]) });
+  const stats = ctx.zpracovatEmailTipy_(ss);
+  shodneNapricRealmy(stats, { celkem: 1, ok: 0, chyba: 0, nelzeOverit: 1 });
+  const radek = ss.getSheetByName('EMAIL_TIPY').getRange(2, 1, 1, 9).getValues()[0];
+  assert.equal(radek[5], 'nelze-ověřit');
+  assert.match(radek[8], /nena[šs]la|nenaslo|neověřila/i);
+});
+
+test('zpracovatEmailTipy_: obec mimo pokryté profily → "nelze-ověřit" s poznámkou, nezapíše do AKCE', () => {
+  const ss = zakladniSs_([emailTipRadek_('a', 'akce v neznámém městě')]);
+  const mimoProfil = Object.assign({}, EMAIL_TIP_EVENT, { obec: 'Nikde nad Nislou' });
+  const resp = anthropicResp({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'report_events', input: { events: [mimoProfil] } }] });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([resp]) });
+  const stats = ctx.zpracovatEmailTipy_(ss);
+  shodneNapricRealmy(stats, { celkem: 1, ok: 0, chyba: 0, nelzeOverit: 1 });
+  const radek = ss.getSheetByName('EMAIL_TIPY').getRange(2, 1, 1, 9).getValues()[0];
+  assert.equal(radek[5], 'nelze-ověřit');
+  assert.match(radek[8], /Nikde nad Nislou/);
+  assert.equal(ss.getSheetByName('AKCE').getLastRow(), 1, 'do AKCE se nic nezapsalo (jen hlavička)');
+});
+
+// Prázdný Nominatim výsledek (žádná shoda) – použito jako stub odpověď pro
+// geokódování, které zajistitSouradniceProAkce_ vyvolá po KAŽDÉM úspěšně
+// upsertnutém tipu (samostatný fetch navíc, mimo AI ověření). Zajišťuje čistý
+// null bez výjimky, ať zůstane fronta odpovědí v testech správně zarovnaná.
+const GEOKOD_PRAZDNY = { code: 200, body: [] };
+
+test('zpracovatEmailTipy_: ověřená akce se zapíše do AKCE, řádek dostane "zpracováno-ok" + ID akce', () => {
+  const ss = zakladniSs_([emailTipRadek_('a', 'zítra jarmark v Brně')]);
+  const resp = anthropicResp({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'report_events', input: { events: [EMAIL_TIP_EVENT] } }] });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([resp, GEOKOD_PRAZDNY]) });
+  const stats = ctx.zpracovatEmailTipy_(ss);
+  shodneNapricRealmy(stats, { celkem: 1, ok: 1, chyba: 0, nelzeOverit: 0 });
+
+  const radek = ss.getSheetByName('EMAIL_TIPY').getRange(2, 1, 1, 9).getValues()[0];
+  assert.equal(radek[5], 'zpracováno-ok');
+  assert.equal(radek[6], 'et-jarmark');
+
+  const akce = ss.getSheetByName('AKCE').getRange(2, 1, 1, 25).getValues()[0];
+  assert.equal(akce[4], 'Jarmark');       // E: název
+  assert.equal(akce[6], 'Brno');          // G: obec
+  assert.equal(akce[24], 'Brno');         // Y: profil – podle obce, ne podle "aktivního" profilu
+  assert.match(akce[18], /e-mailový tip/); // S: primarni_zdroj dostal fallback tag
+});
+
+test('zpracovatEmailTipy_: chyba při volání AI (výpadek sítě) → "zpracováno-chyba" s chybovou zprávou', () => {
+  const ss = zakladniSs_([emailTipRadek_('a', 'text')]);
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu(['throw']) });
+  const stats = ctx.zpracovatEmailTipy_(ss);
+  shodneNapricRealmy(stats, { celkem: 1, ok: 0, chyba: 1, nelzeOverit: 0 });
+  const radek = ss.getSheetByName('EMAIL_TIPY').getRange(2, 1, 1, 9).getValues()[0];
+  assert.equal(radek[5], 'zpracováno-chyba');
+  assert.match(radek[8], /síť spadla/);
+});
+
+test('zpracovatEmailTipy_: víc řádků – zpracují se jen ty "nové", stats sečtou všechny výsledky', () => {
+  const ss = zakladniSs_([
+    emailTipRadek_('a', 'ok tip'),
+    emailTipRadek_('b', 'uz hotovo', 'zpracováno-ok'),
+    emailTipRadek_('c', 'nejde overit'),
+  ]);
+  const respOk = anthropicResp({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'report_events', input: { events: [EMAIL_TIP_EVENT] } }] });
+  const respPrazdne = anthropicResp({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'report_events', input: { events: [] } }] });
+  // Pořadí ve frontě musí sedět s pořadím zpracování řádků: řádek 'a' (ok tip)
+  // vyvolá AI dotaz + navazující geokódování (viz GEOKOD_PRAZDNY výš), teprve
+  // pak přijde na řadu řádek 'c' (nejde ověřit, jen AI dotaz, bez geokódování).
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([respOk, GEOKOD_PRAZDNY, respPrazdne]) });
+  const stats = ctx.zpracovatEmailTipy_(ss);
+  shodneNapricRealmy(stats, { celkem: 2, ok: 1, chyba: 0, nelzeOverit: 1 });
 });

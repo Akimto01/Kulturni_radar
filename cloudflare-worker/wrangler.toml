@@ -1,0 +1,15 @@
+name = "kulturni-radar-email-webhook"
+main = "email-webhook.js"
+compatibility_date = "2026-08-20"
+
+# URL appky (?exec endpoint) – NENI tajna hodnota, jen konfigurace.
+# Sedi se soucasnym produkcnim nasazenim (viz .clasp.json a poslednim
+# `clasp deploy -i ...` v hlavnim repu). Pri zmene produkcni implementace
+# (nova /exec URL) staci upravit tady, zadny redeploy appky navic.
+[vars]
+EXEC_URL = "https://script.google.com/macros/s/AKfycbwwLACExWtRUULK5XX1bMD8SJiC6cBqAY-q99Flp3SLAEr4ejB4VnekFNH9yYnlOuJvRQ/exec"
+
+# EMAIL_WEBHOOK_TOKEN je TAJNA hodnota - NEPATRI sem do wrangler.toml
+# (ten se muze commitnout do gitu). Nastavuje se pres:
+#   wrangler secret put EMAIL_WEBHOOK_TOKEN
+# viz README.md v tomhle adresari.

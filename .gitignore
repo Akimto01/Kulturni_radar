@@ -14,3 +14,8 @@ vysledky/
 # clasp OAuth token – normálně žije v ~/.clasprc.json mimo repo,
 # ale pro jistotu i tady (viz SKILL.md sekce 6)
 .clasprc.json
+
+# cloudflare-worker/ má vlastní npm závislosti (postal-mime, wrangler) –
+# node_modules se necommitují, package-lock.json ano.
+cloudflare-worker/node_modules/
+cloudflare-worker/.wrangler/

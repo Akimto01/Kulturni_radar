@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.28 (20. 8. 2026) – Podkategorie: slovník + AI prompt/schema, folklor programově (krok A)
- * (předchozí: 3.27 – Haiku experiment pro denní kontrolu (měření kvality 20.–27. 8. 2026))
+ * Verze: 3.29 (20. 8. 2026) – Email tipy: fronta + webhook + AI ověření + report (kroky A–C)
+ * (předchozí: 3.28 – Podkategorie: slovník + AI prompt/schema, folklor programově)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -26,6 +26,8 @@
  *       NTFY_TOPIC         = nazev-kanalu        (volitelné, push přes ntfy.sh)
  *       NOTIFY_EMAIL       = adresa@example.com  (volitelné, e-mail navíc)
  *       NOTIFY_EMAIL_VIKEND = dalsi@example.com  (volitelné, jen k Víkendovým tipům navíc)
+ *       EMAIL_WEBHOOK_TOKEN = nahodny-token       (volitelné, viz apiEmailTip_ – sdílený
+ *                              secret s Cloudflare Email Workerem, NENÍ totéž co WEB_TOKEN)
  *  3. Spustit funkci setupTriggers() (a autorizovat oprávnění).
  */
 
@@ -46,6 +48,7 @@ const SHEET = {
   SLEDOVANA_MESTA: 'SLEDOVANÁ MĚSTA',
   UZIVATELE: 'UŽIVATELÉ',
   POCASI: 'POČASÍ',
+  EMAIL_TIPY: 'EMAIL_TIPY',
 };
 
 const KRIT = {           // adresy v listu KRITÉRIA
@@ -65,7 +68,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.28';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.29';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -75,6 +78,9 @@ const MAX_WEB_SEARCHES = 3;  // v3.6: úspora kreditů (bývalo 5)
 const KONTAKT_EMAIL = 'info@kulturniradar.cz';
 const KONTAKT_ZPRAVA_MAX = 2000;        // znaků – proti zneužití formuláře
 const KONTAKT_COOLDOWN_MS = 30 * 1000;  // stejný duch jako WEB_COOLDOWN_MS, jen kratší (kontaktní formulář, ne AI dotaz)
+
+const EMAIL_TIP_TEXT_MAX = 5000;   // v3.29: znaků – stejný duch jako KONTAKT_ZPRAVA_MAX, jen vyšší
+                                    // strop (mail bývá delší než ruční zpráva – podpis, citované vlákno)
 
 /** v3.28: Slovník podkategorií per hlavní kategorie – jediný zdroj pravdy,
  *  ze kterého se skládá jak `enum` v REPORT_TOOL, tak text instrukce pro AI
@@ -211,6 +217,7 @@ function routePost_(body, ss) {
   if (akce === 'filtry') return apiSetFiltry_(ss, body.uzivatelId, body.filtry);
   if (akce === 'najdi')  return apiNajdiProUzivatele_(ss, body.uzivatelId, body.token);
   if (akce === 'kontakt') return apiKontakt_(body.jmeno, body.zprava, body.email, body.uzivatelId);
+  if (akce === 'email-tip') return apiEmailTip_(ss, body.token, body.from, body.subject, body.text);
   return { ok: false, error: 'Neznámá akce.' };
 }
 
@@ -668,7 +675,11 @@ function onEditInstallable(e) {
 function dailyCheck() {
   try {
     markPastEvents();
-    runCheck_('denní kontrola');
+    // v3.29: fronta EMAIL_TIPY se zpracuje PŘED běžnou kontrolou, ať jsou obě
+    // sady výsledků (email-tipy i běžně nalezené akce) v JEDNOM denním
+    // reportu (viz runCheck_/notifyOk_) – ne ve dvou samostatných e-mailech.
+    const emailTipyStats = zpracovatEmailTipy_(SpreadsheetApp.getActiveSpreadsheet());
+    runCheck_('denní kontrola', emailTipyStats);
   } catch (err) {
     notifyFail_('Denní kontrola selhala', err);
     throw err;
@@ -679,7 +690,11 @@ function dailyCheck() {
 // HLAVNÍ BĚH
 // ---------------------------------------------------------------------------
 
-function runCheck_(typKontroly) {
+/** v3.29: emailTipyStats je volitelný ({celkem, ok, chyba, nelzeOverit} z
+ *  zpracovatEmailTipy_) – jen dailyCheck ho předává, ostatní volání
+ *  (mimořádná kontrola, sledovaná města, osobní hledání) ho vynechávají a
+ *  notifyOk_ pak sekci s email-tipy do reportu vůbec nepřidá. */
+function runCheck_(typKontroly, emailTipyStats) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) {
     Logger.log('Jiný běh právě probíhá – končím.');
@@ -716,7 +731,7 @@ function runCheck_(typKontroly) {
       krit.getRange(KRIT.CHECKBOX).setValue(false);
     }
 
-    notifyOk_(typKontroly, cfg, stats, now);
+    notifyOk_(typKontroly, cfg, stats, now, emailTipyStats);
   } finally {
     lock.releaseLock();
   }
@@ -791,71 +806,34 @@ function vyberModelProKontrolu_(typKontroly) {
   return typKontroly === 'denní kontrola' ? ANTHROPIC_MODEL_HAIKU : ANTHROPIC_MODEL;
 }
 
-function callAnthropic_(cfg, zdroje, typKontroly) {
-  const apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
-  if (!apiKey) throw new Error('Chybí Script Property ANTHROPIC_API_KEY.');
-  const model = vyberModelProKontrolu_(typKontroly);
-
-  const sourcesList = zdroje
-    .map(z => '- ' + z.nazev + (z.priorita ? ' [' + z.priorita + ']' : '') + ': ' + z.url)
-    .join('\n');
-
-  const system = [
-    'Jsi Kulturní radar – asistent, který vyhledává kulturní akce v ČR.',
-    'Výsledky NIKDY nevypisuj jako text – po dokončení hledání je odevzdej',
-    'PRÁVĚ JEDNÍM zavoláním nástroje report_events (parametr events = seznam akcí).',
-    'Formáty hodnot: id = RRRR-MM-DD-slug-nazvu; datum_od/datum_do = "D. M. RRRR" (datum_do může být "");',
-    'dojezd = text VŽDY s časem i vzdáleností (např. "cca 30–40 min, ~35 km"); kategorie = středníkem oddělené;',
+/** v3.29: řádky instrukce pro pole `podkategorie` – identické ve
+ *  callAnthropic_ i callAnthropicEmailTip_, vytažené sem, ať se text
+ *  nerozjede na dvou místech (viz PODKATEGORIE_SLOVNIK). */
+function podkategorieInstrukce_() {
+  return [
     'podkategorie = pole 0–3 hodnot, VÝHRADNĚ z tohoto seznamu podle hlavní kategorie akce (jinou hodnotu nepiš):',
     Object.keys(PODKATEGORIE_SLOVNIK).map(k => '  ' + k + ': ' + PODKATEGORIE_SLOVNIK[k].join(', ')).join('\n'),
     'U kategorie "folklor" podkategorii vůbec neurčuj – nech pole prázdné, appka si ji dopočítá sama.',
-    'skore = číslo 1–10, rodinná atraktivita podle této rubriky:',
-    '  9–10 = jedinečná/festivalová akce, kterou by škoda propásnout (výjimečný headliner, ojedinělý formát, silná lokální tradice);',
-    '  6–8 = solidní rodinný výlet, dobrý program, ale ne zcela ojedinělý;',
-    '  3–5 = průměrná akce, spíš doplňkový tip;',
-    '  1–2 = drobná/rutinní akce (pravidelná menší akce bez zvláštního lákadla).',
-    'stav = "potvrzeno". Piš česky.',
-    'Uváděj jen akce ověřené na uvedených nebo jiných OFICIÁLNÍCH zdrojích',
-    '(města, pořadatelé, instituce); agregátory jen jako doplňkové ověření.',
-  ].join('\n');
+  ];
+}
 
-  const userMsg = [
-    'Vyhledej kulturní akce podle těchto kritérií:',
-    '- Profil lokality (střed hledání): ' + cfg.profil,
-    '- Období: ' + cfg.rozsah,
-    '- Maximální dojezd autem (1 cesta): ' + cfg.dojezd + ' z města ' + cfg.profil,
-    '- Kategorie: ' + cfg.kategorie,
-    '- Malé lokální akce: ' + cfg.maleAkce,
-    '- Dětské akce: ' + cfg.detske,
-    '- Typ běhu: ' + typKontroly,
-    '',
-    'Výběrový režim: koncerty/festivaly/jarmarky/slavnosti jednotlivě;',
-    'výstavy jednou za celé období; divadlo hlavně mimořádné/venkovní/festivalové;',
-    'hrady a zámky jen slavnosti, noční prohlídky a tematické programy;',
-    'vinařské/gastro jen s výrazným kulturním programem.',
-    'Vícedenní a probíhající akce uváděj JEDNOU jako celek (datum_od až datum_do),',
-    'nikdy po jednotlivých dnech ani jako dílčí podprogramy; dílčí body shrň v popisu.',
-    '',
-    'Prioritní zdroje ke kontrole:',
-    sourcesList,
-    '',
-    'Odevzdej max 15 nejrelevantnějších akcí zavoláním nástroje report_events.',
-    'Uváděj pouze KONKRÉTNÍ pojmenované akce; nikdy obecné souhrny typu',
-    '"letní kulturní akce města" nebo "víkendový program" bez vlastního názvu.',
-    'Pole "popis" drž STRUČNÉ – maximálně 1–2 krátké věty. Pokud nic, odevzdej prázdný seznam.',
-  ].join('\n');
-
+/** v3.29: sdílené jádro volání Anthropic API s web_search + report_events
+ *  nástrojem – smyčka kvůli stop_reason (pause_turn/end_turn) s časovým
+ *  rozpočtem (pojistka proti 6min limitu), a záchranné formátovací dovolání,
+ *  když model odevzdá nerozparsovatelný text místo volání nástroje. Vytaženo
+ *  z callAnthropic_ beze změny chování – sdíleno i s callAnthropicEmailTip_,
+ *  ať se retry logika nerozjede na dvou místech. */
+function volatAnthropicSTool_(apiKey, model, system, userMsg, maxWebSearches) {
   const basePayload = {
     model: model,
     max_tokens: 16000,
     system: system,
     tools: [
-      { type: 'web_search_20250305', name: 'web_search', max_uses: MAX_WEB_SEARCHES },
+      { type: 'web_search_20250305', name: 'web_search', max_uses: maxWebSearches },
       REPORT_TOOL,
     ],
   };
 
-  // Smyčka kvůli stop_reason 'pause_turn' s časovým rozpočtem (pojistka proti 6min limitu)
   const t0 = Date.now();
   let msgs = [{ role: 'user', content: userMsg }];
   let text = '';
@@ -945,6 +923,106 @@ function callAnthropic_(cfg, zdroje, typKontroly) {
     throw new Error('Odpověď API se nepodařilo naparsovat jako JSON: ' + text.slice(0, 300));
   }
   return events;
+}
+
+function callAnthropic_(cfg, zdroje, typKontroly) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('Chybí Script Property ANTHROPIC_API_KEY.');
+  const model = vyberModelProKontrolu_(typKontroly);
+
+  const sourcesList = zdroje
+    .map(z => '- ' + z.nazev + (z.priorita ? ' [' + z.priorita + ']' : '') + ': ' + z.url)
+    .join('\n');
+
+  const system = [
+    'Jsi Kulturní radar – asistent, který vyhledává kulturní akce v ČR.',
+    'Výsledky NIKDY nevypisuj jako text – po dokončení hledání je odevzdej',
+    'PRÁVĚ JEDNÍM zavoláním nástroje report_events (parametr events = seznam akcí).',
+    'Formáty hodnot: id = RRRR-MM-DD-slug-nazvu; datum_od/datum_do = "D. M. RRRR" (datum_do může být "");',
+    'dojezd = text VŽDY s časem i vzdáleností (např. "cca 30–40 min, ~35 km"); kategorie = středníkem oddělené;',
+  ].concat(podkategorieInstrukce_()).concat([
+    'skore = číslo 1–10, rodinná atraktivita podle této rubriky:',
+    '  9–10 = jedinečná/festivalová akce, kterou by škoda propásnout (výjimečný headliner, ojedinělý formát, silná lokální tradice);',
+    '  6–8 = solidní rodinný výlet, dobrý program, ale ne zcela ojedinělý;',
+    '  3–5 = průměrná akce, spíš doplňkový tip;',
+    '  1–2 = drobná/rutinní akce (pravidelná menší akce bez zvláštního lákadla).',
+    'stav = "potvrzeno". Piš česky.',
+    'Uváděj jen akce ověřené na uvedených nebo jiných OFICIÁLNÍCH zdrojích',
+    '(města, pořadatelé, instituce); agregátory jen jako doplňkové ověření.',
+  ]).join('\n');
+
+  const userMsg = [
+    'Vyhledej kulturní akce podle těchto kritérií:',
+    '- Profil lokality (střed hledání): ' + cfg.profil,
+    '- Období: ' + cfg.rozsah,
+    '- Maximální dojezd autem (1 cesta): ' + cfg.dojezd + ' z města ' + cfg.profil,
+    '- Kategorie: ' + cfg.kategorie,
+    '- Malé lokální akce: ' + cfg.maleAkce,
+    '- Dětské akce: ' + cfg.detske,
+    '- Typ běhu: ' + typKontroly,
+    '',
+    'Výběrový režim: koncerty/festivaly/jarmarky/slavnosti jednotlivě;',
+    'výstavy jednou za celé období; divadlo hlavně mimořádné/venkovní/festivalové;',
+    'hrady a zámky jen slavnosti, noční prohlídky a tematické programy;',
+    'vinařské/gastro jen s výrazným kulturním programem.',
+    'Vícedenní a probíhající akce uváděj JEDNOU jako celek (datum_od až datum_do),',
+    'nikdy po jednotlivých dnech ani jako dílčí podprogramy; dílčí body shrň v popisu.',
+    '',
+    'Prioritní zdroje ke kontrole:',
+    sourcesList,
+    '',
+    'Odevzdej max 15 nejrelevantnějších akcí zavoláním nástroje report_events.',
+    'Uváděj pouze KONKRÉTNÍ pojmenované akce; nikdy obecné souhrny typu',
+    '"letní kulturní akce města" nebo "víkendový program" bez vlastního názvu.',
+    'Pole "popis" drž STRUČNÉ – maximálně 1–2 krátké věty. Pokud nic, odevzdej prázdný seznam.',
+  ].join('\n');
+
+  return volatAnthropicSTool_(apiKey, model, system, userMsg, MAX_WEB_SEARCHES);
+}
+
+/** v3.29: ověří JEDEN e-mailový tip (syrový text mailu) přes AI + web search
+ *  – stejný nástroj report_events jako běžná kontrola, ale jiný prompt: místo
+ *  hledání podle kritérií/zdrojů appka žádá AI, ať dohledá A OVĚŘÍ konkrétní
+ *  vedení z textu. AI vrátí buď PRÁVĚ JEDNU ověřenou akci, nebo prázdné pole
+ *  (events: []), pokud se ověřit nepovede – to je platný výsledek, ne chyba
+ *  (viz zpracovatEmailTipy_, stav "nelze-ověřit"). Vždy na Sonnetu (mimo
+ *  Haiku experiment, který se týká jen 'denní kontrola', viz
+ *  vyberModelProKontrolu_). */
+function callAnthropicEmailTip_(text) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('Chybí Script Property ANTHROPIC_API_KEY.');
+  const model = vyberModelProKontrolu_('email-tip');
+
+  const kategorieSeznam = Object.keys(PODKATEGORIE_SLOVNIK).concat(['folklor']).join('; ');
+
+  const system = [
+    'Jsi Kulturní radar – asistent, který ověřuje tip na kulturní akci v ČR poslaný e-mailem.',
+    'Dostaneš syrový text jednoho e-mailu (může být neúplný, nestrukturovaný, s podpisem/citovaným vláknem).',
+    'Nejdřív z něj vytáhni, o jakou KONKRÉTNÍ pojmenovanou akci jde. Pak ji zkus OVĚŘIT WEBEM – najdi',
+    'oficiální zdroj (web pořadatele, města, instituce), který termín/místo skutečně potvrzuje.',
+    'Pokud se akci NEPODAŘÍ ověřit na důvěryhodném zdroji (nebo mail nepopisuje žádnou konkrétní akci),',
+    'odevzdej PRÁZDNÝ seznam (events: []) zavoláním nástroje report_events – to je platný výsledek,',
+    'NE chyba. Nikdy si nic nevymýšlej ani nedoplňuj z domněnky.',
+    'Pokud se ověřit podaří, odevzdej PRÁVĚ JEDNU akci zavoláním nástroje report_events.',
+    'Formáty hodnot: id = RRRR-MM-DD-slug-nazvu; datum_od/datum_do = "D. M. RRRR" (datum_do může být "");',
+    'obec = přesný název obce/města, kde se akce koná (appka podle něj dohledává, kam akci zařadit);',
+    'dojezd = stručný text o dostupnosti místa konání vzhledem k centru obce (u akce přímo ve městě stačí "v centru obce" nebo podobně);',
+    'kategorie = středníkem oddělené, VÝHRADNĚ z tohoto seznamu: ' + kategorieSeznam + ';',
+  ].concat(podkategorieInstrukce_()).concat([
+    'skore = číslo 1–10, rodinná atraktivita (9–10 jedinečná akce, 6–8 solidní výlet, 3–5 průměrná, 1–2 drobná).',
+    'stav = "potvrzeno". primarni_zdroj = název/URL zdroje, na kterém jsi akci ověřil. Piš česky.',
+  ]).join('\n');
+
+  const userMsg = [
+    'Text e-mailového tipu:',
+    '---',
+    text,
+    '---',
+    '',
+    'Ověř a odevzdej podle instrukcí v systémovém promptu.',
+  ].join('\n');
+
+  return volatAnthropicSTool_(apiKey, model, system, userMsg, MAX_WEB_SEARCHES);
 }
 
 /**
@@ -1395,6 +1473,165 @@ function apiSetFiltry_(ss, uzivatelId, filtryObj) {
   if (idx < 0) return { ok: false, error: 'profil nenalezen' };
   sh.getRange(idx + 2, 4).setValue(JSON.stringify(filtryObj || {}));
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// v3.29: EMAIL_TIPY – fronta e-mailových tipů přijatých přes webhook
+// z Cloudflare Email Workeru (viz cloudflare-worker/email-webhook.js).
+// Appka zpracovává frontu jednou denně (zpracovatEmailTipy_, součást
+// dailyCheck), ne synchronně při příjmu – viz apiEmailTip_ níže.
+// ---------------------------------------------------------------------------
+
+const EMAIL_TIPY_HLAVICKA = ['ID', 'Přijato', 'Odesílatel', 'Předmět', 'Text', 'Stav', 'ID akce', 'Zpracováno kdy', 'Poznámka'];
+
+/** Stavy řádku EMAIL_TIPY – sdíleno mezi apiEmailTip_ (zápis) a
+ *  zpracovatEmailTipy_ (čtení fronty + update po zpracování), ať se
+ *  řetězcové hodnoty nerozjedou na dvou místech. */
+const EMAIL_TIP_STAV = {
+  NOVE: 'nové',
+  OK: 'zpracováno-ok',
+  CHYBA: 'zpracováno-chyba',
+  NELZE_OVERIT: 'nelze-ověřit',
+};
+
+function ensureEmailTipySheet_(ss) {
+  let sh = ss.getSheetByName(SHEET.EMAIL_TIPY);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET.EMAIL_TIPY);
+    sh.getRange(1, 1, 1, EMAIL_TIPY_HLAVICKA.length).setValues([EMAIL_TIPY_HLAVICKA])
+      .setFontWeight('bold').setBackground('#8a2e2e').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/** API: přijme e-mailový tip z Cloudflare Email Workeru (webhook na tomhle
+ *  /exec endpointu) a zařadí ho do fronty EMAIL_TIPY ke zpracování při
+ *  příští denní kontrole (zpracovatEmailTipy_). Autentizace přes VLASTNÍ
+ *  sdílený token EMAIL_WEBHOOK_TOKEN (Script Property) – záměrně NE stejný
+ *  jako WEB_TOKEN (ten odemyká přímé spuštění AI hledání, jiná důvěryhodnostní
+ *  hranice; únik jednoho tokenu nemá odemknout obojí). Endpoint jen ZAPÍŠE
+ *  do fronty a hned vrátí – žádné volání Anthropic API tady (webhook musí
+ *  odpovědět rychle, a AI zpracování má běžet v denním rytmu, ne při každém
+ *  příchozím mailu). */
+function apiEmailTip_(ss, token, from, subject, text) {
+  const props = PropertiesService.getScriptProperties();
+  const ocekavanyToken = props.getProperty('EMAIL_WEBHOOK_TOKEN');
+  if (!ocekavanyToken || token !== ocekavanyToken) return { ok: false, error: 'Neplatný token.' };
+
+  const textOrez = String(text || '').trim();
+  if (!textOrez) return { ok: false, error: 'Prázdný text mailu.' };
+  if (textOrez.length > EMAIL_TIP_TEXT_MAX) {
+    return { ok: false, error: 'Text je příliš dlouhý (max ' + EMAIL_TIP_TEXT_MAX + ' znaků).' };
+  }
+
+  const sh = ensureEmailTipySheet_(ss);
+  const id = Utilities.getUuid();
+  sh.appendRow([
+    id,
+    formatDate_(new Date()),
+    String(from || '').trim(),
+    String(subject || '').trim(),
+    textOrez,
+    EMAIL_TIP_STAV.NOVE,
+    '',
+    '',
+    '',
+  ]);
+  return { ok: true, id };
+}
+
+/** PURE-ish: seznam názvů profilů z LOKALITY (sloupec B), bez prázdných
+ *  řádků. Stejná data jako readMetaApi_.profily, jen zúžená na pouhé názvy
+ *  – použito v zpracovatEmailTipy_ pro mapování obec→profil. */
+function nazvyProfiluLokalit_(ss) {
+  const sh = ss.getSheetByName(SHEET.LOKALITY);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 2, sh.getLastRow() - 1, 1).getValues()
+    .map(row => String(row[0] || '').trim())
+    .filter(Boolean);
+}
+
+/** v3.29: zpracuje frontu EMAIL_TIPY (řádky se stavem "nové") – pro každý
+ *  zavolá callAnthropicEmailTip_ (AI ověření webem), a pokud se podaří najít
+ *  a ověřit konkrétní akci, zapíše ji do AKCE stejnou cestou jako běžná
+ *  kontrola (upsertEvents_/zajistitSouradniceProAkce_). Volá se z dailyCheck
+ *  PŘED runCheck_('denní kontrola') – viz krok C.
+ *
+ *  Mapování obec→profil: normalizovaný přesný match proti profilům v
+ *  LOKALITY (nazvyProfiluLokalit_). Bez shody se akce NEZAPISUJE do AKCE
+ *  (rozhodnutí 20. 8. 2026: raději nezapsat nespolehlivá data než riskovat
+ *  matoucí výsledek, který by se nikde nezobrazil) – řádek dostane stav
+ *  "nelze-ověřit" s poznámkou k ruční kontrole.
+ *
+ *  Časový rozpočet 2 min – dailyCheck pak ještě potřebuje čas na běžnou
+ *  kontrolu (runCheck_) v rámci 6min limitu Apps Scriptu, stejný duch jako
+ *  zpracovatSledovanaMesta (tam 4,5 min, protože běží samostatně).
+ *
+ *  Vrací { celkem, ok, chyba, nelzeOverit } pro denní report (notifyOk_). */
+function zpracovatEmailTipy_(ss) {
+  const stats = { celkem: 0, ok: 0, chyba: 0, nelzeOverit: 0 };
+  const sh = ss.getSheetByName(SHEET.EMAIL_TIPY);
+  if (!sh) return stats;   // list ještě nikdy nevznikl (žádný tip nikdy nepřišel)
+
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return stats;
+
+  const data = sh.getRange(2, 1, lastRow - 1, EMAIL_TIPY_HLAVICKA.length).getValues();
+  const profily = new Set(nazvyProfiluLokalit_(ss).map(p => norm_(p)));
+  const dnes = formatDate_(new Date());
+  const CAS_LIMIT_MS = 2 * 60 * 1000;
+  const t0 = Date.now();
+
+  for (let i = 0; i < data.length; i++) {
+    if (Date.now() - t0 > CAS_LIMIT_MS) {
+      Logger.log('zpracovatEmailTipy_: přerušeno kvůli časovému limitu po ' + stats.celkem + ' tipech.');
+      break;
+    }
+    const row = data[i];
+    if (String(row[5] || '') !== EMAIL_TIP_STAV.NOVE) continue;   // jen nezpracované
+    stats.celkem++;
+    const r = i + 2;   // 1-based řádek v listu (řádek 1 = hlavička)
+    const text = String(row[4] || '');
+
+    try {
+      const events = callAnthropicEmailTip_(text);
+      if (!events || events.length === 0) {
+        sh.getRange(r, 6, 1, 4).setValues([[EMAIL_TIP_STAV.NELZE_OVERIT, '', dnes, 'AI nenašla/neověřila konkrétní akci.']]);
+        stats.nelzeOverit++;
+        continue;
+      }
+
+      const ev = events[0];
+      if (!profily.has(norm_(ev.obec))) {
+        sh.getRange(r, 6, 1, 4).setValues([[EMAIL_TIP_STAV.NELZE_OVERIT, '', dnes,
+          'Obec "' + (ev.obec || '') + '" není mezi pokrytými profily – nutná ruční kontrola.']]);
+        stats.nelzeOverit++;
+        continue;
+      }
+
+      const zakladniCfg = readCriteria_(ss.getSheetByName(SHEET.KRITERIA));
+      const cfg = cfgProMesto_(zakladniCfg, ev.obec);
+      ev.primarni_zdroj = ev.primarni_zdroj || 'e-mailový tip';
+      ev.poznamka = ['e-mailový tip'].concat(ev.poznamka ? [ev.poznamka] : []).join(' – ');
+
+      const upsertStats = upsertEvents_(ss, cfg, [ev]);
+      zajistitSouradniceProAkce_(ss, [ev]);
+      logKontrola_(ss, 'email-tip', cfg, upsertStats, 0, vyberModelProKontrolu_('email-tip'));
+
+      // Pozn.: ev.id je ID vygenerované AI pro TENHLE požadavek – pokud
+      // upsertEvents_ akci spároval s JIŽ existujícím řádkem (dedup podle
+      // data+názvu+místa), skutečné ID v AKCE může být jiné (starší). Pro
+      // účely audit stopy v EMAIL_TIPY je to přijatelná nepřesnost, ne bug.
+      sh.getRange(r, 6, 1, 4).setValues([[EMAIL_TIP_STAV.OK, ev.id || '', dnes, '']]);
+      stats.ok++;
+    } catch (err) {
+      sh.getRange(r, 6, 1, 4).setValues([[EMAIL_TIP_STAV.CHYBA, '', dnes, String(err).slice(0, 500)]]);
+      stats.chyba++;
+    }
+  }
+
+  return stats;
 }
 
 /** API: kontaktní formulář ("Kontakt" vedle profilového badge) – e-mail na
@@ -2618,7 +2855,10 @@ function logKontrola_(ss, typ, cfg, stats, pocetZdroju, model) {
   ]);
 }
 
-function notifyOk_(typ, cfg, stats, when) {
+/** emailTipyStats: volitelné {celkem, ok, chyba, nelzeOverit} ze
+ *  zpracovatEmailTipy_ (viz runCheck_) – jen dailyCheck ho posílá, jiné typy
+ *  běhů sekci v reportu vůbec nemají. */
+function notifyOk_(typ, cfg, stats, when, emailTipyStats) {
   const title = (typ.indexOf('mimořádná') === 0 ? 'Mimořádná kontrola dokončena' :
                  typ.indexOf('denní') === 0 ? 'Denní kontrola dokončena' :
                  'Kontrola dokončena');
@@ -2646,6 +2886,11 @@ function notifyOk_(typ, cfg, stats, when) {
   if (!stats.nove && !stats.zmenene && !stats.zrusene) lines.push('Žádné novinky.');
   if (stats.bezZmeny) lines.push('Beze změny (' + stats.bezZmeny + '):\n' + seznam(stats.bezZmenyNazvy));
   else lines.push('Beze změny: 0');
+  if (emailTipyStats) {
+    lines.push('E-mailové tipy: ' + emailTipyStats.celkem + ' přišlo' + (emailTipyStats.celkem
+      ? ' (' + emailTipyStats.ok + ' zpracováno, ' + emailTipyStats.nelzeOverit + ' nešlo ověřit, ' + emailTipyStats.chyba + ' chyba)'
+      : ''));
+  }
   try {
     lines.push('Kompletní přehled: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl());
   } catch (e) { /* odkaz je jen bonus */ }
