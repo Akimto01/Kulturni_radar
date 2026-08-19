@@ -371,6 +371,42 @@ Označení ★ se skutečně promítne do filtru „★ Oblíbené" (integrace, 
     ${puvodni}=    Set Variable    ${FALSE}
     ${puvodni}=    Ověřit plný cyklus označení (přidat i odebrat) s reloadem    fajfka
 
+🏛 Oblíbené místo: lze označit i odznačit (obojí ověřeno reloadem)
+    [Documentation]    I (v3.26–v3.49): stejný scénář jako u hvězdičky/fajfky, jen pro
+    ...                ikonu 🏛 (typ 'misto') – apiToggleMisto klíčuje podle misto+obec
+    ...                místo ID akce, ale sdílený keyword „Ověřit plný cyklus..." to
+    ...                nerozlišuje, jen sleduje třídu .aktivni/.ukladani první karty.
+    ...                Předpokládá, že první karta aktivního profilu má známé místo
+    ...                (a.misto) – dnes platí pro všechny akce v Brně (výchozí profil).
+    ...                Pokud by aktivní profil neměl u první karty místo, test hlasitě
+    ...                Skip místo nedeterministického pádu na chybějící element.
+    [Teardown]    Run Keyword And Ignore Error
+    ...    Nastavit ikonu první karty na    misto    ${puvodni}
+    ${ma_ikonu}=    Get Element Count    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.misto
+    Skip If    ${ma_ikonu} == 0
+    ...    První karta aktivního profilu nemá známé místo (a.misto) – test nemá co ověřit v tomto běhu.
+    ${puvodni}=    Set Variable    ${FALSE}
+    ${puvodni}=    Ověřit plný cyklus označení (přidat i odebrat) s reloadem    misto
+
+Chip „Oblíbená místa" filtruje bez zápisu do tabulky
+    [Documentation]    F (v3.47): klik na CHIP (ne na ikonu karty!) je čistě klientský
+    ...                filtr nad polem mistoOblibene (`filtrovatOblibenaMista_`), nevolá
+    ...                apiToggleMisto, nic nezapisuje. Bezpečné pro CI i když profil
+    ...                aktuálně nemá žádné oblíbené místo (pak stačí prázdný stav) –
+    ...                stejný vzor jako „Chip Oblíbené"/„Chip Neověřeno" výše.
+    ${vsech}=    Get Element Count    ${FRAME} .karta
+    Click    ${FRAME} \#chip-oblibena-mista
+    Sleep    300ms
+    ${je_prazdno}=    Get Element Count    ${FRAME} \#status
+    ${filtrovanych}=    Get Element Count    ${FRAME} .karta
+    Should Be True    ${je_prazdno} == 1 or ${filtrovanych} < ${vsech}
+    ...    msg=Filtr Oblíbená místa buď ukáže prázdný stav, nebo užší podmnožinu karet
+    Click    ${FRAME} \#chip-oblibena-mista
+    Sleep    300ms
+    ${zpet}=    Get Element Count    ${FRAME} .karta
+    Should Be Equal As Integers    ${zpet}    ${vsech}
+    ...    msg=Opětovný klik na chip vrátí plný seznam
+
 Tlačítko Spustit kontrolu otevře token dialog (bez spuštění)
     [Documentation]    Jen UI tok – dialog se otevře a Zrušit ho zavře.
     ...                Skutečné spuštění (validní token) do E2E nepatří.

@@ -1,5 +1,14 @@
 # Changelog
 
+## RF testy (bez bump verze) — Oblíbená místa: plný cyklus + filtr (I) — 19. 8. 2026
+### Přidáno
+- **I) `🏛 Oblíbené místo: lze označit i odznačit (obojí ověřeno reloadem)`** (`tests/robot/frontend.robot`) — stejný scénář jako u ★/✓, jen pro ikonu 🏛 (typ `misto`), reuse sdíleného keywordu `Ověřit plný cyklus označení (přidat i odebrat) s reloadem`. Defensive `Skip If` pro případ, že by první karta aktivního profilu neměla `a.misto`, `[Teardown]` vrací původní stav.
+- **I) `Chip „Oblíbená místa" filtruje bez zápisu do tabulky`** — čistě klientský filtr test (stejný vzor jako „Chip Oblíbené"/„Chip Neověřeno"), bez mutace produkčních dat, bezpečný pro automatický běh v CI i bez přihlášení.
+### Poznámka k architektuře
+- RF-level test pro G (sync napříč VÍCE kartami se stejným místem) se záměrně nezavádí — dnešní scrapovaná data mají jen náhodný pár akcí se shodným místem (mění se denně), karty navíc nemají `data-misto` atribut pro spolehlivý výběr „druhé karty se stejným místem" v DOM. G zůstává pokryté Node testy pro `akceSeStejnymMistem_` (v3.49).
+- RF `--dryrun` (syntax/keyword kontrola): 42 → 44 testů (33 → 35 ve frontend suitě, +2). Reálné spuštění necháno na CI, stejně jako ostatní RF testy dnes.
+- Žádný bump verze appky (jen testy, žádná změna Index.html/kulturni_radar.gs).
+
 ## Index.html v3.49 — Oblíbená místa: sync stavu napříč kartami (G) — 19. 8. 2026
 ### Přidáno
 - **G) `akceSeStejnymMistem_(vsechnaAkce, a)`** — nová pure funkce (stejný vzor jako H), najde všechny akce se stejným `misto`+`obec` (přes `klicMistoUkladani_`). Zapojena v `prepniOznaceniMista`: po úspěšné odpovědi backendu (`res.ok`) se `mistoOblibene` nastaví na VŠECH akcích se stejným místem, ne jen na té jedné, na které se kliklo — následné `prekreslit()` (ve `finally`) tak promítne správný vizuální stav ikony 🏛 na všechny karty se stejným místem i do `#mapa-mista`. 3 nové Node testy.
