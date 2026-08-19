@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.48 – testovatelna cast logiky ikony mista na karte (H) -->
+<!-- Kulturní radar Index.html v3.49 – sync stavu oblibeneho mista napric vsemi kartami po kliknuti (G) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1719,6 +1719,14 @@
     return a.misto + '|' + a.obec + ':misto';
   }
 
+  /** Všechny akce ve `vsechnaAkce` se stejným místem konání jako `a`
+   *  (misto+obec) – použito pro sync ikony 🏛 napříč kartami po přepnutí
+   *  (G, v3.49), ať se nezmění jen ta jedna akce, na které se kliklo. */
+  function akceSeStejnymMistem_(vsechnaAkce, a) {
+    const klic = klicMistoUkladani_(a);
+    return vsechnaAkce.filter(x => klicMistoUkladani_(x) === klic);
+  }
+
   /** Sestaví odkaz na Google Kalendář (celodenní událost – strukturované časy
    *  chybí, viz backlog cas_od/cas_do). null, když datumOd nejde rozparsovat. */
   function gcalUrl_(a) {
@@ -2728,8 +2736,9 @@
     }
   }
 
-  // ── v3.26: 🏛 Oblíbené MÍSTO (jen tahle karta – sync napříč seznamem
-  // míst/piny na mapě je odložen na příště, viz BACKLOG.md) ──────────
+  // ── v3.26: 🏛 Oblíbené MÍSTO (G, v3.49: sync napříč všemi kartami se
+  // stejným místem – #mapa-mista/piny nemají dnes vlastní vizuální
+  // indikátor mistoOblibene, viz BACKLOG.md) ──────────
   async function prepniOznaceniMista(a) {
     if (!prihlasenyUzivatel) {
       otevritLogin('Pro ukládání oblíbených míst se prosím přihlas.');
@@ -2743,7 +2752,7 @@
     try {
       const res = await gsr('apiToggleMisto', a.misto, a.obec, prihlasenyUzivatel ? prihlasenyUzivatel.id : '');
       if (res && res.ok) {
-        a.mistoOblibene = res.oblibene;
+        akceSeStejnymMistem_(vsechnaAkce, a).forEach(x => { x.mistoOblibene = res.oblibene; });
       } else {
         a.mistoOblibene = puvodni;
         alert((res && res.error) || 'Označení místa se nepodařilo uložit.');

@@ -1,5 +1,14 @@
 # Changelog
 
+## Index.html v3.49 — Oblíbená místa: sync stavu napříč kartami (G) — 19. 8. 2026
+### Přidáno
+- **G) `akceSeStejnymMistem_(vsechnaAkce, a)`** — nová pure funkce (stejný vzor jako H), najde všechny akce se stejným `misto`+`obec` (přes `klicMistoUkladani_`). Zapojena v `prepniOznaceniMista`: po úspěšné odpovědi backendu (`res.ok`) se `mistoOblibene` nastaví na VŠECH akcích se stejným místem, ne jen na té jedné, na které se kliklo — následné `prekreslit()` (ve `finally`) tak promítne správný vizuální stav ikony 🏛 na všechny karty se stejným místem i do `#mapa-mista`. 3 nové Node testy.
+### Poznámka k architektuře
+- Stav "ukládá se…" (`.ukladani`) byl už dřív synchronizovaný napříč kartami mimoděk — `probihaUkladani` je keyovaný podle místa (`klicMistoUkladani_`), ne podle ID akce jako u ★/✓, takže všechny karty se stejným místem tenhle indikátor sdílely od v3.26. G teď dorovnává i finální stav `.aktivni` po dokončení požadavku.
+- Piny na mapě dnes nemají žádný vizuální indikátor `mistoOblibene` (na rozdíl od karet) — sync dat proběhne, ale není co na pinu zvýraznit. Přidání vizuálního rozlišení na pinech by byl samostatný rozsahový úkol, mimo dnešní G.
+- Node testy 321 → 324 (+3: `akceSeStejnymMistem_`).
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.49"`), ověřeno `?api=meta` → `"ok":true` (backend beze změny, nezávislé číslování Index.html vs. VERZE).
+
 ## Index.html v3.48 — Oblíbená místa: testovatelná část logiky ikony (H) — 19. 8. 2026
 ### Přidáno
 - **H) `klicMistoUkladani_(a)`** — nová pure funkce, klíč do Setu `probihaUkladani` pro ikonu 🏛 (`misto|obec:misto`), dřív inline duplikovaný na dvou místech (render karty v `vytvorKartu` + `prepniOznaceniMista`) bez sdílení. Nasazena na obě místa, 3 nové Node testy.

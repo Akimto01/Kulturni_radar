@@ -10,7 +10,7 @@ const { nactiFrontendFunkce } = require('./frontend-harness');
 const f = nactiFrontendFunkce([
   'parseCeskeDatum', 'dateKeyBezpecne_', 'pad2_', 'gcalUrl_',
   'filtrovatNavstivenaPodleObdobi_', 'jeNeoverena_', 'jeNeoverenaBezUrl_', 'sestavTextSdileni_', 'mapsUrl_',
-  'klicMistoUkladani_',
+  'klicMistoUkladani_', 'akceSeStejnymMistem_',
   'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
   'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
   'sestavOdkazNaAkci_', 'parsovatOdkazNaAkci_',
@@ -290,6 +290,31 @@ test('klicMistoUkladani_: stejné misto ve dvou obcích dává různé klíče',
   const a = f.klicMistoUkladani_({ misto: 'Zámek', obec: 'Brno' });
   const b = f.klicMistoUkladani_({ misto: 'Zámek', obec: 'Olomouc' });
   assert.notEqual(a, b);
+});
+
+// ---------------------------------------------------------------------------
+// akceSeStejnymMistem_ (G, v3.49) – sync ikony 🏛 napříč kartami se stejným
+// místem po přepnutí v prepniOznaceniMista
+// ---------------------------------------------------------------------------
+
+test('akceSeStejnymMistem_: najde všechny akce se stejným misto+obec, včetně vstupní', () => {
+  const spilberk1 = { id: '1', misto: 'Špilberk', obec: 'Brno' };
+  const spilberk2 = { id: '2', misto: 'Špilberk', obec: 'Brno' };
+  const jine = { id: '3', misto: 'Zelný trh', obec: 'Brno' };
+  const vysledek = f.akceSeStejnymMistem_([spilberk1, spilberk2, jine], spilberk1);
+  assert.deepEqual(vysledek.map(x => x.id).sort(), ['1', '2']);
+});
+
+test('akceSeStejnymMistem_: stejné misto v jiné obci se nepočítá', () => {
+  const a = { id: '1', misto: 'Zámek', obec: 'Brno' };
+  const b = { id: '2', misto: 'Zámek', obec: 'Olomouc' };
+  assert.deepEqual(f.akceSeStejnymMistem_([a, b], a).map(x => x.id), ['1']);
+});
+
+test('akceSeStejnymMistem_: žádná shoda kromě vstupní akce samotné', () => {
+  const a = { id: '1', misto: 'Špilberk', obec: 'Brno' };
+  const jine = { id: '2', misto: 'Zelný trh', obec: 'Brno' };
+  assert.deepEqual(f.akceSeStejnymMistem_([a, jine], a).map(x => x.id), ['1']);
 });
 
 // ---------------------------------------------------------------------------
