@@ -1,5 +1,16 @@
 # Changelog
 
+## Index.html v3.47 — Oblíbená místa: filtr chip (F) — 19. 8. 2026
+### Přidáno
+- **F) Nový chip `#chip-oblibena-mista` (🏛 Oblíbená místa)** v `#controls-oznaceni`, stejný vizuální vzor jako `chip-oblibene`/`chip-navstivene`/`chip-neoverene`. Na rozdíl od `rezimZobrazeni` (exkluzivní výběr mezi Vše/★/✓/❓) jde o nezávislý toggle (`filtrOblibenaMista`), kombinovatelný se všemi rezimy i s kategorie-filtrem — stejný vzor jako `aktKategorie`.
+- **Nová pure funkce `filtrovatOblibenaMista_(akce, aktivni)`** — neaktivní = beze změny, aktivní = jen akce s `a.mistoOblibene === true` (pole z backend v3.26/`readEventsApi_`). Zapojena do `renderAkce` (pohled „Vše"), všech tří speciálních větví v `prekreslit()` (★/✓/❓), `vykreslitKalendar` a `akceProMapu_` (mapa) — piny i seznam míst pod mapou (`#mapa-mista`) sdílí stejná filtrovaná data přes `akceProMapu_`, takže se aktualizují automaticky, beze změny `sestavSeznamMist_`.
+- `akceProMapu_` rozšířena o volitelný 4. parametr (`aktivniOblibenaMista`) — chybějící argument = beze změny chování, staré volání/testy dál fungují.
+### Poznámka k architektuře
+- Zadání dnešního promptu předpokládalo, že `jeViditelnaVSeznamu_` implementuje filtrování podle ★/✓/❓ chipů — ve skutečnosti ta funkce jen vylučuje proběhlé a budoucí neověřené-bez-URL akce (sdíleno mezi „Vše"/kalendářem/mapou); skutečná ★/✓/❓ logika je v samostatných větvích `prekreslit()`. Nový filtr byl proto zapojen přímo tam a ve všech čtyřech pipeline (Vše, ★, ✓, ❓), ne jen v `jeViditelnaVSeznamu_`.
+- Záměrně mimo dnešní rozsah (viz BACKLOG.md): **G** sync ikony 🏛 napříč kartami/`#mapa-mista`/piny při kliknutí (známé omezení, stejné jako u ★/✓), **H/I** Node testy pro E (ikona na kartě) a RF test plného cyklu.
+- Node testy 312 → 318 (+6: `filtrovatOblibenaMista_` 3×, `akceProMapu_` nový 4. parametr 3×).
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.47"`), ověřeno `?api=meta` → `"verze":"3.26"` (backend beze změny, nezávislé číslování Index.html vs. VERZE).
+
 ## Backend v3.26 + Index.html v3.46 — Oblíbená místa: základ (backend + ikona na kartě) — 19. 8. 2026
 ### Přidáno
 - **A) `apiToggleMisto_`/`apiToggleMisto`** — nová funkce pro přepnutí „oblíbené MÍSTO" (ne jednotlivou akci) PRO PŘIHLÁŠENÝ profil. Na rozdíl od `apiToggle_` nebere ID akce (místo nemá jedno konkrétní ID akce) — identita místa se odvozuje přímo z `misto`+`obec` přes existující `klicSouradnic_` (stejný normalizovaný `misto|obec` klíč, který `readEventsApi_` už dnes používá pro lookup do SOUŘADNICE). Klíč se ukládá do sloupce „ID akce" v OZNAČENÍ (přepoužití sloupce u typu `oblibene_misto`); sloupec „Místo" dostává stejnou hodnotu jako „Název" (ne prázdno) — u tohoto typu pole „Místo konání" ztrácí původní význam, prázdná buňka by v Sheetu vypadala jako chybějící data. Zaroutováno v `routePost_` (`akce: 'toggle-misto'`), stejný toggle mechanismus (přidá/smaže řádek) jako `toggleOznaceni_`.

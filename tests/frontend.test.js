@@ -16,7 +16,7 @@ const f = nactiFrontendFunkce([
   'sestavOdkazNaVyber_', 'parsovatOdkazNaVyber_',
   'weathercodeEmoji_', 'pocasiZobrazeni_',
   'isoDatum_', 'dnySAkcemi_', 'sestavKalendarMrizku_',
-  'jeViditelnaVSeznamu_', 'filtrovatKategorii_', 'akceProMapu_',
+  'jeViditelnaVSeznamu_', 'filtrovatKategorii_', 'filtrovatOblibenaMista_', 'akceProMapu_',
   'akceDnePodleData_', 'seskupitPodleSouradnic_',
   'vypocitejPoziciTooltipuKalendare_',
   'klicSouradnic_', 'sestavSeznamMist_', 'prepnoutVyberPinu_',
@@ -689,6 +689,26 @@ test('filtrovatKategorii_: žádná akce nesedí → prázdné pole', () => {
   assert.equal(f.filtrovatKategorii_(akce, new Set(['koncerty'])).length, 0);
 });
 
+function akceMistoOblibene_(mistoOblibene) { return { mistoOblibene }; }
+
+test('filtrovatOblibenaMista_: neaktivní filtr vrátí pole beze změny', () => {
+  const akce = [akceMistoOblibene_(true), akceMistoOblibene_(false), akceMistoOblibene_(undefined)];
+  assert.equal(f.filtrovatOblibenaMista_(akce, false), akce);
+  assert.equal(f.filtrovatOblibenaMista_(akce, undefined), akce);
+});
+
+test('filtrovatOblibenaMista_: aktivní filtr ponechá jen akce s mistoOblibene === true', () => {
+  const akce = [akceMistoOblibene_(true), akceMistoOblibene_(false), akceMistoOblibene_(undefined)];
+  const vysledek = f.filtrovatOblibenaMista_(akce, true);
+  assert.equal(vysledek.length, 1);
+  assert.equal(vysledek[0].mistoOblibene, true);
+});
+
+test('filtrovatOblibenaMista_: aktivní filtr, žádná akce nesedí → prázdné pole', () => {
+  const akce = [akceMistoOblibene_(false), akceMistoOblibene_(undefined)];
+  assert.equal(f.filtrovatOblibenaMista_(akce, true).length, 0);
+});
+
 function akceMapa(over) {
   return Object.assign({ stav: 'potvrzeno', datumOd: '15. 8. 2026', url: '', kategorie: ['koncerty'], lat: 49.2, lng: 16.6 }, over);
 }
@@ -718,6 +738,27 @@ test('akceProMapu_: akce, co projde vším, se vrátí beze změny', () => {
 test('akceProMapu_: prázdné/chybějící pole akcí nespadne', () => {
   assert.equal(f.akceProMapu_([], new Set(), KAL_DNES).length, 0);
   assert.equal(f.akceProMapu_(undefined, new Set(), KAL_DNES).length, 0);
+});
+
+test('akceProMapu_: chybějící 4. argument (filtr oblíbených míst) = beze změny, jako dřív', () => {
+  const a = akceMapa({ mistoOblibene: false });
+  assert.equal(f.akceProMapu_([a], new Set(), KAL_DNES).length, 1);
+});
+
+test('akceProMapu_: aktivní filtr oblíbených míst akci bez mistoOblibene vynechá', () => {
+  const vysledek = f.akceProMapu_([akceMapa({ mistoOblibene: false })], new Set(), KAL_DNES, true);
+  assert.equal(vysledek.length, 0);
+});
+
+test('akceProMapu_: aktivní filtr oblíbených míst + kategorie-filtr se kombinují', () => {
+  const akce = [
+    akceMapa({ mistoOblibene: true, kategorie: ['koncerty'] }),
+    akceMapa({ mistoOblibene: true, kategorie: ['divadlo'] }),
+    akceMapa({ mistoOblibene: false, kategorie: ['koncerty'] }),
+  ];
+  const vysledek = f.akceProMapu_(akce, new Set(['koncerty']), KAL_DNES, true);
+  assert.equal(vysledek.length, 1);
+  assert.equal(vysledek[0].mistoOblibene, true);
 });
 
 // ---------------------------------------------------------------------------
