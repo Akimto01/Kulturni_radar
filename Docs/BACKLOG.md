@@ -78,6 +78,7 @@ změně BACKLOGu.
 
 ## Probíhající měření
 - **Haiku vs. Sonnet na denní kontrole** — SPUŠTĚNO 20. 8. 2026 (backend v3.27, viz CHANGELOG.md): denní automatická kontrola (`dailyCheck` → typ `'denní kontrola'`) běží na `claude-haiku-4-5`, všechny ostatní běhy (mimořádné z menu/webu, osobní hledání, sledovaná města, měsíční kontrola stálých míst) zůstávají na Sonnetu (`vyberModelProKontrolu_`). List KONTROLY (sloupec K) teď zaznamenává skutečně použitý model pro každý běh, ne jen globální konstantu — díky tomu jde řádky zpětně rozlišit podle modelu. **Vyhodnocení a rozhodnutí: 27. 8. 2026** — porovnat kvalitu úlovků denní kontroly (Haiku) proti ostatním běhům (Sonnet) v listu KONTROLY a rozhodnout, jestli Haiku pro denní běh trvale stačí, nebo se vrátit k Sonnetu.
+  PŘIPOMÍNKA: vyhodnotit 27. 8. 2026 — zkontrolovat sloupec K v listu KONTROLY (filtrovat řádky typu 'denní kontrola' za 20.–27. 8. 2026, porovnat kvalitu/počet nalezených akcí s předchozími Sonnet běhy), rozhodnout, jestli Haiku pro denní kontrolu zůstává natrvalo, nebo se vrací na Sonnet.
 
 ## Nové funkce (schváleno, čeká na zpětnou vazbu rodiny)
 - Doporučení podle historie navštívených akcí.
