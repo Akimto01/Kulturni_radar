@@ -108,6 +108,7 @@ změně BACKLOGu.
   - Třinec: nic výrazně lepšího než obecné agregátory (KulturniMapa.cz, GoOut) — nenalezen žádný silný kandidát, zůstává otevřené.
 
   Přidání řádků do ZDROJE (Sheet) zatím NEPROVEDENO — jen průzkum, čekalo se na čas. Až bude čas, přidat Žurnál Plzeň a Živý Zlín stejným postupem jako objevbrno.cz (ruční zápis do Sheetu).
+  AKTUALIZACE 20. 8. 2026 (dokončení kroku 2 pro Plzeň a Zlín): Žurnál Plzeň (zurnalmag.cz/program, agregátor, střední, profil Plzeň) a Živý Zlín (kulturazlin.cz/akce, oficiální kulturní organizace, střední, profil Zlín) přidány jako řádky do listu ZDROJE, ruční úprava přímo v Sheetu. Projeví se při příští kontrole akcí daných profilů. Zbývá otevřené: Olomouc (jen oficiální městský kalendář, bez specifického magazínu) a Třinec (žádný silný kandidát nenalezen).
 
 ## Plán rozvoje — schváleno 4. 8. 2026, aktualizováno 8. 8. 2026
 1. ~~**Rodinné profily**~~ — **HOTOVO 7.–8. 8. 2026** (backend v3.20, frontend
