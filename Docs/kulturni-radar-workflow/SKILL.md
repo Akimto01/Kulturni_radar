@@ -1,6 +1,6 @@
 ---
 name: kulturni-radar-workflow
-description: Nasazení, balení, ladění testů (Node i Robot Framework) a údržba dokumentace (CHANGELOG.md/BACKLOG.md) pro projekt Kulturní radar Vojty Čermáka (Apps Script + Google Sheets + GitHub, repo Akimto01/Kulturni_radar). VŽDY použij tento skill, když uživatel žádá o zabalení/nasazení změny v Kulturním radaru, když posílá výstup z Robot Framework testů (obzvlášť pokud něco spadlo), když se má bumpnout verze, nebo když se upravuje Docs/CHANGELOG.md či Docs/BACKLOG.md pro tento projekt. Spouštěj i implicitně při jakékoli práci na souborech kulturni_radar.gs / Index.html / tests/*, i bez výslovné zmínky slova "skill".
+description: Nasazení, balení, ladění testů (Node i Robot Framework) a údržba dokumentace (CHANGELOG.md/BACKLOG.md) pro projekt Kulturní radar Vojty Čermáka (Apps Script + Google Sheets + GitHub, repo Akimto01/Kulturni_radar). VŽDY použij tento skill, když uživatel žádá o zabalení/nasazení změny v Kulturním radaru, když posílá výstup z Robot Framework testů (obzvlášť pokud něco spadlo), když se má bumpnout verze, nebo když se upravuje Docs/CHANGELOG.md či Docs/BACKLOG.md pro tento projekt. Spouštěj i implicitně při jakékoli práci na souborech kulturni_radar.gs / Index.html / tests/*, i bez výslovné zmínky slova "skill". Spouštěj i na samostatné klíčové slovo "Start" nebo "End" na začátku zprávy, i bez dalšího kontextu (bez zmínky nasazení/testů) — jde o explicitní hranice pracovní session, viz sekce 4.
 ---
 
 # Kulturní radar — vývojový workflow
@@ -196,13 +196,18 @@ k příchodu a odchodu od práce vícekrát:
   fráze), zároveň uzavírá aktuální okno session.
 
 Doplňkově, kvůli prevenci zapomnění:
-- Pri pozdravu ("Ahoj", "Dobré ráno", "Dobré odpoledne", "Zdravím"
-  apod.) se zeptej: "Chceš tímto začít novou session? Napiš 'Start'
-  pro potvrzení." Bez potvrzení "Start" se žádná hranice nenastavuje.
-- Pri rozloučení ("Dobrou noc", "Zatím ahoj", "končím na dnešek"
-  apod.) se zeptej: "Ukončujeme tím aktuální session? Napiš 'End' pro
-  potvrzení a shrnutí." Bez potvrzení "End" se shrnutí negeneruje
-  automaticky.
+- Když zpráva obsahuje pozdrav nebo náznak začátku (např. "dobré ráno",
+  "ahoj", "jsem zpět" apod.) BEZ explicitního slova "Start", zeptej se,
+  jestli tímhle začíná nová session ("Chceš tímto začít novou session?
+  Napiš 'Start' pro potvrzení."), a čekej na potvrzení slovem "Start"
+  před tím, než to tak započítáš. Bez potvrzení "Start" se žádná
+  hranice nenastavuje.
+- Když zpráva obsahuje náznak konce (např. "půjdu spát", "budu
+  končit", "zatím díky" apod.) BEZ explicitního slova "End", zeptej
+  se, jestli tímhle session končí ("Ukončujeme tím aktuální session?
+  Napiš 'End' pro potvrzení a shrnutí."), a čekej na potvrzení slovem
+  "End" před tím, než uděláš závěrečné shrnutí/retrospektivu. Bez
+  potvrzení "End" se shrnutí negeneruje automaticky.
 
 ## Referenční vzorce pro psaní nových testů (harness)
 
