@@ -101,6 +101,13 @@ změně BACKLOGu.
   2. Stejný princip zkusit i pro DALŠÍ sledovaná města (SLEDOVANÁ MĚSTA sheet) — najít, jestli mají podobné lokální kulturní magazíny/weby (analogie ke Kam v Brně) s obdobně čitelnými redakčními přehledovými články, a případně je taky přidat jako nápovědu do AI promptu.
   3. Obecnější poznámka k budoucímu zvážení: při hledání nových zdrojů preferovat běžné HTML weby s articles/redakčním obsahem před PDF/flipbook/JS-heavy kalendáři — ty první jsou pro AI web search spolehlivě dostupné, ty druhé prakticky ne.
   AKTUALIZACE 20. 8. 2026: krok 1 dokončen — objevbrno.cz přidán jako řádek do listu ZDROJE (typ: agregátor, priorita: střední, profil: Brno, URL: https://www.objevbrno.cz/cs/udalosti), ruční úprava přímo v Google Sheetu (Claude v hlavním chatu, claude-in-chrome). Projeví se při příští kontrole akcí. Krok 2 (stejný princip pro další sledovaná města) zůstává otevřený.
+  AKTUALIZACE 20. 8. 2026 (krok 2, rychlý web průzkum): pro zbývající sledovaná města bez vlastního zdroje v ZDROJE listu (Olomouc, Plzeň, Třinec, Zlín) nalezeno:
+  - Plzeň: Žurnál Plzeň (zurnalmag.cz/program) — dobrá analogie ke Kam v Brně, pravidelný týdenní program. Kandidát k přidání do ZDROJE (typ: agregátor, priorita: střední, profil: Plzeň).
+  - Zlín: Živý Zlín (kulturazlin.cz/akce) — kulturní centrum provozované přímo městem, aktuální kalendář. Kandidát k přidání (typ: oficiální kulturní organizace nebo agregátor, priorita: střední/vysoká, profil: Zlín).
+  - Olomouc: žádný specifický magazín nalezen, jen oficiální městský kalendář (olomouc.eu/portal/kalendar) — případně přidat jako standardní 'oficiální městský kalendář' typ, ne jako doplňkový agregátor.
+  - Třinec: nic výrazně lepšího než obecné agregátory (KulturniMapa.cz, GoOut) — nenalezen žádný silný kandidát, zůstává otevřené.
+
+  Přidání řádků do ZDROJE (Sheet) zatím NEPROVEDENO — jen průzkum, čekalo se na čas. Až bude čas, přidat Žurnál Plzeň a Živý Zlín stejným postupem jako objevbrno.cz (ruční zápis do Sheetu).
 
 ## Plán rozvoje — schváleno 4. 8. 2026, aktualizováno 8. 8. 2026
 1. ~~**Rodinné profily**~~ — **HOTOVO 7.–8. 8. 2026** (backend v3.20, frontend
