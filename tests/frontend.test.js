@@ -10,6 +10,7 @@ const { nactiFrontendFunkce } = require('./frontend-harness');
 const f = nactiFrontendFunkce([
   'parseCeskeDatum', 'dateKeyBezpecne_', 'pad2_', 'gcalUrl_',
   'filtrovatNavstivenaPodleObdobi_', 'jeNeoverena_', 'jeNeoverenaBezUrl_', 'sestavTextSdileni_', 'mapsUrl_',
+  'klicMistoUkladani_',
   'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
   'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
   'sestavOdkazNaAkci_', 'parsovatOdkazNaAkci_',
@@ -268,6 +269,27 @@ test('mapsUrl_: jen obec (misto chybí) – funguje i tak', () => {
 test('mapsUrl_: chybí misto i obec → null (žádný odkaz)', () => {
   assert.equal(f.mapsUrl_({ misto: '', obec: '' }), null);
   assert.equal(f.mapsUrl_({}), null);
+});
+
+// ---------------------------------------------------------------------------
+// klicMistoUkladani_ (H, v3.48) – klíč do Setu probihaUkladani pro 🏛,
+// sdílený mezi render karty (btnMisto) a prepniOznaceniMista
+// ---------------------------------------------------------------------------
+
+test('klicMistoUkladani_: skládá misto|obec:misto', () => {
+  assert.equal(f.klicMistoUkladani_({ misto: 'Špilberk', obec: 'Brno' }), 'Špilberk|Brno:misto');
+});
+
+test('klicMistoUkladani_: dvě různá místa ve stejné obci dávají různé klíče', () => {
+  const a = f.klicMistoUkladani_({ misto: 'Špilberk', obec: 'Brno' });
+  const b = f.klicMistoUkladani_({ misto: 'Zelný trh', obec: 'Brno' });
+  assert.notEqual(a, b);
+});
+
+test('klicMistoUkladani_: stejné misto ve dvou obcích dává různé klíče', () => {
+  const a = f.klicMistoUkladani_({ misto: 'Zámek', obec: 'Brno' });
+  const b = f.klicMistoUkladani_({ misto: 'Zámek', obec: 'Olomouc' });
+  assert.notEqual(a, b);
 });
 
 // ---------------------------------------------------------------------------

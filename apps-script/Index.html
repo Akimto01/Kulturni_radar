@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.47 – filtr chip pro oblibena mista (F) -->
+<!-- Kulturní radar Index.html v3.48 – testovatelna cast logiky ikony mista na karte (H) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1604,7 +1604,7 @@
     if (a.misto) {
       btnMisto.className = 'ikona-oznaceni misto'
         + (a.mistoOblibene ? ' aktivni' : '')
-        + (probihaUkladani.has(a.misto + '|' + a.obec + ':misto') ? ' ukladani' : '');
+        + (probihaUkladani.has(klicMistoUkladani_(a)) ? ' ukladani' : '');
       btnMisto.type = 'button';
       btnMisto.title = a.mistoOblibene
         ? 'Odebrat „' + a.misto + '" z oblíbených míst'
@@ -1710,6 +1710,13 @@
     el.appendChild(akceDiv);
 
     return el;
+  }
+
+  /** Klíč do Setu probihaUkladani pro oblíbené MÍSTO – stejný vzorec musí
+   *  sedět na obou místech, kde se používá (render karty i prepniOznaceniMista),
+   *  jinak se stavový indikátor "ukládá se…" rozjede. */
+  function klicMistoUkladani_(a) {
+    return a.misto + '|' + a.obec + ':misto';
   }
 
   /** Sestaví odkaz na Google Kalendář (celodenní událost – strukturované časy
@@ -2728,7 +2735,7 @@
       otevritLogin('Pro ukládání oblíbených míst se prosím přihlas.');
       return;
     }
-    const klic = a.misto + '|' + a.obec + ':misto';
+    const klic = klicMistoUkladani_(a);
     const puvodni = a.mistoOblibene;
     a.mistoOblibene = !a.mistoOblibene;
     probihaUkladani.add(klic);

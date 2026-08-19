@@ -1,5 +1,14 @@
 # Changelog
 
+## Index.html v3.48 — Oblíbená místa: testovatelná část logiky ikony (H) — 19. 8. 2026
+### Přidáno
+- **H) `klicMistoUkladani_(a)`** — nová pure funkce, klíč do Setu `probihaUkladani` pro ikonu 🏛 (`misto|obec:misto`), dřív inline duplikovaný na dvou místech (render karty v `vytvorKartu` + `prepniOznaceniMista`) bez sdílení. Nasazena na obě místa, 3 nové Node testy.
+### Poznámka k architektuře
+- Prošetřeny i další kandidáti z E (ikona na kartě): podmínka zobrazení (`if (a.misto)`) a text/title tlačítka podle stavu jsou triviální inline ternary — extrakce by přidala jen umělou obálku bez přínosu, ponechány beze změny.
+- Zbytek E logiky (DOM vytváření, event listener, `google.script.run` volání v `prepniOznaceniMista`) zůstává netestovatelný čistě v Node bez DOM mocku, stejně jako u ★/✓ — pokrytí patří RF (viz BACKLOG.md, položka I).
+- Node testy 318 → 321 (+3: `klicMistoUkladani_`).
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.48"`), ověřeno `?api=meta` → `"verze":"3.26"` (backend beze změny, nezávislé číslování Index.html vs. VERZE).
+
 ## Index.html v3.47 — Oblíbená místa: filtr chip (F) — 19. 8. 2026
 ### Přidáno
 - **F) Nový chip `#chip-oblibena-mista` (🏛 Oblíbená místa)** v `#controls-oznaceni`, stejný vizuální vzor jako `chip-oblibene`/`chip-navstivene`/`chip-neoverene`. Na rozdíl od `rezimZobrazeni` (exkluzivní výběr mezi Vše/★/✓/❓) jde o nezávislý toggle (`filtrOblibenaMista`), kombinovatelný se všemi rezimy i s kategorie-filtrem — stejný vzor jako `aktKategorie`.
