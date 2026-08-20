@@ -132,6 +132,15 @@ tenhle symptom.
   neklikat naslepo v automatickém RF běhu bez teardownu, co vrátí původní
   stav — viz vzor v `tests/robot/frontend.robot` (`Ověřit plný cyklus
   označení… s reloadem`).
+- Gotcha: VS Code Problems panel hlásí "robotframework not installed"
+  u .robot souborů — lokální Python prostředí (ne to, co appka/CI
+  používá) nemá nainstalovaný balíček robotframework, takže Language
+  Server nemůže poskytovat zvýrazňování/kontrolu syntaxe. NETÝKÁ SE
+  appky ani CI (RF testy tam běží správně) — je to čistě editor
+  pohodlí. Oprava: nainstalovat robotframework do Python prostředí, co
+  VS Code používá (cesta se liší podle instalace, viz chybová hláška
+  v Problems panelu pro přesnou cestu k python.exe), pak Reload Window
+  ve VS Code.
 
 ## 3. Sync CHANGELOG.md ↔ BACKLOG.md
 
