@@ -1,0 +1,46 @@
+meta {
+  name: Login - spravny PIN
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "akce": "login",
+    "uzivatelId": "{{testUserId}}",
+    "pin": "{{process.env.TEST_PIN}}"
+  }
+}
+
+tests {
+  test("status je 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("ok je true (vyzaduje platne testUserId v prostredi a TEST_PIN v OS)", function () {
+    expect(res.getBody().ok).to.equal(true);
+  });
+
+  test("odpoved obsahuje id, jmeno a filtry profilu", function () {
+    const body = res.getBody();
+    expect(body).to.have.property('id');
+    expect(body).to.have.property('jmeno');
+    expect(body).to.have.property('filtry');
+  });
+}
+
+docs {
+  Vyzaduje skutecny testovaci profil (viz tests/robot/resources.robot,
+  RF_TEST_USER_ID/RF_TEST_PIN): testUserId vyplneny v prostredi Produkce,
+  TEST_PIN nastaveny jako promenna prostredi OS (viz README.md, stejny
+  princip jako u SoapUI) - Bruno ji cte pres {{process.env.TEST_PIN}}
+  a nikdy se neuklada do souboru trackovaneho gitem. Bez nich vrati appka
+  ok:false ("profil nenalezen"), ne test failure v Bruno smyslu - jde
+  o ocekavane chovani bez konfigurace.
+}

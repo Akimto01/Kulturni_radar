@@ -1,0 +1,42 @@
+meta {
+  name: Toggle - neplatny uzivatel
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "akce": "toggle",
+    "id": "{{testEventId}}",
+    "typ": "oblibene",
+    "uzivatelId": ""
+  }
+}
+
+tests {
+  test("status je 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("ok je false", function () {
+    expect(res.getBody().ok).to.equal(false);
+  });
+
+  test("odpoved obsahuje chybovou hlasku o chybejicim profilu", function () {
+    expect(res.getBody()).to.have.property('error');
+  });
+}
+
+docs {
+  "Neplatny" uzivatelId = zamerne prazdny retezec. apiToggle_ v
+  apps-script/kulturni_radar.gs neoveruje, ze uzivatelId patri ke
+  skutecnemu existujicimu profilu (jen ze neni prazdne) - neexistujici,
+  ale neprazdne ID by proslo stejne jako platne. Prazdny retezec je
+  jedina deterministicka cesta k ok:false podle soucasneho kodu.
+}

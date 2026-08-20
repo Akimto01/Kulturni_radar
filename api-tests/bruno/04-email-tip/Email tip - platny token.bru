@@ -1,0 +1,43 @@
+meta {
+  name: Email tip - platny token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "akce": "email-tip",
+    "token": "{{process.env.EMAIL_WEBHOOK_TOKEN}}",
+    "from": "test@example.com",
+    "subject": "Testovaci tip",
+    "text": "Testovaci akce v Testovacim meste, 1. 1. 2030."
+  }
+}
+
+tests {
+  test("status je 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("ok je true (vyzaduje spravny EMAIL_WEBHOOK_TOKEN v OS)", function () {
+    expect(res.getBody().ok).to.equal(true);
+  });
+
+  test("odpoved obsahuje id zapisu ve fronte", function () {
+    expect(res.getBody()).to.have.property('id');
+  });
+}
+
+docs {
+  Vyzaduje skutecnou hodnotu Script Property EMAIL_WEBHOOK_TOKEN nastavenou
+  jako promenna prostredi OS (viz README.md, stejny princip jako u SoapUI)
+  - Bruno ji cte pres {{process.env.EMAIL_WEBHOOK_TOKEN}} a nikdy se
+  neuklada do souboru trackovaneho gitem. Uspesne volani zapise novy
+  radek do listu EMAIL_TIPY na produkci.
+}

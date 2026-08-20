@@ -1,0 +1,34 @@
+meta {
+  name: Email tip - chybejici token
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "akce": "email-tip",
+    "from": "test@example.com",
+    "subject": "Testovaci tip",
+    "text": "Testovaci akce v Testovacim meste, 1. 1. 2030."
+  }
+}
+
+tests {
+  test("status je 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("ok je false", function () {
+    expect(res.getBody().ok).to.equal(false);
+  });
+
+  test("odpoved obsahuje 'Neplatny token.'", function () {
+    expect(res.getBody().error).to.equal('Neplatný token.');
+  });
+}

@@ -1,0 +1,33 @@
+meta {
+  name: GET meta
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}?api=meta
+  body: none
+  auth: none
+}
+
+tests {
+  test("status je 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("ok je true", function () {
+    expect(res.getBody().ok).to.equal(true);
+  });
+
+  test("odpoved obsahuje profily, kategorie, verze a aktivniProfil", function () {
+    const body = res.getBody();
+    expect(body).to.have.property('profily');
+    expect(body).to.have.property('kategorie');
+    expect(body).to.have.property('verze');
+    expect(body).to.have.property('aktivniProfil');
+  });
+
+  test("profily je pole", function () {
+    expect(res.getBody().profily).to.be.an('array');
+  });
+}

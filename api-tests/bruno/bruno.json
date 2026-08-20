@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "name": "Kulturni radar API (cvicny projekt)",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"]
+}

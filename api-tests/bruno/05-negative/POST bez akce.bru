@@ -1,0 +1,31 @@
+meta {
+  name: POST bez akce
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "poznamka": "zamerne chybi pole akce"
+  }
+}
+
+tests {
+  test("status je 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("ok je false", function () {
+    expect(res.getBody().ok).to.equal(false);
+  });
+
+  test("odpoved obsahuje 'Neznama akce.'", function () {
+    expect(res.getBody().error).to.equal('Neznámá akce.');
+  });
+}

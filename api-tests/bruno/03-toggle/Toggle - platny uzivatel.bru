@@ -1,0 +1,43 @@
+meta {
+  name: Toggle - platny uzivatel
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "akce": "toggle",
+    "id": "{{testEventId}}",
+    "typ": "oblibene",
+    "uzivatelId": "{{testUserId}}"
+  }
+}
+
+tests {
+  test("status je 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("ok je true (vyzaduje platne testEventId/testUserId v prostredi)", function () {
+    expect(res.getBody().ok).to.equal(true);
+  });
+
+  test("odpoved obsahuje id a stav oblibene", function () {
+    const body = res.getBody();
+    expect(body).to.have.property('id');
+    expect(body).to.have.property('oblibene');
+  });
+}
+
+docs {
+  Pozor: tenhle request PRIMO ZAPISUJE do listu OZNACENI na produkci
+  (prepina hvezdicku u zadane akce). Pouzij testEventId z vyhrazeneho
+  testovaciho profilu/akce, ne z ostre rodinne agendy - a po testovani
+  rucne vrat puvodni stav, pokud zalezi.
+}

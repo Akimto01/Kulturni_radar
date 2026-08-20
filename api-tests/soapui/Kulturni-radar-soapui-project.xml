@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:soapui-project id="a1e5c001-0000-4000-8000-000000000001" activeEnvironment="Default" name="Kulturni radar API (cvicny projekt)" soapui-version="5.10.0" abortOnError="false" runType="SEQUENTIAL" resourceRoot="" xmlns:con="http://eviware.com/soapui/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <con:settings/>
+  <con:interface xsi:type="con:RestService" id="a1e5c001-0000-4000-8000-000000000002" name="Kulturni radar" type="rest" wadlVersion="http://wadl.dev.java.net/2009/02">
+    <con:settings/>
+    <con:definitionCache type="TEXT" rootPart=""/>
+    <con:endpoints>
+      <con:endpoint>https://script.google.com/macros/s/AKfycbwwLACExWtRUULK5XX1bMD8SJiC6cBqAY-q99Flp3SLAEr4ejB4VnekFNH9yYnlOuJvRQ/exec</con:endpoint>
+    </con:endpoints>
+    <con:resource name="exec" path="" id="a1e5c001-0000-4000-8000-000000000003">
+      <con:settings/>
+      <con:parameters/><con:method name="GET meta" id="a1e5c001-0000-4000-8000-000000000004" method="GET">
+        <con:settings/>
+        <con:parameters>
+          <con:parameter>
+            <con:name>api</con:name>
+            <con:value>meta</con:value>
+            <con:style>QUERY</con:style>
+            <con:default>meta</con:default>
+          </con:parameter>
+        </con:parameters>
+        <con:representation type="RESPONSE">
+          <con:mediaType>application/json</con:mediaType>
+          <con:status>200</con:status>
+        <con:params/></con:representation>
+        <con:representation type="RESPONSE"><con:mediaType>application/json; charset=utf-8</con:mediaType><con:status>200</con:status><con:params/><con:element xmlns:echo="https://script.googleusercontent.com/macros/echo">echo:Response</con:element></con:representation><con:request name="GET meta" id="a1e5c001-0000-4000-8000-000000000005" mediaType="application/json">
+          <con:settings/>
+          <con:endpoint>https://script.google.com/macros/s/AKfycbwwLACExWtRUULK5XX1bMD8SJiC6cBqAY-q99Flp3SLAEr4ejB4VnekFNH9yYnlOuJvRQ/exec</con:endpoint>
+          <con:request/>
+        <con:parameters/></con:request>
+      </con:method>
+      <con:method name="POST akce" id="a1e5c001-0000-4000-8000-000000000006" method="POST">
+        <con:settings/>
+        <con:parameters/><con:representation type="RESPONSE">
+          <con:mediaType>application/json</con:mediaType>
+          <con:status>200</con:status>
+        <con:params/></con:representation>
+        <con:representation type="REQUEST"><con:mediaType>application/json</con:mediaType><con:params/></con:representation><con:representation type="FAULT"><con:mediaType>text/html; charset=utf-8</con:mediaType><con:status>405</con:status><con:params/><con:element>html</con:element></con:representation><con:request name="POST akce" id="a1e5c001-0000-4000-8000-000000000007" mediaType="application/json">
+          <con:settings/>
+          <con:endpoint>https://script.google.com/macros/s/AKfycbwwLACExWtRUULK5XX1bMD8SJiC6cBqAY-q99Flp3SLAEr4ejB4VnekFNH9yYnlOuJvRQ/exec</con:endpoint>
+          <con:request>{"akce":""}</con:request>
+        <con:parameters/></con:request>
+      </con:method>
+    </con:resource>
+  </con:interface>
+
+  <con:testSuite id="a1e5c001-0000-4000-8000-000000000100" name="Kulturni radar API testy">
+    <con:settings/>
+    <con:runType>SEQUENTIAL</con:runType>
+
+    <con:testCase id="a1e5c001-0000-4000-8000-000000000101" failOnError="false" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="01 GET meta" searchProperties="true">
+      <con:settings/>
+      <con:testStep type="restrequest" name="GET meta" id="a1e5c001-0000-4000-8000-000000000102">
+        <con:settings/>
+        <con:config service="Kulturni radar" resourcePath="" methodName="GET meta" xsi:type="con:RestRequestStep">
+          <con:restRequest name="GET meta" mediaType="application/json" method="GET" id="d8c48f9a-7911-4ab2-8020-c50ada3d48ca">
+            <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;xml-fragment/></con:setting></con:settings>
+            <con:endpoint>${#Project#baseUrl}</con:endpoint>
+            <con:request/>
+            <con:originalUri>https://script.googleusercontent.com/macros/echo</con:originalUri><con:credentials><con:authType>No Authorization</con:authType></con:credentials><con:jmsConfig JMSDeliveryMode="PERSISTENT"/><con:jmsPropertyConfig/><con:parameters>
+              <entry key="api" value="meta" xmlns="http://eviware.com/soapui/config"/>
+            </con:parameters>
+            <con:assertion type="Valid HTTP Status Codes" id="a1e5c001-0000-4000-8000-000000000103" name="status 200">
+              <con:configuration>
+                <codes>200</codes>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Match" id="a1e5c001-0000-4000-8000-000000000104" name="ok je true">
+              <con:configuration>
+                <path>$['ok']</path>
+                <content>true</content>
+                <allowWildcards>false</allowWildcards>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Existence Match" id="a1e5c001-0000-4000-8000-000000000105" name="obsahuje verze">
+              <con:configuration>
+                <path>$['verze']</path>
+                <expectedResult>true</expectedResult>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Existence Match" id="a1e5c001-0000-4000-8000-000000000106" name="obsahuje profily">
+              <con:configuration>
+                <path>$['profily']</path>
+                <expectedResult>true</expectedResult>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Existence Match" id="a1e5c001-0000-4000-8000-000000000107" name="obsahuje kategorie">
+              <con:configuration>
+                <path>$['kategorie']</path>
+                <expectedResult>true</expectedResult>
+              </con:configuration>
+            </con:assertion>
+          </con:restRequest>
+        </con:config>
+      </con:testStep>
+    <con:properties/></con:testCase>
+
+    <con:testCase id="a1e5c001-0000-4000-8000-000000000110" failOnError="false" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="02 Login - spravny PIN" searchProperties="true">
+      <con:settings/>
+      <con:testStep type="restrequest" name="Login - spravny PIN" id="a1e5c001-0000-4000-8000-000000000111">
+        <con:settings/>
+        <con:config service="Kulturni radar" resourcePath="" methodName="POST akce" xsi:type="con:RestRequestStep">
+          <con:restRequest name="Login - spravny PIN" mediaType="application/json" method="POST" postQueryString="false" id="3cfe762c-7d27-4ab2-b3d4-2dab0f7457c9">
+            <con:settings/>
+            <con:endpoint>${#Project#baseUrl}</con:endpoint>
+            <con:request>{"akce":"login","uzivatelId":"${#Project#testUserId}","pin":"${System#TEST_PIN}"}</con:request>
+            <con:assertion type="Valid HTTP Status Codes" id="a1e5c001-0000-4000-8000-000000000112" name="status 200">
+              <con:configuration>
+                <codes>200</codes>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Match" id="a1e5c001-0000-4000-8000-000000000113" name="ok je true (vyzaduje platne Project properties testUserId/testPin)">
+              <con:configuration>
+                <path>$['ok']</path>
+                <content>true</content>
+                <allowWildcards>false</allowWildcards>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Existence Match" id="a1e5c001-0000-4000-8000-000000000114" name="obsahuje id a jmeno">
+              <con:configuration>
+                <path>$['jmeno']</path>
+                <expectedResult>true</expectedResult>
+              </con:configuration>
+            </con:assertion>
+          <con:parameters/></con:restRequest>
+        </con:config>
+      </con:testStep>
+    <con:properties/></con:testCase>
+
+    <con:testCase id="a1e5c001-0000-4000-8000-000000000120" failOnError="false" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="03 Login - spatny PIN" searchProperties="true">
+      <con:settings/>
+      <con:testStep type="restrequest" name="Login - spatny PIN" id="a1e5c001-0000-4000-8000-000000000121">
+        <con:settings/>
+        <con:config service="Kulturni radar" resourcePath="" methodName="POST akce" xsi:type="con:RestRequestStep">
+          <con:restRequest name="Login - spatny PIN" mediaType="application/json" method="POST" postQueryString="false" id="db5a1296-1a4b-4dba-9e01-0c35dac17a02">
+            <con:settings/>
+            <con:endpoint>${#Project#baseUrl}</con:endpoint>
+            <con:request>{"akce":"login","uzivatelId":"${#Project#testUserId}","pin":"0000-jiste-spatny-pin"}</con:request>
+            <con:assertion type="Valid HTTP Status Codes" id="a1e5c001-0000-4000-8000-000000000122" name="status 200">
+              <con:configuration>
+                <codes>200</codes>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Match" id="a1e5c001-0000-4000-8000-000000000123" name="ok je false">
+              <con:configuration>
+                <path>$['ok']</path>
+                <content>false</content>
+                <allowWildcards>false</allowWildcards>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Existence Match" id="a1e5c001-0000-4000-8000-000000000124" name="obsahuje error">
+              <con:configuration>
+                <path>$['error']</path>
+                <expectedResult>true</expectedResult>
+              </con:configuration>
+            </con:assertion>
+          <con:parameters/></con:restRequest>
+        </con:config>
+      </con:testStep>
+    <con:properties/></con:testCase>
+
+    <con:testCase id="a1e5c001-0000-4000-8000-000000000130" failOnError="false" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="04 Toggle - platny uzivatel" searchProperties="true">
+      <con:settings/>
+      <con:testStep type="restrequest" name="Toggle - platny uzivatel" id="a1e5c001-0000-4000-8000-000000000131">
+        <con:settings/>
+        <con:config service="Kulturni radar" resourcePath="" methodName="POST akce" xsi:type="con:RestRequestStep">
+          <con:restRequest name="Toggle - platny uzivatel" mediaType="application/json" method="POST" postQueryString="false" id="e8b4b142-d26b-4638-862a-81ce5d9c49c3">
+            <con:settings/>
+            <con:endpoint>${#Project#baseUrl}</con:endpoint>
+            <con:request>{"akce":"toggle","id":"${#Project#testEventId}","typ":"oblibene","uzivatelId":"${#Project#testUserId}"}</con:request>
+            <con:assertion type="Valid HTTP Status Codes" id="a1e5c001-0000-4000-8000-000000000132" name="status 200">
+              <con:configuration>
+                <codes>200</codes>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Match" id="a1e5c001-0000-4000-8000-000000000133" name="ok je true (vyzaduje platne Project properties testEventId/testUserId)">
+              <con:configuration>
+                <path>$['ok']</path>
+                <content>true</content>
+                <allowWildcards>false</allowWildcards>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Existence Match" id="a1e5c001-0000-4000-8000-000000000134" name="obsahuje oblibene">
+              <con:configuration>
+                <path>$['oblibene']</path>
+                <expectedResult>true</expectedResult>
+              </con:configuration>
+            </con:assertion>
+          <con:parameters/></con:restRequest>
+        </con:config>
+      </con:testStep>
+    <con:properties/></con:testCase>
+
+    <con:testCase id="a1e5c001-0000-4000-8000-000000000140" failOnError="false" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="05 Toggle - neplatny uzivatel" searchProperties="true">
+      <con:settings/>
+      <con:testStep type="restrequest" name="Toggle - neplatny uzivatel" id="a1e5c001-0000-4000-8000-000000000141">
+        <con:settings/>
+        <con:config service="Kulturni radar" resourcePath="" methodName="POST akce" xsi:type="con:RestRequestStep">
+          <con:restRequest name="Toggle - neplatny uzivatel" mediaType="application/json" method="POST" postQueryString="false" id="ef21efdb-6868-4fe3-abb6-0f456370e71d">
+            <con:settings/>
+            <con:endpoint>${#Project#baseUrl}</con:endpoint>
+            <con:request>{"akce":"toggle","id":"${#Project#testEventId}","typ":"oblibene","uzivatelId":""}</con:request>
+            <con:assertion type="Valid HTTP Status Codes" id="a1e5c001-0000-4000-8000-000000000142" name="status 200">
+              <con:configuration>
+                <codes>200</codes>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Match" id="a1e5c001-0000-4000-8000-000000000143" name="ok je false">
+              <con:configuration>
+                <path>$['ok']</path>
+                <content>false</content>
+                <allowWildcards>false</allowWildcards>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Existence Match" id="a1e5c001-0000-4000-8000-000000000144" name="obsahuje error">
+              <con:configuration>
+                <path>$['error']</path>
+                <expectedResult>true</expectedResult>
+              </con:configuration>
+            </con:assertion>
+          <con:parameters/></con:restRequest>
+        </con:config>
+      </con:testStep>
+    <con:properties/></con:testCase>
+
+    <con:testCase id="a1e5c001-0000-4000-8000-000000000150" failOnError="false" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="06 Email tip - platny token" searchProperties="true">
+      <con:settings/>
+      <con:testStep type="restrequest" name="Email tip - platny token" id="a1e5c001-0000-4000-8000-000000000151">
+        <con:settings/>
+        <con:config service="Kulturni radar" resourcePath="" methodName="POST akce" xsi:type="con:RestRequestStep">
+          <con:restRequest name="Email tip - platny token" mediaType="application/json" method="POST" postQueryString="false" id="8cc23e83-0baf-481e-bafa-03c01cf3a46e">
+            <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;xml-fragment/></con:setting></con:settings>
+            <con:endpoint>${#Project#baseUrl}</con:endpoint>
+            <con:request>{"akce":"email-tip","token":"${System#EMAIL_WEBHOOK_TOKEN}","from":"test@example.com","subject":"Testovaci tip","text":"Testovaci akce v Testovacim meste, 1. 1. 2030."}</con:request>
+            <con:originalUri>https://script.googleusercontent.com/macros/echo</con:originalUri><con:assertion type="Valid HTTP Status Codes" id="a1e5c001-0000-4000-8000-000000000152" name="status 200">
+              <con:configuration>
+                <codes>200</codes>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Match" id="a1e5c001-0000-4000-8000-000000000153" name="ok je true (vyzaduje spravny EMAIL_WEBHOOK_TOKEN v Project properties)">
+              <con:configuration>
+                <path>$['ok']</path>
+                <content>true</content>
+                <allowWildcards>false</allowWildcards>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Existence Match" id="a1e5c001-0000-4000-8000-000000000154" name="obsahuje id">
+              <con:configuration>
+                <path>$['id']</path>
+                <expectedResult>true</expectedResult>
+              </con:configuration>
+            </con:assertion>
+          <con:credentials><con:authType>No Authorization</con:authType></con:credentials><con:jmsConfig JMSDeliveryMode="PERSISTENT"/><con:jmsPropertyConfig/><con:parameters/></con:restRequest>
+        </con:config>
+      </con:testStep>
+    <con:properties/></con:testCase>
+
+    <con:testCase id="a1e5c001-0000-4000-8000-000000000160" failOnError="false" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="07 Email tip - chybejici token" searchProperties="true">
+      <con:settings/>
+      <con:testStep type="restrequest" name="Email tip - chybejici token" id="a1e5c001-0000-4000-8000-000000000161">
+        <con:settings/>
+        <con:config service="Kulturni radar" resourcePath="" methodName="POST akce" xsi:type="con:RestRequestStep">
+          <con:restRequest name="Email tip - chybejici token" mediaType="application/json" method="POST" postQueryString="false" id="f16ead3c-80b1-4c00-87c4-17f536c0c447">
+            <con:settings/>
+            <con:endpoint>${#Project#baseUrl}</con:endpoint>
+            <con:request>{"akce":"email-tip","from":"test@example.com","subject":"Testovaci tip","text":"Testovaci akce v Testovacim meste, 1. 1. 2030."}</con:request>
+            <con:assertion type="Valid HTTP Status Codes" id="a1e5c001-0000-4000-8000-000000000162" name="status 200">
+              <con:configuration>
+                <codes>200</codes>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Match" id="a1e5c001-0000-4000-8000-000000000163" name="ok je false">
+              <con:configuration>
+                <path>$['ok']</path>
+                <content>false</content>
+                <allowWildcards>false</allowWildcards>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Match" id="a1e5c001-0000-4000-8000-000000000164" name="error je 'Neplatny token.'">
+              <con:configuration>
+                <path>$['error']</path>
+                <content>Neplatný token.</content>
+                <allowWildcards>false</allowWildcards>
+              </con:configuration>
+            </con:assertion>
+          <con:parameters/></con:restRequest>
+        </con:config>
+      </con:testStep>
+    <con:properties/></con:testCase>
+
+    <con:testCase id="a1e5c001-0000-4000-8000-000000000170" failOnError="false" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="08 Negativni test - POST bez akce" searchProperties="true">
+      <con:settings/>
+      <con:testStep type="restrequest" name="POST bez akce" id="a1e5c001-0000-4000-8000-000000000171">
+        <con:settings/>
+        <con:config service="Kulturni radar" resourcePath="" methodName="POST akce" xsi:type="con:RestRequestStep">
+          <con:restRequest name="POST bez akce" mediaType="application/json" method="POST" postQueryString="false" id="ea349b51-927e-4e57-b741-541d5a483469">
+            <con:settings/>
+            <con:endpoint>${#Project#baseUrl}</con:endpoint>
+            <con:request>{"poznamka":"zamerne chybi pole akce"}</con:request>
+            <con:assertion type="Valid HTTP Status Codes" id="a1e5c001-0000-4000-8000-000000000172" name="status 200">
+              <con:configuration>
+                <codes>200</codes>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Match" id="a1e5c001-0000-4000-8000-000000000173" name="ok je false">
+              <con:configuration>
+                <path>$['ok']</path>
+                <content>false</content>
+                <allowWildcards>false</allowWildcards>
+              </con:configuration>
+            </con:assertion>
+            <con:assertion type="JsonPath Match" id="a1e5c001-0000-4000-8000-000000000174" name="error je 'Neznama akce.'">
+              <con:configuration>
+                <path>$['error']</path>
+                <content>Neznámá akce.</content>
+                <allowWildcards>false</allowWildcards>
+              </con:configuration>
+            </con:assertion>
+          <con:parameters/></con:restRequest>
+        </con:config>
+      </con:testStep>
+    <con:properties/></con:testCase>
+
+  <con:properties/></con:testSuite>
+
+  <con:properties>
+    <con:property>
+      <con:name>baseUrl</con:name>
+      <con:value>https://script.google.com/macros/s/AKfycbwwLACExWtRUULK5XX1bMD8SJiC6cBqAY-q99Flp3SLAEr4ejB4VnekFNH9yYnlOuJvRQ/exec</con:value>
+    </con:property>
+    <con:property>
+      <con:name>emailWebhookToken</con:name>
+      <con:value>nastavuje se pres System property EMAIL_WEBHOOK_TOKEN (viz README), ne tady</con:value>
+    </con:property>
+    <con:property>
+      <con:name>testUserId</con:name>
+      <con:value>rf-test</con:value>
+    </con:property>
+    <con:property>
+      <con:name>testPin</con:name>
+      <con:value>nastavuje se pres System property TEST_PIN (viz README), ne tady</con:value>
+    </con:property>
+    <con:property>
+      <con:name>testEventId</con:name>
+      <con:value>2026-07-25-folkove-prazdniny</con:value>
+    </con:property>
+  </con:properties>
+<con:wssContainer/><con:oAuth2ProfileContainer/><con:oAuth1ProfileContainer/><con:sensitiveInformation/></con:soapui-project>
