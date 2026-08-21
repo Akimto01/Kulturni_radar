@@ -9,7 +9,7 @@ const { nactiFrontendFunkce } = require('./frontend-harness');
 
 const f = nactiFrontendFunkce([
   'parseCeskeDatum', 'dateKeyBezpecne_', 'pad2_', 'gcalUrl_',
-  'filtrovatNavstivenaPodleObdobi_', 'spocitatStatistikuNavstivenych_', 'jeNeoverena_', 'jeNeoverenaBezUrl_', 'sestavTextSdileni_', 'mapsUrl_',
+  'filtrovatNavstivenaPodleObdobi_', 'spocitatStatistikuNavstivenych_', 'spocitatDoporuceni_', 'jeNeoverena_', 'jeNeoverenaBezUrl_', 'sestavTextSdileni_', 'mapsUrl_',
   'klicMistoUkladani_', 'akceSeStejnymMistem_',
   'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
   'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
@@ -177,6 +177,85 @@ test('spocitatStatistikuNavstivenych_: místo se skládá z misto+obec, bez obce
 test('spocitatStatistikuNavstivenych_: akce bez místa spadne pod "neuvedeno"', () => {
   const s = f.spocitatStatistikuNavstivenych_([navstiveny('koncerty', '')]);
   assert.equal(s.podleMista['neuvedeno'], 1);
+});
+
+// ---------------------------------------------------------------------------
+// spocitatDoporuceni_ – heuristika skóre pro „Doporučujeme pro vás“
+// (Roční přehled Část 2, v3.53)
+// ---------------------------------------------------------------------------
+
+function navstivenaHistorie(kategorie, podkategorie) {
+  return { navstivenoDne: '1. 8. 2026', kategorie: kategorie || [], podkategorie: podkategorie || [] };
+}
+
+function kandidat(nazev, kategorie, podkategorie, mistoOblibene, extra) {
+  return Object.assign({
+    nazev, kategorie: kategorie || [], podkategorie: podkategorie || [], mistoOblibene: !!mistoOblibene,
+    navstivenoDne: '', stav: 'potvrzeno', datumOd: '25. 8. 2026', url: 'https://example.com',
+  }, extra || {});
+}
+
+test('spocitatDoporuceni_: shoda hlavní kategorie s historií dá doporučení', () => {
+  const vysledek = f.spocitatDoporuceni_([
+    navstivenaHistorie(['koncerty']),
+    kandidat('A', ['koncerty']),
+  ], TED);
+  assert.deepEqual(vysledek.map(a => a.nazev), ['A']);
+});
+
+test('spocitatDoporuceni_: bez jakékoli shody (jiná kategorie, žádná podkategorie, ne oblíbené místo) se nedoporučí', () => {
+  const vysledek = f.spocitatDoporuceni_([
+    navstivenaHistorie(['koncerty']),
+    kandidat('B', ['divadlo']),
+  ], TED);
+  assert.deepEqual(vysledek, []);
+});
+
+test('spocitatDoporuceni_: prázdná historie (žádné navštívené akce) → žádná doporučení bez shody místa', () => {
+  const vysledek = f.spocitatDoporuceni_([kandidat('C', ['koncerty'])], TED);
+  assert.deepEqual(vysledek, []);
+});
+
+test('spocitatDoporuceni_: bonus za mistoOblibene i bez shody kategorie/podkategorie', () => {
+  const vysledek = f.spocitatDoporuceni_([
+    navstivenaHistorie(['koncerty']),
+    kandidat('E', ['divadlo'], [], true),
+  ], TED);
+  assert.deepEqual(vysledek.map(a => a.nazev), ['E']);
+});
+
+test('spocitatDoporuceni_: shoda podkategorie je capovaná na max 2 body – 3 shody nepřeváží samotnou shodu kategorie', () => {
+  const historie = [navstivenaHistorie(['festivaly'], ['hudební', 'filmový', 'gastro']), navstivenaHistorie(['koncerty'])];
+  const jenKategorie = kandidat('F', ['koncerty'], []);                                    // skóre 2 (jen kategorie)
+  const tripodkategorie = kandidat('G', ['výstavy'], ['hudební', 'filmový', 'gastro']);    // bez cappingu by bylo skóre 3
+  const vysledek = f.spocitatDoporuceni_(historie.concat([jenKategorie, tripodkategorie]), TED);
+  // Se stropem 2 mají F i G stejné skóre (2) a stabilní řazení zachová pořadí ze
+  // vstupu (F před G) – kdyby strop neplatil, G (skóre 3) by bylo první.
+  assert.deepEqual(vysledek.map(a => a.nazev), ['F', 'G']);
+});
+
+test('spocitatDoporuceni_: kombinace víc faktorů (kategorie+podkategorie+místo) řadí výš než jen jeden faktor', () => {
+  const historie = [navstivenaHistorie(['koncerty'], ['jazz/blues'])];
+  const jedenFaktor = kandidat('J', ['koncerty']);                          // skóre 2
+  const vicFaktoru = kandidat('K', ['koncerty'], ['jazz/blues'], true);     // skóre 2+1+1 = 4
+  const vysledek = f.spocitatDoporuceni_(historie.concat([jedenFaktor, vicFaktoru]), TED);
+  assert.deepEqual(vysledek.map(a => a.nazev), ['K', 'J']);
+});
+
+test('spocitatDoporuceni_: akce, která už je navštívená, se znovu nedoporučí i při shodě kategorie', () => {
+  const vysledek = f.spocitatDoporuceni_([
+    navstivenaHistorie(['koncerty']),
+    Object.assign(kandidat('H', ['koncerty']), { navstivenoDne: '10. 8. 2026' }),
+  ], TED);
+  assert.deepEqual(vysledek, []);
+});
+
+test('spocitatDoporuceni_: proběhlá akce (stav "proběhlo") se nedoporučí i při shodě kategorie', () => {
+  const vysledek = f.spocitatDoporuceni_([
+    navstivenaHistorie(['koncerty']),
+    kandidat('I', ['koncerty'], [], false, { stav: 'proběhlo' }),
+  ], TED);
+  assert.deepEqual(vysledek, []);
 });
 
 // ---------------------------------------------------------------------------

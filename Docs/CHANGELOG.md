@@ -1,5 +1,17 @@
 # Changelog
 
+## Index.html v3.53 — Roční přehled (Část 2): doporučení podle historie — 21. 8. 2026
+### Přidáno
+- **`spocitatDoporuceni_`** (PURE) — heuristika skóre podobnosti pro sekci „Doporučujeme pro vás". Pro každou dosud nenavštívenou a viditelnou budoucí akci (`jeViditelnaVSeznamu_` — bez proběhlých, bez neověřených-bez-URL) spočítá skóre vůči kategoriím/podkategoriím napříč všemi navštívenými akcemi uživatele: **+2** za shodu hlavní kategorie s libovolnou navštívenou akcí (jednorázově, ne za každou shodující se navštívenou akci zvlášť), **+1** za každou sdílenou podkategorii až do stropu **max 2 body celkem** (strop záměrně pod hodnotou kategorie, ať jemné podkategorie nikdy nepřeváží hlavní signál kategorie, i kdyby akce sdílela všechny 3 možné podkategorie), **+1** bonus za `mistoOblibene === true`. Vrací seřazený seznam (nejvyšší skóre první), jen akce se skóre > 0.
+- **`vykreslitDoporuceni_`** (DOM) — vykreslí sekci „Doporučujeme pro vás" (max 5 karet, `vytvorKartu`) nad hlavní seznam akcí, volané z `prekreslit()` hned po `renderAkce()` (jen v běžném pohledu „Vše", ne ve speciálních filtrovaných pohledech). Stejný `main.prepend` vzor jako `vykreslitStatistikuNavstivenych_` (v3.52) — předchozí sekci smaže sama `renderAkce()`/`renderSpecialni()` clear-loop při příštím překreslení. Viditelná jen když je uživatel přihlášený, má aspoň **2 navštívené akce** (práh viditelnosti, rozhodnuto 21. 8. 2026 — ukázat brzy, i s méně spolehlivým skóre zpočátku) a existuje aspoň jedno doporučení se skóre > 0.
+- 8 nových Node testů pro `spocitatDoporuceni_` (shoda kategorie, žádná shoda, prázdná historie, bonus za oblíbené místo, capping podkategorie na max 2 body, kombinace víc faktorů, už navštívená akce se nedoporučí znovu, proběhlá akce se nedoporučí).
+### Poznámka k architektuře
+- Čistě frontend, žádný zásah do `kulturni_radar.gs` — `apiEvents` už posílá `kategorie`, `podkategorie` i `mistoOblibene` pro všechny akce, stačila nová agregace nad daty, co appka měla k dispozici.
+- Cap podkategorie (`PODKATEGORIE_BONUS_MAX = 2`) je záměrně deklarován jako lokální konstanta UVNITŘ `spocitatDoporuceni_`, ne jako sdílený modulový konstant — `tests/frontend-harness.js` extrahuje pro testy jen tělo pojmenované funkce (počítáním `{ }`), ne okolní kód, takže externí konstanta by v testovacím kontextu nebyla definovaná.
+- Node testy 385 → 393 (+8).
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.53"`), ověřeno `?api=meta` → HTTP 200, `ok:true` (backend `VERZE` beze změny, 3.29 — měnil se jen Index.html).
+- Součást spárované položky „Roční přehled + Doporučení podle historie" (BACKLOG.md) — **obě části teď kompletně hotové** (Část 1 = Index.html v3.52, Část 2 = Index.html v3.53).
+
 ## Index.html v3.52 — Roční přehled (Část 1): souhrnná statistika nad „✓ Navštívené“ — 21. 8. 2026
 ### Přidáno
 - **`spocitatStatistikuNavstivenych_`** (PURE) — agreguje statistiku nad už vyfiltrovaným seznamem navštívených akcí (výstup `filtrovatNavstivenaPodleObdobi_` + `filtrovatOblibenaMista_`): počet, rozpad podle hlavní kategorie (`a.kategorie[0]`, fallback `'ostatní'`), rozpad podle místa (`misto (obec)`, fallback `'neuvedeno'`).

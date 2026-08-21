@@ -30,9 +30,8 @@ Zohledňuje závislosti mezi položkami a paralelizaci čekacích dob
    kdykoli mezi ostatním
 4. ~~**Filtr žánrů/podkategorie**~~ — **HOTOVO 20. 8. 2026** (backend
    v3.28 + Index.html v3.50, viz CHANGELOG.md), čeká na nasazení/commit
-5. ~~**Roční přehled**~~ — **HOTOVO 21. 8. 2026** (Index.html v3.52, viz
-   CHANGELOG.md), zbývá **Doporučení podle historie** (~2–2,5 h) —
-   spárováno, staví na stejných datech (OZNAČENÍ)
+5. ~~**Roční přehled** + **Doporučení podle historie**~~ — **KOMPLETNĚ
+   HOTOVO 21. 8. 2026** (Index.html v3.52 + v3.53, viz CHANGELOG.md)
 6. **Mapa akcí** — vědomě odložená budoucí varianta (viz Větší
    témata), ne aktivně plánovaná v tomhle pořadí; jednotlivá akce
    je už pokrytá hotovým odkazem „📍 Mapa" na kartě
@@ -82,16 +81,6 @@ změně BACKLOGu.
 ## Probíhající měření
 - **Haiku vs. Sonnet na denní kontrole** — SPUŠTĚNO 20. 8. 2026 (backend v3.27, viz CHANGELOG.md): denní automatická kontrola (`dailyCheck` → typ `'denní kontrola'`) běží na `claude-haiku-4-5`, všechny ostatní běhy (mimořádné z menu/webu, osobní hledání, sledovaná města, měsíční kontrola stálých míst) zůstávají na Sonnetu (`vyberModelProKontrolu_`). List KONTROLY (sloupec K) teď zaznamenává skutečně použitý model pro každý běh, ne jen globální konstantu — díky tomu jde řádky zpětně rozlišit podle modelu. **Vyhodnocení a rozhodnutí: 27. 8. 2026** — porovnat kvalitu úlovků denní kontroly (Haiku) proti ostatním běhům (Sonnet) v listu KONTROLY a rozhodnout, jestli Haiku pro denní běh trvale stačí, nebo se vrátit k Sonnetu.
   PŘIPOMÍNKA: vyhodnotit 27. 8. 2026 — zkontrolovat sloupec K v listu KONTROLY (filtrovat řádky typu 'denní kontrola' za 20.–27. 8. 2026, porovnat kvalitu/počet nalezených akcí s předchozími Sonnet běhy), rozhodnout, jestli Haiku pro denní kontrolu zůstává natrvalo, nebo se vrací na Sonnet.
-
-## Nové funkce (schváleno, čeká na zpětnou vazbu rodiny)
-- **Doporučení podle historie navštívených akcí** (Část 2, ~2–2,5 h) —
-  heuristika skóre podobnosti (shoda kategorie/podkategorie, bonus za
-  oblíbené místo) nad daty z `apiEvents`, čistě frontend (stejný vzor
-  jako Část 1). Rozhodnuto 21. 8. 2026: práh viditelnosti sekce
-  „Doporučujeme pro vás" = 2 navštívené akce (ukázat brzy, i s méně
-  spolehlivým skóre zpočátku).
-- ~~Roční přehled/statistika navštívených akcí a typů~~ — **HOTOVO
-  21. 8. 2026** (Index.html v3.52, viz CHANGELOG.md).
 
 ## Větší témata
 - ~~Plnohodnotná interaktivní mapa akcí (víc pinů najednou)~~ — **HOTOVO 17.–18. 8. 2026** (fáze 3 redesignu, Index.html v3.35–v3.38, viz CHANGELOG.md): vestavěná Leaflet mapa se všemi piny najednou, akce na stejném místě seskupené do jednoho pinu, popup s odkazem zpět do seznamu. Odkaz „📍 Mapa" na kartě (v3.10, jedna akce, garantovaný pin díky souřadnicím z Nominatim) zůstává beze změny vedle ní — dvě různé věci.

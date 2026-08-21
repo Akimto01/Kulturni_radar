@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.52 – Rocni prehled: souhrnna statistika (pocet/kategorie/mista) nad navstivenymi akcemi -->
+<!-- Kulturní radar Index.html v3.53 – Rocni prehled cast 2 - doporuceni podle historie navstivenych akci -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -2779,6 +2779,7 @@
       renderSpecialni(seznam, 'Žádné neověřené akce bez odkazu.');
     } else {
       renderAkce();
+      vykreslitDoporuceni_(vsechnaAkce, !!prihlasenyUzivatel);
     }
     vykreslitKalendar();   // v3.33/v3.35: tečky podle aktuálních akcí + kategorie-filtru
     vykreslitMapu();       // v3.35: piny podle aktuálních akcí + kategorie-filtru
@@ -2862,6 +2863,85 @@
     }
 
     main.prepend(el);
+  }
+
+  /** PURE (v3.53): heuristika skóre podobnosti pro sekci „Doporučujeme pro
+   *  vás" – pro každou dosud NENAVŠTÍVENOU a viditelnou budoucí akci
+   *  (jeViditelnaVSeznamu_ – bez proběhlých, bez neověřených-bez-URL, stejná
+   *  definice „viditelná" jako v běžném seznamu) spočítá skóre vůči
+   *  kategoriím/podkategoriím napříč VŠEMI navštívenými akcemi stejného
+   *  uživatele. `dnes` je injektované (stejný vzor jako
+   *  jeNeoverenaBezUrl_/filtrovatNavstivenaPodleObdobi_), ať jde otestovat
+   *  bez závislosti na skutečném aktuálním čase. Vrací seřazený seznam
+   *  (nejvyšší skóre první), jen akce se skóre > 0 – nenavštívené akce bez
+   *  jediné shody se nikdy nedoporučí.
+   *  Skórování (schváleno 20.–21. 8. 2026, viz BACKLOG.md):
+   *   +2 shoda hlavní kategorie s LIBOVOLNOU navštívenou akcí – jednorázově
+   *      za kategorii, ne za každou navštívenou akci zvlášť (jinak by
+   *      uživatel s 10 navštívenými koncerty dostal 20 bodů jen za to).
+   *   +1 za KAŽDOU sdílenou podkategorii, max 2 body celkem (strop
+   *      záměrně POD hodnotou kategorie samotné) – bez stropu by akce se 3
+   *      shodnými podkategoriemi (max možný počet, viz PODKATEGORIE_SLOVNIK)
+   *      převážila i shodu kategorie, což by zploštilo skóre na "kolik
+   *      podkategorií sedí" místo hlavního signálu.
+   *   +1 bonus, pokud se akce koná na uživatelově oblíbeném místě
+   *      (a.mistoOblibene === true).
+   *  Práh viditelnosti sekce (min. 2 navštívené akce, rozhodnuto 21. 8.
+   *  2026) řeší až volající (vykreslitDoporuceni_), ne tahle funkce. */
+  function spocitatDoporuceni_(vsechnaAkce, dnes) {
+    const navstiveneKategorie = new Set();
+    const navstivenePodkategorie = new Set();
+    vsechnaAkce.filter(a => a.navstivenoDne).forEach(a => {
+      (a.kategorie || []).forEach(k => navstiveneKategorie.add(k));
+      (a.podkategorie || []).forEach(p => navstivenePodkategorie.add(p));
+    });
+    const PODKATEGORIE_BONUS_MAX = 2;
+
+    return vsechnaAkce
+      .filter(a => !a.navstivenoDne && jeViditelnaVSeznamu_(a, dnes))
+      .map(a => {
+        let skore = 0;
+        if ((a.kategorie || []).some(k => navstiveneKategorie.has(k))) skore += 2;
+        const shodnePodkat = (a.podkategorie || []).filter(p => navstivenePodkategorie.has(p)).length;
+        skore += Math.min(shodnePodkat, PODKATEGORIE_BONUS_MAX);
+        if (a.mistoOblibene === true) skore += 1;
+        return { a, skore };
+      })
+      .filter(o => o.skore > 0)
+      .sort((x, y) => y.skore - x.skore)
+      .map(o => o.a);
+  }
+
+  const DOPORUCENI_MIN_NAVSTIVENYCH_ = 2;   // práh viditelnosti, rozhodnuto 21. 8. 2026
+  const DOPORUCENI_MAX_KARET_ = 5;
+
+  /** v3.53: vykreslí sekci „Doporučujeme pro vás" (max 5 karet) nad hlavní
+   *  seznam akcí – DOM only, výpočet skóre je ve spocitatDoporuceni_. Volané
+   *  z prekreslit() hned po renderAkce(), stejný `main.prepend` vzor jako
+   *  vykreslitStatistikuNavstivenych_ (Roční přehled, v3.52) – předchozí
+   *  sekci smaže sama renderAkce()/renderSpecialni() clear-loop při příštím
+   *  překreslení, není potřeba ji ručně odstraňovat.
+   *  Viditelná jen když je uživatel PŘIHLÁŠENÝ (`prihlasen`), má aspoň
+   *  DOPORUCENI_MIN_NAVSTIVENYCH_ navštívených akcí a existuje aspoň jedno
+   *  doporučení se skóre > 0 – jinak nevykreslí nic (žádný prázdný/matoucí
+   *  box pro nové uživatele nebo hosty bez historie). */
+  function vykreslitDoporuceni_(vsechnaAkce, prihlasen) {
+    const main = document.getElementById('main');
+    if (!main || !prihlasen) return;
+    if (vsechnaAkce.filter(a => a.navstivenoDne).length < DOPORUCENI_MIN_NAVSTIVENYCH_) return;
+
+    const doporucene = spocitatDoporuceni_(vsechnaAkce, new Date()).slice(0, DOPORUCENI_MAX_KARET_);
+    if (!doporucene.length) return;
+
+    const sekce = document.createElement('div');
+    sekce.id = 'doporuceni-sekce';
+    const label = document.createElement('div');
+    label.className = 'sekce-label';
+    label.textContent = 'Doporučujeme pro vás';
+    sekce.appendChild(label);
+    doporucene.forEach(a => sekce.appendChild(vytvorKartu(a, { datumLabel: a.datumOd })));
+
+    main.prepend(sekce);
   }
 
   // ── ★ Oblíbené / ✓ Navštívené ──────────────────────────────
