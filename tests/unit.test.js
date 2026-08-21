@@ -1621,6 +1621,169 @@ test('v3.20: apiSeznamUzivatelu_ vrací jen id+jméno, žádné PIN hashe', () =
   assert.equal('filtry' in seznam[0], false, 'ani filtry se v přihlašovacím seznamu neexponují');
 });
 
+// ---------------------------------------------------------------------------
+// v3.30: NOTIFIKACE – validace + uložení osobního nastavení doručování
+// (kanál/frekvence/obsah), viz BACKLOG.md „Notifikace o akcích" kroky A–B.
+// (MemSheet/fakeSpreadsheet jsou definované níže v souboru, ale test()
+// callbacky se spouští až po dokončení celého synchronního načtení modulu,
+// takže pořadí definice v souboru tu nehraje roli.)
+// ---------------------------------------------------------------------------
+
+test('v3.30: validovatNotifikace_ – prázdné kanaly (vypnuto) projdou bez dalších podmínek', () => {
+  assert.equal(r.validovatNotifikace_({ kanaly: [] }).ok, true);
+  assert.equal(r.validovatNotifikace_({ kanaly: [], email: '', frekvenceDny: 0 }).ok, true);
+});
+
+test('v3.30: validovatNotifikace_ – kanál email vyžaduje platnou adresu', () => {
+  const spatny = r.validovatNotifikace_({ kanaly: ['email'], email: 'neplatne', frekvenceDny: 7 });
+  assert.equal(spatny.ok, false);
+  assert.match(spatny.error, /e-mail/);
+  const ok = r.validovatNotifikace_({ kanaly: ['email'], email: 'a@b.cz', frekvenceDny: 7 });
+  assert.equal(ok.ok, true);
+});
+
+test('v3.30: validovatNotifikace_ – kanál ntfy vyžaduje už vygenerované téma', () => {
+  const spatny = r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: '', frekvenceDny: 7 });
+  assert.equal(spatny.ok, false);
+  assert.match(spatny.error, /ntfy/);
+  const ok = r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: 'radar-abc', frekvenceDny: 7 });
+  assert.equal(ok.ok, true);
+});
+
+test('v3.30: validovatNotifikace_ – frekvence mimo rozsah 1–90 dní se odmítne', () => {
+  assert.equal(r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: 'x', frekvenceDny: 0 }).ok, false);
+  assert.equal(r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: 'x', frekvenceDny: 91 }).ok, false);
+  assert.equal(r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: 'x', frekvenceDny: 1 }).ok, true);
+  assert.equal(r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: 'x', frekvenceDny: 90 }).ok, true);
+});
+
+test('v3.30: novaNtfyTema_ – formát "radar-" + 32 hex znaků, dvě volání dají různá témata', () => {
+  const tema1 = r.novaNtfyTema_();
+  const tema2 = r.novaNtfyTema_();
+  assert.match(tema1, /^radar-[0-9a-f]{32}$/);
+  assert.notEqual(tema1, tema2, 'negenerovatelné/neuhodnutelné téma – musí být pokaždé jiné');
+});
+
+test('v3.30: apiSetNotifikace_ – bez uzivatelId nebo s neznámým profilem vrací ok:false', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ 'UŽIVATELÉ': [[], ['vojta', 'Vojta', 'h', '{}', '', '{}']] });
+  assert.equal(ctx.apiSetNotifikace_(ss, '', { kanaly: [] }).ok, false);
+  assert.equal(ctx.apiSetNotifikace_(ss, 'nikdo', { kanaly: [] }).ok, false);
+});
+
+test('v3.30: apiSetNotifikace_ – validní uložení zapíše JSON do sloupce F (6)', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ 'UŽIVATELÉ': [[], ['vojta', 'Vojta', 'h', '{}', '', '{}']] });
+  const vysledek = ctx.apiSetNotifikace_(ss, 'vojta',
+    { kanaly: ['email'], email: 'a@b.cz', frekvenceDny: 7, obsah: ['kategorie'] });
+  assert.equal(vysledek.ok, true);
+  const ulozeno = JSON.parse(ss.__sheets['UŽIVATELÉ'].rows[1][5]);
+  assert.deepEqual(ulozeno.kanaly, ['email']);
+  assert.equal(ulozeno.email, 'a@b.cz');
+  assert.equal(ulozeno.frekvenceDny, 7);
+  assert.deepEqual(ulozeno.obsah, ['kategorie']);
+});
+
+test('v3.30: apiSetNotifikace_ – nevalidní nastavení se nezapíše (sloupec zůstane beze změny)', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ 'UŽIVATELÉ': [[], ['vojta', 'Vojta', 'h', '{}', '', '{}']] });
+  const vysledek = ctx.apiSetNotifikace_(ss, 'vojta', { kanaly: ['email'], email: 'neplatne', frekvenceDny: 7 });
+  assert.equal(vysledek.ok, false);
+  assert.equal(ss.__sheets['UŽIVATELÉ'].rows[1][5], '{}', 'nevalidní pokus nesmí přepsat uložený stav');
+});
+
+test('v3.30: apiSetNotifikace_ – neznámé hodnoty kanaly/obsah se tiše odfiltrují, ne chyba', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ 'UŽIVATELÉ': [[], ['vojta', 'Vojta', 'h', '{}', '', '{}']] });
+  const vysledek = ctx.apiSetNotifikace_(ss, 'vojta',
+    { kanaly: ['email', 'sms'], email: 'a@b.cz', frekvenceDny: 7, obsah: ['kategorie', 'doporuceni'] });
+  assert.equal(vysledek.ok, true);
+  const ulozeno = JSON.parse(ss.__sheets['UŽIVATELÉ'].rows[1][5]);
+  assert.deepEqual(ulozeno.kanaly, ['email']);
+  assert.deepEqual(ulozeno.obsah, ['kategorie'], '"doporuceni" zatím není povolený obsah (odloženo, viz BACKLOG.md)');
+});
+
+test('v3.30: apiSetNotifikace_ – klient nikdy nesmí nastavit ntfyTema/posledniOdeslano přímo', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ 'UŽIVATELÉ': [[], ['vojta', 'Vojta', 'h', '{}', '', '{}']] });
+  // Pokus propašovat vlastní téma spolu s kanálem 'ntfy' – bez PŘEDCHOZÍHO
+  // vygenerování (apiVygenerovatNtfyTema_) musí selhat validace, ne přijmout
+  // klientovu hodnotu.
+  const pokus = ctx.apiSetNotifikace_(ss, 'vojta',
+    { kanaly: ['ntfy'], ntfyTema: 'vojta-uhodnutelne-tema', frekvenceDny: 7 });
+  assert.equal(pokus.ok, false);
+  assert.match(pokus.error, /ntfy/);
+
+  // I kdyby uživatel poslal posledniOdeslano, uložený stav ho ignoruje – jen
+  // budoucí odesílací job (krok D) smí tohle pole nastavit.
+  ctx.apiVygenerovatNtfyTema_(ss, 'vojta');
+  const ok = ctx.apiSetNotifikace_(ss, 'vojta',
+    { kanaly: ['ntfy'], posledniOdeslano: '2020-01-01T00:00:00.000Z', frekvenceDny: 7 });
+  assert.equal(ok.ok, true);
+  const ulozeno = JSON.parse(ss.__sheets['UŽIVATELÉ'].rows[1][5]);
+  assert.equal(ulozeno.posledniOdeslano, '', 'klientův pokus nastavit posledniOdeslano se ignoruje');
+});
+
+test('v3.30: apiVygenerovatNtfyTema_ – vygeneruje a uloží téma, zachová ostatní pole při rotaci', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ 'UŽIVATELÉ': [[], ['vojta', 'Vojta', 'h', '{}', '',
+    JSON.stringify({ kanaly: ['email'], email: 'a@b.cz', frekvenceDny: 7, obsah: [] })]] });
+  const prvni = ctx.apiVygenerovatNtfyTema_(ss, 'vojta');
+  assert.equal(prvni.ok, true);
+  assert.match(prvni.ntfyTema, /^radar-[0-9a-f]{32}$/);
+
+  const druhy = ctx.apiVygenerovatNtfyTema_(ss, 'vojta');
+  assert.notEqual(druhy.ntfyTema, prvni.ntfyTema, 'rotace musí dát nové téma');
+
+  const ulozeno = JSON.parse(ss.__sheets['UŽIVATELÉ'].rows[1][5]);
+  assert.equal(ulozeno.ntfyTema, druhy.ntfyTema);
+  assert.equal(ulozeno.email, 'a@b.cz', 'ostatní pole zůstávají zachovaná při rotaci tématu');
+});
+
+test('v3.30: apiVygenerovatNtfyTema_ – bez uzivatelId nebo neznámý profil vrací ok:false', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ 'UŽIVATELÉ': [[], ['vojta', 'Vojta', 'h', '{}', '', '{}']] });
+  assert.equal(ctx.apiVygenerovatNtfyTema_(ss, '').ok, false);
+  assert.equal(ctx.apiVygenerovatNtfyTema_(ss, 'nikdo').ok, false);
+});
+
+test('v3.30: apiPrihlaseniUzivatele_ – vrací i notifikace (validní JSON, rozbité JSON i chybějící sloupec)', () => {
+  const ctx = nactiRadar();
+  const hash = ctx.hashPin_('1234', 'sul-n');
+  const ssOk = { getSheetByName: (n) => n === 'UŽIVATELÉ' ? {
+    getLastRow: () => 2,
+    getRange: () => ({ getValues: () => [['vojta', 'Vojta', hash, '{}', '', '{"kanaly":["ntfy"]}']] }),
+  } : null };
+  const vysledek = ctx.apiPrihlaseniUzivatele_(ssOk, 'vojta', '1234');
+  shodneNapricRealmy(vysledek.notifikace.kanaly, ['ntfy']);
+
+  const ssRozbite = { getSheetByName: (n) => n === 'UŽIVATELÉ' ? {
+    getLastRow: () => 2,
+    getRange: () => ({ getValues: () => [['vojta', 'Vojta', hash, '{}', '', '{rozbite']] }),
+  } : null };
+  const vysledek2 = ctx.apiPrihlaseniUzivatele_(ssRozbite, 'vojta', '1234');
+  assert.equal(Object.keys(vysledek2.notifikace).length, 0);
+
+  const ssChybi = { getSheetByName: (n) => n === 'UŽIVATELÉ' ? {
+    getLastRow: () => 2,
+    getRange: () => ({ getValues: () => [['vojta', 'Vojta', hash, '{}', '']] }),   // starý řádek, jen 5 sloupců
+  } : null };
+  const vysledek3 = ctx.apiPrihlaseniUzivatele_(ssChybi, 'vojta', '1234');
+  assert.equal(Object.keys(vysledek3.notifikace).length, 0);
+});
+
+test('v3.30: routePost_ – akce "set-notifikace"/"vygenerovat-ntfy-tema" se routují správně', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ 'UŽIVATELÉ': [[], ['vojta', 'Vojta', 'h', '{}', '', '{}']] });
+  const nastaveno = ctx.routePost_(
+    { akce: 'set-notifikace', uzivatelId: 'vojta', notifikace: { kanaly: [] } }, ss);
+  assert.equal(nastaveno.ok, true);
+
+  const tema = ctx.routePost_({ akce: 'vygenerovat-ntfy-tema', uzivatelId: 'vojta' }, ss);
+  assert.equal(tema.ok, true);
+  assert.match(tema.ntfyTema, /^radar-/);
+});
+
 test('v3.20: sirotci s neexistujícím uživatelem – filtr nad řádky OZNAČENÍ', () => {
   // Logika ze samotestu: záznam s uzivatel mimo platnou množinu je sirotek;
   // prázdný uzivatel (historický formát) se za sirotka nepovažuje.

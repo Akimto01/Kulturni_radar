@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.29 (20. 8. 2026) – Email tipy: fronta + webhook + AI ověření + report (kroky A–C)
- * (předchozí: 3.28 – Podkategorie: slovník + AI prompt/schema, folklor programově)
+ * Verze: 3.30 (21. 8. 2026) – Notifikace: datový model + backend API (kroky A–B)
+ * (předchozí: 3.29 – Email tipy: fronta + webhook + AI ověření + report)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -68,7 +68,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.29';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.30';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -215,6 +215,8 @@ function routePost_(body, ss) {
   if (akce === 'toggle') return apiToggle_(ss, body.id, body.typ, body.uzivatelId);
   if (akce === 'toggle-misto') return apiToggleMisto_(ss, body.misto, body.obec, body.uzivatelId);
   if (akce === 'filtry') return apiSetFiltry_(ss, body.uzivatelId, body.filtry);
+  if (akce === 'set-notifikace') return apiSetNotifikace_(ss, body.uzivatelId, body.notifikace);
+  if (akce === 'vygenerovat-ntfy-tema') return apiVygenerovatNtfyTema_(ss, body.uzivatelId);
   if (akce === 'najdi')  return apiNajdiProUzivatele_(ss, body.uzivatelId, body.token);
   if (akce === 'kontakt') return apiKontakt_(body.jmeno, body.zprava, body.email, body.uzivatelId);
   if (akce === 'email-tip') return apiEmailTip_(ss, body.token, body.from, body.subject, body.text);
@@ -222,7 +224,8 @@ function routePost_(body, ss) {
 }
 
 /**
- * POST /exec {akce:'run'|'login'|'toggle'|'filtry'|'najdi'|'kontakt', ...} → JSON.
+ * POST /exec {akce:'run'|'login'|'toggle'|'filtry'|'najdi'|'kontakt'|
+ *   'set-notifikace'|'vygenerovat-ntfy-tema', ...} → JSON.
  * v3.21: rozšířeno z původního jen-run na plné API pro statický frontend
  * (GitHub Pages) – google.script.run mimo Apps Script neexistuje.
  */
@@ -539,6 +542,7 @@ function onOpen() {
     .addItem('Samotest', 'runSelfTest')
     .addSeparator()
     .addItem('Nastavit uživatelské profily (jednorázově)', 'migraceUzivatelskeProfily')
+    .addItem('Přidat sloupec Notifikace do UŽIVATELÉ (jednorázově)', 'migraceNotifikaceSloupec_')
     .addToUi();
 }
 
@@ -557,7 +561,7 @@ function migraceUzivatelskeProfily() {
   if (sh.getLastRow() < 2) {
     const vychozi = ['vojta', 'manzelka', 'dcera', 'profil4'];
     sh.getRange(2, 1, vychozi.length, UZIVATELE_HLAVICKA.length).setValues(
-      vychozi.map(id => [id, '', '', '{}', formatDateOnly_(new Date())]));
+      vychozi.map(id => [id, '', '', '{}', formatDateOnly_(new Date()), '{}']));
     SpreadsheetApp.getUi().alert(
       'List UŽIVATELÉ založen se 4 prázdnými řádky. Doplň prosím ručně sloupce ' +
       '"Jméno" a PIN – PIN se zapisuje jako hash, ne čitelný text (spusť v editoru ' +
@@ -565,6 +569,23 @@ function migraceUzivatelskeProfily() {
   }
   zapsatOznaceni_(ss, []);
   SpreadsheetApp.getUi().alert('List OZNAČENÍ vymazán – oblíbené a navštívené jsou od teď osobní, historie začíná od nuly pro všechny profily.');
+}
+
+/** JEDNORÁZOVÁ migrace v3.30: doplní hlavičku sloupce F ("Notifikace") do
+ *  existujícího listu UŽIVATELÉ, pokud tam ještě není – starší produkční
+ *  řádky mají jen 5 sloupců, čtení (readUzivatele_) si s chybějícím 6.
+ *  sloupcem poradí (prázdný text = notifikace vypnuté), ale samotná
+ *  hlavička by bez týhle migrace zůstala prázdná. Bezpečné spustit i
+ *  opakovaně – nic nepřepisuje, jen doplní chybějící hlavičku. */
+function migraceNotifikaceSloupec_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ensureUzivateleSheet_(ss);
+  if (!sh.getRange(1, 6).getValue()) {
+    sh.getRange(1, 6).setValue('Notifikace')
+      .setFontWeight('bold').setBackground('#4a235a').setFontColor('#ffffff');
+  }
+  SpreadsheetApp.getUi().alert('Sloupec "Notifikace" v UŽIVATELÍCH připraven – prázdné nastavení ' +
+    'znamená notifikace vypnuté, dokud si je uživatel sám nezapne v appce.');
 }
 
 /** Pomocná funkce pro ruční nastavení/změnu PINu profilu z editoru Apps Scriptu
@@ -1407,7 +1428,7 @@ function apiToggleMisto_(ss, misto, obec, uzivatelId) {
 // UŽIVATELSKÉ PROFILY (v3.20) – osobní oblíbené/navštívené + osobní filtry
 // ---------------------------------------------------------------------------
 
-const UZIVATELE_HLAVICKA = ['ID', 'Jméno', 'PIN_hash', 'Filtry', 'Vytvořeno'];
+const UZIVATELE_HLAVICKA = ['ID', 'Jméno', 'PIN_hash', 'Filtry', 'Vytvořeno', 'Notifikace'];
 
 function ensureUzivateleSheet_(ss) {
   let sh = ss.getSheetByName(SHEET.UZIVATELE);
@@ -1428,6 +1449,7 @@ function readUzivatele_(ss) {
     .map(r => ({
       id: String(r[0] || ''), jmeno: String(r[1] || ''), pinHash: String(r[2] || ''),
       filtry: String(r[3] || ''), vytvoreno: cellText_(r[4]),
+      notifikace: String(r[5] || ''),   // v3.30: JSON, viz validovatNotifikace_
     }))
     .filter(r => r.id);
 }
@@ -1456,7 +1478,9 @@ function apiPrihlaseniUzivatele_(ss, uzivatelId, pin) {
   if (!overitPin_(pin, uzivatel.pinHash)) return { ok: false, error: 'nesprávný PIN' };
   let filtry = {};
   try { filtry = uzivatel.filtry ? JSON.parse(uzivatel.filtry) : {}; } catch (e) { filtry = {}; }
-  return { ok: true, id: uzivatel.id, jmeno: uzivatel.jmeno, filtry };
+  let notifikace = {};
+  try { notifikace = uzivatel.notifikace ? JSON.parse(uzivatel.notifikace) : {}; } catch (e) { notifikace = {}; }
+  return { ok: true, id: uzivatel.id, jmeno: uzivatel.jmeno, filtry, notifikace };
 }
 
 /** API: seznam profilů k výběru na přihlašovací obrazovce (jen ID + jméno, žádné PINy). */
@@ -1473,6 +1497,113 @@ function apiSetFiltry_(ss, uzivatelId, filtryObj) {
   if (idx < 0) return { ok: false, error: 'profil nenalezen' };
   sh.getRange(idx + 2, 4).setValue(JSON.stringify(filtryObj || {}));
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// v3.30: NOTIFIKACE – osobní nastavení doručování (kanál/frekvence/obsah),
+// uložené jako JSON v novém sloupci "Notifikace" listu UŽIVATELÉ (krok A+B,
+// viz BACKLOG.md; sestavení a odesílání samotných notifikací – kroky C–F –
+// je samostatná budoucí práce, tenhle blok jen ukládá/čte preference).
+//
+// Datový model (JSON v buňce):
+//   {
+//     kanaly: ['email','ntfy'],   // podmnožina POVOLENE_KANALY_, [] = vypnuto
+//     email: 'jmeno@example.com', // vyžadováno, pokud 'email' v kanaly
+//     ntfyTema: 'radar-<hex>',    // vyžadováno, pokud 'ntfy' v kanaly – NIKDY
+//                                 // nepřichází od klienta (viz apiSetNotifikace_
+//                                 // níže), jen z apiVygenerovatNtfyTema_
+//     frekvenceDny: 7,            // 1–90, jak často (dny mezi odesláními)
+//     obsah: ['kategorie'],       // podmnožina POVOLENY_OBSAH_ (zatím jen
+//                                 // 'kategorie' – 'doporuceni' vědomě odloženo,
+//                                 // viz BACKLOG.md, vyžaduje port spocitatDoporuceni_
+//                                 // na backend, samostatné budoucí rozhodnutí)
+//     posledniOdeslano: '',       // ISO 8601 string (ne Sheets Date!), '' = nikdy;
+//                                 // nastavuje jen budoucí odesílací job (krok D)
+//   }
+// ---------------------------------------------------------------------------
+
+const POVOLENE_KANALY_ = ['email', 'ntfy'];
+const POVOLENY_OBSAH_ = ['kategorie'];   // 'doporuceni' zatím záměrně chybí
+
+/** PURE: validuje už NORMALIZOVANÉ (filtrované) nastavení notifikací –
+ *  volající (apiSetNotifikace_) napřed ořeže kanaly/obsah na povolené
+ *  hodnoty, tahle funkce jen kontroluje podmíněnou požadovanost (e-mail
+ *  vyžaduje platnou adresu, ntfy vyžaduje už vygenerované téma) a rozsah
+ *  frekvence. Prázdné `kanaly` (notifikace vypnuté) projdou vždy bez
+ *  dalších podmínek – vypnutý stav nemá co validovat. */
+function validovatNotifikace_(n) {
+  const kanaly = n.kanaly || [];
+  if (!kanaly.length) return { ok: true };
+  if (kanaly.indexOf('email') !== -1 && !/^\S+@\S+\.\S+$/.test(n.email || '')) {
+    return { ok: false, error: 'kanál e-mail vyžaduje platnou e-mailovou adresu' };
+  }
+  if (kanaly.indexOf('ntfy') !== -1 && !n.ntfyTema) {
+    return { ok: false, error: 'kanál ntfy vyžaduje nejdřív vygenerované téma (naskenuj QR v appce)' };
+  }
+  const frekvence = Number(n.frekvenceDny) || 0;
+  if (frekvence < 1 || frekvence > 90) {
+    return { ok: false, error: 'frekvence musí být 1–90 dní' };
+  }
+  return { ok: true };
+}
+
+/** API: uloží osobní nastavení notifikací. `ntfyTema` a `posledniOdeslano`
+ *  se VŽDY přebírají z už uloženého stavu, nikdy z klientova requestu – ntfy
+ *  téma smí vzniknout jen přes apiVygenerovatNtfyTema_ (ntfy.sh nemá
+ *  autentizaci, kdokoli zná téma může na něj psát i číst, takže nesmí jít
+ *  nastavit na hádatelnou/klientem zvolenou hodnotu) a posledniOdeslano smí
+ *  psát jen budoucí odesílací job (krok D), ne uživatel sám. */
+function apiSetNotifikace_(ss, uzivatelId, nastaveniObj) {
+  if (!uzivatelId) return { ok: false, error: 'chybí uživatelský profil' };
+  const sh = ensureUzivateleSheet_(ss);
+  const data = readUzivatele_(ss);
+  const idx = data.findIndex(u => u.id === uzivatelId);
+  if (idx < 0) return { ok: false, error: 'profil nenalezen' };
+
+  let stavajici = {};
+  try { stavajici = data[idx].notifikace ? JSON.parse(data[idx].notifikace) : {}; } catch (e) { stavajici = {}; }
+
+  const n = nastaveniObj || {};
+  const kandidat = {
+    kanaly: (Array.isArray(n.kanaly) ? n.kanaly : []).filter(k => POVOLENE_KANALY_.indexOf(k) !== -1),
+    email: String(n.email || '').trim(),
+    frekvenceDny: Number(n.frekvenceDny) || 0,
+    obsah: (Array.isArray(n.obsah) ? n.obsah : []).filter(o => POVOLENY_OBSAH_.indexOf(o) !== -1),
+    ntfyTema: stavajici.ntfyTema || '',
+    posledniOdeslano: stavajici.posledniOdeslano || '',
+  };
+
+  const validace = validovatNotifikace_(kandidat);
+  if (!validace.ok) return { ok: false, error: validace.error };
+
+  sh.getRange(idx + 2, 6).setValue(JSON.stringify(kandidat));
+  return { ok: true };
+}
+
+/** Vygeneruje nehádatelné ntfy téma – prefix "radar-" jen pro čitelnost v
+ *  URL/logu, zbytek je náhodný UUID bez pomlček. Vědomě NE z uživatelského
+ *  vstupu (rozhodnutí 21. 8. 2026) – ntfy.sh nemá autentizaci, takže
+ *  user-friendly téma jako "vojta-radar" by šlo uhodnout/zkusit. */
+function novaNtfyTema_() {
+  return 'radar-' + Utilities.getUuid().replace(/-/g, '');
+}
+
+/** API: vygeneruje a rovnou uloží NOVÉ ntfy téma pro daného uživatele
+ *  (přepíše případné předchozí – použitelné i jako „rotace" při podezření
+ *  na únik). Frontend z odpovědi postaví QR/odkaz na https://ntfy.sh/<tema>
+ *  k naskenování v ntfy appce, nikdy needituje jako text (viz novaNtfyTema_). */
+function apiVygenerovatNtfyTema_(ss, uzivatelId) {
+  if (!uzivatelId) return { ok: false, error: 'chybí uživatelský profil' };
+  const sh = ensureUzivateleSheet_(ss);
+  const data = readUzivatele_(ss);
+  const idx = data.findIndex(u => u.id === uzivatelId);
+  if (idx < 0) return { ok: false, error: 'profil nenalezen' };
+
+  let stavajici = {};
+  try { stavajici = data[idx].notifikace ? JSON.parse(data[idx].notifikace) : {}; } catch (e) { stavajici = {}; }
+  stavajici.ntfyTema = novaNtfyTema_();
+  sh.getRange(idx + 2, 6).setValue(JSON.stringify(stavajici));
+  return { ok: true, ntfyTema: stavajici.ntfyTema };
 }
 
 // ---------------------------------------------------------------------------
