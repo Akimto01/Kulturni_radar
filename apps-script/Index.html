@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.56 – Fix: zvyraznitAkci_ self-cancel bug (testovaci dluh krok 5, cast 1/2) -->
+<!-- Kulturní radar Index.html v3.56 – Fix: zvyraznitAkci_ self-cancel bug + sestavPopupMapy_/sestavPopupDataMapy_ refaktor (testovaci dluh krok 5, cast 2/2) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -2223,25 +2223,35 @@
     mapaLeaflet.on('movestart zoomstart', () => mapaLeaflet.closePopup());
   }
 
+  /** PURE (v3.56, testovací dluh krok 5 auditu, část 2/2): obsahová data
+   *  popupu – jméno + id na tlačítko, jedna položka na akci. Oddělené od
+   *  DOM stavby (sestavPopupMapy_ níže), ať jde testovat v Node bez DOM,
+   *  stejný princip jako sestavBlokyAkci_ u notifikací (krok C). */
+  function sestavPopupDataMapy_(akce) {
+    return (akce || []).map(a => ({ nazev: a.nazev || '', id: a.id }));
+  }
+
   /** Obsah popupu pinu – jedna nebo víc akcí na (prakticky) stejném místě
    *  (seskupitPodleSouradnic_, v3.38). Stavěno přes DOM API (ne HTML
    *  string): a.nazev pochází z AI extrakce webového obsahu (nedůvěryhodný
    *  text), sestavení jako raw HTML by bylo XSS riziko. Každá akce má
    *  vlastní tlačítko volající zvyraznitAkci_ (existující funkce pro
-   *  scroll+zvýraznění karty ze sdíleného odkazu). */
+   *  scroll+zvýraznění karty ze sdíleného odkazu). Tenký DOM wrapper nad
+   *  sestavPopupDataMapy_ (v3.56) – obsah/pořadí určuje čistá funkce,
+   *  tady se jen staví DOM. */
   function sestavPopupMapy_(akce) {
     const wrap = document.createElement('div');
     wrap.className = 'mapa-popup';
-    akce.forEach((a, i) => {
+    sestavPopupDataMapy_(akce).forEach((polozka, i) => {
       if (i > 0) wrap.appendChild(document.createElement('hr'));
       const nazev = document.createElement('strong');
-      nazev.textContent = a.nazev || '';
+      nazev.textContent = polozka.nazev;
       wrap.appendChild(nazev);
       wrap.appendChild(document.createElement('br'));
       const btn = document.createElement('button');
       btn.className = 'mapa-popup-btn';
       btn.textContent = 'Zobrazit v seznamu';
-      btn.addEventListener('click', () => zvyraznitAkci_(a.id));
+      btn.addEventListener('click', () => zvyraznitAkci_(polozka.id));
       wrap.appendChild(btn);
     });
     return wrap;

@@ -20,7 +20,7 @@ const f = nactiFrontendFunkce([
   'isoDatum_', 'dnySAkcemi_', 'sestavKalendarMrizku_',
   'jeViditelnaVSeznamu_', 'filtrovatKategorii_', 'filtrovatOblibenaMista_', 'akceProMapu_',
   'dostupnePodkategorie_', 'filtrovatPodkategorii_',
-  'akceDnePodleData_', 'seskupitPodleSouradnic_',
+  'akceDnePodleData_', 'seskupitPodleSouradnic_', 'sestavPopupDataMapy_',
   'vypocitejPoziciTooltipuKalendare_',
   'klicSouradnic_', 'sestavSeznamMist_', 'prepnoutVyberPinu_',
   'spocitejStatistikuVyberu_', 'vycistitVyberPinu_',
@@ -1181,6 +1181,45 @@ test('seskupitPodleSouradnic_: prázdné/chybějící pole akcí nespadne', () =
 test('seskupitPodleSouradnic_: klíč skupiny odpovídá klicSouradnic_ (v3.41 – sdílený s výběrem pinů)', () => {
   const skupiny = f.seskupitPodleSouradnic_([akceMisto({})]);
   assert.equal(skupiny[0].klic, f.klicSouradnic_(49.2, 16.6));
+});
+
+// ---------------------------------------------------------------------------
+// v3.56 (testovací dluh, krok 5 auditu): sestavPopupDataMapy_ – čistá
+// obsahová data popupu mapy, oddělená od DOM stavby (sestavPopupMapy_,
+// DOM-only, testovaná jen přes RF).
+// ---------------------------------------------------------------------------
+
+test('sestavPopupDataMapy_: jedna akce → pole s jednou položkou {nazev, id}', () => {
+  const data = f.sestavPopupDataMapy_([akceMisto({ id: 'a', nazev: 'Koncert' })]);
+  assert.equal(data.length, 1);
+  assert.equal(data[0].nazev, 'Koncert');
+  assert.equal(data[0].id, 'a');
+});
+
+test('sestavPopupDataMapy_: víc akcí → pořadí a počet zachovány', () => {
+  const data = f.sestavPopupDataMapy_([
+    akceMisto({ id: 'a', nazev: 'Koncert' }),
+    akceMisto({ id: 'b', nazev: 'Festival' }),
+    akceMisto({ id: 'c', nazev: 'Výstava' }),
+  ]);
+  assert.equal(data.length, 3);
+  shodneNapricRealmy(data.map(d => d.id), ['a', 'b', 'c']);
+  shodneNapricRealmy(data.map(d => d.nazev), ['Koncert', 'Festival', 'Výstava']);
+});
+
+test('sestavPopupDataMapy_: chybějící/prázdný název → prázdný řetězec, ne undefined', () => {
+  const data = f.sestavPopupDataMapy_([akceMisto({ id: 'a', nazev: undefined })]);
+  assert.equal(data[0].nazev, '');
+});
+
+test('sestavPopupDataMapy_: prázdné/chybějící pole akcí nespadne', () => {
+  assert.equal(f.sestavPopupDataMapy_([]).length, 0);
+  assert.equal(f.sestavPopupDataMapy_(undefined).length, 0);
+});
+
+test('sestavPopupDataMapy_: cizí pole vstupního objektu (lat/lng/kategorie) se do výstupu nepropíšou', () => {
+  const data = f.sestavPopupDataMapy_([akceMisto({ id: 'a', nazev: 'Koncert', kategorie: ['hudba'] })]);
+  shodneNapricRealmy(Object.keys(data[0]).sort(), ['id', 'nazev']);
 });
 
 // ---------------------------------------------------------------------------

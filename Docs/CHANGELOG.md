@@ -1,5 +1,17 @@
 # Changelog
 
+## Index.html v3.56 (část 2/2) — Refaktor sestavPopupMapy_/sestavPopupDataMapy_ + testy (testovací dluh, krok 5 auditu — POSLEDNÍ) — 21. 8. 2026
+### Přidáno
+- **`sestavPopupDataMapy_(akce)`** (PURE) — extrahuje obsahová data popupu mapy (`{nazev, id}` na akci) z `sestavPopupMapy_`, oddělené od DOM stavby, stejný princip jako `sestavBlokyAkci_` u notifikací (krok C). `sestavPopupMapy_` je teď tenký DOM wrapper, který jen volá tuhle čistou funkci a staví DOM podle jejího výstupu — výsledná DOM struktura beze změny (mechanická extrakce, ne přepis chování).
+- **2 nové RF testy**: „Klik na pin otevře popup se strukturálně konzistentním obsahem" (ověřuje počet názvů == počet tlačítek == počet oddělovačů + 1, funguje na libovolném pinu — osamoceném i seskupeném, bez potřeby předem znát data) a „Tlačítko „Zobrazit v seznamu" v popupu zvýrazní odpovídající kartu" (ověřitelné až po opravě self-cancel bugu z části 1/2).
+- **5 nových Node testů** pro `sestavPopupDataMapy_`: jedna akce, víc akcí (pořadí/počet), chybějící název → `''`, prázdné pole, cizí pole vstupního objektu (lat/lng/kategorie) se nepropíšou do výstupu.
+### Poznámka k architektuře
+- Node testy 431 → 436 (+5).
+- Popup samotný (Leaflet marker click → `.leaflet-popup .mapa-popup`) zůstává jinak netestovatelný v Node (DOM-only, `document.createElement`) — RF je jediná úroveň pokrytí pro samotnou DOM stavbu/klik, Node teď pokrývá OBSAH nezávisle na DOM.
+- Živě ověřeno: celá sada proti lokální opravené kopii i po nasazení (viz níže) proti `kulturniradar.cz` — 47/47 (1 nesouvisející jednorázový zákmit u „✓ Navštívené" toggle testu vyloučen, potvrzeno izolovaným rerunem).
+- **Tímhle je krok 5 (a tedy CELÝ audit testovacího dluhu, kroky 1–5) kompletně hotový** — viz BACKLOG.md.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Index v3.56 (část 2 - popup refaktor + testy)"`), ověřeno `?api=meta`. Backend beze změny.
+
 ## Index.html v3.56 (část 1/2) — Fix: zvyraznitAkci_ self-cancel bug (testovací dluh, krok 5 auditu) — 21. 8. 2026
 ### Opraveno
 - **`zvyraznitAkci_`** — volaná zevnitř vlastního click handleru (tlačítko „Zobrazit v seznamu" v popupu mapy, viz část 2 níže) se sama okamžitě rušila: `document.addEventListener('click', odstranit)` registrovaný SYNCHRONNĚ uvnitř click handleru ještě stihl zachytit TENTÝŽ probublávající click, protože listener přidaný na předka, dokud u něj probíhající událost ještě nedorazila v bublání, se pro ni ještě stihne spustit. Objeveno živě 21. 8. 2026 při RF diagnostice mapových popupů (empiricky ověřeno: přímé volání mimo click event → zvýraznění zůstává; volání z click handleru → mizí okamžitě, bez `Sleep` potřeba k reprodukci). Oprava: `setTimeout(() => document.addEventListener('click', odstranit), 0)` odloží registraci o jeden tick, mimo aktuální probublávání. Volání ze sdíleného odkazu (`?akce=ID`, mimo click event) beze změny chování.

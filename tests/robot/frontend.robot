@@ -818,6 +818,54 @@ Klik na řádek v seznamu míst vybere pin na mapě
         Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto.vybrano    detached    timeout=5s
     END
 
+Klik na pin otevře popup se strukturálně konzistentním obsahem
+    [Documentation]    v3.56 (testovací dluh, krok 5 auditu): sestavPopupMapy_
+    ...    (tenký DOM wrapper nad sestavPopupDataMapy_, viz Node testy) může
+    ...    zobrazit 1 i víc akcí na jednom pinu (seskupitPodleSouradnic_) –
+    ...    test proto neověřuje konkrétní počet, ale VNITŘNÍ konzistenci:
+    ...    počet názvů == počet tlačítek == počet oddělovačů + 1, ať jde
+    ...    o osamocený nebo seskupený pin. Funguje na LIBOVOLNÉM pinu,
+    ...    žádná závislost na tom, jestli dnešní data mají zrovna
+    ...    seskupené místo – multi-akce scénář už s jistotou pokrývají
+    ...    Node testy sestavPopupDataMapy_.
+    Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
+    ${pocet_pinu}=    Get Element Count    ${FRAME} \#mapa .leaflet-marker-icon
+    IF    ${pocet_pinu} == 0
+        Log    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice) – test nemá co ověřit v tomto běhu.    level=WARN
+    ELSE
+        Click    ${FRAME} \#mapa .leaflet-marker-icon >> nth=0
+        Wait For Elements State    ${FRAME} .leaflet-popup .mapa-popup    visible    timeout=3s
+        ${pocet_nazvu}=    Get Element Count    ${FRAME} .leaflet-popup .mapa-popup strong
+        ${pocet_tlacitek}=    Get Element Count    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn
+        ${pocet_hr}=    Get Element Count    ${FRAME} .leaflet-popup .mapa-popup hr
+        Should Be True    ${pocet_nazvu} >= 1    Popup má obsahovat aspoň jeden název akce
+        Should Be Equal As Integers    ${pocet_tlacitek}    ${pocet_nazvu}
+        ...    msg=Počet tlačítek „Zobrazit v seznamu" (${pocet_tlacitek}) neodpovídá počtu názvů (${pocet_nazvu})
+        ${ocekavane_hr}=    Evaluate    ${pocet_nazvu} - 1
+        Should Be Equal As Integers    ${pocet_hr}    ${ocekavane_hr}
+        ...    msg=Počet oddělovačů (${pocet_hr}) neodpovídá počtu názvů - 1 (${pocet_nazvu})
+    END
+
+Tlačítko „Zobrazit v seznamu" v popupu zvýrazní odpovídající kartu
+    [Documentation]    v3.56 (testovací dluh, krok 5 auditu): tlačítko volá
+    ...    zvyraznitAkci_ (v3.56 fix: self-cancel bug při volání zevnitř
+    ...    click handleru, viz komentář u funkce v Index.html). Neověřuje
+    ...    KTEROU konkrétní kartu (to by vyžadovalo párovat konkrétní pin
+    ...    s konkrétní kartou), jen že se zvýraznění vůbec spustí a
+    ...    zůstane – obecný, na datech nezávislý signál.
+    Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
+    ${pocet_pinu}=    Get Element Count    ${FRAME} \#mapa .leaflet-marker-icon
+    IF    ${pocet_pinu} == 0
+        Log    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice) – test nemá co ověřit v tomto běhu.    level=WARN
+    ELSE
+        Click    ${FRAME} \#mapa .leaflet-marker-icon >> nth=0
+        Wait For Elements State    ${FRAME} .leaflet-popup .mapa-popup    visible    timeout=3s
+        Click    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn >> nth=0
+        ${pocet_zvyraznenych}=    Get Element Count    ${FRAME} .karta.zvyrazneno
+        Should Be True    ${pocet_zvyraznenych} >= 1
+        ...    Klik na „Zobrazit v seznamu" měl zvýraznit odpovídající kartu (.karta.zvyrazneno)
+    END
+
 Header a #controls-oznaceni zůstávají viditelné po scrollu (sticky)
     [Documentation]    N) H/I) header i #controls-oznaceni mají
     ...    position: sticky (v3.42) – po scrollu stránky dolů mají zůstat
