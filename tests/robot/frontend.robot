@@ -123,9 +123,9 @@ Notifikace: zaškrtnutí kanálu ukáže/schová příslušnou oblast (bez ulož
     Click    ${FRAME} \#uzivatel-badge
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
     ${stav_email}=    Get Checkbox State    ${FRAME} \#notif-kanal-email
-    IF    "${stav_email}" == "checked"    Click    ${FRAME} \#notif-kanal-email
+    IF    ${stav_email}    Click    ${FRAME} \#notif-kanal-email
     ${stav_ntfy}=    Get Checkbox State    ${FRAME} \#notif-kanal-ntfy
-    IF    "${stav_ntfy}" == "checked"    Click    ${FRAME} \#notif-kanal-ntfy
+    IF    ${stav_ntfy}    Click    ${FRAME} \#notif-kanal-ntfy
     Wait For Elements State    ${FRAME} \#notif-email-oblast    hidden    timeout=3s
     Wait For Elements State    ${FRAME} \#notif-ntfy-oblast    hidden    timeout=3s
 
@@ -148,9 +148,9 @@ Notifikace: neplatný stav (e-mail zaškrtnutý bez adresy) zobrazí inline chyb
     Click    ${FRAME} \#uzivatel-badge
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
     ${stav_ntfy}=    Get Checkbox State    ${FRAME} \#notif-kanal-ntfy
-    IF    "${stav_ntfy}" == "checked"    Click    ${FRAME} \#notif-kanal-ntfy
+    IF    ${stav_ntfy}    Click    ${FRAME} \#notif-kanal-ntfy
     ${stav_email}=    Get Checkbox State    ${FRAME} \#notif-kanal-email
-    IF    "${stav_email}" == "unchecked"    Click    ${FRAME} \#notif-kanal-email
+    IF    not ${stav_email}    Click    ${FRAME} \#notif-kanal-email
     Fill Text    ${FRAME} \#notif-email    neplatna-adresa
     Click    ${FRAME} \#filtry-ulozit
     Wait For Elements State    ${FRAME} \#filtry-chyba    visible    timeout=3s
@@ -174,7 +174,7 @@ Notifikace: vygenerování ntfy tématu, uložení a znovunačtení po přihlá�
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
 
     ${stav_ntfy}=    Get Checkbox State    ${FRAME} \#notif-kanal-ntfy
-    IF    "${stav_ntfy}" == "unchecked"    Click    ${FRAME} \#notif-kanal-ntfy
+    IF    not ${stav_ntfy}    Click    ${FRAME} \#notif-kanal-ntfy
     Wait For Elements State    ${FRAME} \#notif-ntfy-bez-tematu    visible    timeout=3s
     Click    ${FRAME} \#notif-ntfy-generovat
     Wait For Elements State    ${FRAME} \#notif-ntfy-s-tematem    visible    timeout=10s
@@ -194,7 +194,7 @@ Notifikace: vygenerování ntfy tématu, uložení a znovunačtení po přihlá�
     Click    ${FRAME} \#uzivatel-badge
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
     ${stav_po_loginu}=    Get Checkbox State    ${FRAME} \#notif-kanal-ntfy
-    Should Be Equal As Strings    ${stav_po_loginu}    checked
+    Should Be True    ${stav_po_loginu}
     ...    msg=Po znovupřihlášení má být kanál ntfy zaškrtnutý podle uloženého stavu ze serveru
     Wait For Elements State    ${FRAME} \#notif-ntfy-s-tematem    visible    timeout=5s
 
