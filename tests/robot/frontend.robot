@@ -175,11 +175,38 @@ Notifikace: vygenerování ntfy tématu, uložení a znovunačtení po přihlá�
 
     ${stav_ntfy}=    Get Checkbox State    ${FRAME} \#notif-kanal-ntfy
     IF    not ${stav_ntfy}    Click    ${FRAME} \#notif-kanal-ntfy
-    Wait For Elements State    ${FRAME} \#notif-ntfy-bez-tematu    visible    timeout=3s
-    Click    ${FRAME} \#notif-ntfy-generovat
+
+    # v3.33 RF fix (21. 8. 2026): účet může už mít téma z dřívějška
+    # (kanál vypnutí téma nemaže, viz apiVygenerovatNtfyTema_) – test
+    # proto nesmí předpokládat konkrétní podstav, jen klikne na to
+    # tlačítko, které je zrovna zobrazené (generovat, nebo rotovat).
+    ${ma_tema}=    Get Style    ${FRAME} \#notif-ntfy-s-tematem    display
+    IF    "${ma_tema}" != "none"
+        ${odkaz_pred}=    Get Attribute    ${FRAME} \#notif-ntfy-odkaz    href
+        Click    ${FRAME} \#notif-ntfy-rotovat
+    ELSE
+        ${odkaz_pred}=    Set Variable    ${EMPTY}
+        Wait For Elements State    ${FRAME} \#notif-ntfy-bez-tematu    visible    timeout=3s
+        Click    ${FRAME} \#notif-ntfy-generovat
+    END
+    # v3.33 RF fix (21. 8. 2026): oba tlačítka se disablují/re-enablují
+    # SPOLEČNĚ v témže try/finally (viz vygenerovatNtfyTema_ v Index.html),
+    # bez ohledu na to, které z nich spustilo volání – čekání na
+    # #notif-ntfy-rotovat:not([disabled]) je proto spolehlivý signál
+    # dokončení async volání v OBOU větvích, ne jen v té rotační. Dřívější
+    # verze čekala jen na viditelnost #notif-ntfy-s-tematem, což je
+    # v rotační větvi splněné OKAMŽITĚ (téma tam už bylo PŘED kliknutím) –
+    # test tak mohl projít i s ještě neproběhlým voláním na serveru
+    # (přesně tohle způsobilo rozdílnou hodnotu tématu mezi RF logem
+    # a ručním ověřením v Sheetu 21. 8. 2026).
+    Wait For Elements State    ${FRAME} \#notif-ntfy-rotovat:not([disabled])    visible    timeout=10s
     Wait For Elements State    ${FRAME} \#notif-ntfy-s-tematem    visible    timeout=10s
     ${odkaz}=    Get Attribute    ${FRAME} \#notif-ntfy-odkaz    href
     Should Contain    ${odkaz}    https://ntfy.sh/radar-
+    IF    "${odkaz_pred}" != "${EMPTY}"
+        Should Not Be Equal    ${odkaz}    ${odkaz_pred}
+        ...    msg=Rotace měla vygenerovat NOVÉ téma, ne zachovat staré (${odkaz_pred})
+    END
 
     Click    ${FRAME} \#filtry-ulozit
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=10s
