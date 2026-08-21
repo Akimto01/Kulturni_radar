@@ -554,6 +554,67 @@ Tlačítko Spustit kontrolu otevře token dialog (bez spuštění)
     Click    ${FRAME} \#token-cancel
     Wait For Elements State    ${FRAME} \#token-dialog.open    detached    timeout=5s
 
+Kontaktní formulář: prázdná zpráva zobrazí inline chybu (bez odeslání)
+    [Documentation]    v3.55 (testovací dluh, krok 2 auditu): prázdná
+    ...    zpráva se odchytí přímo v klientském handleru PŘED voláním
+    ...    serveru (viz Index.html, kontakt-odeslat listener) – žádný
+    ...    network request, nulové riziko, lze spouštět opakovaně.
+    Click    ${FRAME} \#kontakt-btn
+    Wait For Elements State    ${FRAME} \#kontakt-dialog.open    visible    timeout=5s
+    Fill Text    ${FRAME} \#kontakt-zprava    ${EMPTY}
+    Click    ${FRAME} \#kontakt-odeslat
+    Wait For Elements State    ${FRAME} \#kontakt-chyba    visible    timeout=3s
+    ${text}=    Get Text    ${FRAME} \#kontakt-chyba
+    Should Contain    ${text}    zprávu
+    ${otevreny}=    Get Element Count    ${FRAME} \#kontakt-dialog.open
+    Should Be Equal As Integers    ${otevreny}    1
+    ...    msg=Dialog nemá při prázdné zprávě zmizet
+    Click    ${FRAME} \#kontakt-zrusit
+    Wait For Elements State    ${FRAME} \#kontakt-dialog.open    detached    timeout=5s
+
+Odeslání kontaktního formuláře: úspěch, pak okamžité druhé odeslání selže na cooldown
+    [Documentation]    v3.55 (testovací dluh, krok 2 auditu): JEDINÝ test
+    ...    v sadě, co skutečně pošle reálný e-mail na KONTAKT_EMAIL
+    ...    (info@kulturniradar.cz) – proto spojený s ověřením cooldownu
+    ...    (KONTAKT_COOLDOWN_MS = 30 s, apiKontakt_ v kulturni_radar.gs)
+    ...    do JEDNOHO testu s dvěma rychle po sobě jdoucími odesláními,
+    ...    ať test pošle jen jeden e-mail a cooldown se ověří
+    ...    deterministicky (druhý klik proběhne v řádu ms po prvním,
+    ...    hluboko uvnitř 30s okna) – žádná časová závislost/flake.
+    ...    Zpráva má v textu jasný marker, ať je v poštovní schránce na
+    ...    první pohled zřejmé, že jde o automatizovaný test. E-mail pole
+    ...    záměrně prázdné (jde přes větev MailApp bez replyTo).
+    ...    Ruční rerun < 30 s od předchozího běhu tenhle test legitimně
+    ...    rozbije na prvním kroku (cooldown ještě neuplynul) – vědomě
+    ...    bez obcházení, viz schválený návrh 21. 8. 2026.
+    Click    ${FRAME} \#kontakt-btn
+    Wait For Elements State    ${FRAME} \#kontakt-dialog.open    visible    timeout=5s
+    Fill Text    ${FRAME} \#kontakt-jmeno    RF Test
+    Fill Text    ${FRAME} \#kontakt-zprava    Automaticky RF test (E2E) - kontaktni formular, bezpecne ignorovat.
+    Click    ${FRAME} \#kontakt-odeslat
+    Wait For Elements State    ${FRAME} \#kontakt-odeslat:not([disabled])    visible    timeout=15s
+    Wait For Elements State    ${FRAME} \#kontakt-chyba.uspech    visible    timeout=5s
+    ${text_uspech}=    Get Text    ${FRAME} \#kontakt-chyba
+    Should Contain    ${text_uspech}    Díky
+    Wait For Elements State    ${FRAME} \#kontakt-dialog.open    detached    timeout=3s
+
+    # Okamžité druhé odeslání – má narazit na 30s cooldown (globální
+    # Script Property KONTAKT_LAST_SENT, nastavená prvním odesláním výš).
+    Click    ${FRAME} \#kontakt-btn
+    Wait For Elements State    ${FRAME} \#kontakt-dialog.open    visible    timeout=5s
+    Fill Text    ${FRAME} \#kontakt-zprava    Automaticky RF test (E2E) - druhy pokus, ma selhat na cooldown.
+    Click    ${FRAME} \#kontakt-odeslat
+    Wait For Elements State    ${FRAME} \#kontakt-odeslat:not([disabled])    visible    timeout=15s
+    Wait For Elements State    ${FRAME} \#kontakt-chyba    visible    timeout=5s
+    ${text_cooldown}=    Get Text    ${FRAME} \#kontakt-chyba
+    Should Contain    ${text_cooldown}    půl minuty
+    ...    msg=Druhé odeslání do 30s má selhat na cooldown, ne projít znovu
+    ${ma_uspech}=    Get Element Count    ${FRAME} \#kontakt-chyba.uspech
+    Should Be Equal As Integers    ${ma_uspech}    0
+    ...    msg=Cooldown chyba nemá mít třídu .uspech
+    Click    ${FRAME} \#kontakt-zrusit
+    Wait For Elements State    ${FRAME} \#kontakt-dialog.open    detached    timeout=5s
+
 # ── v3.43: RF pokrytí redesignu (fáze 1–3, v3.31–v3.42) ─────────────────
 # M) smoke testy, N) klíčové interakce střední úrovně. Záměrně BEZ testů
 # na přesné pixelové zarovnání (bod K, sticky offsety) – viz BACKLOG.md,

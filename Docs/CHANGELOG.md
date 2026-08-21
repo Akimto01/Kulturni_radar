@@ -1,5 +1,15 @@
 # Changelog
 
+## RF testy (bez bump verze) — Kontaktní formulář: plný E2E cyklus + cooldown (testovací dluh, krok 2 auditu) — 21. 8. 2026
+### Přidáno
+- **„Kontaktní formulář: prázdná zpráva zobrazí inline chybu (bez odeslání)"** — ověřuje klientskou validaci (`kontakt-odeslat` handler v `Index.html`), která se vrací PŘED voláním serveru — žádný network request, nulové riziko, lze spouštět opakovaně.
+- **„Odeslání kontaktního formuláře: úspěch, pak okamžité druhé odeslání selže na cooldown"** — jediný test v sadě, co skutečně pošle e-mail na `KONTAKT_EMAIL` (info@kulturniradar.cz), spojený s ověřením 30s cooldownu (`KONTAKT_COOLDOWN_MS`, `apiKontakt_`) do JEDNOHO testu s dvěma rychle po sobě jdoucími odesláními — druhý klik proběhne v řádu ms po prvním, hluboko uvnitř 30s okna, takže cooldown se ověří deterministicky bez časové závislosti/flake a pošle se jen 1 e-mail za běh. Zpráva má v textu jasný marker („Automaticky RF test (E2E)..."), e-mail pole záměrně prázdné (jde přes větev `MailApp` bez `replyTo`).
+- Backend `apiKontakt_` byl už dřív plně pokrytý Node testy — tahle dvojice doplňuje chybějící E2E vrstvu (skutečný klik/formulář/DOM), ne logiku samotnou.
+### Poznámka k architektuře
+- Node testy beze změny (431) — žádná nová čistá logika, jen RF pokrytí existujícího, už otestovaného backendu.
+- Živě ověřeno proti `kulturniradar.cz`: celá sada 41/41 (39 předchozích + 2 nové). Reálné doručení e-mailu potvrzeno přímo v Gmailu (`info@kulturniradar.cz`) — 3 zprávy z ladění (vlastní `msg=` bug na `Wait For Elements State`, dokumentovaná gotcha ze SKILL.md, odhalený a opravený před odesláním k review), všechny s markerem, žádná se netvářila jako skutečný dotaz.
+- Žádný produkční kód se touhle změnou nedotkl (`Index.html`/`kulturni_radar.gs` beze změny) — jen `tests/robot/frontend.robot`, deploy proto nebyl potřeba.
+
 ## Index.html v3.55 — Fix: race condition v inicializovatMapu_() (testovací dluh #14-19) — 21. 8. 2026
 ### Opraveno
 - **`inicializovatMapuAzPripravena_()`** — nová obálka nad `inicializovatMapu_()`, řeší časový závod objevený při živém RF běhu proti produkci (21. 8. 2026): `inicializovatMapu_()` se volala hned po prvním `await api('meta')`, což za normálních okolností stačilo (Leaflet `<script>` je head-blocking bez `async`/`defer`), ale zrychlené odpovědi (cache) tenhle náhodný časový polštář odstranily a `L` občas ještě nebylo definované. Oprava čeká na `load`/`error` event `<script id="leaflet-script">` tagu, s timeoutem 5 s jako pojistkou pro skutečný výpadek CDN — appka i pak běží dál beze mapy (nezměněná filozofie „bonus, ne kritické"). `inicializovatMapu_()` samotná beze změny, mění se jen KDY se volá.
