@@ -73,6 +73,7 @@ změně BACKLOGu.
 ## Ke kontrole
 
 ## Testovací dluh
+- **Leaflet mapa/kalendář testy (#14-19) selhávají při testování přes syrový Apps Script `/exec` endpoint** (zjištěno 21. 8. 2026 při živém spuštění RF sady): sandboxFrame >>> userHtmlFrame — pravděpodobně CSP blokuje unpkg.com skript nebo timeout budget vyčerpán extra frame vrstvami. Default `SITE_URL` (kulturniradar.cz) tímhle problémem netrpí — jde o artefakt testovací cesty, ne produkční bug. K prošetření zvlášť, neblokující.
 - **RF pokrytí obsahu podkategorie-chipů** (nápad, 20. 8. 2026) — dnešní RF test pro `#podkat-chips` (v3.50) ověřuje jen strukturální chování (prázdný kontejner bez výběru hlavní kategorie), ne konkrétní obsah po výběru kategorie, protože produkční data v tuhle chvíli nemají žádnou platnou podkategorii (čekají na re-kontrolu AI s novým promptem, viz CHANGELOG.md). Až proběhne dost kontrol s novým promptem a produkční data budou mít reálné podkategorie, zvážit rozšíření testu o ověření, že klik na konkrétní podkategorie-chip skutečně zúží seznam karet.
 - RF test na opakované přepnutí profilu v dropdownu — regresní pojistka na bug v3.12 (#status mizel z DOM).
 - RF test na opakované spuštění zpracovatSledovanaMesta — regresní pojistka na bug v3.18 (chybějící skip logika).
