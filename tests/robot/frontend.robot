@@ -235,6 +235,35 @@ Přepínač profilů je naplněn z meta API
     ${pocet}=    Get Element Count    ${FRAME} \#profil-select option
     Should Be True    ${pocet} >= 1    Select má mít aspoň jeden profil
 
+Opakované přepnutí profilu v dropdownu nerozbije appku (regrese v3.12)
+    [Documentation]    v3.56 (testovací dluh, krok 1 auditu): statický
+    ...    #status se mazal z DOM při prvním úspěšném vykreslení
+    ...    (renderAkce() čistí #main) – každé DALŠÍ volání nactiAkce
+    ...    (přepnutí profilu) narazilo na getElementById('status')
+    ...    vracející null a tiše spadlo PŘED try blokem (nepřevzatý
+    ...    async reject, žádná viditelná chyba) – appka na druhé a další
+    ...    přepnutí přestala reagovat. Oprava (5. 8. 2026): zobrazitStatus_
+    ...    element znovu vytvoří, pokud chybí. Test přepne postupně přes
+    ...    3 různé profily (bug se projevil až na DRUHÉM a dalším volání)
+    ...    – Wait For Elements State po KAŽDÉM přepnutí je přímý regresní
+    ...    signál: pokud by se bug vrátil, druhé/třetí přepnutí by
+    ...    timeoutovalo (karty by se nikdy nepřekreslily).
+    ${pocet_profilu}=    Get Element Count    ${FRAME} \#profil-select option
+    IF    ${pocet_profilu} < 3
+        Log    Méně než 3 profily k dispozici – test nemá co ověřit v tomto běhu.    level=WARN
+    ELSE
+        ${puvodni}=    Get Property    ${FRAME} \#profil-select    value
+        FOR    ${i}    IN RANGE    3
+            ${hodnota}=    Get Attribute    ${FRAME} \#profil-select option >> nth=${i}    value
+            Select Options By    ${FRAME} \#profil-select    value    ${hodnota}
+            Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=10s
+        END
+        # Vrátit sdílenou stránku na původní profil, ať navazující testy
+        # v sadě nezůstanou na jiném profilu, než čekají.
+        Select Options By    ${FRAME} \#profil-select    value    ${puvodni}
+        Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=10s
+    END
+
 Chipy kategorií se vykreslily
     ${pocet}=    Get Element Count    ${FRAME} .chip
     Should Be True    ${pocet} >= 4    Vše + aspoň 3 kategorie z KRITÉRIÍ
@@ -315,6 +344,43 @@ Druhá úroveň filtru (podkategorie) se zobrazí a zase skryje podle hlavní ka
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
     ${po}=    Get Element Count    ${FRAME} \#podkat-chips .chip
     Should Be Equal As Integers    ${po}    0    msg=Po návratu na Vše se podkategorie-chipy zase vyprázdní
+
+Klik na podkategorii-chip skutečně zúží seznam karet
+    [Documentation]    v3.56 (testovací dluh, krok 3 auditu): test výš
+    ...    ověřuje jen strukturální chování #podkat-chips (prázdný/plný
+    ...    kontejner), ne že klik na konkrétní podkategorii skutečně
+    ...    zúží seznam karet – dřív produkční data neměla žádnou platnou
+    ...    podkategorii (čekala na re-kontrolu AI s novým promptem).
+    ...    Ověřeno živě 21. 8. 2026 (?api=events): kategorie „festivaly"
+    ...    má 11 akcí, z toho jen 1 s podkategorií „dětský" – konkrétní,
+    ...    ověřitelné zúžení (ne triviální shoda, kdy by podkategorie
+    ...    pokrývala všechny akce kategorie stejně). Podmíněné (Log WARN
+    ...    skip) pro případ budoucí změny dat.
+    ${ma_festivaly}=    Get Element Count    ${FRAME} \#kat-chips .chip >> text=festivaly
+    IF    ${ma_festivaly} == 0
+        Log    Kategorie „festivaly" dnes v datech chybí – test nemá co ověřit v tomto běhu.    level=WARN
+    ELSE
+        Click    ${FRAME} \#kat-chips .chip >> text=festivaly
+        Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
+        ${pocet_festivaly}=    Get Element Count    ${FRAME} .karta
+        ${ma_detsky}=    Get Element Count    ${FRAME} \#podkat-chips .chip[data-kat="dětský"]
+        IF    ${ma_detsky} == 0
+            Log    Podkategorie „dětský" dnes v kategorii „festivaly" chybí – test nemá co ověřit v tomto běhu.    level=WARN
+        ELSE
+            Click    ${FRAME} \#podkat-chips .chip[data-kat="dětský"]
+            Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
+            ${pocet_zuzeny}=    Get Element Count    ${FRAME} .karta
+            Should Be True    ${pocet_zuzeny} < ${pocet_festivaly}
+            ...    Klik na podkategorii „dětský" měl zúžit seznam karet (${pocet_zuzeny} vs ${pocet_festivaly})
+            Click    ${FRAME} \#podkat-chips .chip[data-kat="dětský"]
+            Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
+            ${pocet_zpet}=    Get Element Count    ${FRAME} .karta
+            Should Be Equal As Integers    ${pocet_zpet}    ${pocet_festivaly}
+            ...    msg=Druhý klik (toggle off podkategorie) se měl vrátit na původní počet karet
+        END
+        Click    ${FRAME} \#kat-chips .chip >> text=Vše
+        Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
+    END
 
 Sekce stálých míst existuje
     Wait For Elements State    ${FRAME} \#mista-sekce .misto-karta >> nth=0    visible    timeout=15s

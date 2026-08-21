@@ -1,5 +1,18 @@
 # Changelog
 
+## Testy (bez bump verze) — 3 zbývající regresní testy testovacího dluhu + dokumentace flaky testů — 21. 8. 2026
+### Přidáno
+- **RF: „Opakované přepnutí profilu v dropdownu nerozbije appku"** — regresní pojistka na bug v3.12 (statický `#status` se mazal z DOM po prvním úspěšném vykreslení, každé DALŠÍ volání `nactiAkce` po přepnutí profilu tak tiše spadlo PŘED try blokem). Přepne postupně přes 3 různé profily, `Wait For Elements State .karta` po každém přepnutí je přímý regresní signál — kdyby se bug vrátil, druhé/třetí přepnutí by timeoutovalo. Na konci vrátí sdílenou stránku na původní profil.
+- **Node: „zpracovatSledovanaMesta – přeskočí dnes už zpracované město"** — regresní pojistka na bug v3.18 (chybějící skip logika, opakované spuštění vždy začínalo od začátku seznamu měst). Na rozdíl od existujících 4 testů na `jeDnesJizZpracovano_` (čistá logika) tenhle testuje WIRING celého orchestrátoru — stub 2 měst (jedno „dnes zpracované", jedno ne), ověří že se AI zavolá jen pro nezpracované. Ověřeno i negativně: dočasné vypnutí skip-checku v `.gs` test korektně rozbilo (2 volání místo 1), pak vráceno zpět.
+- **RF: „Klik na podkategorii-chip skutečně zúží seznam karet"** — dosavadní RF pokrytí `#podkat-chips` ověřovalo jen strukturální chování (prázdný/plný kontejner), ne že klik na konkrétní podkategorii seznam skutečně zúží — produkční data dřív žádnou platnou podkategorii neměla. Živě ověřeno 21. 8. 2026 (`?api=events`): kategorie „festivaly" má 11 akcí, jen 1 s podkategorií „dětský" — konkrétní, ověřitelné zúžení. Podmíněné (Log WARN skip) pro budoucí změnu dat.
+- **`tests/unit.test.js`: `MemSheet.getDataRange()`** — nový helper, `readSources_`/ZDROJE dřív nebylo přes test harness vůbec testovatelné.
+- **`SKILL.md` (obě kopie): nová sekce 8 „Flaky testy — obecný princip a náš případ"** — obecná část (co je flaky test, kategorie příčin, proč jsou zákeřné, jak se s nimi správně zachází) + zdokumentovaný dnešní případ (proměnlivá nestabilita RF sady po desítkách živých běhů v jedné session, diagnóza kumulativní zátěže Apps Script, ne regrese — viz BACKLOG.md).
+### Poznámka k architektuře
+- Node testy 437 (beze změny od minulého záznamu, tenhle bod jen dokumentuje krok 2 regresního testu samostatně).
+- Živě ověřeno: oba nové RF testy prošly spolehlivě ve všech bězích (izolovaně i ve 4 plných bězích celé sady, včetně jednoho s proměnlivou nestabilitou zbytku sady nesouvisející s touhle prací — viz `SKILL.md` sekce 8 a `BACKLOG.md`).
+- Tímhle je **testovací dluh po redesignu kompletně uzavřen** — všech 5 kroků auditu (notifikace, kontaktní formulář, kalendář, responzivní pásma, mapové piny) + tyhle 3 dodatečné regresní testy (profil, sledovaná města, podkategorie).
+- Žádný produkční kód se touhle změnou nedotkl, deploy nebyl potřeba.
+
 ## Index.html v3.56 (část 2/2) — Refaktor sestavPopupMapy_/sestavPopupDataMapy_ + testy (testovací dluh, krok 5 auditu — POSLEDNÍ) — 21. 8. 2026
 ### Přidáno
 - **`sestavPopupDataMapy_(akce)`** (PURE) — extrahuje obsahová data popupu mapy (`{nazev, id}` na akci) z `sestavPopupMapy_`, oddělené od DOM stavby, stejný princip jako `sestavBlokyAkci_` u notifikací (krok C). `sestavPopupMapy_` je teď tenký DOM wrapper, který jen volá tuhle čistou funkci a staví DOM podle jejího výstupu — výsledná DOM struktura beze změny (mechanická extrakce, ne přepis chování).

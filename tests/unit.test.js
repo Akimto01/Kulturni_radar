@@ -1306,6 +1306,49 @@ test('jeDnesJizZpracovano_: přesně půlnoc dneška se počítá jako dnešek (
   assert.equal(r.jeDnesJizZpracovano_('5. 8. 2026 0:00', dnes), true);
 });
 
+/** "Dnes" v českém formátu "d. M. yyyy" (jeDnesJizZpracovano_/parseCzDate_
+ *  regex akceptuje 1-2místné den/měsíc bez nutnosti nul navíc) –
+ *  zpracovatSledovanaMesta nemá injektované "dnes" (stejně jako
+ *  sendUserNotifications_), používá reálné new Date(). */
+function dnesCz_() {
+  const d = new Date();
+  return d.getDate() + '. ' + (d.getMonth() + 1) + '. ' + d.getFullYear();
+}
+
+test('v3.56 (testovací dluh, krok 2 auditu): zpracovatSledovanaMesta – přeskočí dnes už zpracované město, AI se zavolá jen pro nezpracované', () => {
+  // Regresní test na WIRING orchestrátoru (ne jen na jeDnesJizZpracovano_
+  // samotné výš) – i kdyby se pure funkce kdykoli v budoucnu porouchala
+  // jinak, tenhle test ověřuje, že se skip logika ve smyčce SKUTEČNĚ volá
+  // a ovlivňuje, jestli se AI zavolá, ne jen že existuje.
+  const volaneUrl = [];
+  const ctx = nactiRadar({
+    properties: { ANTHROPIC_API_KEY: 'test-key' },
+    urlFetch: frontaFetchu([anthropicResp({
+      stop_reason: 'tool_use',
+      content: [{ type: 'tool_use', name: 'report_events', input: { events: [] } }],
+    })], volaneUrl),
+  });
+  ctx.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) };
+
+  const ss = fakeSpreadsheet({
+    'KRITÉRIA': fakeKriteria_({ B2: 'Brno', B3: '90 min', B4: '2', B5: 'vše', B6: 'ano', B7: 'ano' }),
+    'SLEDOVANÁ MĚSTA': new MemSheet([['Město'], ['Praha'], ['Ostrava']]),
+    // Praha: sloupec H (poslední kontrola) = dnešek → má se PŘESKOČIT.
+    // Ostrava: sloupec H prázdný → nikdy nezpracována → má se ZPRACOVAT.
+    LOKALITY: new MemSheet([
+      [], ['id1', 'Praha', '', '', '', '', '', dnesCz_()], ['id2', 'Ostrava', '', '', '', '', '', ''],
+    ]),
+    ZDROJE: new MemSheet([['Název', 'URL', 'Profil', 'Priorita']]),   // jen hlavička → readSources_ vrátí []
+    AKCE: new MemSheet([[]]),
+    KONTROLY: new MemSheet([[]]),
+  });
+  ctx.SpreadsheetApp.getActiveSpreadsheet = () => ss;
+
+  ctx.zpracovatSledovanaMesta();
+
+  assert.equal(volaneUrl.length, 1, 'AI se má zavolat přesně jednou (jen pro Ostravu, ne pro Prahu)');
+});
+
 // ---------------------------------------------------------------------------
 // v3.19: Víkendové tipy – volitelný druhý příjemce (NOTIFY_EMAIL_VIKEND)
 // ---------------------------------------------------------------------------
@@ -2205,6 +2248,8 @@ class MemSheet {
   }
   appendRow(vals) { this.rows.push(vals.slice()); }
   setFrozenRows() {}
+  // v3.56: getDataRange (readSources_/ZDROJE – dřív nikdy testováno).
+  getDataRange() { return { getValues: () => this.rows.map(r => r.slice()) }; }
 }
 
 function fakeSpreadsheet(pocatecni) {

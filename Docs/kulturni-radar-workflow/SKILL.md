@@ -488,3 +488,64 @@ RF testy tohle omezení nemají (vlastní `New Context` s `viewport`
 parametrem, viz sekce M/N testů v `tests/robot/frontend.robot`) a
 fungují spolehlivě.
 
+## 8. Flaky testy — obecný princip a náš případ (21. 8. 2026)
+
+### Co je flaky test
+Test, který na STEJNÉM kódu a STEJNÉM vstupu jednou projde a podruhé
+selže, aniž by se testovaný kód mezitím jakkoli změnil. Liší se od
+běžného pádu právě tímhle — deterministický bug spadne pokaždé stejně,
+flaky test je nespolehlivý sám o sobě, nezávisle na tom, jestli je kód
+v pořádku.
+
+### Hlavní kategorie příčin
+- **Časování/race conditions** — test nečeká na správný signál dokončení
+  (viz i vlastní historie tohohle projektu: race condition v
+  `inicializovatMapu_()`, self-cancel bug v `zvyraznitAkci_`).
+- **Sdílený/měnící se stav** — víc testů čte/zapisuje stejná data
+  (produkční Sheet, sdílený testovací účet), pořadí běhu ovlivňuje
+  výsledek.
+- **Vnější závislosti pod zátěží** — síť, backend API (typicky Apps
+  Script), třetí strana — reagují pomaleji nebo nespolehlivě při
+  vysokém zatížení, ne kvůli chybě v testovaném kódu.
+- **Pořadí testů/vedlejší efekty** — test A nechá stav, který ovlivní
+  test B, aniž by to bylo zjevné z kódu testu B samotného.
+- **Konkurence/paralelismus** — souběžné operace, které se dřív
+  nekřížily, začnou kolidovat.
+
+### Proč jsou zákeřné
+Podkopávají důvěru v celou testovací sadu ("zase to spadlo, asi nic") —
+riziko, že se přehlédne SKUTEČNÁ regrese schovaná mezi šumem. Navíc se
+špatně reprodukují na požádání: přesně to, co je dělá neškodnými pro
+kód, je dělá těžko prokazatelnými.
+
+### Jak se s nimi správně zachází
+- **Nikdy automaticky nepředpokládat "je to jen flake"** — nejdřív
+  diagnostikovat (izolovaný rerun, trasování, u zápisových testů i
+  přímé ověření dat), teprve pak uzavřít jako flake nebo jako reálný bug.
+- **Ověřit dopad na DATA, ne jen na testovací výstup** — hlavně u
+  zápisových testů: selhání uprostřed zápisu může nechat sdílený účet
+  v nekonzistentním stavu, i když samotný test "jen" timeoutnul.
+- **Hledat vzorec napříč víc pokusy** — mění se pokaždé JINÁ sada
+  selhávajících testů (ukazuje na vnější zátěž/timing), nebo padá
+  VŽDY ten samý test na tom samém místě (ukazuje spíš na reálný bug)?
+
+### Náš konkrétní případ (21. 8. 2026)
+- **Kontext**: desítky živých RF běhů proti produkci během jedné dlouhé
+  session (audit testovacího dluhu, kroky 1–5).
+- **Pozorování**: 3–4 plné běhy sady (50 testů) v řadě, pokaždé jiný
+  počet a skladba selhání (45/4, 45/4 s jinou 4. položkou, 44/5).
+- **Konzistentně postižené**: `★ Oblíbené`, `✓ Navštívené`, `Označení ★`
+  — vždy timeout na ULOŽENÍ. Jediný společný znak: jsou to jediné
+  zápisové testy v celé sadě.
+- **Diagnóza**: kumulativní zátěž Apps Script platformy po desítkách
+  živých běhů za sebou — NE regrese v kódu.
+- **Ověření**: cílená izolovaná reprodukce přesně postižené pětice
+  testů proběhla čistě, 5/5.
+- **Write-safety důsledek**: po každém běhu s tímhle problémem bylo
+  nutné ověřit skutečný stav dat (ne předpokládat "nic se nestalo") —
+  nalezen `rf-test` se zaseknutou hvězdou 2×, oba případy ručně
+  uklizeny a ověřeny ze serveru (reload+login).
+- **Poučení pro budoucnost**: při rozsáhlém RF testování v jedné
+  session počítat s tímhle typem nestability u zápisových testů,
+  nepanikařit, diagnostikovat izolovanou reprodukci PŘED závěrem
+  "regrese".
