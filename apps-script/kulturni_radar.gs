@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.31 (21. 8. 2026) – Notifikace: obsah „podle kategorií" (krok C)
- * (předchozí: 3.30 – Notifikace: datový model + backend API, kroky A–B)
+ * Verze: 3.32 (21. 8. 2026) – Notifikace: trigger + odesílací smyčka + dry-run (krok D)
+ * (předchozí: 3.31 – Notifikace: obsah „podle kategorií", krok C)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -68,7 +68,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.31';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.32';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -532,6 +532,7 @@ function onOpen() {
     .addItem('Označit proběhlé akce', 'markPastEvents')
     .addItem('Odstranit duplicity', 'cleanupDuplicates')
     .addItem('Test notifikací', 'testNtfy')
+    .addItem('Notifikace: suchý běh (test)', 'sendUserNotificationsDryRun_')
     .addSeparator()
     .addItem('Týdenní přehled teď', 'weeklyDigest')
     .addItem('Víkendové tipy teď', 'weekendDigest')
@@ -628,6 +629,15 @@ function setupTriggers() {
     .everyDays(1)
     .create();
 
+  // v3.32: notifikace krok D – PO dailyCheck (8:00), ať jsou data v AKCE
+  // čerstvá pro digestProUzivatele_ (stejný princip jako sledovaná města
+  // před weeklyDigest/weekendDigest níže).
+  ScriptApp.newTrigger('sendUserNotifications')
+    .timeBased()
+    .atHour(9)
+    .everyDays(1)
+    .create();
+
   ScriptApp.newTrigger('weeklyDigest')
     .timeBased()
     .onWeekDay(ScriptApp.WeekDay.MONDAY)
@@ -674,7 +684,7 @@ function setupTriggers() {
     .atHour(10)
     .create();
 
-  Logger.log('Triggery vytvořeny: onEdit + denní 8:00 + pondělní přehled 7:00 + čtvrteční tipy 16:00 + měsíční místa + nedělní samotest 18:00 + denní watchdog 20:00 + sledovaná města (neděle 20:00, čtvrtek 10:00).');
+  Logger.log('Triggery vytvořeny: onEdit + denní 8:00 + notifikace uživatelů 9:00 + pondělní přehled 7:00 + čtvrteční tipy 16:00 + měsíční místa + nedělní samotest 18:00 + denní watchdog 20:00 + sledovaná města (neděle 20:00, čtvrtek 10:00).');
 }
 
 /** Instalovatelný onEdit – reaguje jen na zaškrtnutí KRITÉRIA!B11. */
@@ -1512,7 +1522,10 @@ function apiSetFiltry_(ss, uzivatelId, filtryObj) {
 //     ntfyTema: 'radar-<hex>',    // vyžadováno, pokud 'ntfy' v kanaly – NIKDY
 //                                 // nepřichází od klienta (viz apiSetNotifikace_
 //                                 // níže), jen z apiVygenerovatNtfyTema_
-//     frekvenceDny: 7,            // 1–90, jak často (dny mezi odesláními)
+//     frekvenceDny: 7,            // 1–30 (v3.32: sníženo z 1–90 – okno
+//                                 // obsahu nikdy nepokryje víc než ~30 dní,
+//                                 // delší frekvence by tiše nechávala mezery
+//                                 // mezi okny, viz digestProUzivatele_/D)
 //     obsah: ['kategorie'],       // podmnožina POVOLENY_OBSAH_ (zatím jen
 //                                 // 'kategorie' – 'doporuceni' vědomě odloženo,
 //                                 // viz BACKLOG.md, vyžaduje port spocitatDoporuceni_
@@ -1541,8 +1554,8 @@ function validovatNotifikace_(n) {
     return { ok: false, error: 'kanál ntfy vyžaduje nejdřív vygenerované téma (naskenuj QR v appce)' };
   }
   const frekvence = Number(n.frekvenceDny) || 0;
-  if (frekvence < 1 || frekvence > 90) {
-    return { ok: false, error: 'frekvence musí být 1–90 dní' };
+  if (frekvence < 1 || frekvence > 30) {
+    return { ok: false, error: 'frekvence musí být 1–30 dní' };
   }
   return { ok: true };
 }
@@ -1604,6 +1617,122 @@ function apiVygenerovatNtfyTema_(ss, uzivatelId) {
   stavajici.ntfyTema = novaNtfyTema_();
   sh.getRange(idx + 2, 6).setValue(JSON.stringify(stavajici));
   return { ok: true, ntfyTema: stavajici.ntfyTema };
+}
+
+// ---------------------------------------------------------------------------
+// v3.32: NOTIFIKACE krok D – denní odesílací smyčka. Trigger sendUserNotifications
+// (registrovaný v setupTriggers, 9:00 denně, po dailyCheck v 8:00) volá
+// sendUserNotifications_(false); manuální suchý běh jde spustit z menu Sheets
+// (sendUserNotificationsDryRun_ → sendUserNotifications_(true)).
+// ---------------------------------------------------------------------------
+
+/** PURE: true, pokud je uživatel dnes "due" na notifikaci podle frekvence.
+ *  Prázdné posledniOdeslano ('') = nikdy neodesláno = due okamžitě.
+ *  `dnes` injektované pro testovatelnost (stejný vzor jako
+ *  filtrovatNavstivenaPodleObdobi_/jeNeoverenaBezUrl_ na frontendu). */
+function jeDueNaNotifikaci_(notifikace, dnes) {
+  if (!notifikace.posledniOdeslano) return true;
+  const posledni = new Date(notifikace.posledniOdeslano);   // ISO 8601 string
+  const dnyOdPoslednu = Math.floor((dnes.getTime() - posledni.getTime()) / 86400000);
+  return dnyOdPoslednu >= (Number(notifikace.frekvenceDny) || 0);
+}
+
+/** PURE: rozhodne, jestli uživatel dnes dostane notifikaci – kombinuje tři
+ *  přeskakovací podmínky (vypnuté kanály, obsah bez podporovaného typu,
+ *  ještě není čas) do jednoho { posli, duvod } rozhodnutí. NEŘEŠÍ sestavení
+ *  obsahu (digestProUzivatele_, krok C) ani odeslání (sendUserNotifications_
+ *  níže) – jen čistou logiku "má se dnes něco dít", testovatelnou bez
+ *  Sheets. Obsah 'doporuceni' (krok G) zatím není podporovaný – viz
+ *  BACKLOG.md, POVOLENY_OBSAH_ zatím obsahuje jen 'kategorie'. */
+function planNotifikaceUzivatele_(notifikace, dnes) {
+  const kanaly = notifikace.kanaly || [];
+  if (!kanaly.length) return { posli: false, duvod: 'notifikace vypnuté (žádné kanály)' };
+  const obsah = notifikace.obsah || [];
+  if (obsah.indexOf('kategorie') === -1) return { posli: false, duvod: 'obsah "kategorie" není zapnutý' };
+  if (!jeDueNaNotifikaci_(notifikace, dnes)) return { posli: false, duvod: 'ještě není čas (frekvence)' };
+  return { posli: true, duvod: null };
+}
+
+/** Denní odesílací smyčka (krok D). Pro KAŽDÉHO uživatele: rozhodne
+ *  (planNotifikaceUzivatele_), pokud má dnes dostat notifikaci sestaví
+ *  obsah (digestProUzivatele_, krok C – jen čte ověřená data, žádné volání
+ *  Anthropic API) a odešle na JEHO OSOBNÍ kanál (odeslatNotifikaci_,
+ *  sdíleno se sendNotification_). Okno obsahu = dnes až dnes+frekvenceDny
+ *  (validace v3.32 garantuje frekvenceDny <= 30, žádný další strop
+ *  potřeba). `dryRun=true`: NEODESÍLÁ, NEZAPISUJE posledniOdeslano, jen
+ *  Logger.log co by se stalo – ověřitelné ručně z editoru (menu „Notifikace:
+ *  suchý běh"). Vrací pole { uzivatelId, jmeno, posli, duvod, pocetAkci }
+ *  pro KAŽDÉHO uživatele (i přeskočené), ať jde ověřit Node testy bez
+ *  čtení Logger výstupu. */
+function sendUserNotifications_(dryRun) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const dnes = new Date();
+  const vysledky = [];
+
+  readUzivatele_(ss).forEach(u => {
+    let notifikace = {};
+    try { notifikace = u.notifikace ? JSON.parse(u.notifikace) : {}; } catch (e) { notifikace = {}; }
+
+    const plan = planNotifikaceUzivatele_(notifikace, dnes);
+    if (!plan.posli) {
+      Logger.log('Notifikace ' + u.jmeno + ': přeskočeno – ' + plan.duvod);
+      vysledky.push({ uzivatelId: u.id, jmeno: u.jmeno, posli: false, duvod: plan.duvod, pocetAkci: 0 });
+      return;
+    }
+
+    const from = new Date(dnes); from.setHours(0, 0, 0, 0);
+    const to = new Date(from.getTime() + (Number(notifikace.frekvenceDny) || 1) * 86400000);
+    const obsah = digestProUzivatele_(ss, u.id, from, to);
+    if (!obsah.ok) {
+      Logger.log('Notifikace ' + u.jmeno + ': přeskočeno – ' + obsah.error);
+      vysledky.push({ uzivatelId: u.id, jmeno: u.jmeno, posli: false, duvod: obsah.error, pocetAkci: 0 });
+      return;
+    }
+
+    if (dryRun) {
+      Logger.log('[SUCHÝ BĚH] Notifikace ' + u.jmeno + ' (' + notifikace.kanaly.join('+') + '): ' +
+        obsah.pocetAkci + ' akcí, NEODESLÁNO.');
+      vysledky.push({ uzivatelId: u.id, jmeno: u.jmeno, posli: true, duvod: null, pocetAkci: obsah.pocetAkci });
+      return;
+    }
+
+    const topic = notifikace.kanaly.indexOf('ntfy') !== -1 ? notifikace.ntfyTema : '';
+    const email = notifikace.kanaly.indexOf('email') !== -1 ? notifikace.email : '';
+    odeslatNotifikaci_('Tvůj přehled akcí', obsah.text, obsah.html, topic, email);
+
+    const sh = ensureUzivateleSheet_(ss);
+    const data = readUzivatele_(ss);
+    const idx = data.findIndex(x => x.id === u.id);
+    if (idx >= 0) {
+      const aktualni = Object.assign({}, notifikace, { posledniOdeslano: dnes.toISOString() });
+      sh.getRange(idx + 2, 6).setValue(JSON.stringify(aktualni));
+    }
+
+    Logger.log('Notifikace ' + u.jmeno + ' odeslána (' + notifikace.kanaly.join('+') + '), ' + obsah.pocetAkci + ' akcí.');
+    vysledky.push({ uzivatelId: u.id, jmeno: u.jmeno, posli: true, duvod: null, pocetAkci: obsah.pocetAkci });
+  });
+
+  return vysledky;
+}
+
+/** Trigger cíl (time-based, viz setupTriggers) – no-arg wrapper, stejný
+ *  vzor jako menuRunNow/dailyCheck. */
+function sendUserNotifications() {
+  sendUserNotifications_(false);
+}
+
+/** Ruční suchý běh z menu Sheets – nic neodešle, jen zaloguje a zobrazí
+ *  souhrn v alertu (View → Executions by fungovalo taky, ale alert je
+ *  rychlejší k ověření bez otevírání logu). getUi() funguje jen v UI
+ *  kontextu (menu klik), proto je to samostatná funkce, ne parametr
+ *  sdílený s time-based triggerem sendUserNotifications() výš. */
+function sendUserNotificationsDryRun_() {
+  const vysledky = sendUserNotifications_(true);
+  const radky = vysledky.map(v => v.jmeno + ': ' +
+    (v.posli ? ('POSLALO BY SE (' + v.pocetAkci + ' akcí)') : ('přeskočeno – ' + v.duvod)));
+  const posli = vysledky.filter(v => v.posli).length;
+  SpreadsheetApp.getUi().alert('Suchý běh notifikací (nic se neodeslalo)\n\n' + radky.join('\n') +
+    '\n\nCelkem by se poslalo: ' + posli + ' / ' + vysledky.length);
 }
 
 // ---------------------------------------------------------------------------
@@ -3111,11 +3240,15 @@ function spojitPrijemce_(zakladni, extra) {
   return [...new Set(adresy)].join(',');
 }
 
-function sendNotification_(title, body, htmlBody, extraEmail) {
-  const props = PropertiesService.getScriptProperties();
-  const topic = props.getProperty('NTFY_TOPIC');
-  const email = spojitPrijemce_(props.getProperty('NOTIFY_EMAIL'), extraEmail);
-
+/** Nízkoúrovňové odeslání na EXPLICITNÍ příjemce (ntfy téma + e-mail) –
+ *  žádné čtení Script Properties, jen mechanika odeslání (ntfy e-mailová
+ *  brána včetně zkracování dlouhých těl, MailApp pro e-mail). Sdíleno mezi
+ *  sendNotification_ (family-wide, čte NOTIFY_EMAIL/NTFY_TOPIC) a
+ *  sendUserNotifications_ (v3.32, krok D notifikací – adresuje konkrétního
+ *  uživatele jeho vlastním kanálem) – ať existuje jen JEDNA verze mechaniky
+ *  odeslání, ne dvě kopie. Prázdný topic/email = ten kanál se přeskočí
+ *  (žádná chyba – volající řídí, které kanály jsou pro příjemce aktivní). */
+function odeslatNotifikaci_(title, body, htmlBody, topic, email) {
   if (topic) {
     // ntfy.sh omezuje HTTP publikování podle IP odesílatele a sdílené IP Google
     // serverů mají kvótu trvale vyčerpanou (429). E-mailová brána ntfy-<topic>@ntfy.sh
@@ -3151,6 +3284,18 @@ function sendNotification_(title, body, htmlBody, extraEmail) {
     } catch (e) { Logger.log('e-mail selhal: ' + e); }
   }
   Logger.log(title + '\n' + body);
+}
+
+/** Family-wide notifikace (denní/týdenní/víkendové reporty) – tenký wrapper
+ *  nad odeslatNotifikaci_, čte příjemce z globálních Script Properties
+ *  (NOTIFY_EMAIL/NTFY_TOPIC). v3.32: mechanika odeslání extrahována do
+ *  odeslatNotifikaci_ (sdíleno s per-user notifikacemi), beze změny
+ *  chování – viz regresní test. */
+function sendNotification_(title, body, htmlBody, extraEmail) {
+  const props = PropertiesService.getScriptProperties();
+  const topic = props.getProperty('NTFY_TOPIC');
+  const email = spojitPrijemce_(props.getProperty('NOTIFY_EMAIL'), extraEmail);
+  odeslatNotifikaci_(title, body, htmlBody, topic, email);
 }
 
 // ---------------------------------------------------------------------------

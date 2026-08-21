@@ -1650,11 +1650,11 @@ test('v3.30: validovatNotifikace_ – kanál ntfy vyžaduje už vygenerované t�
   assert.equal(ok.ok, true);
 });
 
-test('v3.30: validovatNotifikace_ – frekvence mimo rozsah 1–90 dní se odmítne', () => {
+test('v3.32: validovatNotifikace_ – frekvence mimo rozsah 1–30 dní se odmítne (sníženo z 1–90, viz krok D)', () => {
   assert.equal(r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: 'x', frekvenceDny: 0 }).ok, false);
-  assert.equal(r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: 'x', frekvenceDny: 91 }).ok, false);
+  assert.equal(r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: 'x', frekvenceDny: 31 }).ok, false);
   assert.equal(r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: 'x', frekvenceDny: 1 }).ok, true);
-  assert.equal(r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: 'x', frekvenceDny: 90 }).ok, true);
+  assert.equal(r.validovatNotifikace_({ kanaly: ['ntfy'], ntfyTema: 'x', frekvenceDny: 30 }).ok, true);
 });
 
 test('v3.30: novaNtfyTema_ – formát "radar-" + 32 hex znaků, dvě volání dají různá témata', () => {
@@ -1884,6 +1884,130 @@ test('v3.31: digestRange_ po extrakci sestavBlokyAkci_ – REGRESE: stejný obsa
   assert.ok(mail.telo.endsWith('Kompletní přehled: https://sheet.example/test'));
   assert.ok(mail.options.htmlBody.includes('<strong>Divadlo</strong>'));
   assert.ok(mail.options.htmlBody.includes('<strong>Koncerty</strong>'));
+});
+
+// ---------------------------------------------------------------------------
+// v3.32: NOTIFIKACE krok D – jeDueNaNotifikaci_/planNotifikaceUzivatele_
+// (čistá logika, pevná data) + sendUserNotifications_ (orchestrátor,
+// odeslatNotifikaci_ regrese už pokrytá existujícími sendNotification_
+// testy výš – po extrakci beze změny chování, 412/412 beze změny).
+// ---------------------------------------------------------------------------
+
+const DNES_D = new Date(2026, 7, 21);   // "dnes" pro pevné testy kroku D
+
+test('v3.32: jeDueNaNotifikaci_ – prázdné posledniOdeslano = due okamžitě', () => {
+  assert.equal(r.jeDueNaNotifikaci_({ posledniOdeslano: '', frekvenceDny: 30 }, DNES_D), true);
+});
+
+test('v3.32: jeDueNaNotifikaci_ – dost starý posledniOdeslano (>= frekvence) = due', () => {
+  const pred7dny = new Date(DNES_D.getTime() - 7 * 86400000).toISOString();
+  assert.equal(r.jeDueNaNotifikaci_({ posledniOdeslano: pred7dny, frekvenceDny: 7 }, DNES_D), true);
+});
+
+test('v3.32: jeDueNaNotifikaci_ – nedávný posledniOdeslano (< frekvence) = ještě ne', () => {
+  const pred1dnem = new Date(DNES_D.getTime() - 1 * 86400000).toISOString();
+  assert.equal(r.jeDueNaNotifikaci_({ posledniOdeslano: pred1dnem, frekvenceDny: 7 }, DNES_D), false);
+});
+
+test('v3.32: planNotifikaceUzivatele_ – due + kanály + kategorie v obsah → posli:true', () => {
+  const plan = r.planNotifikaceUzivatele_(
+    { kanaly: ['email'], obsah: ['kategorie'], frekvenceDny: 7, posledniOdeslano: '' }, DNES_D);
+  assert.equal(plan.posli, true);
+  assert.equal(plan.duvod, null);
+});
+
+test('v3.32: planNotifikaceUzivatele_ – ještě není čas → posli:false, důvod zmiňuje frekvenci', () => {
+  const nedavno = new Date(DNES_D.getTime() - 1 * 86400000).toISOString();
+  const plan = r.planNotifikaceUzivatele_(
+    { kanaly: ['email'], obsah: ['kategorie'], frekvenceDny: 7, posledniOdeslano: nedavno }, DNES_D);
+  assert.equal(plan.posli, false);
+  assert.match(plan.duvod, /frekvence/);
+});
+
+test('v3.32: planNotifikaceUzivatele_ – prázdné kanály (vypnuto) → posli:false', () => {
+  const plan = r.planNotifikaceUzivatele_(
+    { kanaly: [], obsah: ['kategorie'], frekvenceDny: 7, posledniOdeslano: '' }, DNES_D);
+  assert.equal(plan.posli, false);
+  assert.match(plan.duvod, /kanál/);
+});
+
+test('v3.32: planNotifikaceUzivatele_ – obsah bez "kategorie" → posli:false', () => {
+  const plan = r.planNotifikaceUzivatele_(
+    { kanaly: ['email'], obsah: [], frekvenceDny: 7, posledniOdeslano: '' }, DNES_D);
+  assert.equal(plan.posli, false);
+  assert.match(plan.duvod, /obsah/);
+});
+
+/** notifikace JSON builder pro orchestrátor testy – frekvenceDny/posledniOdeslano
+ *  relativní ke skutečnému `new Date()` (sendUserNotifications_ nemá injektované
+ *  "dnes", na rozdíl od jeDueNaNotifikaci_/planNotifikaceUzivatele_ výš). */
+function notifikaceRadek_(kanaly, obsah, frekvenceDny, dniZpetPosledni, extra) {
+  const posledni = dniZpetPosledni == null ? '' : new Date(Date.now() - dniZpetPosledni * 86400000).toISOString();
+  return JSON.stringify(Object.assign({
+    kanaly, obsah, frekvenceDny, posledniOdeslano: posledni,
+    email: kanaly.indexOf('email') !== -1 ? 'uzivatel@example.com' : '',
+    ntfyTema: kanaly.indexOf('ntfy') !== -1 ? 'radar-test123' : '',
+  }, extra || {}));
+}
+
+function zitraDatum_() {
+  const d = new Date(); d.setDate(d.getDate() + 1);
+  return d.getDate() + '. ' + (d.getMonth() + 1) + '. ' + d.getFullYear();
+}
+
+test('v3.32: sendUserNotifications_ – due/not-due/prázdné kanály/obsah bez kategorie rozliší správně', () => {
+  const ctx = nactiRadar();
+  const ss = digestSs_(
+    [
+      ['due', 'Due', 'h', '{}', '', notifikaceRadek_(['email'], ['kategorie'], 7, null)],
+      ['notdue', 'NotDue', 'h', '{}', '', notifikaceRadek_(['email'], ['kategorie'], 30, 1)],
+      ['vypnuto', 'Vypnuto', 'h', '{}', '', notifikaceRadek_([], ['kategorie'], 7, null)],
+      ['bezobsahu', 'BezObsahu', 'h', '{}', '', notifikaceRadek_(['email'], [], 7, null)],
+    ],
+    [akceRadekDigest_('a1', zitraDatum_(), 'Koncert', 'koncerty', 'potvrzeno', 'Brno')]);
+  ctx.SpreadsheetApp.getActiveSpreadsheet = () => ss;
+
+  const vysledky = ctx.sendUserNotifications_(true);
+  const podleId = {};
+  vysledky.forEach(v => { podleId[v.uzivatelId] = v; });
+
+  assert.equal(podleId.due.posli, true);
+  assert.equal(podleId.due.pocetAkci, 1);
+  assert.equal(podleId.notdue.posli, false);
+  assert.match(podleId.notdue.duvod, /frekvence/);
+  assert.equal(podleId.vypnuto.posli, false);
+  assert.match(podleId.vypnuto.duvod, /kanál/);
+  assert.equal(podleId.bezobsahu.posli, false);
+  assert.match(podleId.bezobsahu.duvod, /obsah/);
+});
+
+test('v3.32: sendUserNotifications_ – dry-run neposílá e-mail a nezapisuje posledniOdeslano', () => {
+  const ctx = nactiRadar();
+  const ss = digestSs_(
+    [['due', 'Due', 'h', '{}', '', notifikaceRadek_(['email'], ['kategorie'], 7, null)]],
+    [akceRadekDigest_('a1', zitraDatum_(), 'Koncert', 'koncerty', 'potvrzeno', 'Brno')]);
+  ctx.SpreadsheetApp.getActiveSpreadsheet = () => ss;
+
+  const vysledky = ctx.sendUserNotifications_(true);
+  assert.equal(vysledky[0].posli, true);
+  assert.equal(ctx.__odeslaneEmaily.length, 0, 'dry-run nesmí nic odeslat');
+  const ulozeno = JSON.parse(ss.__sheets['UŽIVATELÉ'].rows[1][5]);
+  assert.equal(ulozeno.posledniOdeslano, '', 'dry-run nesmí zapsat posledniOdeslano');
+});
+
+test('v3.32: sendUserNotifications_ – reálné odeslání pošle e-mail a zapíše posledniOdeslano jako ISO string', () => {
+  const ctx = nactiRadar();
+  const ss = digestSs_(
+    [['due', 'Due', 'h', '{}', '', notifikaceRadek_(['email'], ['kategorie'], 7, null)]],
+    [akceRadekDigest_('a1', zitraDatum_(), 'Koncert', 'koncerty', 'potvrzeno', 'Brno')]);
+  ctx.SpreadsheetApp.getActiveSpreadsheet = () => ss;
+
+  const vysledky = ctx.sendUserNotifications_(false);
+  assert.equal(vysledky[0].posli, true);
+  assert.equal(ctx.__odeslaneEmaily.length, 1, 'reálný běh musí odeslat e-mail');
+  assert.equal(ctx.__odeslaneEmaily[0].komu, 'uzivatel@example.com');
+  const ulozeno = JSON.parse(ss.__sheets['UŽIVATELÉ'].rows[1][5]);
+  assert.match(ulozeno.posledniOdeslano, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/, 'ISO 8601, ne Sheets Date');
 });
 
 test('v3.20: sirotci s neexistujícím uživatelem – filtr nad řádky OZNAČENÍ', () => {

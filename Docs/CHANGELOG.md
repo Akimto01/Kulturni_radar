@@ -1,5 +1,22 @@
 # Changelog
 
+## Backend v3.32 — Notifikace: trigger + odesílací smyčka + dry-run (krok D) — 21. 8. 2026
+### Přidáno
+- **`odeslatNotifikaci_(title, body, htmlBody, topic, email)`** — nízkoúrovňová odesílací mechanika (ntfy e-mailová brána + zkracování dlouhých těl, MailApp pro e-mail) extrahovaná ze `sendNotification_`, teď bere EXPLICITNÍHO příjemce místo čtení Script Properties. `sendNotification_` je teď 3-řádkový wrapper (čte `NOTIFY_EMAIL`/`NTFY_TOPIC`, volá `odeslatNotifikaci_`) — beze změny chování, ověřeno existujícími testy (žádná nová regrese nebyla potřeba, protože `sendNotification_` už měl 4 přímé testovací scénáře, všechny beze změny prošly).
+- **`jeDueNaNotifikaci_(notifikace, dnes)`** (PURE) — prázdné `posledniOdeslano` = due okamžitě, jinak `(dnes − posledniOdeslano) >= frekvenceDny` v celých dnech.
+- **`planNotifikaceUzivatele_(notifikace, dnes)`** (PURE) — kombinuje tři přeskakovací podmínky (vypnuté kanály, obsah bez `'kategorie'`, ještě není čas) do `{ posli, duvod }`.
+- **`sendUserNotifications_(dryRun)`** — denní odesílací orchestrátor. Pro každého uživatele: `planNotifikaceUzivatele_` → pokud due, `digestProUzivatele_` (krok C, okno = dnes až dnes+`frekvenceDny`) → `odeslatNotifikaci_` na uživatelův vlastní kanál (ntfy téma/e-mail, ne globální Script Properties) → zápis `posledniOdeslano` jako ISO 8601 string. Dry-run (`true`): neodešle, nezapíše, jen `Logger.log` + vrátí `[{uzivatelId, jmeno, posli, duvod, pocetAkci}]`.
+- **Trigger `sendUserNotifications()`** (no-arg wrapper) registrovaný v `setupTriggers()`, denně v 9:00 — po `dailyCheck` (8:00), ať jsou data v AKCE čerstvá.
+- **Menu „Notifikace: suchý běh (test)"** (`sendUserNotificationsDryRun_`) — spustí dry-run a zobrazí souhrn přes `SpreadsheetApp.getUi().alert(...)`, ať jde ověřit bez procházení Execution logu.
+- 10 nových Node testů: `jeDueNaNotifikaci_` (3), `planNotifikaceUzivatele_` (4), `sendUserNotifications_` (3 — rozlišení due/not-due/vypnuto/bez-obsahu v jednom běhu, dry-run neodešle/nezapíše, reálný běh odešle a zapíše ISO string).
+### Změněno
+- **`validovatNotifikace_`: rozsah `frekvenceDny` snížen z 1–90 na 1–30 dní** (rozhodnutí 21. 8. 2026) — okno obsahu (`digestProUzivatele_`) nikdy nepokryje víc než ~30 dní (čitelnost + `weatherFor_` má smysluplná data jen ~16 dní dopředu), takže delší frekvence by matematicky garantovala tichou mezeru mezi okny (uživatel s frekvencí 90 dní by viděl jen prvních 30 dní každého cyklu). Řešeno na vstupu (nejde to vůbec zvolit), ne ořezáváním okna na výstupu — jednodušší kód v `sendUserNotifications_`. Migrace nebyla potřeba (žádný uživatel dnes nemá reálně nastavené notifikace).
+### Poznámka k architektuře
+- Node testy 412 → 422 (+10).
+- Drobná neblokující poznámka pro budoucnost: `sendUserNotifications_` volá `readUzivatele_(ss)` znovu per odesílaný uživatel (kvůli indexu řádku) — pro ~4 rodinné profily zanedbatelné, zvážit cachování/index jen při výrazném nárůstu počtu uživatelů.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.32"`), ověřeno `?api=meta` → `"verze":"3.32"`.
+- **Krok E (frontend UI) a F (testy/nasazení celku) zůstávají pro příští session.** Krok G (obsah „doporučení") zůstává vědomě odloženo, viz BACKLOG.md.
+
 ## Backend v3.31 — Notifikace: obsah „podle kategorií" (krok C) — 21. 8. 2026
 ### Přidáno
 - **`digestProUzivatele_(ss, uzivatelId, from, to)`** — sestaví TEXTOVÝ i HTML obsah personalizovaného digestu pro JEDNOHO uživatele, filtrovaný podle jeho osobních kategorií (`UŽIVATELÉ.Filtry.kategorie`, volný text stejného formátu jako `KRIT.KATEGORIE`), místo celého rodinného profilu. Čistá funkce bez side-effectů — nevolá `sendNotification_` ani Anthropic API, jen čte už ověřená data přes `readEventsInRange_` (stejný zdroj jako `digestRange_`). Vrací `{ ok, pocetAkci, hlavicka, text, html }`; odeslání je úkolem budoucího odesílacího jobu (krok D).
