@@ -1,5 +1,13 @@
 # Changelog
 
+## Index.html v3.56 (část 1/2) — Fix: zvyraznitAkci_ self-cancel bug (testovací dluh, krok 5 auditu) — 21. 8. 2026
+### Opraveno
+- **`zvyraznitAkci_`** — volaná zevnitř vlastního click handleru (tlačítko „Zobrazit v seznamu" v popupu mapy, viz část 2 níže) se sama okamžitě rušila: `document.addEventListener('click', odstranit)` registrovaný SYNCHRONNĚ uvnitř click handleru ještě stihl zachytit TENTÝŽ probublávající click, protože listener přidaný na předka, dokud u něj probíhající událost ještě nedorazila v bublání, se pro ni ještě stihne spustit. Objeveno živě 21. 8. 2026 při RF diagnostice mapových popupů (empiricky ověřeno: přímé volání mimo click event → zvýraznění zůstává; volání z click handleru → mizí okamžitě, bez `Sleep` potřeba k reprodukci). Oprava: `setTimeout(() => document.addEventListener('click', odstranit), 0)` odloží registraci o jeden tick, mimo aktuální probublávání. Volání ze sdíleného odkazu (`?akce=ID`, mimo click event) beze změny chování.
+### Poznámka k architektuře
+- Bug byl v produkci od zavedení mapových popupů (v3.38) — první call site (`?akce=ID` deep link) ho nikdy nevystavil, protože běží mimo click event. Objeven až testováním DRUHÉHO call site (popup tlačítko), který vznikl později a nikdy neměl žádné pokrytí (testovací dluh, viz BACKLOG.md).
+- Samostatný, malý commit oddělený od navazujícího refaktoru `sestavPopupMapy_`/`sestavPopupDataMapy_` (část 2/2) — dvě nesouvisející změny.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Index v3.56 (část 1 - zvyraznitAkci fix)"`), ověřeno `?api=meta`. Backend beze změny.
+
 ## RF testy (bez bump verze) — Responzivní pásma: 900px/1360px breakpointy (testovací dluh, krok 4 auditu) — 21. 8. 2026
 ### Přidáno
 - **„Responzivní pásma: střední (900-1359px) omezí main na 656px a mapu zalomí pod obsah"** — běží na sdílené desktopové stránce ze Suite Setup (1280×900, uvnitř tohohle pásma, žádný nový Context), ověřuje `main` šířku přesně `656px` (`max-width` strop z `@media (min-width:900px) and (max-width:1359px)`) a že `#mapa-panel` je zalomená POD `main` (`y` mapy ≥ `main` `y`+`výška`).

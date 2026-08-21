@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.55 – Fix: race condition v inicializovatMapu_() (cekani na Leaflet CDN load) -->
+<!-- Kulturní radar Index.html v3.56 – Fix: zvyraznitAkci_ self-cancel bug (testovaci dluh krok 5, cast 1/2) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1599,7 +1599,17 @@
    *  a dočasně zvýrazní. Karta nemusí existovat (starý/neplatný odkaz,
    *  akce mezitím zmizela) – v tom případě se tiše nic nestane.
    *  v3.17→úprava: zvýraznění zůstává, dokud uživatel nikam neklikne (dá mu
-   *  čas se zorientovat), s pojistkou 30 s pro případ, že vůbec neklikne. */
+   *  čas se zorientovat), s pojistkou 30 s pro případ, že vůbec neklikne.
+   *  v3.56 (fix, testovací dluh krok 5 auditu): když se tahle funkce
+   *  zavolá ZEVNITŘ vlastního click handleru (např. tlačítko „Zobrazit
+   *  v seznamu" v popupu mapy), listener přidaný na document ještě
+   *  stihne zachytit TENTÝŽ probublávající click – DOM listener přidaný
+   *  na předka, dokud u něj probíhající událost ještě nedorazila v
+   *  bublání, se pro ni ještě stihne spustit. Výsledek: zvýraznění se
+   *  hned samo zrušilo (objeveno živě při RF diagnostice mapových
+   *  popupů, 21. 8. 2026). setTimeout(...,0) odloží registraci o jeden
+   *  tick, mimo aktuální probublávání – volání ze sdíleného odkazu
+   *  (mimo click event) beze změny chování. */
   function zvyraznitAkci_(id) {
     if (!id) return;
     const el = document.querySelector('.karta[data-id="' + CSS.escape(id) + '"]');
@@ -1613,7 +1623,7 @@
       el.classList.remove('zvyrazneno');
       document.removeEventListener('click', odstranit);
     };
-    document.addEventListener('click', odstranit);
+    setTimeout(() => document.addEventListener('click', odstranit), 0);
     setTimeout(odstranit, 30000);
   }
 
