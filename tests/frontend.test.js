@@ -12,6 +12,7 @@ const f = nactiFrontendFunkce([
   'filtrovatNavstivenaPodleObdobi_', 'spocitatStatistikuNavstivenych_', 'spocitatDoporuceni_', 'jeNeoverena_', 'jeNeoverenaBezUrl_', 'sestavTextSdileni_', 'mapsUrl_',
   'klicMistoUkladani_', 'akceSeStejnymMistem_',
   'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
+  'sestavNotifikace_', 'validovatNotifikaceKlient_', 'sestavPrihlasenehoUzivatele_',
   'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
   'sestavOdkazNaAkci_', 'parsovatOdkazNaAkci_',
   'sestavOdkazNaVyber_', 'parsovatOdkazNaVyber_',
@@ -524,10 +525,74 @@ test('v3.15: sestavFetchPozadavek_ – POST routy: PIN a token jdou v TĚLE, nik
 
   const run = f.sestavFetchPozadavek_('apiSpustKontrolu', ['tok-y'], EXEC);
   shodneNapricRealmy(run.telo, { akce: 'run', token: 'tok-y' });
+
+  // v3.33 (krok E): notifikace – bez tohohle by google.script.run fungoval,
+  // ale statický frontend (Cloudflare Pages) by tiše dostal null a spadl.
+  const notif = { kanaly: ['email'], email: 'a@b.cz', frekvenceDny: 7, obsah: ['kategorie'] };
+  const setNotif = f.sestavFetchPozadavek_('apiSetNotifikace', ['vojta', notif], EXEC);
+  shodneNapricRealmy(setNotif.telo, { akce: 'set-notifikace', uzivatelId: 'vojta', notifikace: notif });
+
+  const tema = f.sestavFetchPozadavek_('apiVygenerovatNtfyTema', ['vojta'], EXEC);
+  shodneNapricRealmy(tema.telo, { akce: 'vygenerovat-ntfy-tema', uzivatelId: 'vojta' });
 });
 
 test('v3.15: sestavFetchPozadavek_ – neznámá funkce vrací null (gsr vyhodí srozumitelnou chybu)', () => {
   assert.equal(f.sestavFetchPozadavek_('apiNeexistuje', [], EXEC), null);
+});
+
+// ---------------------------------------------------------------------------
+// v3.33: NOTIFIKACE krok E – sestavNotifikace_/validovatNotifikaceKlient_/
+// sestavPrihlasenehoUzivatele_ (dialog #filtry-dialog, sekce Notifikace)
+// ---------------------------------------------------------------------------
+
+test('v3.33: sestavNotifikace_ – kanály podle checkboxů, obsah vždy ["kategorie"]', () => {
+  const zadny = f.sestavNotifikace_(false, false, '', '7');
+  shodneNapricRealmy(zadny.kanaly, []);
+  shodneNapricRealmy(zadny.obsah, ['kategorie']);
+
+  const oba = f.sestavNotifikace_(true, true, '  vojta@example.com  ', '14');
+  shodneNapricRealmy(oba.kanaly, ['email', 'ntfy']);
+  assert.equal(oba.email, 'vojta@example.com', 'e-mail se ořeže o mezery');
+  assert.equal(oba.frekvenceDny, 14);
+});
+
+test('v3.33: sestavNotifikace_ – jen ntfy zaškrtnuté, e-mail zůstává prázdný i při nesmyslném vstupu', () => {
+  const n = f.sestavNotifikace_(false, true, 'cokoliv', '30');
+  shodneNapricRealmy(n.kanaly, ['ntfy']);
+  assert.equal(n.email, 'cokoliv', 'sestavNotifikace_ sama nevaliduje formát – to dělá validovatNotifikaceKlient_');
+});
+
+test('v3.33: validovatNotifikaceKlient_ – prázdné kanály (vypnuto) projdou vždy', () => {
+  assert.equal(f.validovatNotifikaceKlient_({ kanaly: [] }, false).ok, true);
+});
+
+test('v3.33: validovatNotifikaceKlient_ – kanál email vyžaduje platnou adresu', () => {
+  const spatny = f.validovatNotifikaceKlient_({ kanaly: ['email'], email: 'neplatne' }, false);
+  assert.equal(spatny.ok, false);
+  assert.match(spatny.error, /e-mailovou adresu/);
+  const ok = f.validovatNotifikaceKlient_({ kanaly: ['email'], email: 'a@b.cz' }, false);
+  assert.equal(ok.ok, true);
+});
+
+test('v3.33: validovatNotifikaceKlient_ – kanál ntfy bez vygenerovaného tématu se odmítne', () => {
+  const spatny = f.validovatNotifikaceKlient_({ kanaly: ['ntfy'] }, false);
+  assert.equal(spatny.ok, false);
+  assert.match(spatny.error, /téma/);
+  const ok = f.validovatNotifikaceKlient_({ kanaly: ['ntfy'] }, true);
+  assert.equal(ok.ok, true);
+});
+
+test('v3.33: sestavPrihlasenehoUzivatele_ – notifikace z odpovědi serveru se NEZAHODÍ', () => {
+  const vysledek = f.sestavPrihlasenehoUzivatele_({
+    id: 'vojta', jmeno: 'Vojta', filtry: { dojezd: '60 min' },
+    notifikace: { kanaly: ['ntfy'], ntfyTema: 'radar-abc123' },
+  });
+  assert.deepEqual(vysledek.notifikace, { kanaly: ['ntfy'], ntfyTema: 'radar-abc123' });
+});
+
+test('v3.33: sestavPrihlasenehoUzivatele_ – chybějící notifikace v odpovědi → prázdný objekt, ne undefined/pád', () => {
+  const vysledek = f.sestavPrihlasenehoUzivatele_({ id: 'vojta', jmeno: 'Vojta', filtry: {} });
+  assert.equal(Object.keys(vysledek.notifikace).length, 0);
 });
 
 // ---------------------------------------------------------------------------

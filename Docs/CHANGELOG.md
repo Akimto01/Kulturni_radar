@@ -1,5 +1,19 @@
 # Changelog
 
+## Backend v3.33 + Index.html v3.54 — Notifikace: frontend UI (krok E) — 21. 8. 2026
+### Přidáno
+- **Nová sekce „Notifikace" v `#filtry-dialog`** (rozšíření existujícího „Můj profil" panelu, ne nový modal), po poli Dojezd, před akčními tlačítky: dva checkboxy kanálu (E-mail/Push-ntfy), pole e-mailu a blok ntfy tématu podmíněně viditelné jen podle zaškrtnutého kanálu (`prekreslitNotifOblasti_`), `<select>` frekvence s presety 1/3/7/14/30 dní, statický popisek obsahu (`obsah: ['kategorie']` posílá handler implicitně — žádný checkbox, jediná dnes podporovaná hodnota).
+- **ntfy téma jen jako odkaz** na `https://ntfy.sh/<tema>` + tlačítko „Vygenerovat nové téma" (rotace) — vědomě ŽÁDNÁ QR knihovna pro MVP (rodina appku primárně používá na telefonu, kde odkaz stačí; QR lze doplnit později beze zásahu do zbytku). Téma samotné zůstává NIKDY needitovatelné jako text — jen `apiVygenerovatNtfyTema_` ho smí vytvořit (viz krok B).
+- **Jedno sjednocené tlačítko „Uložit"** — volá `apiSetFiltry` a `apiSetNotifikace` sekvenčně (dvě nezávislé věci: selhání notifikací nezahodí už uložené filtry). Inline chybová hláška ve sdíleném `#filtry-chyba` (stejný vzor jako `#kontakt-chyba`), ne `alert()` — chyba nechá dialog otevřený k opravě.
+- **`sestavNotifikace_`/`validovatNotifikaceKlient_`** (PURE) — sestaví objekt nastavení z formuláře a zrcadlí backendovou `validovatNotifikace_` pro okamžitou zpětnou vazbu PŘED voláním serveru (e-mail vyžaduje platný formát, ntfy vyžaduje už vygenerované téma).
+- **Tři chybějící propojení (gaps) objevené při návrhu, doplněná jako součást kroku E:** no-underscore wrappery `apiSetNotifikace`/`apiVygenerovatNtfyTema` v `.gs` (potřebné pro `google.script.run`), odpovídající case větve v `sestavFetchPozadavek_` (potřebné pro statický frontend/Cloudflare Pages), a `sestavPrihlasenehoUzivatele_` (PURE) — rozšíření login handleru, aby `notifikace` z `apiPrihlaseniUzivatele_` už nepadalo pod stůl.
+- 9 nových Node testů: `sestavNotifikace_` (2), `validovatNotifikaceKlient_` (3), `sestavPrihlasenehoUzivatele_` (2), `apiSetNotifikace`/`apiVygenerovatNtfyTema` wrappery (2) + rozšíření existujícího `sestavFetchPozadavek_` testu o obě nové akce. 4 nové RF scénáře v `tests/robot/frontend.robot` (checkbox toggle bez uložení, neplatný stav → inline chyba/dialog zůstává otevřený, plný cyklus generování tématu + uložení + reload + ověření populace ze serveru + návrat do původního stavu).
+### Poznámka k architektuře
+- Node testy 422 → 431 (+9).
+- RF testy napsané, ale **neověřené živě** — tohle vývojové prostředí nemá prohlížeč ani přístup k nasazenému `?exec`; první ověření proběhne až po tomhle nasazení (viz BACKLOG.md, krok F).
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.33 / Index v3.54"`), ověřeno `?api=meta` → `"verze":"3.33"`.
+- **Kroky A–F notifikací jsou tímhle kompletně hotové.** Krok G (obsah „doporučení") zůstává vědomě odloženo, viz BACKLOG.md.
+
 ## Backend v3.32 — Notifikace: trigger + odesílací smyčka + dry-run (krok D) — 21. 8. 2026
 ### Přidáno
 - **`odeslatNotifikaci_(title, body, htmlBody, topic, email)`** — nízkoúrovňová odesílací mechanika (ntfy e-mailová brána + zkracování dlouhých těl, MailApp pro e-mail) extrahovaná ze `sendNotification_`, teď bere EXPLICITNÍHO příjemce místo čtení Script Properties. `sendNotification_` je teď 3-řádkový wrapper (čte `NOTIFY_EMAIL`/`NTFY_TOPIC`, volá `odeslatNotifikaci_`) — beze změny chování, ověřeno existujícími testy (žádná nová regrese nebyla potřeba, protože `sendNotification_` už měl 4 přímé testovací scénáře, všechny beze změny prošly).

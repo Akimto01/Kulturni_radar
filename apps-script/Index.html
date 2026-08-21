@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.53 – Rocni prehled cast 2 - doporuceni podle historie navstivenych akci -->
+<!-- Kulturní radar Index.html v3.54 – Notifikace: frontend UI v dialogu Muj profil (krok E) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -575,8 +575,8 @@
     border: 1.5px solid #d0cdc6; border-radius: 6px;
     font-family: var(--sans); font-size: .85rem; resize: vertical;
   }
-  #kontakt-chyba { color: var(--accent); font-size: .82rem; min-height: 1.2em; margin-top: 8px; }
-  #kontakt-chyba.uspech { color: #27ae60; }
+  #kontakt-chyba, #filtry-chyba { color: var(--accent); font-size: .82rem; min-height: 1.2em; margin-top: 8px; }
+  #kontakt-chyba.uspech, #filtry-chyba.uspech { color: #27ae60; }
 
   /* v3.24: patička s kontaktní zmínkou – tlumený styl jako #meta-info */
   #patka {
@@ -598,11 +598,24 @@
   }
   #filtry-box h2 { font-size: 1rem; margin-bottom: 12px; }
   #filtry-box label { display: block; font-size: .78rem; color: var(--ink-2); margin: 10px 0 4px; }
-  #filtry-box input {
+  #filtry-box input, #filtry-box select {
     width: 100%; padding: 9px 12px;
     border: 1.5px solid #d0cdc6; border-radius: 6px;
     font-family: var(--sans); font-size: .85rem;
   }
+  #filtry-box input[type="checkbox"] { width: auto; }
+  #filtry-box hr { border: none; border-top: 1px solid #e5e1d8; margin: 16px 0 4px; }
+  #filtry-box h3 { font-size: .85rem; margin: 4px 0 6px; }
+  /* v3.33: krok E – sekce Notifikace uvnitř #filtry-box */
+  .notif-kanaly { display: flex; gap: 18px; margin: 6px 0 4px; }
+  .notif-kanaly label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: .85rem; color: var(--ink); margin: 0;
+  }
+  .notif-obsah-info { font-size: .74rem; color: var(--ink-2); margin-top: 10px; }
+  #notif-ntfy-oblast { margin-top: 6px; }
+  #notif-ntfy-s-tematem { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #notif-ntfy-odkaz { font-size: .82rem; }
   #filtry-box .filtry-akce-radek { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
   .btn-hledat {
     padding: 8px 16px; border: 1px solid var(--accent); border-radius: 6px;
@@ -906,6 +919,37 @@
     <input id="filtry-kategorie" type="text" placeholder="např. koncerty; festivaly; dětské">
     <label for="filtry-dojezd">Maximální dojezd (prázdné = výchozí)</label>
     <input id="filtry-dojezd" type="text" placeholder="např. 60 min">
+
+    <hr>
+    <h3>Notifikace</h3>
+    <div class="notif-kanaly">
+      <label><input type="checkbox" id="notif-kanal-email"> E-mail</label>
+      <label><input type="checkbox" id="notif-kanal-ntfy"> Push (ntfy)</label>
+    </div>
+    <div id="notif-email-oblast" style="display:none">
+      <label for="notif-email">E-mailová adresa</label>
+      <input id="notif-email" type="email" placeholder="tvuj@email.cz">
+    </div>
+    <div id="notif-ntfy-oblast" style="display:none">
+      <div id="notif-ntfy-bez-tematu">
+        <button class="btn-cancel" type="button" id="notif-ntfy-generovat">Vygenerovat ntfy téma</button>
+      </div>
+      <div id="notif-ntfy-s-tematem" style="display:none">
+        <a id="notif-ntfy-odkaz" href="#" target="_blank" rel="noopener">Otevřít v ntfy appce</a>
+        <button class="btn-cancel" type="button" id="notif-ntfy-rotovat">Vygenerovat nové téma</button>
+      </div>
+    </div>
+    <label for="notif-frekvence">Jak často</label>
+    <select id="notif-frekvence">
+      <option value="1">denně</option>
+      <option value="3">co 3 dny</option>
+      <option value="7">týdně</option>
+      <option value="14">co 14 dní</option>
+      <option value="30">měsíčně</option>
+    </select>
+    <div class="notif-obsah-info">Obsah: podle tvých kategorií (pole Kategorie výše). Další typy obsahu časem přibudou.</div>
+    <div id="filtry-chyba"></div>
+
     <div class="filtry-akce-radek">
       <button class="btn-cancel" id="filtry-odhlasit">Odhlásit</button>
       <button class="btn-cancel" id="filtry-zavrit">Zavřít</button>
@@ -961,7 +1005,10 @@
   let filtrOblibenaMista = false;
   // v3.13: přihlášený uživatelský profil – JEN v paměti (rozhodnutí 7. 8. 2026:
   // PIN se zadává při každém vstupu na web, žádné localStorage přihlášení).
-  let prihlasenyUzivatel = null;    // { id, jmeno, filtry } | null
+  let prihlasenyUzivatel = null;    // { id, jmeno, filtry, notifikace } | null
+  // v3.33: aktuální ntfy téma pro #filtry-dialog (mimo formulářová pole –
+  // needitovatelné, jen zobrazené jako odkaz, viz validovatNotifikaceKlient_).
+  let aktualniNtfyTema_ = '';
 
   // ── v3.13: čisté funkce uživatelských profilů (testovatelné bez DOM) ──
   /** Z textových polí formuláře sestaví objekt filtrů; prázdné hodnoty se
@@ -973,6 +1020,46 @@
     if (kat) filtry.kategorie = kat;
     if (doj) filtry.dojezd = doj;
     return filtry;
+  }
+
+  /** PURE (v3.33, krok E): sestaví objekt nastavení notifikací z formulářových
+   *  hodnot dialogu – stejný vzor jako sestavFiltry_. `obsah` je vždy
+   *  ['kategorie'] (jediná dnes podporovaná hodnota, viz backend
+   *  POVOLENY_OBSAH_) – žádný checkbox pro to není, posílá se implicitně. */
+  function sestavNotifikace_(kanalEmail, kanalNtfy, emailText, frekvenceDny) {
+    const kanaly = [];
+    if (kanalEmail) kanaly.push('email');
+    if (kanalNtfy) kanaly.push('ntfy');
+    return {
+      kanaly,
+      email: String(emailText == null ? '' : emailText).trim(),
+      frekvenceDny: Number(frekvenceDny) || 0,
+      obsah: ['kategorie'],
+    };
+  }
+
+  /** PURE (v3.33, krok E): zrcadlí backend validovatNotifikace_ pro okamžitou
+   *  zpětnou vazbu v UI PŘED voláním serveru. `maNtfyTema` = má už uživatel
+   *  vygenerované téma (z prihlasenyUzivatel.notifikace.ntfyTema) – klient
+   *  sám téma nikdy negeneruje ani nevaliduje jeho formát, jen ví, jestli
+   *  existuje (viz krok B – téma je vždy server-generované). */
+  function validovatNotifikaceKlient_(notifikace, maNtfyTema) {
+    const kanaly = notifikace.kanaly || [];
+    if (!kanaly.length) return { ok: true };
+    if (kanaly.indexOf('email') !== -1 && !/^\S+@\S+\.\S+$/.test(notifikace.email || '')) {
+      return { ok: false, error: 'Zadej prosím platnou e-mailovou adresu.' };
+    }
+    if (kanaly.indexOf('ntfy') !== -1 && !maNtfyTema) {
+      return { ok: false, error: 'Nejdřív vygeneruj ntfy téma tlačítkem výše.' };
+    }
+    return { ok: true };
+  }
+
+  /** PURE (v3.33, krok E): sestaví objekt přihlášeného profilu z odpovědi
+   *  apiPrihlaseniUzivatele_ – oddělené od event handleru přihlášení, ať jde
+   *  otestovat, že se `notifikace` (na rozdíl od dřívějška) nezahodí. */
+  function sestavPrihlasenehoUzivatele_(res) {
+    return { id: res.id, jmeno: res.jmeno, filtry: res.filtry || {}, notifikace: res.notifikace || {} };
   }
 
   /** Základní kontrola PINu před odesláním: 4–8 znaků bez mezer. */
@@ -1015,6 +1102,10 @@
         return { metoda: 'POST', url: execUrl, telo: { akce: 'toggle-misto', misto: a[0], obec: a[1], uzivatelId: a[2] } };
       case 'apiSetFiltry':
         return { metoda: 'POST', url: execUrl, telo: { akce: 'filtry', uzivatelId: a[0], filtry: a[1] } };
+      case 'apiSetNotifikace':
+        return { metoda: 'POST', url: execUrl, telo: { akce: 'set-notifikace', uzivatelId: a[0], notifikace: a[1] } };
+      case 'apiVygenerovatNtfyTema':
+        return { metoda: 'POST', url: execUrl, telo: { akce: 'vygenerovat-ntfy-tema', uzivatelId: a[0] } };
       case 'apiNajdiProUzivatele':
         return { metoda: 'POST', url: execUrl, telo: { akce: 'najdi', uzivatelId: a[0], token: a[1] } };
       case 'apiSpustKontrolu':
@@ -1126,7 +1217,7 @@
     try {
       const res = await gsr('apiPrihlaseniUzivatele', vybranyUzivatelId, pin);
       if (res && res.ok) {
-        prihlasenyUzivatel = { id: res.id, jmeno: res.jmeno, filtry: res.filtry || {} };
+        prihlasenyUzivatel = sestavPrihlasenehoUzivatele_(res);
         // v3.14→oprava: nactiAkce (osobní ★/✓) MUSÍ doběhnout PŘED zavřením
         // overlaye, jinak hrozí race condition – klik na kartu hned po
         // přihlášení mohl zasáhnout element, který vzápětí přepsal ještě
@@ -1186,11 +1277,25 @@
 
   // ── v3.13: Dialog osobních filtrů + hledání na vyžádání ───
   // v3.14: badge má dvojí roli – nepřihlášený otevírá login, přihlášený dialog profilu.
+  // v3.33 (krok E): dialog teď populuje i sekci Notifikace.
   document.getElementById('uzivatel-badge').addEventListener('click', () => {
     if (!prihlasenyUzivatel) { otevritLogin(); return; }
     document.getElementById('filtry-nadpis').textContent = 'Profil: ' + prihlasenyUzivatel.jmeno;
     document.getElementById('filtry-kategorie').value = prihlasenyUzivatel.filtry.kategorie || '';
     document.getElementById('filtry-dojezd').value = prihlasenyUzivatel.filtry.dojezd || '';
+
+    const notif = prihlasenyUzivatel.notifikace || {};
+    const kanaly = notif.kanaly || [];
+    document.getElementById('notif-kanal-email').checked = kanaly.indexOf('email') !== -1;
+    document.getElementById('notif-kanal-ntfy').checked = kanaly.indexOf('ntfy') !== -1;
+    document.getElementById('notif-email').value = notif.email || '';
+    document.getElementById('notif-frekvence').value = String(notif.frekvenceDny || 7);
+    aktualniNtfyTema_ = notif.ntfyTema || '';
+    prekreslitNotifOblasti_();
+    const chyba = document.getElementById('filtry-chyba');
+    chyba.textContent = '';
+    chyba.classList.remove('uspech');
+
     document.getElementById('filtry-dialog').classList.add('open');
   });
   document.getElementById('filtry-zavrit').addEventListener('click', () => {
@@ -1198,23 +1303,94 @@
   });
   document.getElementById('filtry-odhlasit').addEventListener('click', odhlasit_);
 
+  /** v3.33 (krok E): DOM only – ukáže/skryje pole e-mailu a blok ntfy podle
+   *  zaškrtnutých kanálů, a uvnitř bloku ntfy přepíná mezi "vygeneruj téma"
+   *  a "téma existuje, tady je odkaz" podle aktualniNtfyTema_. */
+  function prekreslitNotifOblasti_() {
+    const emailChecked = document.getElementById('notif-kanal-email').checked;
+    const ntfyChecked = document.getElementById('notif-kanal-ntfy').checked;
+    document.getElementById('notif-email-oblast').style.display = emailChecked ? '' : 'none';
+    document.getElementById('notif-ntfy-oblast').style.display = ntfyChecked ? '' : 'none';
+
+    const maTema = !!aktualniNtfyTema_;
+    document.getElementById('notif-ntfy-bez-tematu').style.display = maTema ? 'none' : '';
+    document.getElementById('notif-ntfy-s-tematem').style.display = maTema ? '' : 'none';
+    if (maTema) {
+      document.getElementById('notif-ntfy-odkaz').href = 'https://ntfy.sh/' + aktualniNtfyTema_;
+    }
+  }
+  document.getElementById('notif-kanal-email').addEventListener('change', prekreslitNotifOblasti_);
+  document.getElementById('notif-kanal-ntfy').addEventListener('change', prekreslitNotifOblasti_);
+
+  /** v3.33 (krok E): generuje NOVÉ ntfy téma (první nastavení i rotace –
+   *  stejné tlačítko-akce, viz apiVygenerovatNtfyTema_ v .gs). Téma se
+   *  NIKDY needituje jako text, jen zobrazí jako odkaz po vygenerování. */
+  async function vygenerovatNtfyTema_() {
+    if (!prihlasenyUzivatel) return;
+    const tlacitka = [
+      document.getElementById('notif-ntfy-generovat'),
+      document.getElementById('notif-ntfy-rotovat'),
+    ];
+    tlacitka.forEach(b => { b.disabled = true; });
+    const chyba = document.getElementById('filtry-chyba');
+    try {
+      const res = await gsr('apiVygenerovatNtfyTema', prihlasenyUzivatel.id);
+      if (res && res.ok) {
+        aktualniNtfyTema_ = res.ntfyTema;
+        prihlasenyUzivatel.notifikace = Object.assign({}, prihlasenyUzivatel.notifikace, { ntfyTema: res.ntfyTema });
+        prekreslitNotifOblasti_();
+      } else {
+        chyba.classList.remove('uspech');
+        chyba.textContent = (res && res.error) || 'Téma se nepodařilo vygenerovat.';
+      }
+    } catch (e) {
+      chyba.classList.remove('uspech');
+      chyba.textContent = 'Chyba: ' + e.message;
+    } finally {
+      tlacitka.forEach(b => { b.disabled = false; });
+    }
+  }
+  document.getElementById('notif-ntfy-generovat').addEventListener('click', vygenerovatNtfyTema_);
+  document.getElementById('notif-ntfy-rotovat').addEventListener('click', vygenerovatNtfyTema_);
+
   document.getElementById('filtry-ulozit').addEventListener('click', async () => {
     if (!prihlasenyUzivatel) return;
     const filtry = sestavFiltry_(
       document.getElementById('filtry-kategorie').value,
       document.getElementById('filtry-dojezd').value);
+    const notifikace = sestavNotifikace_(
+      document.getElementById('notif-kanal-email').checked,
+      document.getElementById('notif-kanal-ntfy').checked,
+      document.getElementById('notif-email').value,
+      document.getElementById('notif-frekvence').value);
+
+    const chyba = document.getElementById('filtry-chyba');
+    chyba.classList.remove('uspech');
+    const klientOk = validovatNotifikaceKlient_(notifikace, !!aktualniNtfyTema_);
+    if (!klientOk.ok) { chyba.textContent = klientOk.error; return; }
+
     const btn = document.getElementById('filtry-ulozit');
     btn.disabled = true;
+    chyba.textContent = '';
     try {
-      const res = await gsr('apiSetFiltry', prihlasenyUzivatel.id, filtry);
-      if (res && res.ok) {
-        prihlasenyUzivatel.filtry = filtry;
-        document.getElementById('filtry-dialog').classList.remove('open');
-      } else {
-        alert((res && res.error) || 'Filtry se nepodařilo uložit.');
+      const resFiltry = await gsr('apiSetFiltry', prihlasenyUzivatel.id, filtry);
+      if (!resFiltry || !resFiltry.ok) {
+        chyba.textContent = (resFiltry && resFiltry.error) || 'Filtry se nepodařilo uložit.';
+        return;
       }
+      prihlasenyUzivatel.filtry = filtry;
+
+      // v3.33: druhé, nezávislé volání – selhání notifikací nesmí zahodit
+      // už uložené filtry (dvě oddělené věci, viz schválený design kroku E).
+      const resNotif = await gsr('apiSetNotifikace', prihlasenyUzivatel.id, notifikace);
+      if (!resNotif || !resNotif.ok) {
+        chyba.textContent = (resNotif && resNotif.error) || 'Notifikace se nepodařilo uložit.';
+        return;
+      }
+      prihlasenyUzivatel.notifikace = Object.assign({}, prihlasenyUzivatel.notifikace, notifikace);
+      document.getElementById('filtry-dialog').classList.remove('open');
     } catch (e) {
-      alert('Chyba: ' + e.message);
+      chyba.textContent = 'Chyba: ' + e.message;
     } finally {
       btn.disabled = false;
     }

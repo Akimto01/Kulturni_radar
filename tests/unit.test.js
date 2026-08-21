@@ -2010,6 +2010,37 @@ test('v3.32: sendUserNotifications_ – reálné odeslání pošle e-mail a zap�
   assert.match(ulozeno.posledniOdeslano, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/, 'ISO 8601, ne Sheets Date');
 });
 
+// ---------------------------------------------------------------------------
+// v3.33: NOTIFIKACE krok E (backend část) – no-underscore wrappery
+// apiSetNotifikace/apiVygenerovatNtfyTema, potřebné pro google.script.run
+// volání z frontendu (stejný vzor jako apiSetFiltry/apiSetFiltry_).
+// ---------------------------------------------------------------------------
+
+test('v3.33: apiSetNotifikace (wrapper) volá apiSetNotifikace_ přes aktivní spreadsheet se stejnými argumenty', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ 'UŽIVATELÉ': [[], ['vojta', 'Vojta', 'h', '{}', '', '{}']] });
+  ctx.SpreadsheetApp.getActiveSpreadsheet = () => ss;
+
+  const vysledek = ctx.apiSetNotifikace('vojta',
+    { kanaly: ['email'], email: 'a@b.cz', frekvenceDny: 7, obsah: ['kategorie'] });
+  assert.equal(vysledek.ok, true);
+  const ulozeno = JSON.parse(ss.__sheets['UŽIVATELÉ'].rows[1][5]);
+  assert.deepEqual(ulozeno.kanaly, ['email']);
+  assert.equal(ulozeno.email, 'a@b.cz');
+});
+
+test('v3.33: apiVygenerovatNtfyTema (wrapper) volá apiVygenerovatNtfyTema_ přes aktivní spreadsheet', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ 'UŽIVATELÉ': [[], ['vojta', 'Vojta', 'h', '{}', '', '{}']] });
+  ctx.SpreadsheetApp.getActiveSpreadsheet = () => ss;
+
+  const vysledek = ctx.apiVygenerovatNtfyTema('vojta');
+  assert.equal(vysledek.ok, true);
+  assert.match(vysledek.ntfyTema, /^radar-[0-9a-f]{32}$/);
+  const ulozeno = JSON.parse(ss.__sheets['UŽIVATELÉ'].rows[1][5]);
+  assert.equal(ulozeno.ntfyTema, vysledek.ntfyTema, 'wrapper skutečně zapsal do stejného ss, ne do nějakého jiného');
+});
+
 test('v3.20: sirotci s neexistujícím uživatelem – filtr nad řádky OZNAČENÍ', () => {
   // Logika ze samotestu: záznam s uzivatel mimo platnou množinu je sirotek;
   // prázdný uzivatel (historický formát) se za sirotka nepovažuje.

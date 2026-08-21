@@ -102,14 +102,107 @@ Odhlášení vrátí appku do anonymního režimu (vlastní stránka)
 Profil: dialog obsahuje osobní filtry a tlačítko Najít akce pro mě (bez spuštění)
     [Documentation]    Jen existence prvků a otevření/zavření dialogu – NEKLIKÁME
     ...    na "Najít akce pro mě", protože by to spustilo skutečné (placené)
-    ...    AI hledání. Stejný princip jako u FABu níž.
+    ...    AI hledání. Stejný princip jako u FABu níž. v3.33 (krok E): i prvky
+    ...    sekce Notifikace.
     Click    ${FRAME} \#uzivatel-badge
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
     Get Element    ${FRAME} \#filtry-kategorie
     Get Element    ${FRAME} \#filtry-dojezd
     Get Element    ${FRAME} \#filtry-hledat
+    Get Element    ${FRAME} \#notif-kanal-email
+    Get Element    ${FRAME} \#notif-kanal-ntfy
+    Get Element    ${FRAME} \#notif-frekvence
     Click    ${FRAME} \#filtry-zavrit
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=5s
+
+Notifikace: zaškrtnutí kanálu ukáže/schová příslušnou oblast (bez uložení)
+    [Documentation]    v3.33 (krok E): čistě klientská interakce
+    ...    (prekreslitNotifOblasti_), žádné volání serveru – bezpečné bez
+    ...    ohledu na produkční data, nezávisle na stavu, ve kterém dialog
+    ...    otevřením zastihne (jiný test mohl kanál nechat zaškrtnutý).
+    Click    ${FRAME} \#uzivatel-badge
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
+    ${stav_email}=    Get Checkbox State    ${FRAME} \#notif-kanal-email
+    IF    "${stav_email}" == "checked"    Click    ${FRAME} \#notif-kanal-email
+    ${stav_ntfy}=    Get Checkbox State    ${FRAME} \#notif-kanal-ntfy
+    IF    "${stav_ntfy}" == "checked"    Click    ${FRAME} \#notif-kanal-ntfy
+    Wait For Elements State    ${FRAME} \#notif-email-oblast    hidden    timeout=3s
+    Wait For Elements State    ${FRAME} \#notif-ntfy-oblast    hidden    timeout=3s
+
+    Click    ${FRAME} \#notif-kanal-ntfy
+    Wait For Elements State    ${FRAME} \#notif-ntfy-oblast    visible    timeout=3s
+    Click    ${FRAME} \#notif-kanal-ntfy
+    Wait For Elements State    ${FRAME} \#notif-ntfy-oblast    hidden    timeout=3s
+
+    Click    ${FRAME} \#notif-kanal-email
+    Wait For Elements State    ${FRAME} \#notif-email-oblast    visible    timeout=3s
+    Click    ${FRAME} \#notif-kanal-email
+    Wait For Elements State    ${FRAME} \#notif-email-oblast    hidden    timeout=3s
+    Click    ${FRAME} \#filtry-zavrit
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=5s
+
+Notifikace: neplatný stav (e-mail zaškrtnutý bez adresy) zobrazí inline chybu, dialog zůstane otevřený
+    [Documentation]    v3.33 (krok E): validovatNotifikaceKlient_ musí odchytit
+    ...    chybu PŘED voláním serveru – žádný zápis do produkčních dat,
+    ...    bezpečné spustit kdykoli.
+    Click    ${FRAME} \#uzivatel-badge
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
+    ${stav_ntfy}=    Get Checkbox State    ${FRAME} \#notif-kanal-ntfy
+    IF    "${stav_ntfy}" == "checked"    Click    ${FRAME} \#notif-kanal-ntfy
+    ${stav_email}=    Get Checkbox State    ${FRAME} \#notif-kanal-email
+    IF    "${stav_email}" == "unchecked"    Click    ${FRAME} \#notif-kanal-email
+    Fill Text    ${FRAME} \#notif-email    neplatna-adresa
+    Click    ${FRAME} \#filtry-ulozit
+    Wait For Elements State    ${FRAME} \#filtry-chyba    visible    timeout=3s
+    ${chyba}=    Get Text    ${FRAME} \#filtry-chyba
+    Should Contain    ${chyba}    e-mailovou adresu
+    ${stale_otevreny}=    Get Element Count    ${FRAME} \#filtry-dialog.open
+    Should Be Equal As Integers    ${stale_otevreny}    1
+    ...    msg=Po neplatném stavu má dialog zůstat otevřený, ne se tvářit jako úspěch
+    Click    ${FRAME} \#notif-kanal-email
+    Click    ${FRAME} \#filtry-zavrit
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=5s
+
+Notifikace: vygenerování ntfy tématu, uložení a znovunačtení po přihlášení (plný cyklus s návratem)
+    [Documentation]    v3.33 (krok E): jediný test, co skutečně zapisuje do
+    ...    sloupce Notifikace testovacího profilu (RF_TEST_USER_ID) – proto
+    ...    plný cyklus s návratem na konci, stejný princip jako
+    ...    plný cyklus ★/✓ testů výš (ne holý zápis bez úklidu). Rotace
+    ...    ntfy tématu samotná je bezstavová/nedestruktivní, tu bezpečně
+    ...    provést bez návratu.
+    Click    ${FRAME} \#uzivatel-badge
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
+
+    ${stav_ntfy}=    Get Checkbox State    ${FRAME} \#notif-kanal-ntfy
+    IF    "${stav_ntfy}" == "unchecked"    Click    ${FRAME} \#notif-kanal-ntfy
+    Wait For Elements State    ${FRAME} \#notif-ntfy-bez-tematu    visible    timeout=3s
+    Click    ${FRAME} \#notif-ntfy-generovat
+    Wait For Elements State    ${FRAME} \#notif-ntfy-s-tematem    visible    timeout=10s
+    ${odkaz}=    Get Attribute    ${FRAME} \#notif-ntfy-odkaz    href
+    Should Contain    ${odkaz}    https://ntfy.sh/radar-
+
+    Click    ${FRAME} \#filtry-ulozit
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=10s
+
+    # Reload + nové přihlášení – ověří, že se stav skutečně načetl ZE SERVERU
+    # (apiPrihlaseniUzivatele_ → notifikace → sestavPrihlasenehoUzivatele_),
+    # ne jen z JS proměnné přežívající z předchozího kroku.
+    Reload
+    Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
+    Click    ${FRAME} \#uzivatel-badge
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    visible    timeout=5s
+    ${stav_po_loginu}=    Get Checkbox State    ${FRAME} \#notif-kanal-ntfy
+    Should Be Equal As Strings    ${stav_po_loginu}    checked
+    ...    msg=Po znovupřihlášení má být kanál ntfy zaškrtnutý podle uloženého stavu ze serveru
+    Wait For Elements State    ${FRAME} \#notif-ntfy-s-tematem    visible    timeout=5s
+
+    # Návrat do původního (vypnutého) stavu, ať test nenechá testovací
+    # profil trvale se zapnutými notifikacemi.
+    Click    ${FRAME} \#notif-kanal-ntfy
+    Click    ${FRAME} \#filtry-ulozit
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=10s
 
 Přepínač profilů je naplněn z meta API
     ${pocet}=    Get Element Count    ${FRAME} \#profil-select option

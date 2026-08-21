@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.32 (21. 8. 2026) – Notifikace: trigger + odesílací smyčka + dry-run (krok D)
- * (předchozí: 3.31 – Notifikace: obsah „podle kategorií", krok C)
+ * Verze: 3.33 (21. 8. 2026) – Notifikace: API wrappery pro frontend (krok E, backend část)
+ * (předchozí: 3.32 – Notifikace: trigger + odesílací smyčka + dry-run, krok D)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -68,7 +68,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.32';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.33';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -503,6 +503,14 @@ function apiSeznamUzivatelu() {
 /** Uloží osobní filtry (kategorie/dojezd) přihlášeného uživatelského profilu. */
 function apiSetFiltry(uzivatelId, filtryObj) {
   return apiSetFiltry_(SpreadsheetApp.getActiveSpreadsheet(), uzivatelId, filtryObj);
+}
+/** v3.33 (krok E): uloží osobní nastavení notifikací (kanál/frekvence/obsah). */
+function apiSetNotifikace(uzivatelId, notifikaceObj) {
+  return apiSetNotifikace_(SpreadsheetApp.getActiveSpreadsheet(), uzivatelId, notifikaceObj);
+}
+/** v3.33 (krok E): vygeneruje a uloží nové ntfy téma pro přihlášeného uživatele. */
+function apiVygenerovatNtfyTema(uzivatelId) {
+  return apiVygenerovatNtfyTema_(SpreadsheetApp.getActiveSpreadsheet(), uzivatelId);
 }
 /** Odešle zprávu z kontaktního formuláře – dostupné i bez přihlášení. */
 function apiKontakt(jmeno, zprava, email, uzivatelId) {
