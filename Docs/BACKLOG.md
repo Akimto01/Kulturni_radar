@@ -53,7 +53,7 @@ změně BACKLOGu.
 
 ## K ověření
 - iPad: ověřit, jestli window.open() (v3.7 Index.html) vyřešil otevírání „Více info"/„Do kalendáře" v nové záložce — dcera se ještě nevrátila s iPadem. (Dojezd v km u nově nalezených akcí ověřen 7. 8. jako OK, položka odstraněna.)
-- „Festival Špilberk" (ID `2026-08-17-festival-spilberk`, profil Brno) — AI ho našla jako neověřenou akci bez URL, teď se zobrazuje přes chip „❓ Neověřeno" (v3.27). Potřeba ručně dohledat spolehlivý zdroj/URL (web pořadatele, Brno.cz) a buď označit jako potvrzeno, nebo smazat, pokud zdroj neexistuje.
+- ~~„Festival Špilberk" (ID `2026-08-17-festival-spilberk`, profil Brno)~~ — **VYŘEŠENO, OVĚŘENO 21. 8. 2026**: akce se mezitím sama doověřila při jedné z pravidelných kontrol (Poslední kontrola: 20. 8. 2026) — v listu AKCE má teď Stav „potvrzeno" (ne „neověřeno"), Primární zdroj i URL vyplněné (filharmonie-brno.cz). Žádný ruční zásah nebyl potřeba, systém to vyřešil sám.
 
 ## Zpětná vazba syna — 5. 8. 2026
 ### Design/rozvržení (patří do dceřina designového večera, ne bodová oprava)
