@@ -614,7 +614,7 @@ Mapa se vykreslí (Leaflet)
     ...    na vlastní Leaflet kontejner uvnitř #mapa, ne jen na prázdný
     ...    div. Běží na desktopové sdílené stránce (Suite Setup), kde je
     ...    #mapa-panel vždy vidět (≥900px, v3.35/v3.40).
-    Wait For Elements State    ${FRAME} \#mapa .leaflet-container    visible    timeout=20s
+    Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
 
 Seznam míst pod mapou obsahuje řádky, pokud existují akce se souřadnicemi
     [Documentation]    M) F) #mapa-mista (v3.41) je viditelné jen na
@@ -624,7 +624,7 @@ Seznam míst pod mapou obsahuje řádky, pokud existují akce se souřadnicemi
     ...    hotové geokódování), proto podmíněné na existenci pinů na
     ...    mapě, stejný vzor jako „Sekce stálých míst"/„Chip typu stálého
     ...    místa" výš.
-    Wait For Elements State    ${FRAME} \#mapa .leaflet-container    visible    timeout=20s
+    Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
     ${pocet_pinu}=    Get Element Count    ${FRAME} \#mapa .leaflet-marker-icon
     IF    ${pocet_pinu} >= 1
         Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto >> nth=0    visible    timeout=10s
@@ -663,7 +663,7 @@ Klik na řádek v seznamu míst vybere pin na mapě
     ...    karty (test výš) – ověřeno přes .mapa-misto.vybrano a
     ...    .pin-vybrany na mapě, včetně zrušení druhým klikem. Podmíněné
     ...    na existenci aspoň jednoho řádku (viz M – seznam míst).
-    Wait For Elements State    ${FRAME} \#mapa .leaflet-container    visible    timeout=20s
+    Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
     ${pocet}=    Get Element Count    ${FRAME} \#mapa-mista .mapa-misto
     IF    ${pocet} == 0
         Log    Seznam míst je prázdný (žádná akce se souřadnicemi) – test nemá co ověřit v tomto běhu.    level=WARN
@@ -829,3 +829,4 @@ Otevřít radar na mobilním viewportu
     New Context    viewport={'width': 375, 'height': 800}
     New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
