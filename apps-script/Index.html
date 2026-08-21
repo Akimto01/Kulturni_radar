@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.54 – Notifikace: frontend UI v dialogu Muj profil (krok E) -->
+<!-- Kulturní radar Index.html v3.55 – Fix: race condition v inicializovatMapu_() (cekani na Leaflet CDN load) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -8,7 +8,7 @@
 <!-- v3.35: Leaflet – vestavěná mapa (redesign fáze 3), první externí JS
      závislost appky. Bez API klíče (OpenStreetMap dlaždice). -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script id="leaflet-script" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   /* ── Tokeny ─────────────────────────────────────────────── */
   :root {
@@ -1575,7 +1575,8 @@
         });
         vykreslitKalendar();
         // v3.35: mapa (fáze 3 redesignu) – jednorázová inicializace Leaflet
-        inicializovatMapu_();
+        // v3.55: přes wrapper, co počká na dokončení CDN loadu (viz níže)
+        inicializovatMapuAzPripravena_();
         vykreslitMapu();
         posluchaceStatickychPrvkuNastaveny = true;
       }
@@ -2169,6 +2170,30 @@
 
   let mapaLeaflet = null;
   let mapaVrstvaPinu = null;
+
+  /** v3.55: Leaflet se z CDN načítá asynchronně; přímé zavolání
+   *  inicializovatMapu_() hned po prvním API round-tripu se ukázalo jako
+   *  časový závod – L nemusí být ještě definované (zjištěno 21. 8. 2026,
+   *  konzistentně reprodukováno automatizovaným testováním). Místo
+   *  jednorázového "zkus a případně se navždy vzdej" počká na 'load' event
+   *  <script> tagu, pokud L ještě není hotové. 'error' event i timeout 5s
+   *  jsou pojistka pro SKUTEČNÝ výpadek/blokaci CDN – appka i pak běží dál
+   *  beze mapy, stejná filozofie jako dřív (bonus prvek, ne kritický). */
+  function inicializovatMapuAzPripravena_() {
+    if (typeof L !== 'undefined') { inicializovatMapu_(); return; }
+    const skript = document.getElementById('leaflet-script');
+    let vyrizeno = false;
+    const zkusit = () => {
+      if (vyrizeno) return;
+      vyrizeno = true;
+      if (typeof L !== 'undefined') inicializovatMapu_();
+    };
+    if (skript) {
+      skript.addEventListener('load', zkusit, { once: true });
+      skript.addEventListener('error', zkusit, { once: true });
+    }
+    setTimeout(zkusit, 5000);
+  }
 
   /** Jednorázová inicializace Leaflet mapy (střed ČR). Pokud se CDN
    *  nenačetlo (výpadek/blokace), `L` neexistuje – appka běží dál beze

@@ -1,5 +1,18 @@
 # Changelog
 
+## Index.html v3.55 — Fix: race condition v inicializovatMapu_() (testovací dluh #14-19) — 21. 8. 2026
+### Opraveno
+- **`inicializovatMapuAzPripravena_()`** — nová obálka nad `inicializovatMapu_()`, řeší časový závod objevený při živém RF běhu proti produkci (21. 8. 2026): `inicializovatMapu_()` se volala hned po prvním `await api('meta')`, což za normálních okolností stačilo (Leaflet `<script>` je head-blocking bez `async`/`defer`), ale zrychlené odpovědi (cache) tenhle náhodný časový polštář odstranily a `L` občas ještě nebylo definované. Oprava čeká na `load`/`error` event `<script id="leaflet-script">` tagu, s timeoutem 5 s jako pojistkou pro skutečný výpadek CDN — appka i pak běží dál beze mapy (nezměněná filozofie „bonus, ne kritické"). `inicializovatMapu_()` samotná beze změny, mění se jen KDY se volá.
+- `<script>` tag pro Leaflet dostal `id="leaflet-script"` (dřív bez id) — nutné pro navěšení event listeneru na konkrétní tag.
+- **4 opravy v `tests/robot/frontend.robot`** (testovací dluh #14-19, viz BACKLOG.md), objevené jako vedlejší nález při ověřování opravy výš:
+  - 3× selektor `#mapa .leaflet-container` → `#mapa.leaflet-container` (bez mezery) v testech „Mapa se vykreslí (Leaflet)", „Seznam míst pod mapou...", „Klik na řádek v seznamu míst...". Leaflet stamps třídu `leaflet-container` přímo na `#mapa` (element předaný do `L.map(id)`), ne na vnořený potomek — descendant selektor s mezerou proto nikdy nemohl nic najít, nezávisle na časovém závodu výš. Ověřeno přímou DOM inspekcí (`#mapa .leaflet-container` → 0 shod, `#mapa.leaflet-container` → 1 shoda).
+  - Keyword `Otevřít radar na mobilním viewportu` doplněn o `Wait For Elements State .karta >> nth=0 visible` (dřív čekal jen na `header h1`) — testy „Kalendář/Mapa lze otevřít... (mobil)" klikaly na `#kalendar-toggle`/`#mapa-toggle` dřív, než appka stihla doběhnout `init()` a navěsit listenery (samostatný, na Leaflet nezávislý časový závod v testu samotném, ne v appce).
+### Poznámka k architektuře
+- Node testy beze změny (431) — `inicializovatMapuAzPripravena_()` je DOM/timer-heavy (script element, event listenery, `setTimeout`), stejná kategorie jako ostatní DOM-vykreslovací funkce bez Node pokrytí, spoléhá na RF.
+- Diagnostika: `file://` lokální kopie `Index.html` s reálnými fetch voláními proti nasazené `EXEC_URL` posloužila k ověření opravy PŘED nasazením (appka natahuje data vždy přes napevno zapsanou Apps Script URL, bez ohledu na to, odkud se HTML samo načetlo — CORS z `file://` originu funguje).
+- Živě ověřeno: 5 původně selhávajících testů + celá sada (39/39) proti `file://` kopii s opravou, pak znovu po nasazení proti `kulturniradar.cz`. Jeden dodatečný, nesouvisející nález při plné sadě: test „Notifikace: vygenerování ntfy tématu..." jednou selhal na timeoutu při ukládání (ponechal `rf-test` s dočasně zapnutým kanálem ntfy) — potvrzeno jako jednorázový zákmit (rerun prošel čistě), účet ručně vrácen do `kanaly:[]` a ověřeno ze serveru.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Index v3.55"`), ověřeno `?api=meta`. Backend (`kulturni_radar.gs`) se touhle změnou nedotkl, `VERZE` konstanta zůstává 3.33.
+
 ## Backend v3.33 + Index.html v3.54 — Notifikace: frontend UI (krok E) — 21. 8. 2026
 ### Přidáno
 - **Nová sekce „Notifikace" v `#filtry-dialog`** (rozšíření existujícího „Můj profil" panelu, ne nový modal), po poli Dojezd, před akčními tlačítky: dva checkboxy kanálu (E-mail/Push-ntfy), pole e-mailu a blok ntfy tématu podmíněně viditelné jen podle zaškrtnutého kanálu (`prekreslitNotifOblasti_`), `<select>` frekvence s presety 1/3/7/14/30 dní, statický popisek obsahu (`obsah: ['kategorie']` posílá handler implicitně — žádný checkbox, jediná dnes podporovaná hodnota).
