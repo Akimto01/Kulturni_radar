@@ -655,6 +655,84 @@ Kalendář lze otevřít a zavřít přes #kalendar-toggle (mobil)
     Click    ${FRAME} \#kalendar-toggle
     Wait For Elements State    ${FRAME} \#kalendar-panel.otevreno    detached    timeout=5s
 
+Kalendář: navigace mezi měsíci mění nadpis měsíce/roku
+    [Documentation]    v3.55 (testovací dluh, krok 3 auditu): #kalendar-dalsi/
+    ...    #kalendar-predchozi volají posunoutMesic_(), které přepíše
+    ...    #kalendar-nazev-mesice (a přerenderuje mřížku). Appka běží proti
+    ...    reálnému "dnes", proto se ověřuje jen ZMĚNA textu a návrat na
+    ...    původní hodnotu, ne konkrétní očekávaný měsíc – žádná závislost
+    ...    na produkčních datech.
+    ${mesic_puvodni}=    Get Text    ${FRAME} \#kalendar-nazev-mesice
+    Click    ${FRAME} \#kalendar-dalsi
+    ${mesic_dalsi}=    Get Text    ${FRAME} \#kalendar-nazev-mesice
+    Should Not Be Equal    ${mesic_dalsi}    ${mesic_puvodni}
+    ...    msg=Klik na #kalendar-dalsi měl změnit nadpis měsíce
+    Click    ${FRAME} \#kalendar-predchozi
+    ${mesic_zpet}=    Get Text    ${FRAME} \#kalendar-nazev-mesice
+    Should Be Equal    ${mesic_zpet}    ${mesic_puvodni}
+    ...    msg=Návrat přes #kalendar-predchozi měl vrátit původní měsíc
+
+Kalendář: klik na den s akcí odscrolluje na odpovídající sekci v seznamu
+    [Documentation]    v3.55 (testovací dluh, krok 3 auditu): skocitNaDen_
+    ...    scrolluje na #den-<iso>, pokud existuje – dlouhodobé akce v sekci
+    ...    "Probíhá / dlouhodobé" vlastní cíl nemají, klik se pak tiše
+    ...    neprojeví (viz komentář u skocitNaDen_ v Index.html). Test proto
+    ...    hledá PRVNÍ .ma-akce buňku s existujícím cílem, ne nutně první
+    ...    buňku vůbec – jinak podmíněně přeskočí (viz WARN větev), ať
+    ...    nezávisí na tom, jestli aktuální měsíc takový den má.
+    ...
+    ...    POZNÁMKA: Evaluate JavaScript tu čte přímo interní proměnné/
+    ...    funkce appky (kalendarRok, kalendarMesic, isoDatum_) kvůli
+    ...    spárování buňky s cílovým ID (buňka v DOM sama žádné ISO
+    ...    nenese) – test je tak vázaný na tyhle konkrétní názvy; při
+    ...    jejich přejmenování při budoucím refaktoru může tiše spadnout
+    ...    bez souvislosti se skutečným bugem. Evaluace běží na úrovni
+    ...    celé stránky (ne přes ${FRAME}-scoped selector), což odpovídá
+    ...    výchozímu SITE_URL bez iframe (viz hlavička souboru).
+    ${pocet}=    Get Element Count    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce
+    IF    ${pocet} == 0
+        Log    Aktuální měsíc nemá žádný den s akcí (.ma-akce) – test nemá co ověřit v tomto běhu.    level=WARN
+    ELSE
+        ${cil_iso}=    Set Variable    ${EMPTY}
+        ${cil_index}=    Set Variable    ${-1}
+        FOR    ${i}    IN RANGE    ${pocet}
+            ${den_text}=    Get Text    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce >> nth=${i}
+            ${iso}=    Evaluate JavaScript    ${None}    isoDatum_(new Date(kalendarRok, kalendarMesic, ${den_text}))
+            ${existuje}=    Get Element Count    ${FRAME} \#den-${iso}
+            IF    ${existuje} > 0
+                ${cil_iso}=    Set Variable    ${iso}
+                ${cil_index}=    Set Variable    ${i}
+                Exit For Loop
+            END
+        END
+        IF    "${cil_iso}" == "${EMPTY}"
+            Log    Žádný den s akcí v aktuálním měsíci nemá odpovídající #den-<iso> sekci (jen dlouhodobé akce bez vlastního data) – test nemá co ověřit v tomto běhu.    level=WARN
+        ELSE
+            Click    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce >> nth=${cil_index}
+            Wait Until Keyword Succeeds    5x    300ms
+            ...    Cíl dne musí být poblíž horního okraje viewportu    ${cil_iso}
+        END
+    END
+
+Kalendář: hover na den s akcí zobrazí tooltip s názvy akcí, mouseout ho schová
+    [Documentation]    v3.55 (testovací dluh, krok 3 auditu): tooltip
+    ...    (zobrazitTooltipKalendare_) obsahuje jen holé názvy akcí – jeden
+    ...    <div> na název, žádné datum ani počet – proto se ověřuje jen
+    ...    neprázdnost obsahu, ne konkrétní text (ten se v datech mění).
+    ${pocet}=    Get Element Count    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce
+    IF    ${pocet} == 0
+        Log    Aktuální měsíc nemá žádný den s akcí (.ma-akce) – test nemá co ověřit v tomto běhu.    level=WARN
+    ELSE
+        Hover    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce >> nth=0
+        Wait For Elements State    ${FRAME} \#kalendar-tooltip.zobrazeno    visible    timeout=3s
+        ${pocet_radku}=    Get Element Count    ${FRAME} \#kalendar-tooltip > div
+        Should Be True    ${pocet_radku} >= 1    Tooltip má obsahovat aspoň jeden název akce
+        ${prvni_radek}=    Get Text    ${FRAME} \#kalendar-tooltip > div >> nth=0
+        Should Not Be Empty    ${prvni_radek}    msg=První řádek tooltipu nemá být prázdný
+        Hover    ${FRAME} header h1
+        Wait For Elements State    ${FRAME} \#kalendar-tooltip.zobrazeno    hidden    timeout=3s
+    END
+
 Mapa lze otevřít a zavřít přes #mapa-toggle (mobil)
     [Documentation]    M) Stejný sbalitelný vzor jako kalendář (v3.40,
     ...    test výš), nezávislý na kalendáři – vlastní třída .otevreno na
@@ -760,6 +838,16 @@ Header a #controls-oznaceni zůstávají viditelné po scrollu (sticky)
     ...    msg=#controls-oznaceni (sticky) změnilo Y pozici po scrollu: ${oznaceni_y_pred} → ${oznaceni_y_po}
 
 *** Keywords ***
+Cíl dne musí být poblíž horního okraje viewportu
+    [Documentation]    Pomocná keyword pro „Kalendář: klik na den s akcí
+    ...    odscrolluje..." – scrollIntoView({behavior:'smooth', block:'start'})
+    ...    může pár framů trvat, proto se volá přes Wait Until Keyword
+    ...    Succeeds, ne jednorázově.
+    [Arguments]    ${iso}
+    ${top}=    Evaluate JavaScript    ${None}    document.getElementById('den-${iso}').getBoundingClientRect().top
+    Should Be True    -100 <= ${top} <= 400
+    ...    #den-${iso} není poblíž horního okraje viewportu po scrollIntoView (top=${top})
+
 Zjistit je-li ikona první karty aktivní
     [Arguments]    ${trida_ikony}
     ${trida}=    Get Attribute    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.${trida_ikony}    class

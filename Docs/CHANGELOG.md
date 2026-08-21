@@ -1,5 +1,16 @@
 # Changelog
 
+## RF testy (bez bump verze) — Kalendář: navigace, klik→scroll, tooltip (testovací dluh, krok 3 auditu) — 21. 8. 2026
+### Přidáno
+- **„Kalendář: navigace mezi měsíci mění nadpis měsíce/roku"** — ověřuje `#kalendar-predchozi`/`#kalendar-dalsi` (`posunoutMesic_`) tak, že sleduje ZMĚNU textu `#kalendar-nazev-mesice` a návrat na původní hodnotu (round-trip dalsi→predchozi), ne konkrétní očekávaný měsíc — appka běží proti reálnému „dnes", žádná závislost na produkčních datech.
+- **„Kalendář: klik na den s akcí odscrolluje na odpovídající sekci v seznamu"** — protože buňka dne v DOM nenese žádné ISO datum (jen `textContent` = číslo dne), test spočítá ISO datum pro každou `.ma-akce` buňku přes `Evaluate JavaScript` (`isoDatum_(new Date(kalendarRok, kalendarMesic, den))` — čte přímo top-level proměnné appky, jsou dostupné, protože appka neběží v IIFE), najde první buňku s existujícím `#den-<iso>` cílem (dlouhodobé akce v sekci „Probíhá/dlouhodobé" cíl nemají, viz `skocitNaDen_`) a ověří scroll přes `getBoundingClientRect().top` blízko horního okraje viewportu (přesnější signál než jen změna `scrollY`), s `Wait Until Keyword Succeeds` kvůli `behavior:'smooth'`. Podmíněné na existenci aspoň jedné `.ma-akce` buňky s platným cílem — jinak `Log WARN` a přeskočí (stejný vzor jako „Sekce stálých míst").
+- **„Kalendář: hover na den s akcí zobrazí tooltip s názvy akcí, mouseout ho schová"** — `Hover` na `.ma-akce` buňku ověří `#kalendar-tooltip.zobrazeno` + neprázdný obsah (tooltip obsahuje jen holé názvy akcí, žádné datum/počet), `Hover` na jiný prvek ověří schování. Podmíněné stejně jako výš.
+### Poznámka k architektuře
+- Node testy beze změny (431) — pure logika (`sestavKalendarMrizku_`, `vypocitejPoziciTooltipuKalendare_`, `akceDnePodleData_`) už dřív pokrytá, tahle trojice doplňuje E2E vrstvu.
+- Test „klik→scroll" je vědomě zdokumentovaný jako vázaný na konkrétní interní názvy (`kalendarRok`/`kalendarMesic`/`isoDatum_`) — při budoucím refaktoru může tiše spadnout bez souvislosti se skutečným bugem, viz komentář přímo v testu.
+- Živě ověřeno proti `kulturniradar.cz`: celá sada 44/44 (41 předchozích + 3 nové). Oba podmíněné testy prošly REÁLNOU ověřovací větví (žádný WARN skip) — srpen 2026 měl dostatek dat (7 z 8 `.ma-akce` dnů s platným scroll cílem).
+- Žádný produkční kód se touhle změnou nedotkl — jen `tests/robot/frontend.robot`, deploy nebyl potřeba.
+
 ## RF testy (bez bump verze) — Kontaktní formulář: plný E2E cyklus + cooldown (testovací dluh, krok 2 auditu) — 21. 8. 2026
 ### Přidáno
 - **„Kontaktní formulář: prázdná zpráva zobrazí inline chybu (bez odeslání)"** — ověřuje klientskou validaci (`kontakt-odeslat` handler v `Index.html`), která se vrací PŘED voláním serveru — žádný network request, nulové riziko, lze spouštět opakovaně.
