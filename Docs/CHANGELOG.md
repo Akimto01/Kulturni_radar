@@ -1,5 +1,16 @@
 # Changelog
 
+## Index.html v3.52 — Roční přehled (Část 1): souhrnná statistika nad „✓ Navštívené“ — 21. 8. 2026
+### Přidáno
+- **`spocitatStatistikuNavstivenych_`** (PURE) — agreguje statistiku nad už vyfiltrovaným seznamem navštívených akcí (výstup `filtrovatNavstivenaPodleObdobi_` + `filtrovatOblibenaMista_`): počet, rozpad podle hlavní kategorie (`a.kategorie[0]`, fallback `'ostatní'`), rozpad podle místa (`misto (obec)`, fallback `'neuvedeno'`).
+- **`vykreslitStatistikuNavstivenych_`** (DOM) — vykreslí souhrnný box (počet + kategorie + top 5 míst) nad karty v pohledu „✓ Navštívené", volané z `prekreslit()` hned po `renderSpecialni` se stejným `seznam`, takže souhrn vždy odpovídá aktivnímu období (`obdobi-select`) i filtru „🏛 Oblíbená místa". Nic nevykreslí u prázdného seznamu (prázdný stav už řeší text z `renderSpecialni`).
+- CSS `#navstivene-statistika`/`.navstivene-stat-pocet`/`.navstivene-stat-radek`, převzato ze stylu existující `.misto-karta`.
+### Poznámka k architektuře
+- Čistě frontend, žádný zásah do `kulturni_radar.gs` — data (kategorie, místo, `navstivenoDne`) i period-select už existovaly, stačila nová agregace. Kategorie/místo odráží AKTUÁLNÍ data akce (`apiEvents` je dohledává živě podle ID, OZNAČENÍ samo kategorii neukládá), ne stav v době návštěvy.
+- Node testy 380 → 385 (+5 pro `spocitatStatistikuNavstivenych_`).
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.52"`), ověřeno `?api=meta` → HTTP 200, `ok:true` (backend `VERZE` beze změny, 3.29 — měnil se jen Index.html).
+- Součást spárované položky „Roční přehled + Doporučení podle historie" (BACKLOG.md) — Část 2 (Doporučení podle historie navštívených akcí) navazuje jako samostatná session.
+
 ## Backend v3.29 — Email zpracování návrhů: fronta EMAIL_TIPY, webhook, AI ověření webem — 20. 8. 2026
 ### Přidáno
 - **A) Fronta EMAIL_TIPY + webhook příjem** — nový list `EMAIL_TIPY` (`ensureEmailTipySheet_`, vzniká automaticky při prvním tipu), nový endpoint `apiEmailTip_` v `routePost_` (`akce: 'email-tip'`). Autentizace přes VLASTNÍ sdílený token `EMAIL_WEBHOOK_TOKEN` (Script Property) — záměrně ne stejný jako `WEB_TOKEN` (jiná důvěryhodnostní hranice: únik webhook tokenu smí nanejvýš naplnit frontu textem k ověření, ne spustit přímé AI hledání). Endpoint jen zapisuje do fronty a hned odpovídá (žádné volání Anthropic API při příjmu mailu) — zpracování běží v denním rytmu, ne synchronně. Limit délky textu `EMAIL_TIP_TEXT_MAX = 5000` znaků.

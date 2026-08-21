@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.51 – oprava - folklorni podkategorie se neplete do filtru jinych kategorii -->
+<!-- Kulturní radar Index.html v3.52 – Rocni prehled: souhrnna statistika (pocet/kategorie/mista) nad navstivenymi akcemi -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -422,6 +422,16 @@
   }
   .misto-nazev { font-weight: 600; font-size: .95rem; }
   .misto-meta { font-size: .82rem; color: var(--ink-2); margin-top: 3px; }
+
+  /* ── Navštívené: souhrnná statistika za období (v3.52) ──────── */
+  #navstivene-statistika {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 8px;
+  }
+  .navstivene-stat-pocet { font-weight: 600; font-size: .95rem; }
+  .navstivene-stat-radek { font-size: .82rem; color: var(--ink-2); margin-top: 3px; }
   .misto-skore {
     font-family: var(--mono);
     font-size: .7rem;
@@ -2759,6 +2769,7 @@
       const seznam = filtrovatOblibenaMista_(
         filtrovatNavstivenaPodleObdobi_(vsechnaAkce, obdobiNavstivene, new Date()), filtrOblibenaMista);
       renderSpecialni(seznam, 'V tomto období nemáte žádné navštívené akce.');
+      vykreslitStatistikuNavstivenych_(seznam);
     } else if (rezimZobrazeni === 'neoverene') {
       const dnes = new Date();
       dnes.setHours(0, 0, 0, 0);
@@ -2793,6 +2804,64 @@
     }
     seznam.sort((a, b) => dateKeyBezpecne_(b.navstivenoDne) - dateKeyBezpecne_(a.navstivenoDne));
     return seznam;
+  }
+
+  /** PURE (v3.52): agreguje statistiku nad už vyfiltrovaným seznamem
+   *  navštívených akcí (výstup filtrovatNavstivenaPodleObdobi_ +
+   *  filtrovatOblibenaMista_) – počet, rozpad podle (hlavní) kategorie a
+   *  podle místa konání. Kategorie/místo odráží AKTUÁLNÍ data akce (apiEvents
+   *  je dohledává živě podle ID, OZNAČENÍ samo kategorii neukládá) – u
+   *  případné zpětné změny kategorie akce by tedy přehled ukázal novou
+   *  hodnotu, ne tu z doby návštěvy. */
+  function spocitatStatistikuNavstivenych_(seznam) {
+    const podleKategorie = {};
+    const podleMista = {};
+    seznam.forEach(a => {
+      const kat = (a.kategorie && a.kategorie[0]) || 'ostatní';
+      podleKategorie[kat] = (podleKategorie[kat] || 0) + 1;
+      const misto = a.misto ? (a.obec ? a.misto + ' (' + a.obec + ')' : a.misto) : 'neuvedeno';
+      podleMista[misto] = (podleMista[misto] || 0) + 1;
+    });
+    return { pocet: seznam.length, podleKategorie, podleMista };
+  }
+
+  /** v3.52: vykreslí souhrnnou statistiku nad seznamem navštívených akcí
+   *  (počet, rozpad podle kategorie a místa) nad karty v pohledu „✓
+   *  Navštívené" – DOM only, výpočet je ve spocitatStatistikuNavstivenych_.
+   *  Volané z prekreslit() hned po renderSpecialni, ať je vždy v sync s
+   *  aktuálně filtrovaným seznamem (obdobi-select i filtr oblíbených míst).
+   *  Nová `main.prepend` sekce se stará předchozí smaže sama – renderSpecialni/
+   *  renderAkce při každém překreslení odstraní z #main vše kromě
+   *  #mista-sekce, viz jejich clear-loop. Nic nevykreslí u prázdného seznamu –
+   *  prázdný stav už řeší text z renderSpecialni. */
+  function vykreslitStatistikuNavstivenych_(seznam) {
+    const main = document.getElementById('main');
+    if (!main || !seznam.length) return;
+    const s = spocitatStatistikuNavstivenych_(seznam);
+    const razeno = obj => Object.entries(obj).sort((a, b) => b[1] - a[1]);
+
+    const el = document.createElement('div');
+    el.id = 'navstivene-statistika';
+
+    const pocetEl = document.createElement('div');
+    pocetEl.className = 'navstivene-stat-pocet';
+    pocetEl.textContent = s.pocet + ' navštívených akcí';
+    el.appendChild(pocetEl);
+
+    const kategorieEl = document.createElement('div');
+    kategorieEl.className = 'navstivene-stat-radek';
+    kategorieEl.textContent = 'Kategorie: ' + razeno(s.podleKategorie).map(([k, n]) => k + ' (' + n + ')').join(', ');
+    el.appendChild(kategorieEl);
+
+    const mistaText = razeno(s.podleMista).slice(0, 5).map(([m, n]) => m + ' (' + n + ')').join(', ');
+    if (mistaText) {
+      const mistaEl = document.createElement('div');
+      mistaEl.className = 'navstivene-stat-radek';
+      mistaEl.textContent = 'Místa: ' + mistaText;
+      el.appendChild(mistaEl);
+    }
+
+    main.prepend(el);
   }
 
   // ── ★ Oblíbené / ✓ Navštívené ──────────────────────────────

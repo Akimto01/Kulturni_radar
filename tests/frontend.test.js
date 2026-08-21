@@ -9,7 +9,7 @@ const { nactiFrontendFunkce } = require('./frontend-harness');
 
 const f = nactiFrontendFunkce([
   'parseCeskeDatum', 'dateKeyBezpecne_', 'pad2_', 'gcalUrl_',
-  'filtrovatNavstivenaPodleObdobi_', 'jeNeoverena_', 'jeNeoverenaBezUrl_', 'sestavTextSdileni_', 'mapsUrl_',
+  'filtrovatNavstivenaPodleObdobi_', 'spocitatStatistikuNavstivenych_', 'jeNeoverena_', 'jeNeoverenaBezUrl_', 'sestavTextSdileni_', 'mapsUrl_',
   'klicMistoUkladani_', 'akceSeStejnymMistem_',
   'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
   'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
@@ -132,6 +132,51 @@ test('filtrovatNavstivenaPodleObdobi_: řadí od nejnovější návštěvy', () 
   const vysledek = f.filtrovatNavstivenaPodleObdobi_(
     [akce('1. 8. 2026'), akce('3. 8. 2026'), akce('2. 8. 2026')], 'vse', TED);
   assert.deepEqual(vysledek.map(a => a.navstivenoDne), ['3. 8. 2026', '2. 8. 2026', '1. 8. 2026']);
+});
+
+// ---------------------------------------------------------------------------
+// spocitatStatistikuNavstivenych_ – souhrn nad „✓ Navštívené“ (Roční přehled)
+// ---------------------------------------------------------------------------
+
+function navstiveny(kategorie, misto, obec) {
+  return { kategorie: kategorie ? [kategorie] : [], misto: misto || '', obec: obec || '' };
+}
+
+test('spocitatStatistikuNavstivenych_: prázdný seznam → počet 0, prázdné rozpady', () => {
+  const s = f.spocitatStatistikuNavstivenych_([]);
+  assert.equal(s.pocet, 0);
+  assert.equal(Object.keys(s.podleKategorie).length, 0);
+  assert.equal(Object.keys(s.podleMista).length, 0);
+});
+
+test('spocitatStatistikuNavstivenych_: počítá výskyty podle první kategorie', () => {
+  const s = f.spocitatStatistikuNavstivenych_([
+    navstiveny('koncerty', 'Sono Centrum', 'Brno'),
+    navstiveny('koncerty', 'Stadion', 'Brno'),
+    navstiveny('divadlo', 'Mahenovo divadlo', 'Brno'),
+  ]);
+  assert.equal(s.pocet, 3);
+  assert.equal(s.podleKategorie.koncerty, 2);
+  assert.equal(s.podleKategorie.divadlo, 1);
+});
+
+test('spocitatStatistikuNavstivenych_: akce bez kategorie spadne pod "ostatní"', () => {
+  const s = f.spocitatStatistikuNavstivenych_([navstiveny(null, 'X')]);
+  assert.equal(s.podleKategorie['ostatní'], 1);
+});
+
+test('spocitatStatistikuNavstivenych_: místo se skládá z misto+obec, bez obce jen misto', () => {
+  const s = f.spocitatStatistikuNavstivenych_([
+    navstiveny('koncerty', 'Sono Centrum', 'Brno'),
+    navstiveny('koncerty', 'Nádvoří', ''),
+  ]);
+  assert.equal(s.podleMista['Sono Centrum (Brno)'], 1);
+  assert.equal(s.podleMista['Nádvoří'], 1);
+});
+
+test('spocitatStatistikuNavstivenych_: akce bez místa spadne pod "neuvedeno"', () => {
+  const s = f.spocitatStatistikuNavstivenych_([navstiveny('koncerty', '')]);
+  assert.equal(s.podleMista['neuvedeno'], 1);
 });
 
 // ---------------------------------------------------------------------------
