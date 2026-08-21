@@ -1784,6 +1784,108 @@ test('v3.30: routePost_ – akce "set-notifikace"/"vygenerovat-ntfy-tema" se rou
   assert.match(tema.ntfyTema, /^radar-/);
 });
 
+// ---------------------------------------------------------------------------
+// v3.31: NOTIFIKACE krok C – digestProUzivatele_ (obsah „podle kategorií")
+// + regresní test, že digestRange_ po extrakci sestavBlokyAkci_ dává
+// STEJNÝ výstup jako dřív (MemSheet/fakeSpreadsheet/fakeKriteria_ jsou
+// definované níže v souboru, viz poznámka u NOTIFIKACE testů výš).
+// ---------------------------------------------------------------------------
+
+/** Sestaví jeden řádek AKCE (25 sloupců, jen podstatné vyplněné) pro testy
+ *  digestu – obec záměrně '' (weatherFor_ se pak vrátí hned bez fetch). */
+function akceRadekDigest_(id, datumOd, nazev, kategorie, stav, profil) {
+  const row = new Array(25).fill('');
+  row[0] = id; row[1] = datumOd; row[2] = datumOd; row[3] = '20:00';
+  row[4] = nazev; row[6] = ''; row[8] = kategorie;
+  row[13] = stav || 'potvrzeno';
+  row[24] = profil;
+  return row;
+}
+
+function digestSs_(uzivateleRows, akceRows) {
+  return fakeSpreadsheet({
+    'UŽIVATELÉ': new MemSheet([[]].concat(uzivateleRows)),
+    'KRITÉRIA': fakeKriteria_({ B2: 'Brno' }),
+    AKCE: new MemSheet([[]].concat(akceRows)),
+  });
+}
+
+test('v3.31: digestProUzivatele_ – uživatel s nastavenými kategoriemi vidí jen svoje', () => {
+  const ctx = nactiRadar();
+  const ss = digestSs_(
+    [['vojta', 'Vojta', 'h', '{"kategorie":"koncerty"}', '']],
+    [
+      akceRadekDigest_('a1', '25. 8. 2026', 'Koncert Kabátů', 'koncerty', 'potvrzeno', 'Brno'),
+      akceRadekDigest_('a2', '26. 8. 2026', 'Hamlet', 'divadlo', 'potvrzeno', 'Brno'),
+    ]);
+  const from = new Date(2026, 7, 24), to = new Date(2026, 7, 30);
+  const vysledek = ctx.digestProUzivatele_(ss, 'vojta', from, to);
+  assert.equal(vysledek.ok, true);
+  assert.equal(vysledek.pocetAkci, 1);
+  assert.ok(vysledek.text.includes('Koncert Kabátů'));
+  assert.ok(!vysledek.text.includes('Hamlet'), 'divadlo není v uživatelových kategoriích – nesmí se objevit');
+});
+
+test('v3.31: digestProUzivatele_ – uživatel bez nastavených kategorií vidí vše (žádný filtr)', () => {
+  const ctx = nactiRadar();
+  const ss = digestSs_(
+    [['vojta', 'Vojta', 'h', '{}', '']],
+    [
+      akceRadekDigest_('a1', '25. 8. 2026', 'Koncert Kabátů', 'koncerty', 'potvrzeno', 'Brno'),
+      akceRadekDigest_('a2', '26. 8. 2026', 'Hamlet', 'divadlo', 'potvrzeno', 'Brno'),
+    ]);
+  const from = new Date(2026, 7, 24), to = new Date(2026, 7, 30);
+  const vysledek = ctx.digestProUzivatele_(ss, 'vojta', from, to);
+  assert.equal(vysledek.ok, true);
+  assert.equal(vysledek.pocetAkci, 2);
+  assert.ok(vysledek.text.includes('Koncert Kabátů'));
+  assert.ok(vysledek.text.includes('Hamlet'));
+});
+
+test('v3.31: digestProUzivatele_ – žádné akce v období → ok:true, pocetAkci:0, rozumný prázdný text', () => {
+  const ctx = nactiRadar();
+  const ss = digestSs_([['vojta', 'Vojta', 'h', '{}', '']], []);
+  const from = new Date(2026, 7, 24), to = new Date(2026, 7, 30);
+  const vysledek = ctx.digestProUzivatele_(ss, 'vojta', from, to);
+  assert.equal(vysledek.ok, true);
+  assert.equal(vysledek.pocetAkci, 0);
+  assert.match(vysledek.text, /žádné akce/);
+});
+
+test('v3.31: digestProUzivatele_ – bez uzivatelId nebo neznámý profil vrací ok:false', () => {
+  const ctx = nactiRadar();
+  const ss = digestSs_([['vojta', 'Vojta', 'h', '{}', '']], []);
+  const from = new Date(2026, 7, 24), to = new Date(2026, 7, 30);
+  assert.equal(ctx.digestProUzivatele_(ss, '', from, to).ok, false);
+  assert.equal(ctx.digestProUzivatele_(ss, 'nikdo', from, to).ok, false);
+});
+
+test('v3.31: digestRange_ po extrakci sestavBlokyAkci_ – REGRESE: stejný obsah jako dřív', () => {
+  const ctx = nactiRadar({ properties: { NOTIFY_EMAIL: 'rodina@example.com' } });
+  const ss = digestSs_([], [
+    akceRadekDigest_('a1', '25. 8. 2026', 'Koncert Kabátů', 'koncerty', 'potvrzeno', 'Brno'),
+    akceRadekDigest_('a2', '26. 8. 2026', 'Hamlet', 'divadlo', 'potvrzeno', 'Brno'),
+  ]);
+  // digestRange_ bere ss přes SpreadsheetApp.getActiveSpreadsheet(), ne jako
+  // parametr (na rozdíl od digestProUzivatele_) – přepsat stub jen pro tenhle test.
+  ctx.SpreadsheetApp.getActiveSpreadsheet = () => ss;
+  const from = new Date(2026, 7, 24), to = new Date(2026, 7, 30);
+  ctx.digestRange_('Týdenní přehled', from, to);
+
+  const mail = ctx.__odeslaneEmaily.find(m => m.komu === 'rodina@example.com');
+  assert.ok(mail, 'e-mail se odeslal na NOTIFY_EMAIL');
+  // Přesně stejná struktura jako před refaktorem: hlavička s profilem a
+  // obdobím, kategorie seřazené abecedně (Divadlo před Koncerty), datum +
+  // název u každé položky, odkaz na konci.
+  assert.ok(mail.telo.startsWith('Brno · 24. 8. 2026–30. 8. 2026'));
+  assert.ok(mail.telo.indexOf('Divadlo') < mail.telo.indexOf('Koncerty'), 'kategorie abecedně (cs)');
+  assert.ok(mail.telo.includes('26. 8. 2026 — Hamlet'));
+  assert.ok(mail.telo.includes('25. 8. 2026 — Koncert Kabátů'));
+  assert.ok(mail.telo.endsWith('Kompletní přehled: https://sheet.example/test'));
+  assert.ok(mail.options.htmlBody.includes('<strong>Divadlo</strong>'));
+  assert.ok(mail.options.htmlBody.includes('<strong>Koncerty</strong>'));
+});
+
 test('v3.20: sirotci s neexistujícím uživatelem – filtr nad řádky OZNAČENÍ', () => {
   // Logika ze samotestu: záznam s uzivatel mimo platnou množinu je sirotek;
   // prázdný uzivatel (historický formát) se za sirotka nepovažuje.

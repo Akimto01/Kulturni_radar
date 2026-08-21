@@ -1,5 +1,18 @@
 # Changelog
 
+## Backend v3.31 — Notifikace: obsah „podle kategorií" (krok C) — 21. 8. 2026
+### Přidáno
+- **`digestProUzivatele_(ss, uzivatelId, from, to)`** — sestaví TEXTOVÝ i HTML obsah personalizovaného digestu pro JEDNOHO uživatele, filtrovaný podle jeho osobních kategorií (`UŽIVATELÉ.Filtry.kategorie`, volný text stejného formátu jako `KRIT.KATEGORIE`), místo celého rodinného profilu. Čistá funkce bez side-effectů — nevolá `sendNotification_` ani Anthropic API, jen čte už ověřená data přes `readEventsInRange_` (stejný zdroj jako `digestRange_`). Vrací `{ ok, pocetAkci, hlavicka, text, html }`; odeslání je úkolem budoucího odesílacího jobu (krok D).
+- Prázdné/chybějící `Filtry.kategorie` → žádný filtr, zobrazí se vše z okna (stejná konvence jako frontendové `filtrovatKategorii_` — „prázdná množina = žádný filtr"), ne prázdný obsah.
+- **`sestavBlokyAkci_(evs, profil, prazdnyText)`** — extrahováno z `digestRange_` (seskupení akcí podle kategorie, vložení data/času/počasí do detailů), teď sdílené mezi family-wide `digestRange_` a novým `digestProUzivatele_`, ať existuje jen JEDNA verze formátování položky digestu. `digestRange_` refaktorován na volání této funkce — mechanická extrakce, beze změny chování (ověřeno regresním testem).
+- 5 nových Node testů: `digestProUzivatele_` (uživatel s kategoriemi, bez kategorií, žádné akce v období, neznámý profil) + regresní test `digestRange_` (přesný obsah e-mailu/HTML shodný s chováním před extrakcí).
+### Poznámka k architektuře
+- Node testy 407 → 412 (+5).
+- **Známé omezení** (existující limitace celého systému, ne něco, co tenhle krok zavádí nově — viz BACKLOG.md): `readEventsInRange_`/`digestProUzivatele_` berou jen JEDNO aktivní město z KRITÉRIÍ pro celou domácnost, osobní digest dnes nemůže sledovat jiné město, než je zrovna aktivní.
+- Vědomě mimo rozsah kroku C: sekce „Stálá místa" (není kategorie-related, ponecháno jen v `digestRange_`).
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.31"`), ověřeno `?api=meta` → `"verze":"3.31"`.
+- **Kroky D–F (odesílací trigger + dry-run, frontend UI, testy/nasazení) zůstávají pro příští session.** Krok G (obsah „doporučení") zůstává vědomě odloženo, viz BACKLOG.md.
+
 ## Backend v3.30 — Notifikace: datový model + backend API (kroky A–B) — 21. 8. 2026
 ### Přidáno
 - **A) Datový model** — nový sloupec `Notifikace` (6.) v listu `UŽIVATELÉ` (`UZIVATELE_HLAVICKA`), JSON blob per uživatel: `{ kanaly: ['email','ntfy'], email, ntfyTema, frekvenceDny, obsah: ['kategorie'], posledniOdeslano }`. `readUzivatele_` čte i tenhle sloupec (chybějící/starý 5-sloupcový řádek → prázdný text → `{}`, žádný pád). Jednorázová migrace `migraceNotifikaceSloupec_()` (nová položka v menu Sheets) doplní hlavičku F1 na existujícím produkčním listu — nové listy ji mají automaticky přes `ensureUzivateleSheet_`.

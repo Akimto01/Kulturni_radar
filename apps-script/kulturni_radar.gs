@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.30 (21. 8. 2026) – Notifikace: datový model + backend API (kroky A–B)
- * (předchozí: 3.29 – Email tipy: fronta + webhook + AI ověření + report)
+ * Verze: 3.31 (21. 8. 2026) – Notifikace: obsah „podle kategorií" (krok C)
+ * (předchozí: 3.30 – Notifikace: datový model + backend API, kroky A–B)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -68,7 +68,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.30';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.31';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -2640,38 +2640,52 @@ function weekendDigest() {
   }
 }
 
+/** Sestaví pole bloků {nadpis, polozky:[{titulek, detaily}]} pro danou
+ *  množinu akcí – seskupené podle kategorie (abecedně, cs), s datem/časem
+ *  a počasím vloženým do detailů každé položky. Sdílený stavební blok mezi
+ *  family-wide digestRange_ a personalizovaným digestProUzivatele_ (v3.31,
+ *  krok C notifikací) – ať existuje jen JEDNA verze formátování položky
+ *  digestu, ne dvě mírně odlišné kopie, co se časem rozejdou.
+ *  `prazdnyText` je volitelný (výchozí = hláška family-wide digestu),
+ *  volající si může předat vlastní (např. zmínit aktivní filtr kategorií). */
+function sestavBlokyAkci_(evs, profil, prazdnyText) {
+  if (evs.length === 0) {
+    return [{ nadpis: prazdnyText || 'Na toto období nejsou v databázi žádné akce.', polozky: [] }];
+  }
+  const bloky = [];
+  const cache = {};
+  const skupiny = {};
+  evs.forEach(ev => {
+    const k = ev.kat || 'ostatní';
+    (skupiny[k] = skupiny[k] || []).push(ev);
+  });
+  Object.keys(skupiny).sort((a, b) => a.localeCompare(b, 'cs')).forEach(k => {
+    const blok = { nadpis: k.charAt(0).toUpperCase() + k.slice(1), polozky: [] };
+    skupiny[k].forEach(ev => {
+      const detaily = [];
+      if (ev.probihaOd) detaily.push('probíhá od ' + formatDateOnly_(ev.probihaOd));
+      if (ev.cas) detaily.push('čas: ' + ev.cas);
+      const w = weatherFor_(ev.obec, ev.den, cache);
+      if (w) detaily.push('počasí (' + (ev.obec || profil) + '): ' + w);
+      blok.polozky.push({ titulek: formatDateOnly_(ev.den) + ' — ' + ev.nazev, detaily });
+    });
+    bloky.push(blok);
+  });
+  return bloky;
+}
+
 /** Sestaví a odešle přehled akcí aktivního profilu v daném okně, s počasím.
  *  v3.6: staví datový model bloků a renderuje ho dvakrát – prostý text
- *  (ntfy, záloha) a HTML s předsazenými odrážkami (e-mail, mobil). */
+ *  (ntfy, záloha) a HTML s předsazenými odrážkami (e-mail, mobil).
+ *  v3.31: bloky-building extrahováno do sestavBlokyAkci_ (sdíleno s
+ *  digestProUzivatele_), beze změny chování. */
 function digestRange_(title, from, to, extraEmail) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const profil = String(ss.getSheetByName(SHEET.KRITERIA).getRange(KRIT.PROFIL).getDisplayValue()).trim();
   const evs = readEventsInRange_(ss, profil, from, to);
 
   const hlavicka = profil + ' \u00b7 ' + formatDateOnly_(from) + '\u2013' + formatDateOnly_(to);
-  const bloky = [];
-  if (evs.length === 0) {
-    bloky.push({ nadpis: 'Na toto období nejsou v databázi žádné akce.', polozky: [] });
-  } else {
-    const cache = {};
-    const skupiny = {};
-    evs.forEach(ev => {
-      const k = ev.kat || 'ostatní';
-      (skupiny[k] = skupiny[k] || []).push(ev);
-    });
-    Object.keys(skupiny).sort((a, b) => a.localeCompare(b, 'cs')).forEach(k => {
-      const blok = { nadpis: k.charAt(0).toUpperCase() + k.slice(1), polozky: [] };
-      skupiny[k].forEach(ev => {
-        const detaily = [];
-        if (ev.probihaOd) detaily.push('probíhá od ' + formatDateOnly_(ev.probihaOd));
-        if (ev.cas) detaily.push('čas: ' + ev.cas);
-        const w = weatherFor_(ev.obec, ev.den, cache);
-        if (w) detaily.push('počasí (' + (ev.obec || profil) + '): ' + w);
-        blok.polozky.push({ titulek: formatDateOnly_(ev.den) + ' \u2014 ' + ev.nazev, detaily });
-      });
-      bloky.push(blok);
-    });
-  }
+  const bloky = sestavBlokyAkci_(evs, profil);
   // Stálá místa – top 5 dle skóre, seskupená podle typu, počasí na sobotu v okně
   const mista = readMista_(ss, profil);
   if (mista.length) {
@@ -2702,6 +2716,60 @@ function digestRange_(title, from, to, extraEmail) {
     renderDigestText_(hlavicka, bloky, ss.getUrl()),
     renderDigestHtml_(hlavicka, bloky, ss.getUrl()),
     extraEmail);
+}
+
+/** v3.31 (krok C notifikací): sestaví TEXTOVÝ i HTML obsah personalizovaného
+ *  digestu pro JEDNOHO uživatele – analogické digestRange_, ale filtrované
+ *  podle jeho osobních kategorií (UŽIVATELÉ.Filtry.kategorie) místo celého
+ *  rodinného profilu. ŽÁDNÝ side-effect – nevolá sendNotification_ ani
+ *  Anthropic API, jen čte už ověřená data z AKCE (readEventsInRange_,
+ *  stejný zdroj jako digestRange_). Vrací hotový obsah; odeslání je úkolem
+ *  budoucího odesílacího jobu (krok D).
+ *
+ *  Kategorie ve Filtry jsou volný text (stejný formát jako KRIT.KATEGORIE
+ *  – uživatel si ho ručně napsal do #filtry-kategorie), porovnává se
+ *  case-insensitive přes norm_() proti ev.kat. Prázdné/chybějící
+ *  Filtry.kategorie = ŽÁDNÝ filtr, zobrazí se vše z okna – stejná
+ *  konvence jako frontendové filtrovatKategorii_ ("prázdná množina =
+ *  žádný filtr"), ne prázdný obsah: uživatel bez nastavené kategorie
+ *  pravděpodobně chce obecný přehled, ne ticho.
+ *
+ *  ZNÁMÉ OMEZENÍ (viz BACKLOG.md): readEventsInRange_ bere jen JEDNO
+ *  aktivní KRITERIA město pro celou domácnost – osobní digest dnes
+ *  nemůže sledovat jiné město, než je zrovna aktivní v KRITÉRIÍCH.
+ *  Existující limitace celého systému (stejně jako digestRange_), ne
+ *  něco, co tenhle krok zavádí nově.
+ *
+ *  Vědomě mimo rozsah (krok C): sekce "Stálá místa" z digestRange_ –
+ *  není kategorie-related, nechána na budoucí iteraci. */
+function digestProUzivatele_(ss, uzivatelId, from, to) {
+  const uzivatel = readUzivatele_(ss).find(u => u.id === uzivatelId);
+  if (!uzivatel) return { ok: false, error: 'profil nenalezen' };
+
+  let filtry = {};
+  try { filtry = uzivatel.filtry ? JSON.parse(uzivatel.filtry) : {}; } catch (e) { filtry = {}; }
+  const kategorie = new Set(
+    String(filtry.kategorie || '').split(';').map(k => norm_(k)).filter(Boolean));
+
+  const krit = ss.getSheetByName(SHEET.KRITERIA);
+  const profil = krit ? String(krit.getRange(KRIT.PROFIL).getDisplayValue()).trim() : '';
+  const vsechny = readEventsInRange_(ss, profil, from, to);
+  const evs = kategorie.size ? vsechny.filter(ev => kategorie.has(norm_(ev.kat))) : vsechny;
+
+  const hlavicka = uzivatel.jmeno + ' · ' + profil + ' · ' +
+    formatDateOnly_(from) + '–' + formatDateOnly_(to);
+  const prazdnyText = kategorie.size
+    ? 'Na toto období nejsou v databázi žádné akce ve tvých kategoriích.'
+    : 'Na toto období nejsou v databázi žádné akce.';
+  const bloky = sestavBlokyAkci_(evs, profil, prazdnyText);
+
+  return {
+    ok: true,
+    pocetAkci: evs.length,
+    hlavicka,
+    text: renderDigestText_(hlavicka, bloky, ss.getUrl()),
+    html: renderDigestHtml_(hlavicka, bloky, ss.getUrl()),
+  };
 }
 
 /** Prostý text digestu (ntfy + záloha pro e-mailové klienty bez HTML). */
