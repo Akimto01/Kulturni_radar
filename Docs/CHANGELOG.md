@@ -1,5 +1,16 @@
 # Changelog
 
+## RF testy (bez bump verze) — Responzivní pásma: 900px/1360px breakpointy (testovací dluh, krok 4 auditu) — 21. 8. 2026
+### Přidáno
+- **„Responzivní pásma: střední (900-1359px) omezí main na 656px a mapu zalomí pod obsah"** — běží na sdílené desktopové stránce ze Suite Setup (1280×900, uvnitř tohohle pásma, žádný nový Context), ověřuje `main` šířku přesně `656px` (`max-width` strop z `@media (min-width:900px) and (max-width:1359px)`) a že `#mapa-panel` je zalomená POD `main` (`y` mapy ≥ `main` `y`+`výška`).
+- **„Responzivní pásma: široké (≥1360px) main přesáhne 656px a mapa zůstává vedle obsahu"** — vlastní Context 1600px, ověřuje `main` šířku `> 656px` (strop zmizel) a že `#mapa-panel` je VEDLE `main` (podobná `y` pozice), ne pod ním.
+- Počet sloupců mřížky (`grid-template-columns`) vědomě NEPOUŽIT jako signál — živě ověřeno (21. 8. 2026), že na 1280px i 1600px vychází stejně 2 sloupce (main na 1600px má jen 848px, na 3. sloupec 320px+gap nestačí) — šířka `main` a pozice `#mapa-panel` jsou přímý, spolehlivý otisk testovaného CSS pravidla.
+### Poznámka k architektuře
+- Node testy beze změny (431) — čistě CSS media query chování, žádná JS logika k testování.
+- Žádná závislost na produkčních datech — obě měření jsou čistě layout výsledky nezávislé na počtu `.karta` prvků.
+- Živě ověřeno proti `kulturniradar.cz`: celá sada 46/46 (44 předchozích + 2 nové).
+- Žádný produkční kód se touhle změnou nedotkl — jen `tests/robot/frontend.robot`, deploy nebyl potřeba.
+
 ## RF testy (bez bump verze) — Kalendář: navigace, klik→scroll, tooltip (testovací dluh, krok 3 auditu) — 21. 8. 2026
 ### Přidáno
 - **„Kalendář: navigace mezi měsíci mění nadpis měsíce/roku"** — ověřuje `#kalendar-predchozi`/`#kalendar-dalsi` (`posunoutMesic_`) tak, že sleduje ZMĚNU textu `#kalendar-nazev-mesice` a návrat na původní hodnotu (round-trip dalsi→predchozi), ne konkrétní očekávaný měsíc — appka běží proti reálnému „dnes", žádná závislost na produkčních datech.

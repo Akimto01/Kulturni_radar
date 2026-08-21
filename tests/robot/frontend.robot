@@ -837,6 +837,45 @@ Header a #controls-oznaceni zůstávají viditelné po scrollu (sticky)
     Should Be True    abs(${oznaceni_y_po} - ${oznaceni_y_pred}) <= 1
     ...    msg=#controls-oznaceni (sticky) změnilo Y pozici po scrollu: ${oznaceni_y_pred} → ${oznaceni_y_po}
 
+Responzivní pásma: střední (900-1359px) omezí main na 656px a mapu zalomí pod obsah
+    [Documentation]    v3.55 (testovací dluh, krok 4 auditu): @media
+    ...    (min-width:900px) and (max-width:1359px) v Index.html omezuje
+    ...    main na max-width:656px (strop na 2 sloupce karet) a #mapa-panel
+    ...    se zalomí na vlastní řádek POD main (#layout flex-wrap:wrap +
+    ...    #mapa-panel flex-basis:100%). Běží na sdílené desktopové
+    ...    stránce ze Suite Setup (1280×900) – ta je uvnitř tohohle pásma,
+    ...    žádný nový Context proto není potřeba. Počet sloupců mřížky
+    ...    NENÍ použit jako signál (ověřeno živě 21. 8. 2026: na 1280px
+    ...    i 1600px vychází stejně 2 sloupce – šířka main a pozice mapy
+    ...    jsou spolehlivější, přímý otisk CSS pravidla pod testem).
+    ${main_sirka}=    Get BoundingBox    ${FRAME} main    key=width
+    Should Be Equal As Numbers    ${main_sirka}    656
+    ...    msg=main má mít ve středním pásmu přesně 656px (max-width strop)
+    ${main_y}=    Get BoundingBox    ${FRAME} main    key=y
+    ${main_vyska}=    Get BoundingBox    ${FRAME} main    key=height
+    ${mapa_y}=    Get BoundingBox    ${FRAME} \#mapa-panel    key=y
+    Should Be True    ${mapa_y} >= ${main_y} + ${main_vyska} - 20
+    ...    msg=#mapa-panel (y=${mapa_y}) má být POD main (y=${main_y}, výška=${main_vyska}), ne vedle něj
+
+Responzivní pásma: široké (≥1360px) main přesáhne 656px a mapa zůstává vedle obsahu
+    [Documentation]    v3.55 (testovací dluh, krok 4 auditu): @media
+    ...    (min-width:1360px) zruší strop main (max-width:656px platí jen
+    ...    ve středním pásmu výš) a #mapa-panel se stane trvalým sticky
+    ...    3. sloupcem VEDLE main. Vlastní Context 1600px – Suite Setup
+    ...    je pevně 1280px (to je uvnitř STŘEDNÍHO pásma, ne širokého).
+    [Teardown]    Close Context    CURRENT
+    New Context    viewport={'width': 1600, 'height': 900}
+    New Page    ${SITE_URL}
+    Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
+    ${main_sirka}=    Get BoundingBox    ${FRAME} main    key=width
+    Should Be True    ${main_sirka} > 656
+    ...    msg=main má být širší než 656px stropu ze středního pásma (naměřeno ${main_sirka})
+    ${main_y}=    Get BoundingBox    ${FRAME} main    key=y
+    ${mapa_y}=    Get BoundingBox    ${FRAME} \#mapa-panel    key=y
+    Should Be True    abs(${mapa_y} - ${main_y}) <= 50
+    ...    msg=#mapa-panel (y=${mapa_y}) má být VEDLE main (y=${main_y}), ne pod ním
+
 *** Keywords ***
 Cíl dne musí být poblíž horního okraje viewportu
     [Documentation]    Pomocná keyword pro „Kalendář: klik na den s akcí
