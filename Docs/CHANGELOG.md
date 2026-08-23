@@ -1,5 +1,16 @@
 # Changelog
 
+## Index.html v3.57 — Audit selektorů: data-iso/data-id/data-klic (body A+B+C) — 23. 8. 2026
+### Přidáno
+- **`.kalendar-den[data-iso]`** (`vykreslitKalendar()`) — buňka kalendářní mřížky teď nese vlastní ISO datum přímo v DOM. RF test „Klik na den v kalendáři svolá k odpovídající sekci" dřív musel datum ke konkrétní buňce dohledat přes `Evaluate JavaScript` voláním interní `isoDatum_()` a čtením `kalendarRok`/`kalendarMesic` napřímo — komentář testu to sám označoval za křehké vůči budoucímu přejmenování těchhle proměnných. Teď čte `data-iso` přímo z DOM, žádná závislost na interních názvech appky.
+- **`.mapa-popup-btn[data-id]`** (`sestavPopupMapy_()`) — tlačítko „Zobrazit v seznamu" v popupu mapového pinu teď nese ID akce. RF test dřív ověřoval jen obecně, že SE NĚJAKÁ karta zvýrazní (žádný způsob, jak spárovat konkrétní pin s konkrétní kartou) — teď ověřuje, že zvýrazněná je PRÁVĚ TA karta, jejíž ID neslo kliknuté tlačítko (`.karta[data-id="X"].zvyrazneno`).
+- **`.mapa-misto[data-klic]`** (`vykreslitSeznamMist_()`) — řádek v seznamu míst pod mapou teď nese stejný souřadnicový klíč jako `.nazev[data-klic]` na titulku karty (existující vzor od v3.41). RF test dřív vždy klikal na `nth=0` a ověřoval jen že NĚJAKÝ pin dostal `.pin-vybrany` — teď navíc ověřuje, že se vybrala karta se STEJNÝM klíčem (`.nazev[data-klic="K"].vybrano`), včetně zrušení výběru druhým klikem.
+### Poznámka k architektuře
+- Vychází z návrhu `Docs/AUDIT-SELEKTORU.md` (23. 8. 2026) — audit existujících ID/class/data-atributů napříč appkou, body A a B byly vysoká priorita s přímým dopadem na existující RF testy (self-dokumentovaná mezera v komentářích testů), C střední priorita.
+- Node testy beze změny (437) — čistě HTML/RF úprava, žádný backendový ani čistý JS kód se nedotkl. Backend `VERZE` beze změny (3.33).
+- Zbývá D–H z návrhu (`.misto-karta`, `.btn-url` v kartě akce, chipy stálých míst, `.mapa-stat`, `.den-hlavicka` „Probíhá") — nižší priorita, bez přímého dopadu na existující testy, viz BACKLOG.md.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Index v3.57 (audit selektoru A+B+C)"`), ověřeno živě přes obsah `?exec` odpovědi (`dataset.iso`/`dataset.id`/`dataset.klic` přítomné v nasazeném JS).
+
 ## Testy (bez bump verze) — 3 zbývající regresní testy testovacího dluhu + dokumentace flaky testů — 21. 8. 2026
 ### Přidáno
 - **RF: „Opakované přepnutí profilu v dropdownu nerozbije appku"** — regresní pojistka na bug v3.12 (statický `#status` se mazal z DOM po prvním úspěšném vykreslení, každé DALŠÍ volání `nactiAkce` po přepnutí profilu tak tiše spadlo PŘED try blokem). Přepne postupně přes 3 různé profily, `Wait For Elements State .karta` po každém přepnutí je přímý regresní signál — kdyby se bug vrátil, druhé/třetí přepnutí by timeoutovalo. Na konci vrátí sdílenou stránku na původní profil.

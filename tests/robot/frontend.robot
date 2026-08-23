@@ -747,34 +747,29 @@ Kalendář: klik na den s akcí odscrolluje na odpovídající sekci v seznamu
     ...    buňku vůbec – jinak podmíněně přeskočí (viz WARN větev), ať
     ...    nezávisí na tom, jestli aktuální měsíc takový den má.
     ...
-    ...    POZNÁMKA: Evaluate JavaScript tu čte přímo interní proměnné/
-    ...    funkce appky (kalendarRok, kalendarMesic, isoDatum_) kvůli
-    ...    spárování buňky s cílovým ID (buňka v DOM sama žádné ISO
-    ...    nenese) – test je tak vázaný na tyhle konkrétní názvy; při
-    ...    jejich přejmenování při budoucím refaktoru může tiše spadnout
-    ...    bez souvislosti se skutečným bugem. Evaluace běží na úrovni
-    ...    celé stránky (ne přes ${FRAME}-scoped selector), což odpovídá
-    ...    výchozímu SITE_URL bez iframe (viz hlavička souboru).
+    ...    v3.57 (audit selektorů, bod A): buňka nese ISO datum přímo přes
+    ...    data-iso (Index.html, vykreslitKalendar()) – dřív se muselo
+    ...    dohledávat přes Evaluate JavaScript čtením interních proměnných/
+    ...    funkcí appky (kalendarRok, kalendarMesic, isoDatum_), což bylo
+    ...    křehké vůči jejich přejmenování při refaktoru. Teď čte data-iso
+    ...    přímo z DOM, žádná závislost na interních názvech appky.
     ${pocet}=    Get Element Count    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce
     IF    ${pocet} == 0
         Log    Aktuální měsíc nemá žádný den s akcí (.ma-akce) – test nemá co ověřit v tomto běhu.    level=WARN
     ELSE
         ${cil_iso}=    Set Variable    ${EMPTY}
-        ${cil_index}=    Set Variable    ${-1}
         FOR    ${i}    IN RANGE    ${pocet}
-            ${den_text}=    Get Text    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce >> nth=${i}
-            ${iso}=    Evaluate JavaScript    ${None}    isoDatum_(new Date(kalendarRok, kalendarMesic, ${den_text}))
+            ${iso}=    Get Attribute    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce >> nth=${i}    data-iso
             ${existuje}=    Get Element Count    ${FRAME} \#den-${iso}
             IF    ${existuje} > 0
                 ${cil_iso}=    Set Variable    ${iso}
-                ${cil_index}=    Set Variable    ${i}
                 Exit For Loop
             END
         END
         IF    "${cil_iso}" == "${EMPTY}"
             Log    Žádný den s akcí v aktuálním měsíci nemá odpovídající #den-<iso> sekci (jen dlouhodobé akce bez vlastního data) – test nemá co ověřit v tomto běhu.    level=WARN
         ELSE
-            Click    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce >> nth=${cil_index}
+            Click    ${FRAME} \#kalendar-mrizka .kalendar-den[data-iso="${cil_iso}"]
             Wait Until Keyword Succeeds    5x    300ms
             ...    Cíl dne musí být poblíž horního okraje viewportu    ${cil_iso}
         END
@@ -868,20 +863,38 @@ Klik na řádek v seznamu míst vybere pin na mapě
     ...    karty (test výš) – ověřeno přes .mapa-misto.vybrano a
     ...    .pin-vybrany na mapě, včetně zrušení druhým klikem. Podmíněné
     ...    na existenci aspoň jednoho řádku (viz M – seznam míst).
+    ...
+    ...    v3.57 (audit selektorů, bod C): řádek teď nese data-klic
+    ...    (Index.html, vykreslitSeznamMist_()) – stejný souřadnicový
+    ...    klíč jako .nazev[data-klic] na titulku karty (existující vzor,
+    ...    v3.41). Leaflet piny samy žádný vlastní identifikátor v DOM
+    ...    nenesou (knihovna, appka do jejich struktury nezasahuje), takže
+    ...    přímé párování "tenhle řádek → tenhle konkrétní pin" nejde
+    ...    ověřit – ALE jde ověřit nepřímo přes sdílený klíč: klik na
+    ...    řádek s klíčem K musí vybrat i kartu se STEJNÝM klíčem K
+    ...    (.nazev[data-klic="K"].vybrano), ne jen "nějaký" pin/kartu
+    ...    kdekoli na stránce.
     Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
     ${pocet}=    Get Element Count    ${FRAME} \#mapa-mista .mapa-misto
     IF    ${pocet} == 0
         Log    Seznam míst je prázdný (žádná akce se souřadnicemi) – test nemá co ověřit v tomto běhu.    level=WARN
     ELSE
-        Click    ${FRAME} \#mapa-mista .mapa-misto >> nth=0
-        Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto.vybrano >> nth=0    visible    timeout=5s
+        ${klic}=    Get Attribute    ${FRAME} \#mapa-mista .mapa-misto >> nth=0    data-klic
+        Click    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"]
+        Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"].vybrano    visible    timeout=5s
         ${pin_vybrany}=    Get Element Count    ${FRAME} \#mapa .pin-vybrany
         Should Be True    ${pin_vybrany} >= 1
         ...    msg=Po výběru řádku v seznamu míst by měl mít odpovídající pin na mapě třídu .pin-vybrany
+        ${karta_stejny_klic}=    Get Element Count    ${FRAME} .nazev[data-klic="${klic}"].vybrano
+        Should Be True    ${karta_stejny_klic} >= 1
+        ...    msg=Výběr řádku s klíčem „${klic}" měl vybrat i kartu se stejným data-klic (.nazev[data-klic="${klic}"].vybrano) – ne jinou/žádnou
         # Druhý klik na stejný řádek má výběr zrušit (toggle zpět) – viz
         # poznámka o Wait For Elements State/msg= v testu titulku karty výš.
-        Click    ${FRAME} \#mapa-mista .mapa-misto.vybrano >> nth=0
-        Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto.vybrano    detached    timeout=5s
+        Click    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"]
+        Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"].vybrano    detached    timeout=5s
+        ${karta_stejny_klic_po}=    Get Element Count    ${FRAME} .nazev[data-klic="${klic}"].vybrano
+        Should Be Equal As Integers    ${karta_stejny_klic_po}    0
+        ...    msg=Po zrušení výběru řádku s klíčem „${klic}" by karta se stejným data-klic už neměla mít .vybrano
     END
 
 Klik na pin otevře popup se strukturálně konzistentním obsahem
@@ -915,10 +928,13 @@ Klik na pin otevře popup se strukturálně konzistentním obsahem
 Tlačítko „Zobrazit v seznamu" v popupu zvýrazní odpovídající kartu
     [Documentation]    v3.56 (testovací dluh, krok 5 auditu): tlačítko volá
     ...    zvyraznitAkci_ (v3.56 fix: self-cancel bug při volání zevnitř
-    ...    click handleru, viz komentář u funkce v Index.html). Neověřuje
-    ...    KTEROU konkrétní kartu (to by vyžadovalo párovat konkrétní pin
-    ...    s konkrétní kartou), jen že se zvýraznění vůbec spustí a
-    ...    zůstane – obecný, na datech nezávislý signál.
+    ...    click handleru, viz komentář u funkce v Index.html).
+    ...
+    ...    v3.57 (audit selektorů, bod B): tlačítko teď nese data-id
+    ...    (Index.html, sestavPopupMapy_()) – dřív se muselo ověřovat jen
+    ...    obecně, že SE NĚJAKÁ karta zvýrazní (žádný způsob, jak spárovat
+    ...    konkrétní pin s konkrétní kartou), teď se ověřuje, že zvýrazněná
+    ...    je PRÁVĚ TA karta, jejíž ID neslo kliknuté tlačítko.
     Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
     ${pocet_pinu}=    Get Element Count    ${FRAME} \#mapa .leaflet-marker-icon
     IF    ${pocet_pinu} == 0
@@ -926,10 +942,11 @@ Tlačítko „Zobrazit v seznamu" v popupu zvýrazní odpovídající kartu
     ELSE
         Click    ${FRAME} \#mapa .leaflet-marker-icon >> nth=0
         Wait For Elements State    ${FRAME} .leaflet-popup .mapa-popup    visible    timeout=3s
+        ${id_akce}=    Get Attribute    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn >> nth=0    data-id
         Click    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn >> nth=0
-        ${pocet_zvyraznenych}=    Get Element Count    ${FRAME} .karta.zvyrazneno
-        Should Be True    ${pocet_zvyraznenych} >= 1
-        ...    Klik na „Zobrazit v seznamu" měl zvýraznit odpovídající kartu (.karta.zvyrazneno)
+        ${pocet_zvyraznenych}=    Get Element Count    ${FRAME} .karta[data-id="${id_akce}"].zvyrazneno
+        Should Be Equal As Integers    ${pocet_zvyraznenych}    1
+        ...    msg=Klik na „Zobrazit v seznamu" měl zvýraznit PRÁVĚ kartu s id „${id_akce}" (.karta[data-id="${id_akce}"].zvyrazneno)
     END
 
 Header a #controls-oznaceni zůstávají viditelné po scrollu (sticky)

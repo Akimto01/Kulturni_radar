@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.56 – Fix: zvyraznitAkci_ self-cancel bug + sestavPopupMapy_/sestavPopupDataMapy_ refaktor (testovaci dluh krok 5, cast 2/2) -->
+<!-- Kulturní radar Index.html v3.57 – Audit selektorů: data-iso (.kalendar-den), data-id (.mapa-popup-btn), data-klic (.mapa-misto) pro stabilní RF selektory -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -2034,6 +2034,7 @@
       cell.className = 'kalendar-den';
       if (b.den == null) { mrizka.appendChild(cell); return; }
       cell.textContent = b.den;
+      cell.dataset.iso = b.iso;   // v3.57: stabilní selektor pro RF testy (audit selektorů, bod A)
       if (b.maAkce) {
         cell.classList.add('ma-akce');
         const nazvy = podleDne.get(b.iso) || [];
@@ -2250,6 +2251,7 @@
       wrap.appendChild(document.createElement('br'));
       const btn = document.createElement('button');
       btn.className = 'mapa-popup-btn';
+      btn.dataset.id = polozka.id;   // v3.57: stabilní selektor pro RF testy (audit selektorů, bod B)
       btn.textContent = 'Zobrazit v seznamu';
       btn.addEventListener('click', () => zvyraznitAkci_(polozka.id));
       wrap.appendChild(btn);
@@ -2303,6 +2305,7 @@
     sestavSeznamMist_(akceMapa).forEach(m => {
       const radek = document.createElement('div');
       radek.className = 'mapa-misto' + (vybranePiny_.has(m.klic) ? ' vybrano' : '');
+      radek.dataset.klic = m.klic;   // v3.57: stabilní selektor pro RF testy (audit selektorů, bod C)
       radek.title = 'Klikněte pro zobrazení na mapě';
 
       const leva = document.createElement('span');
