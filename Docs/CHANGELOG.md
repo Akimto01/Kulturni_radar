@@ -1,5 +1,19 @@
 # Changelog
 
+## Index.html v3.58 — Indexace pro Google/AI crawlery, část (a) — 23. 8. 2026
+### Přidáno
+- **Meta tagy v `<head>`** — `description`, Open Graph (`og:type`/`site_name`/`title`/`description`/`url`/`locale`), Twitter card (`summary`). Statické, obecné pro celou appku (appka je client-side rendered — dynamický OG obsah pro konkrétní sdílenou akci by viděl jen JS-aware crawler, ne link-preview boty jako Facebook/Slack, viz `Docs/AUDIT-INDEXACE.md`).
+- **`favicon.svg`** — nová vlastní SVG ikona (soustředné kružnice, paleta appky), appka dřív žádnou neměla.
+- **`sestavEventJsonLd_(a, odkaz)`** (PURE) + **`vlozitJsonLdAkce_(jsonLd)`** (DOM wrapper) — Schema.org `Event` JSON-LD vložený do `<head>`, jen když stránka běží s `?akce=ID&profil=Město` deep linkem A appka danou akci najde v načtených datech. `cena`/`image` záměrně vynechány (cena je volný text, ne číslo; akce nemají URL obrázku) — bezpečnější žádný údaj než chybný.
+- **4 nové Node testy** pro `sestavEventJsonLd_`: běžná akce se všemi poli, bez platného data → `null`, `stav` „zrušeno" → `EventCancelled`/jinak `EventScheduled`, chybějící volitelná pole se nepropíšou do výstupu.
+- **`apps-script/robots.txt`** (`Allow: /` + `Sitemap:` řádek) a **`apps-script/sitemap.xml`** (jen homepage) — nové soubory, viz poznámka k nasazení níže.
+### Poznámka k architektuře
+- Vychází z návrhu `Docs/AUDIT-INDEXACE.md` (23. 8. 2026, BACKLOG.md „Indexace appky pro Google i AI crawlery", bod a) — schváleno Vojtou 23. 8. 2026.
+- **Klíčové zjištění (dokumentováno s citacemi v AUDIT-INDEXACE.md):** `kulturniradar.cz` už dřív servíroval `robots.txt` — ne z appky, ale z Cloudflare platformy. Cloudflare do každé zóny automaticky vkládá „Managed content" blok s `Disallow: /` pro GPTBot, ClaudeBot a další AI crawlery, VŽDY předřazený před obsah originu (potvrzeno v oficiální Cloudflare dokumentaci) — soubor v repu ho nemůže přebít. Řešení je jen přes Cloudflare dashboard (AI Crawl Control), zapsáno jako úkol pro Vojtu v BACKLOG.md.
+- **Nedokončeno, zjištěno až živým ověřením po nasazení:** nové statické soubory (`robots.txt`, `sitemap.xml`, `favicon.svg`) se na `kulturniradar.cz` neservírují na svých cestách — pořád vrací SPA fallback appky. Předpoklad, že `apps-script/` je Cloudflare Pages build output directory, se nepotvrdil. Vyžaduje diagnostiku v Cloudflare dashboardu (úkol pro Vojtu, viz BACKLOG.md).
+- Node testy 437 → 441 (+4). Backend `VERZE` beze změny (3.33) — čistě frontendová/statická změna.
+- Nasazeno na obou kanálech: `git push` (Cloudflare Pages, `kulturniradar.cz`) a `clasp push -f` + `clasp deploy -i … --description "Index v3.58 (indexace pro Google/AI crawlery, cast a)"` (Apps Script `/exec`) — oba živě ověřeny (`?api=meta`, obsah `Index.html` v odpovědi doGet).
+
 ## Index.html v3.57 — Audit selektorů: data-iso/data-id/data-klic (body A+B+C) — 23. 8. 2026
 ### Přidáno
 - **`.kalendar-den[data-iso]`** (`vykreslitKalendar()`) — buňka kalendářní mřížky teď nese vlastní ISO datum přímo v DOM. RF test „Klik na den v kalendáři svolá k odpovídající sekci" dřív musel datum ke konkrétní buňce dohledat přes `Evaluate JavaScript` voláním interní `isoDatum_()` a čtením `kalendarRok`/`kalendarMesic` napřímo — komentář testu to sám označoval za křehké vůči budoucímu přejmenování těchhle proměnných. Teď čte `data-iso` přímo z DOM, žádná závislost na interních názvech appky.
