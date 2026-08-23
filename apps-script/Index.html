@@ -1,10 +1,24 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.57 – Audit selektorů: data-iso (.kalendar-den), data-id (.mapa-popup-btn), data-klic (.mapa-misto) pro stabilní RF selektory -->
+<!-- Kulturní radar Index.html v3.58 – Indexace pro Google/AI crawlery (a): meta/OG/Twitter tagy, favicon, robots.txt, sitemap.xml, Schema.org Event JSON-LD pro sdílené akce -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kulturní radar</title>
+<!-- v3.58: základní SEO/sdílecí meta tagy – návrh viz Docs/AUDIT-INDEXACE.md.
+     Statické, obecné pro celou appku (ne per-akce – appka je client-side
+     rendered, per-akce JSON-LD viz sestavEventJsonLd_/vlozitJsonLdAkce_ níže). -->
+<meta name="description" content="Automatické hlídání kulturních akcí v okolí – Brno a další města ČR. Denní přehled podle kategorie, mapa, kalendář a filtrování zdarma.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kulturní radar">
+<meta property="og:title" content="Kulturní radar">
+<meta property="og:description" content="Automatické hlídání kulturních akcí v okolí – Brno a další města ČR. Denní přehled podle kategorie, mapa, kalendář a filtrování zdarma.">
+<meta property="og:url" content="https://kulturniradar.cz/">
+<meta property="og:locale" content="cs_CZ">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Kulturní radar">
+<meta name="twitter:description" content="Automatické hlídání kulturních akcí v okolí – Brno a další města ČR. Denní přehled podle kategorie, mapa, kalendář a filtrování zdarma.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <!-- v3.35: Leaflet – vestavěná mapa (redesign fáze 3), první externí JS
      závislost appky. Bez API klíče (OpenStreetMap dlaždice). -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -1589,7 +1603,18 @@
       await nactiMista(aktivniProfil);
 
       // v3.17: teď, když jsou karty vykreslené, najít a zvýraznit sdílenou akci.
-      if (odkazNaAkci) zvyraznitAkci_(odkazNaAkci.id);
+      if (odkazNaAkci) {
+        zvyraznitAkci_(odkazNaAkci.id);
+        // v3.58: sdílená akce → Schema.org Event JSON-LD (indexace pro
+        // Google/AI crawlery, viz Docs/AUDIT-INDEXACE.md).
+        const nalezenaAkce = vsechnaAkce.find(a => a.id === odkazNaAkci.id);
+        if (nalezenaAkce) {
+          const jsonLd = sestavEventJsonLd_(
+            nalezenaAkce,
+            sestavOdkazNaAkci_(nalezenaAkce.id, aktivniProfil, window.location.origin));
+          if (jsonLd) vlozitJsonLdAkce_(jsonLd);
+        }
+      }
     } catch (e) {
       zobrazitStatus_('Chyba načítání: ' + e.message);
     }
@@ -2545,6 +2570,55 @@
     const id = params.get('akce');
     if (!id) return null;
     return { id, profil: params.get('profil') || '' };
+  }
+
+  /** v3.58 (indexace pro Google/AI crawlery, návrh viz Docs/AUDIT-INDEXACE.md):
+   *  PURE – sestaví Schema.org Event JSON-LD objekt pro sdílenou akci
+   *  (deep link ?akce=ID&profil=Město). Bez platného data (parseCeskeDatum
+   *  vrátí null) vrací null – radši žádná strukturovaná data než Event bez
+   *  povinného startDate. 'cena' a 'image' záměrně vynechány (viz audit) –
+   *  cena je volný text (ne číslo), akce nemají URL obrázku. */
+  function sestavEventJsonLd_(a, odkaz) {
+    if (!a) return null;
+    const zacatek = parseCeskeDatum(a.datumOd);
+    if (!zacatek) return null;
+    const konec = parseCeskeDatum(a.datumDo);
+    const jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'Event',
+      name: a.nazev || '',
+      startDate: isoDatum_(zacatek),
+      eventStatus: a.stav === 'zrušeno'
+        ? 'https://schema.org/EventCancelled'
+        : 'https://schema.org/EventScheduled',
+      location: {
+        '@type': 'Place',
+        name: a.misto || a.obec || '',
+        address: { '@type': 'PostalAddress', addressLocality: a.obec || '', addressCountry: 'CZ' },
+      },
+    };
+    if (konec) jsonLd.endDate = isoDatum_(konec);
+    if (a.popis) jsonLd.description = a.popis;
+    if (odkaz) jsonLd.url = odkaz;
+    if (Number.isFinite(a.lat) && Number.isFinite(a.lng)) {
+      jsonLd.location.geo = { '@type': 'GeoCoordinates', latitude: a.lat, longitude: a.lng };
+    }
+    return jsonLd;
+  }
+
+  /** v3.58: tenký DOM wrapper nad sestavEventJsonLd_ – vloží/aktualizuje
+   *  <script type="application/ld+json"> v <head>. Stejný vzor jako
+   *  sestavPopupDataMapy_/sestavPopupMapy_ (v3.56) – čistá data odděleně
+   *  od DOM zápisu. */
+  function vlozitJsonLdAkce_(jsonLd) {
+    let el = document.getElementById('jsonld-akce');
+    if (!el) {
+      el = document.createElement('script');
+      el.type = 'application/ld+json';
+      el.id = 'jsonld-akce';
+      document.head.appendChild(el);
+    }
+    el.textContent = JSON.stringify(jsonLd);
   }
 
   /** PURE: sestaví text ke sdílení akce (název, datum, místo, odkaz) –

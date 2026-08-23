@@ -14,7 +14,7 @@ const f = nactiFrontendFunkce([
   'sestavFiltry_', 'pinVypadaPlatne_', 'sestavFetchPozadavek_',
   'sestavNotifikace_', 'validovatNotifikaceKlient_', 'sestavPrihlasenehoUzivatele_',
   'klicUlozenychChipu_', 'serializovatKategorie_', 'deserializovatKategorie_',
-  'sestavOdkazNaAkci_', 'parsovatOdkazNaAkci_',
+  'sestavOdkazNaAkci_', 'parsovatOdkazNaAkci_', 'sestavEventJsonLd_',
   'sestavOdkazNaVyber_', 'parsovatOdkazNaVyber_',
   'weathercodeEmoji_', 'pocasiZobrazeni_',
   'isoDatum_', 'dnySAkcemi_', 'sestavKalendarMrizku_',
@@ -1350,4 +1350,49 @@ test('vycistitVyberPinu_: na prázdné sadě je no-op, nespadne', () => {
   const sada = new Set();
   f.vycistitVyberPinu_(sada);
   assert.equal(sada.size, 0);
+});
+
+// ---------------------------------------------------------------------------
+// v3.58 (indexace pro Google/AI crawlery, návrh Docs/AUDIT-INDEXACE.md):
+// sestavEventJsonLd_ – Schema.org Event JSON-LD pro sdílenou akci.
+// ---------------------------------------------------------------------------
+
+test('sestavEventJsonLd_: běžná akce se všemi poli', () => {
+  const jsonLd = f.sestavEventJsonLd_({
+    nazev: 'Koncert', datumOd: '14. 5. 2026', datumDo: '16. 5. 2026',
+    misto: 'Zelný trh', obec: 'Brno', popis: 'Bezplatný kulturní program.',
+    stav: 'potvrzeno', lat: 49.19, lng: 16.61,
+  }, 'https://kulturniradar.cz/?akce=x&profil=Brno');
+  assert.equal(jsonLd['@type'], 'Event');
+  assert.equal(jsonLd.name, 'Koncert');
+  assert.equal(jsonLd.startDate, '2026-05-14');
+  assert.equal(jsonLd.endDate, '2026-05-16');
+  assert.equal(jsonLd.eventStatus, 'https://schema.org/EventScheduled');
+  assert.equal(jsonLd.location.name, 'Zelný trh');
+  assert.equal(jsonLd.location.address.addressLocality, 'Brno');
+  assert.equal(jsonLd.location.geo.latitude, 49.19);
+  assert.equal(jsonLd.location.geo.longitude, 16.61);
+  assert.equal(jsonLd.description, 'Bezplatný kulturní program.');
+  assert.equal(jsonLd.url, 'https://kulturniradar.cz/?akce=x&profil=Brno');
+});
+
+test('sestavEventJsonLd_: bez platného data (parseCeskeDatum → null) vrací null', () => {
+  assert.equal(f.sestavEventJsonLd_({ nazev: 'Probíhající akce', datumOd: 'Probíhá / dlouhodobé' }, ''), null);
+  assert.equal(f.sestavEventJsonLd_({ nazev: 'Bez data', datumOd: '' }, ''), null);
+  assert.equal(f.sestavEventJsonLd_(null, ''), null);
+});
+
+test('sestavEventJsonLd_: stav "zrušeno" → EventCancelled, jinak EventScheduled', () => {
+  const zruseno = f.sestavEventJsonLd_({ nazev: 'A', datumOd: '1. 1. 2026', stav: 'zrušeno' }, '');
+  assert.equal(zruseno.eventStatus, 'https://schema.org/EventCancelled');
+  const neovereno = f.sestavEventJsonLd_({ nazev: 'B', datumOd: '1. 1. 2026', stav: 'neověřeno' }, '');
+  assert.equal(neovereno.eventStatus, 'https://schema.org/EventScheduled');
+});
+
+test('sestavEventJsonLd_: chybějící volitelná pole (datumDo/popis/url/lat/lng) se do výstupu nepropíšou', () => {
+  const jsonLd = f.sestavEventJsonLd_({ nazev: 'C', datumOd: '1. 1. 2026' }, '');
+  assert.equal('endDate' in jsonLd, false);
+  assert.equal('description' in jsonLd, false);
+  assert.equal('url' in jsonLd, false);
+  assert.equal('geo' in jsonLd.location, false);
 });
