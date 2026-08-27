@@ -12,6 +12,13 @@ Stav (23. 8. 2026): všechny tři nástroje živě odladěné a spuštěné prot
 produkčnímu API — viz sekce „Diagnostika HTTP 405" níže a `Docs/BACKLOG.md`
 pro plný zápis diagnózy a výsledků.
 
+Stav (27. 8. 2026): Bruno prostředí `Produkce.bru` doplněno o skutečné
+`testUserId`/`testEventId` (viz sekce Bruno níže) — **6/8 requestů PASS**.
+`TEST_PIN` a `EMAIL_WEBHOOK_TOKEN` stále chybí (ověřeno, že `TEST_PIN`
+není nastavený ani jako trvalá Windows proměnná z dřívějška), takže
+zůstávají zamknuté celkem 4 testy (2 v SoapUI, 2 v Bruno) — viz „⚠️ Tajné
+hodnoty" níže.
+
 Pokrývá stejných 8 testovacích scénářů ve všech nástrojích (SoapUI/ReadyAPI,
 Bruno) a navíc jednoduchý zátěžový plán v JMeteru:
 
@@ -62,25 +69,30 @@ pak jako proměnné v `environments/Produkce.bru`, kam si je doplň lokálně.
    má v záložce **Tests** asserty (status 200, `ok` true/false, přítomnost
    očekávaných polí).
 5. Spuštění celé kolekce: pravý klik na kolekci → **Run** (GUI), nebo
-   `bru run --env Produkce` (CLI) ve složce `api-tests/bruno/`. ⚠️ Dokud
-   je `testUserId`/`testEventId` v `environments/Produkce.bru` jen
-   placeholder `DOPLNIT_RUCNE` (appka ověřuje jen že `uzivatelId` není
-   prázdné, ne že profil fakt existuje), spuštění **celé** kolekce by
-   `Toggle - platny uzivatel` zapsalo ★ k neexistujícímu uživateli
-   `DOPLNIT_RUCNE` do produkčního listu OZNAČENÍ — vyplň nejdřív skutečné
-   hodnoty, nebo spouštěj jednotlivé requesty (`bru run "01-meta/GET
-   meta.bru" --env Produkce`).
-   Živě ověřeno (Bruno CLI 4.0.0, 23. 8. 2026): **5/8 requestů PASS** bez
-   žádné úpravy configu (`GET meta`, `Login - spatny PIN`,
-   `Toggle - neplatny uzivatel`, oba `Email tip` negativní scénáře i
-   negativní test bez `akce`) — Bruno staví na `fetch`, který na 302
-   sám degraduje POST→GET, takže na rozdíl od SoapUI zde k HTTP 405
-   vůbec nedochází. Zbylé 3 (`Login - spravny PIN`, `Email tip - platny
-   token`, `Toggle - platny uzivatel`) vyžadují skutečné `TEST_PIN`/
-   `EMAIL_WEBHOOK_TOKEN`/`testUserId` — první dva byly živě vyzkoušeny
-   bez nich a selhaly jen na chybějícím assertu `ok je true` (očekávané,
-   žádný zápis do produkce neproběhl), `Toggle - platny uzivatel`
-   záměrně nespuštěn (viz varování výše).
+   `bru run --env Produkce` (CLI) ve složce `api-tests/bruno/`. ⚠️
+   `testUserId`/`testEventId` v `environments/Produkce.bru` jsou od
+   27. 8. 2026 vyplněné skutečnými hodnotami (`rf-test` — sdílený
+   testovací profil, stejný jako `RF_TEST_USER_ID`; `2026-05-14-leto-na-zelnaku`
+   — reálné, dlouhodobě platné ID akce živě dohledané přes
+   `?api=events&profil=Brno`), takže `Toggle - platny uzivatel` teď
+   zapisuje ★ ke skutečnému testovacímu profilu, ne k neexistujícímu
+   `DOPLNIT_RUCNE` — je to pořád zápis do produkčního listu OZNAČENÍ
+   (i když u vyhrazeného testovacího profilu), po ručním spuštění zvaž
+   vrácení stavu zpět (druhé spuštění stejného requestu ★ zase přepne,
+   je to toggle).
+   Živě ověřeno (Bruno CLI 4.0.0 přes `npx @usebruno/cli`, 27. 8. 2026):
+   **6/8 requestů PASS** (`GET meta`, `Login - spatny PIN`,
+   `Toggle - platny uzivatel`, `Toggle - neplatny uzivatel`, oba
+   `Email tip` negativní scénáře i negativní test bez `akce`) — Bruno
+   staví na `fetch`, který na 302 sám degraduje POST→GET, takže na
+   rozdíl od SoapUI zde k HTTP 405 vůbec nedochází. Zbylé 2
+   (`Login - spravny PIN`, `Email tip - platny token`) vyžadují
+   skutečné `TEST_PIN`/`EMAIL_WEBHOOK_TOKEN` proměnné prostředí (viz
+   sekce „Nastavení citlivých hodnot" níže) — selhaly jen na chybějícím
+   assertu `ok je true` (očekávané, žádný zápis do produkce
+   neproběhl). Zápis z `Toggle - platny uzivatel` byl po běhu ověřen a
+   vrácen zpět na `oblibene:false` přímým `curl` toggle (write-safety
+   kontrola).
 
 ### Nastavení citlivých hodnot (Bruno, Windows)
 
@@ -146,7 +158,9 @@ v odeslaném těle by se měla objevit skutečná hodnota, ne doslovný text.
    sekvenčně, nejde vynechat jeden Test Case — pokud `testUserId` v
    Project Properties ukazuje na skutečný profil, `04 Toggle - platny
    uzivatel` při každém běhu skutečně přepne ★ v listu OZNAČENÍ (je to
-   toggle, takže druhé spuštění stavu vrátí zpět).
+   toggle, takže druhé spuštění stavu vrátí zpět). Znovu živě spuštěno
+   27. 8. 2026 (stejný výsledek, 6/8) — zápis z `04` byl po běhu ověřen
+   a vrácen zpět na `oblibene:false` přímým `curl` toggle.
 
 ### Diagnostika HTTP 405 (Email tip / POST testy) — vyřešeno 23. 8. 2026
 
