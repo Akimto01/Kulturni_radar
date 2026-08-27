@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+<defs>
+<clipPath id="tileClip"><rect x="0" y="0" width="240" height="240" rx="48"/></clipPath>
+</defs>
+<rect x="0" y="0" width="240" height="240" rx="48" fill="#8B6642"/>
+<g clip-path="url(#tileClip)">
+<path d="M0,0 H240 V130 C210,155 160,115 120,138 C80,161 40,128 0,148 Z" fill="#7CA45C"/>
+<path d="M0,180 C20,160 55,168 62,198 L62,240 L0,240 Z" fill="#5B8C51"/>
+<circle cx="15" cy="210" r="4" fill="#3F6A3B"/>
+<circle cx="25" cy="225" r="4" fill="#3F6A3B"/>
+<circle cx="38" cy="215" r="4" fill="#3F6A3B"/>
+<circle cx="48" cy="228" r="4" fill="#3F6A3B"/>
+<circle cx="20" cy="195" r="4" fill="#3F6A3B"/>
+<path d="M210,0 C190,50 170,80 130,110 C90,140 70,180 40,220" fill="none" stroke="#4A90C4" stroke-width="8" stroke-linecap="round"/>
+<path d="M240,220 C210,190 175,182 145,155" fill="none" stroke="#C9A876" stroke-width="4" stroke-dasharray="6 6"/>
+</g>
+<g transform="translate(120,120)">
+<circle cx="70" cy="-60" r="5" fill="#D85A30" opacity="0.85"/>
+<circle cx="-75" cy="40" r="5" fill="#D85A30" opacity="0.85"/>
+<circle cx="55" cy="70" r="5" fill="#D85A30" opacity="0.85"/>
+<circle cx="-50" cy="-70" r="5" fill="#D85A30" opacity="0.85"/>
+<circle cx="0" cy="0" r="100" fill="none" stroke="#101010" stroke-width="7"/>
+<circle cx="0" cy="0" r="64" fill="none" stroke="#101010" stroke-width="7"/>
+<path d="M0,-46 C22,-46 38,-30 38,-8 C38,18 0,66 0,66 C0,66 -38,18 -38,-8 C-38,-30 -22,-46 0,-46 Z" fill="#E3A857" stroke="#101010" stroke-width="4" stroke-linejoin="round"/>
+<circle cx="0" cy="-8" r="12" fill="#FDF3E7"/>
+</g>
+</svg>

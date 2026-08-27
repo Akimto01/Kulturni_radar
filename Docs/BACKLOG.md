@@ -23,6 +23,12 @@ Zohledňuje závislosti mezi položkami a paralelizaci čekacích dob
      zkušeností — dcera, nebo Vojta sám s podobným nástrojem. Claude
      může připravit koncept a přesné specifikace (rozměry, formáty)
      k exportu v libovolném nástroji.
+   - Aktualizace 27. 8. 2026: koncept ikony (varianta C: terénní
+     pozadí hnědá/zelená/modrá řeka, černý radar, zlatý pin s tmavým
+     obrysem a krémovou tečkou, terakotové tečky pro okolní akce)
+     předschválen Vojtou, viz `Docs/design-koncept-ikona-varianta-C.svg`
+     — slouží jako odrazový bod pro finální grafické zpracování
+     (Figma/Illustrator), ne jako hotová produkční grafika.
 2. **Android appka — start submission** (~3–4 h aktivní práce) —
    spustit hned po designu, schvalovací proces v Google Play trvá
    dny a běží na pozadí, ať se nečeká zbytečně
