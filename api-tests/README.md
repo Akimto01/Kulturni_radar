@@ -12,12 +12,11 @@ Stav (23. 8. 2026): všechny tři nástroje živě odladěné a spuštěné prot
 produkčnímu API — viz sekce „Diagnostika HTTP 405" níže a `Docs/BACKLOG.md`
 pro plný zápis diagnózy a výsledků.
 
-Stav (27. 8. 2026): Bruno prostředí `Produkce.bru` doplněno o skutečné
-`testUserId`/`testEventId` (viz sekce Bruno níže) — **6/8 requestů PASS**.
-`TEST_PIN` a `EMAIL_WEBHOOK_TOKEN` stále chybí (ověřeno, že `TEST_PIN`
-není nastavený ani jako trvalá Windows proměnná z dřívějška), takže
-zůstávají zamknuté celkem 4 testy (2 v SoapUI, 2 v Bruno) — viz „⚠️ Tajné
-hodnoty" níže.
+Stav (27. 8. 2026, finální): `TEST_PIN` a `EMAIL_WEBHOOK_TOKEN` nastaveny
+jako trvalé Windows user proměnné (`setx`) a ověřeny živě — **SoapUI
+8/8 PASS, Bruno 8/8 PASS**. Kompletně vyřešeno, žádné chybějící hodnoty,
+žádné blokované testy. Viz sekce SoapUI/Bruno níže pro detaily běhu a
+write-safety úklid.
 
 Pokrývá stejných 8 testovacích scénářů ve všech nástrojích (SoapUI/ReadyAPI,
 Bruno) a navíc jednoduchý zátěžový plán v JMeteru:
@@ -80,19 +79,20 @@ pak jako proměnné v `environments/Produkce.bru`, kam si je doplň lokálně.
    (i když u vyhrazeného testovacího profilu), po ručním spuštění zvaž
    vrácení stavu zpět (druhé spuštění stejného requestu ★ zase přepne,
    je to toggle).
-   Živě ověřeno (Bruno CLI 4.0.0 přes `npx @usebruno/cli`, 27. 8. 2026):
-   **6/8 requestů PASS** (`GET meta`, `Login - spatny PIN`,
-   `Toggle - platny uzivatel`, `Toggle - neplatny uzivatel`, oba
-   `Email tip` negativní scénáře i negativní test bez `akce`) — Bruno
-   staví na `fetch`, který na 302 sám degraduje POST→GET, takže na
-   rozdíl od SoapUI zde k HTTP 405 vůbec nedochází. Zbylé 2
-   (`Login - spravny PIN`, `Email tip - platny token`) vyžadují
-   skutečné `TEST_PIN`/`EMAIL_WEBHOOK_TOKEN` proměnné prostředí (viz
-   sekce „Nastavení citlivých hodnot" níže) — selhaly jen na chybějícím
-   assertu `ok je true` (očekávané, žádný zápis do produkce
-   neproběhl). Zápis z `Toggle - platny uzivatel` byl po běhu ověřen a
-   vrácen zpět na `oblibene:false` přímým `curl` toggle (write-safety
-   kontrola).
+   Živě ověřeno (Bruno CLI 4.0.0 přes `npx @usebruno/cli`, 27. 8. 2026,
+   finální běh po doplnění `TEST_PIN`/`EMAIL_WEBHOOK_TOKEN`):
+   **8/8 requestů PASS, 25/25 testů** — Bruno staví na `fetch`, který
+   na 302 sám degraduje POST→GET, takže na rozdíl od SoapUI zde k HTTP
+   405 vůbec nedochází. Zápis z `Toggle - platny uzivatel` byl po běhu
+   ověřen a vrácen zpět na `oblibene:false` přímým `curl` toggle
+   (write-safety kontrola). `Email tip - platny token` s platným
+   tokenem skutečně založí řádek ve frontě `EMAIL_TIPY` (žádné API pro
+   ruční smazání řádku z fronty neexistuje) — obsah je zjevně testovací
+   („Testovaci akce v Testovacim meste, 1. 1. 2030.“), takže při příští
+   `dailyCheck` ho AI ověření (`callAnthropicEmailTip_`) vyhodnotí jako
+   neplatný/nelze-ověřit a nedostane se do listu AKCE; jde jen o
+   marginální náklad na jedno Anthropic API volání navíc, ne o riziko
+   pro produkční data.
 
 ### Nastavení citlivých hodnot (Bruno, Windows)
 
@@ -151,16 +151,27 @@ v odeslaném těle by se měla objevit skutečná hodnota, ne doslovný text.
 5. Spuštění: pravý klik na Test Suite → **Run** (GUI), nebo
    `testrunner.bat -s "Kulturni radar API testy" Kulturni-radar-soapui-project.xml`
    (CLI, `testrunner.sh` na Linux/Mac, dostupné jako `SoapUITestCaseRunner`
-   v `bin/` složce SoapUI). Živě ověřeno (SoapUI 5.10.0 CLI, 23. 8. 2026):
-   **6/8 test cases PASS** (`01`, `03`, `04`, `05`, `07`, `08`); zbylé 2
-   (`02`, `06`) selžou jen bez skutečných `TEST_PIN`/`EMAIL_WEBHOOK_TOKEN`
-   proměnných — očekávané. Pozor: CLI `-s` spustí **celou** Test Suite
+   v `bin/` složce SoapUI). Pozor: CLI `-s` spustí **celou** Test Suite
    sekvenčně, nejde vynechat jeden Test Case — pokud `testUserId` v
    Project Properties ukazuje na skutečný profil, `04 Toggle - platny
    uzivatel` při každém běhu skutečně přepne ★ v listu OZNAČENÍ (je to
-   toggle, takže druhé spuštění stavu vrátí zpět). Znovu živě spuštěno
-   27. 8. 2026 (stejný výsledek, 6/8) — zápis z `04` byl po běhu ověřen
-   a vrácen zpět na `oblibene:false` přímým `curl` toggle.
+   toggle, takže druhé spuštění stavu vrátí zpět).
+
+   Živě ověřeno (SoapUI 5.10.0 CLI, 27. 8. 2026, finální běh po
+   doplnění `TEST_PIN`/`EMAIL_WEBHOOK_TOKEN` jako trvalých Windows user
+   proměnných): **8/8 test cases PASS**. Zápis z `04 Toggle - platny
+   uzivatel` byl po běhu ověřen a vrácen zpět na `oblibene:false`
+   přímým `curl` toggle (write-safety kontrola). `06 Email tip -
+   platny token` s platným tokenem skutečně založí řádek ve frontě
+   `EMAIL_TIPY` — stejná poznámka jako u Bruno níže (marginální
+   Anthropic API náklad při příští `dailyCheck`, žádné riziko pro
+   AKCE, žádné API pro ruční smazání řádku).
+
+   Historie: 23. 8. 2026 poprvé živě odladěno a spuštěno (6/8, viz
+   sekce „Diagnostika HTTP 405" níže); 27. 8. 2026 dopoledne znovu 6/8
+   po doplnění `testUserId`/`testEventId` v Bruno (`TEST_PIN`/
+   `EMAIL_WEBHOOK_TOKEN` ještě chyběly); 27. 8. 2026 odpoledne finální
+   8/8 po doplnění obou proměnných.
 
 ### Diagnostika HTTP 405 (Email tip / POST testy) — vyřešeno 23. 8. 2026
 
