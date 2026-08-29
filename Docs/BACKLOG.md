@@ -169,6 +169,10 @@ změně BACKLOGu.
   - GitHub Issues (propojit s Kanban nápadem výše)
   - GitHub Releases + tagy provázané s `VERZE` konstantou v `apps-script/kulturni_radar.gs` (doplněk k CHANGELOG.md, historie verzí přímo na GitHubu)
   - GitHub Codespaces (cloudové vývojové prostředí — zajímavé vzhledem k tomu, že Vojta často pracuje z mobilu a potřebuje mít notebook zapnutý/připojený; Codespaces by tuhle závislost mohly odstranit)
+    - **Rešerše 29. 8. 2026** (provedeno přímo v hlavním chatu, ne Claude Code): ověřeno, že Claude Code v Codespaces běžně funguje — je to jen Linux terminál v cloudu, Claude Code je CLI nástroj instalovatelný stejně jako kdekoli jinde. Existuje i hotový projekt „Catnip" přesně na tenhle use-case — spustí Codespace, nainstaluje Claude Code, propojí s mobilní appkou pro ovládání z telefonu bez notebooku.
+      Free tier: 120 core-hodin/měsíc (= 60 hodin na 2jádrovém stroji) + 15 GB úložiště zdarma.
+      Klíčová omezení: automatické vypnutí po ~30 min nečinnosti (nastavitelné, ale ne donekonečna zdarma) — riziko pro déle běžící úkoly bez zásahu; nutná ruční instalace Claude Code při prvním otevření (jednorázové); 60 hodin měsíčně může být těsné při častém používání na delší session.
+      **Doporučení:** vyzkoušet jako ALTERNATIVU pro situace, kdy Vojta nemá notebook vůbec po ruce (ne jako náhradu za dnešní řešení remote control ve VS Code + mobilní appka, které už řeší většinu případů). Zvážit hlavně kvůli časovému limitu nečinnosti u delších úkolů.
   - Dependabot (bezpečnostní aktualizace npm závislostí)
   - Milestones (seskupení issues podle verze/fáze, např. „Notifikace A–F")
   - GitHub Wiki (zvažováno, ale `Docs/*.md` verzovaný v repu je pravděpodobně lepší volba pro tenhle projekt)
