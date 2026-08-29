@@ -17,6 +17,7 @@ ${NTFY_TOPIC}      %{NTFY_TOPIC=}
 
 *** Test Cases ***
 Meta vrací aktivní profil, profily a kategorie
+    [Tags]    smoke    api
     ${r}=    GET    ${BASE_URL}    params=api=meta
     Status Should Be    200    ${r}
     ${j}=    Set Variable    ${r.json()}
@@ -27,6 +28,7 @@ Meta vrací aktivní profil, profily a kategorie
     List Should Contain Value    ${j}[kategorie]    koncerty
 
 Nasazená verze odpovídá repu
+    [Tags]    smoke    regrese    api
     [Documentation]    Zachycuje scénář z 8. 8. 2026 (viz SKILL.md sekce 6):
     ...    `clasp deploy` spuštěný BEZ `-i <deploymentId>` nechá produkci
     ...    běžet na staré verzi, i když repo i lokální Apps Script editor
@@ -51,6 +53,7 @@ Nasazená verze odpovídá repu
     ...    msg=Produkce hlásí verzi „${j}[verze]“, repo má „${verze_repo}“ – zapomenutý "clasp deploy -i" po push? (viz SKILL.md sekce 6)
 
 Events vrací akce s validními českými datumy
+    [Tags]    smoke    regrese    api
     [Documentation]    Regresní test bugů v3.2–3.3: datumOd nesmí být
     ...                sériové číslo (46156) ani anglický Date string.
     ${r}=    GET    ${BASE_URL}    params=api=events
@@ -66,6 +69,7 @@ Events vrací akce s validními českými datumy
     END
 
 Events obsahují pole lat/lng pro souřadnice (v3.14)
+    [Tags]    mapa    api
     [Documentation]    Schema check – lat/lng musí být v odpovědi přítomné
     ...    klíče (hodnota null, dokud se lokalita ještě negeokódovala na
     ...    pozadí po dalším běhu kontroly). Chytí regresi, kdyby pole zmizelo.
@@ -76,6 +80,7 @@ Events obsahují pole lat/lng pro souřadnice (v3.14)
     Dictionary Should Contain Key    ${prvni}    lng
 
 Events umí filtrovat podle profilu
+    [Tags]    api
     ${r}=    GET    ${BASE_URL}    params=api=events&profil=Ostrava
     Status Should Be    200    ${r}
     ${j}=    Set Variable    ${r.json()}
@@ -83,6 +88,7 @@ Events umí filtrovat podle profilu
     Should Be Equal    ${j}[profil]    Ostrava
 
 Places vrací stálá místa se skóre
+    [Tags]    api
     ${r}=    GET    ${BASE_URL}    params=api=places
     Status Should Be    200    ${r}
     ${j}=    Set Variable    ${r.json()}
@@ -91,12 +97,14 @@ Places vrací stálá místa se skóre
     Should Be True    ${pocet} >= 1    MÍSTA mají být naplněná
 
 Neznámý endpoint vrací chybu, ne pád
+    [Tags]    api
     ${r}=    GET    ${BASE_URL}    params=api=neexistuje
     Status Should Be    200    ${r}
     ${j}=    Set Variable    ${r.json()}
     Should Not Be True    ${j}[ok]
 
 Spuštění kontroly s neplatným tokenem je odmítnuto
+    [Tags]    api
     [Documentation]    Testuje POUZE zamítací větev – platný token by spustil
     ...                skutečnou kontrolu (API kredit + cooldown), to do CI nepatří.
     ...                GET varianta (?api=run) – POST přes redirect ztrácí tělo
@@ -108,6 +116,7 @@ Spuštění kontroly s neplatným tokenem je odmítnuto
     Should Contain    ${j}[error]    token
 
 Notifikační kanál ntfy je živý
+    [Tags]    api
     [Documentation]    Monitorovací assert (backlog): radar posílá notifikaci
     ...                minimálně 1× denně (ranní kontrola 8:00), takže pokud
     ...                za posledních 48 h na ntfy nedorazilo NIC, kanál je

@@ -19,11 +19,13 @@ ${PROBIHA_LABEL}    Probíhá / dlouhodobé
 
 *** Test Cases ***
 Hlavička a základní prvky jsou na místě
+    [Tags]    smoke
     Get Text       ${FRAME} header h1        contains    KULTURNÍ RADAR
     Get Element    ${FRAME} \#profil-select
     Get Element    ${FRAME} \#fab
 
 Přihlašovací obrazovka nabízí dlaždice profilů k výběru
+    [Tags]    smoke
     [Documentation]    v3.14: appka startuje anonymně – login overlay se otevírá
     ...    badgem "Přihlásit se". Vlastní nezávislá stránka, aby test ověřil
     ...    počáteční stav bez ovlivnění přihlášení sdílené stránky.
@@ -39,6 +41,7 @@ Přihlašovací obrazovka nabízí dlaždice profilů k výběru
     Close Page
 
 Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastní stránka)
+    [Tags]    ui
     [Documentation]    v3.14: klíčový test nového chování (rozhodnutí 8. 8. 2026).
     ...    1) Appka se načte rovnou s kartami, BEZ přihlašovacího overlay.
     ...    2) Klik na ★ v anonymním stavu NEZAPÍŠE nic – místo toho otevře
@@ -60,6 +63,7 @@ Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastn
     Close Page
 
 Špatný PIN zobrazí chybu a nepřihlásí (vlastní stránka)
+    [Tags]    ui
     [Documentation]    Vlastní nezávislá stránka – viz dokumentace testu výš.
     ...    Záměrně syntakticky platný PIN (splňuje pinVypadaPlatne_, 4–8 znaků,
     ...    bez mezer), jen espere nesprávný, ať se otestuje SERVEROVÁ validace,
@@ -81,6 +85,7 @@ Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastn
     Close Page
 
 Odhlášení vrátí appku do anonymního režimu (vlastní stránka)
+    [Tags]    regrese
     [Documentation]    Regresní pojistka na bug ze 7. 8. 2026 (location.reload()
     ...    v sandboxovaném iframu → prázdná stránka) + v3.14 chování: po
     ...    odhlášení se appka vrací do FUNKČNÍHO anonymního režimu (karty
@@ -100,6 +105,7 @@ Odhlášení vrátí appku do anonymního režimu (vlastní stránka)
     Close Page
 
 Profil: dialog obsahuje osobní filtry a tlačítko Najít akce pro mě (bez spuštění)
+    [Tags]    ui
     [Documentation]    Jen existence prvků a otevření/zavření dialogu – NEKLIKÁME
     ...    na "Najít akce pro mě", protože by to spustilo skutečné (placené)
     ...    AI hledání. Stejný princip jako u FABu níž. v3.33 (krok E): i prvky
@@ -116,6 +122,7 @@ Profil: dialog obsahuje osobní filtry a tlačítko Najít akce pro mě (bez spu
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=5s
 
 Notifikace: zaškrtnutí kanálu ukáže/schová příslušnou oblast (bez uložení)
+    [Tags]    notifikace
     [Documentation]    v3.33 (krok E): čistě klientská interakce
     ...    (prekreslitNotifOblasti_), žádné volání serveru – bezpečné bez
     ...    ohledu na produkční data, nezávisle na stavu, ve kterém dialog
@@ -142,6 +149,7 @@ Notifikace: zaškrtnutí kanálu ukáže/schová příslušnou oblast (bez ulož
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=5s
 
 Notifikace: neplatný stav (e-mail zaškrtnutý bez adresy) zobrazí inline chybu, dialog zůstane otevřený
+    [Tags]    notifikace
     [Documentation]    v3.33 (krok E): validovatNotifikaceKlient_ musí odchytit
     ...    chybu PŘED voláním serveru – žádný zápis do produkčních dat,
     ...    bezpečné spustit kdykoli.
@@ -164,6 +172,7 @@ Notifikace: neplatný stav (e-mail zaškrtnutý bez adresy) zobrazí inline chyb
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=5s
 
 Notifikace: vygenerování ntfy tématu, uložení a znovunačtení po přihlášení (plný cyklus s návratem)
+    [Tags]    notifikace    zapis
     [Documentation]    v3.33 (krok E): jediný test, co skutečně zapisuje do
     ...    sloupce Notifikace testovacího profilu (RF_TEST_USER_ID) – proto
     ...    plný cyklus s návratem na konci, stejný princip jako
@@ -232,10 +241,12 @@ Notifikace: vygenerování ntfy tématu, uložení a znovunačtení po přihlá�
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=10s
 
 Přepínač profilů je naplněn z meta API
+    [Tags]    ui
     ${pocet}=    Get Element Count    ${FRAME} \#profil-select option
     Should Be True    ${pocet} >= 1    Select má mít aspoň jeden profil
 
 Opakované přepnutí profilu v dropdownu nerozbije appku (regrese v3.12)
+    [Tags]    regrese
     [Documentation]    v3.56 (testovací dluh, krok 1 auditu): statický
     ...    #status se mazal z DOM při prvním úspěšném vykreslení
     ...    (renderAkce() čistí #main) – každé DALŠÍ volání nactiAkce
@@ -265,10 +276,12 @@ Opakované přepnutí profilu v dropdownu nerozbije appku (regrese v3.12)
     END
 
 Chipy kategorií se vykreslily
+    [Tags]    ui
     ${pocet}=    Get Element Count    ${FRAME} .chip
     Should Be True    ${pocet} >= 4    Vše + aspoň 3 kategorie z KRITÉRIÍ
 
 Karty akcí se načetly a hlavičky dnů jsou česká data
+    [Tags]    smoke    regrese
     [Documentation]    Regresní test bugu v3.2–3.3 přímo v UI:
     ...                den-hlavicka nesmí být „46156“ ani „FRI AUG 07…“.
     ...                Od v3.3 frontendu je povolena i jediná nedatumová
@@ -292,6 +305,7 @@ Karty akcí se načetly a hlavičky dnů jsou česká data
     END
 
 Dlouhodobé akce nevytvářejí hlavičky s minulým datem
+    [Tags]    regrese
     [Documentation]    Regrese v3.3 frontendu: akce začínající v minulosti
     ...                (např. celoléto běžící série) se řadí do sekce
     ...                „Probíhá / dlouhodobé“, která je vždy úplně první —
@@ -313,6 +327,7 @@ Dlouhodobé akce nevytvářejí hlavičky s minulým datem
     END
 
 Filtr kategorie omezí karty a Vše je vrátí
+    [Tags]    filtr
     [Documentation]    v3.10: selektor zúžen na \#kat-chips – od chipů typů
     ...    stálých míst (které mají vlastní tlačítko „Vše") jinak nastává
     ...    strict-mode kolize (dva prvky s textem „Vše" na stránce).
@@ -327,6 +342,7 @@ Filtr kategorie omezí karty a Vše je vrátí
     Should Be Equal As Integers    ${zpet}    ${vsech}
 
 Druhá úroveň filtru (podkategorie) se zobrazí a zase skryje podle hlavní kategorie
+    [Tags]    filtr
     [Documentation]    v3.50: \#podkat-chips je prázdný, dokud není vybraná
     ...    žádná hlavní kategorie ("Vše"); po výběru kategorie kontejner
     ...    zůstane funkční (nespadne), i když aktuální produkční data ještě
@@ -346,6 +362,7 @@ Druhá úroveň filtru (podkategorie) se zobrazí a zase skryje podle hlavní ka
     Should Be Equal As Integers    ${po}    0    msg=Po návratu na Vše se podkategorie-chipy zase vyprázdní
 
 Klik na podkategorii-chip skutečně zúží seznam karet
+    [Tags]    filtr
     [Documentation]    v3.56 (testovací dluh, krok 3 auditu): test výš
     ...    ověřuje jen strukturální chování #podkat-chips (prázdný/plný
     ...    kontejner), ne že klik na konkrétní podkategorii skutečně
@@ -383,11 +400,13 @@ Klik na podkategorii-chip skutečně zúží seznam karet
     END
 
 Sekce stálých míst existuje
+    [Tags]    ui
     Wait For Elements State    ${FRAME} \#mista-sekce .misto-karta >> nth=0    visible    timeout=15s
     ${mist}=    Get Element Count    ${FRAME} .misto-karta
     Should Be True    ${mist} >= 1
 
 Karta má odkaz Do kalendáře
+    [Tags]    ui
     [Documentation]    v3.10: 📅 Do kalendáře je čistě klientský odkaz (Google
     ...    Calendar šablonová URL) – žádné volání serveru, bezpečné otevřít i
     ...    kliknout by bylo bezpečné, ale stačí ověřit existenci a text odkazu.
@@ -395,6 +414,7 @@ Karta má odkaz Do kalendáře
     Should Contain    ${text}    Do kalendáře
 
 Karta má tlačítko Sdílet
+    [Tags]    ui
     [Documentation]    v3.13: existence tlačítka „📤 Sdílet". NEKLIKÁME –
     ...    navigator.share/clipboard uvnitř sandboxovaného iframe se v headless
     ...    testovacím prohlížeči chová nedeterministicky (může otevřít systémový
@@ -404,6 +424,7 @@ Karta má tlačítko Sdílet
     Should Contain    ${text}    Sdílet
 
 Tlačítko Sdílet výběr existuje
+    [Tags]    ui
     [Documentation]    v3.20: existence tlačítka „📤 Sdílet výběr" vedle
     ...    ★ Oblíbené / ✓ Navštívené. NEKLIKÁME – stejný důvod jako u tlačítka
     ...    Sdílet na kartě výše (nedeterministické Web Share/clipboard chování
@@ -412,6 +433,7 @@ Tlačítko Sdílet výběr existuje
     Should Contain    ${text}    Sdílet výběr
 
 Karta má odkaz Mapa
+    [Tags]    ui
     [Documentation]    v3.13: 📍 Mapa je čistě klientský odkaz (Google Maps
     ...    URL schéma, žádný API klíč) – existence a text stačí ověřit stejně
     ...    jako u Do kalendáře.
@@ -419,6 +441,7 @@ Karta má odkaz Mapa
     Should Contain    ${text}    Mapa
 
 Políčko počasí se zobrazuje správně
+    [Tags]    ui
     [Documentation]    v3.25: ověřuje, že políčko počasí u karty akce má
     ...    SPRÁVNÝ typ obsahu, ne jen že appka nespadla – buď ikona+teplota
     ...    (stav OK, případně CHYBA se zachovanou hodnotou – viz
@@ -450,6 +473,7 @@ Políčko počasí se zobrazuje správně
     END
 
 Chip typu stálého místa zúží seznam (pokud profil má 2+ typů)
+    [Tags]    filtr
     [Documentation]    v3.10: chipy typů se vykreslí jen když má profil 2+
     ...    různé typy míst (viz Index.html renderMista – chip „Vše" + 1 typ by
     ...    byl k ničemu). Test je proto podmíněný na DATECH profilu, ne na
@@ -475,6 +499,7 @@ Chip typu stálého místa zúží seznam (pokud profil má 2+ typů)
     END
 
 Karty mají ikony pro Oblíbené a Navštívené
+    [Tags]    ui
     [Documentation]    v3.9: jen existence prvků – NEKLIKÁME na ikony (☆/○), protože
     ...                klik zapisuje do produkčního listu OZNAČENÍ. Bezpečné pro
     ...                automatický nedělní běh, protože nic nemutuje.
@@ -484,6 +509,7 @@ Karty mají ikony pro Oblíbené a Navštívené
     Should Be Equal As Integers    ${fajfky}    1
 
 Chip Oblíbené filtruje bez zápisu do tabulky
+    [Tags]    filtr
     [Documentation]    Klik na CHIP (ne na ikonu karty!) je čistě klientský filtr –
     ...                nevolá apiToggle, nic nezapisuje. Bezpečné pro CI.
     ${vsech}=    Get Element Count    ${FRAME} .karta
@@ -500,6 +526,7 @@ Chip Oblíbené filtruje bez zápisu do tabulky
     ...    msg=Opětovný klik na chip vrátí plný seznam
 
 Chip Neověřeno filtruje bez zápisu do tabulky
+    [Tags]    filtr
     [Documentation]    v3.27: stejný vzor jako „Chip Oblíbené" – čistě klientský
     ...                filtr nad už načtenými daty, žádné volání apiToggle/apiRun.
     ...                Bezpečné pro CI i když profil aktuálně nemá žádnou
@@ -518,6 +545,7 @@ Chip Neověřeno filtruje bez zápisu do tabulky
     ...    msg=Opětovný klik na chip vrátí plný seznam
 
 Označení ★ se skutečně promítne do filtru „★ Oblíbené" (integrace, ne jen zápis)
+    [Tags]    zapis    krehky
     [Documentation]    Rozdíl oproti „★ Oblíbené: lze označit i odznačit": tam
     ...    jsme ověřovali jen že SE ZAPÍŠE (ikona + reload). Tady ověřujeme, že
     ...    dvě samostatně postavené funkce (toggle a chip-filtr) spolu SKUTEČNĚ
@@ -556,6 +584,7 @@ Označení ★ se skutečně promítne do filtru „★ Oblíbené" (integrace, 
     ...    msg=Po návratu na „Vše" a druhém přepnutí se nepodržel původní stav
 
 ★ Oblíbené: lze označit i odznačit (obojí ověřeno reloadem)
+    [Tags]    zapis    krehky
     [Documentation]    Plný cyklus pro ikonu ★/☆ – viz sdílený keyword níže.
     ...                ${puvodni} má bezpečnou výchozí hodnotu ještě PŘED rizikovým
     ...                voláním – kdyby hlavní keyword spadl hned na prvním kroku
@@ -568,6 +597,7 @@ Označení ★ se skutečně promítne do filtru „★ Oblíbené" (integrace, 
     ${puvodni}=    Ověřit plný cyklus označení (přidat i odebrat) s reloadem    hvezda
 
 ✓ Navštívené: lze označit i odznačit (obojí ověřeno reloadem)
+    [Tags]    zapis    krehky
     [Documentation]    Stejný scénář jako u hvězdičky, jen pro ikonu ✓/○ (typ 'navstiveno').
     ...                Nezávislý sloupec v OZNAČENÍ – ověřuje, že apiToggle funguje
     ...                stejně spolehlivě pro oba typy, ne jen pro ten testovaný dřív.
@@ -577,6 +607,7 @@ Označení ★ se skutečně promítne do filtru „★ Oblíbené" (integrace, 
     ${puvodni}=    Ověřit plný cyklus označení (přidat i odebrat) s reloadem    fajfka
 
 🏛 Oblíbené místo: lze označit i odznačit (obojí ověřeno reloadem)
+    [Tags]    zapis    krehky
     [Documentation]    I (v3.26–v3.49): stejný scénář jako u hvězdičky/fajfky, jen pro
     ...                ikonu 🏛 (typ 'misto') – apiToggleMisto klíčuje podle misto+obec
     ...                místo ID akce, ale sdílený keyword „Ověřit plný cyklus..." to
@@ -594,6 +625,7 @@ Označení ★ se skutečně promítne do filtru „★ Oblíbené" (integrace, 
     ${puvodni}=    Ověřit plný cyklus označení (přidat i odebrat) s reloadem    misto
 
 Chip „Oblíbená místa" filtruje bez zápisu do tabulky
+    [Tags]    filtr
     [Documentation]    F (v3.47): klik na CHIP (ne na ikonu karty!) je čistě klientský
     ...                filtr nad polem mistoOblibene (`filtrovatOblibenaMista_`), nevolá
     ...                apiToggleMisto, nic nezapisuje. Bezpečné pro CI i když profil
@@ -613,6 +645,7 @@ Chip „Oblíbená místa" filtruje bez zápisu do tabulky
     ...    msg=Opětovný klik na chip vrátí plný seznam
 
 Tlačítko Spustit kontrolu otevře token dialog (bez spuštění)
+    [Tags]    ui
     [Documentation]    Jen UI tok – dialog se otevře a Zrušit ho zavře.
     ...                Skutečné spuštění (validní token) do E2E nepatří.
     Click    ${FRAME} \#fab
@@ -621,6 +654,7 @@ Tlačítko Spustit kontrolu otevře token dialog (bez spuštění)
     Wait For Elements State    ${FRAME} \#token-dialog.open    detached    timeout=5s
 
 Kontaktní formulář: prázdná zpráva zobrazí inline chybu (bez odeslání)
+    [Tags]    kontakt
     [Documentation]    v3.55 (testovací dluh, krok 2 auditu): prázdná
     ...    zpráva se odchytí přímo v klientském handleru PŘED voláním
     ...    serveru (viz Index.html, kontakt-odeslat listener) – žádný
@@ -639,6 +673,7 @@ Kontaktní formulář: prázdná zpráva zobrazí inline chybu (bez odeslání)
     Wait For Elements State    ${FRAME} \#kontakt-dialog.open    detached    timeout=5s
 
 Odeslání kontaktního formuláře: úspěch, pak okamžité druhé odeslání selže na cooldown
+    [Tags]    kontakt    zapis
     [Documentation]    v3.55 (testovací dluh, krok 2 auditu): JEDINÝ test
     ...    v sadě, co skutečně pošle reálný e-mail na KONTAKT_EMAIL
     ...    (info@kulturniradar.cz) – proto spojený s ověřením cooldownu
@@ -688,6 +723,7 @@ Odeslání kontaktního formuláře: úspěch, pak okamžité druhé odeslání 
 # tohle spolehlivější a levnější než automatizace na pixel).
 
 Stránka se načte bez JS chyby v konzoli
+    [Tags]    smoke
     [Documentation]    M) Smoke test: appka se má načíst bez neošetřené JS
     ...    výjimky (Get Page Errors – neodchycené throw) a bez
     ...    console.error() volání (Get Console Log, filtr type=error).
@@ -706,6 +742,7 @@ Stránka se načte bez JS chyby v konzoli
     Close Page
 
 Kalendář lze otevřít a zavřít přes #kalendar-toggle (mobil)
+    [Tags]    smoke    kalendar    krehky
     [Documentation]    M) #kalendar-panel je na mobilu (<900px) skládací,
     ...    výchozí zavřeno – #kalendar-toggle v hlavičce ho otevírá/zavírá
     ...    (v3.33). Na desktopu (Suite Setup, viewport 1280×900) je
@@ -722,6 +759,7 @@ Kalendář lze otevřít a zavřít přes #kalendar-toggle (mobil)
     Wait For Elements State    ${FRAME} \#kalendar-panel.otevreno    detached    timeout=5s
 
 Kalendář: navigace mezi měsíci mění nadpis měsíce/roku
+    [Tags]    kalendar
     [Documentation]    v3.55 (testovací dluh, krok 3 auditu): #kalendar-dalsi/
     ...    #kalendar-predchozi volají posunoutMesic_(), které přepíše
     ...    #kalendar-nazev-mesice (a přerenderuje mřížku). Appka běží proti
@@ -739,6 +777,7 @@ Kalendář: navigace mezi měsíci mění nadpis měsíce/roku
     ...    msg=Návrat přes #kalendar-predchozi měl vrátit původní měsíc
 
 Kalendář: klik na den s akcí odscrolluje na odpovídající sekci v seznamu
+    [Tags]    kalendar
     [Documentation]    v3.55 (testovací dluh, krok 3 auditu): skocitNaDen_
     ...    scrolluje na #den-<iso>, pokud existuje – dlouhodobé akce v sekci
     ...    "Probíhá / dlouhodobé" vlastní cíl nemají, klik se pak tiše
@@ -776,6 +815,7 @@ Kalendář: klik na den s akcí odscrolluje na odpovídající sekci v seznamu
     END
 
 Kalendář: hover na den s akcí zobrazí tooltip s názvy akcí, mouseout ho schová
+    [Tags]    kalendar
     [Documentation]    v3.55 (testovací dluh, krok 3 auditu): tooltip
     ...    (zobrazitTooltipKalendare_) obsahuje jen holé názvy akcí – jeden
     ...    <div> na název, žádné datum ani počet – proto se ověřuje jen
@@ -795,6 +835,7 @@ Kalendář: hover na den s akcí zobrazí tooltip s názvy akcí, mouseout ho sc
     END
 
 Mapa lze otevřít a zavřít přes #mapa-toggle (mobil)
+    [Tags]    smoke    mapa    krehky
     [Documentation]    M) Stejný sbalitelný vzor jako kalendář (v3.40,
     ...    test výš), nezávislý na kalendáři – vlastní třída .otevreno na
     ...    #mapa-panel.
@@ -809,6 +850,7 @@ Mapa lze otevřít a zavřít přes #mapa-toggle (mobil)
     Wait For Elements State    ${FRAME} \#mapa-panel.otevreno    detached    timeout=5s
 
 Mapa se vykreslí (Leaflet)
+    [Tags]    smoke    mapa    krehky
     [Documentation]    M) #mapa je bonus prvek (inicializovatMapu_ v
     ...    Index.html je no-op, pokud se Leaflet CDN nenačte) – test čeká
     ...    na vlastní Leaflet kontejner uvnitř #mapa, ne jen na prázdný
@@ -817,6 +859,7 @@ Mapa se vykreslí (Leaflet)
     Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
 
 Seznam míst pod mapou obsahuje řádky, pokud existují akce se souřadnicemi
+    [Tags]    smoke    mapa    krehky
     [Documentation]    M) F) #mapa-mista (v3.41) je viditelné jen na
     ...    desktopu (≥900px) a naplňuje se JEN pokud aktuálně filtrované
     ...    akce mají platné souřadnice (viz akceProMapu_/sestavSeznamMist_
@@ -835,6 +878,7 @@ Seznam míst pod mapou obsahuje řádky, pokud existují akce se souřadnicemi
     END
 
 Klik na titulek karty vybere pin na mapě
+    [Tags]    mapa
     [Documentation]    N) D/E) klik na .nazev-klikatelna (v3.41) přepne
     ...    výběr pinu – ověřeno přes .nazev.vybrano na titulku
     ...    (vybratPin_ sesynchronizuje vizuální stav) a existenci
@@ -858,6 +902,7 @@ Klik na titulek karty vybere pin na mapě
     END
 
 Klik na řádek v seznamu míst vybere pin na mapě
+    [Tags]    mapa    krehky
     [Documentation]    N) D/F) klik na .mapa-misto (v3.41/v3.43) přepne
     ...    výběr stejným sdíleným mechanismem (vybratPin_) jako titulek
     ...    karty (test výš) – ověřeno přes .mapa-misto.vybrano a
@@ -898,6 +943,7 @@ Klik na řádek v seznamu míst vybere pin na mapě
     END
 
 Klik na pin otevře popup se strukturálně konzistentním obsahem
+    [Tags]    mapa
     [Documentation]    v3.56 (testovací dluh, krok 5 auditu): sestavPopupMapy_
     ...    (tenký DOM wrapper nad sestavPopupDataMapy_, viz Node testy) může
     ...    zobrazit 1 i víc akcí na jednom pinu (seskupitPodleSouradnic_) –
@@ -926,6 +972,7 @@ Klik na pin otevře popup se strukturálně konzistentním obsahem
     END
 
 Tlačítko „Zobrazit v seznamu" v popupu zvýrazní odpovídající kartu
+    [Tags]    mapa
     [Documentation]    v3.56 (testovací dluh, krok 5 auditu): tlačítko volá
     ...    zvyraznitAkci_ (v3.56 fix: self-cancel bug při volání zevnitř
     ...    click handleru, viz komentář u funkce v Index.html).
@@ -950,6 +997,7 @@ Tlačítko „Zobrazit v seznamu" v popupu zvýrazní odpovídající kartu
     END
 
 Header a #controls-oznaceni zůstávají viditelné po scrollu (sticky)
+    [Tags]    ui    krehky
     [Documentation]    N) H/I) header i #controls-oznaceni mají
     ...    position: sticky (v3.42) – po scrollu stránky dolů mají zůstat
     ...    na stejné Y pozici ve viewportu (na rozdíl od běžného static
@@ -969,6 +1017,7 @@ Header a #controls-oznaceni zůstávají viditelné po scrollu (sticky)
     ...    msg=#controls-oznaceni (sticky) změnilo Y pozici po scrollu: ${oznaceni_y_pred} → ${oznaceni_y_po}
 
 Responzivní pásma: střední (900-1359px) omezí main na 656px a mapu zalomí pod obsah
+    [Tags]    ui    krehky
     [Documentation]    v3.55 (testovací dluh, krok 4 auditu): @media
     ...    (min-width:900px) and (max-width:1359px) v Index.html omezuje
     ...    main na max-width:656px (strop na 2 sloupce karet) a #mapa-panel
@@ -989,6 +1038,7 @@ Responzivní pásma: střední (900-1359px) omezí main na 656px a mapu zalomí 
     ...    msg=#mapa-panel (y=${mapa_y}) má být POD main (y=${main_y}, výška=${main_vyska}), ne vedle něj
 
 Responzivní pásma: široké (≥1360px) main přesáhne 656px a mapa zůstává vedle obsahu
+    [Tags]    ui    krehky
     [Documentation]    v3.55 (testovací dluh, krok 4 auditu): @media
     ...    (min-width:1360px) zruší strop main (max-width:656px platí jen
     ...    ve středním pásmu výš) a #mapa-panel se stane trvalým sticky

@@ -121,6 +121,39 @@ zrovna nedostupný (vzorec B), hlavička se nikdy nenačte a **celá**
 frontend sada spadne najednou. Řešit kořenovou příčinu (A nebo B), ne
 tenhle symptom.
 
+### Tagy testů (`[Tags]`, zavedeno 29. 8. 2026)
+
+Všech 59 testů v `frontend.robot`/`api.robot` má nativní RF `[Tags]` —
+jde spustit jen podmnožinu přes `--include`/`--exclude`, místo vždy celé
+sady. Kategorie (viz `git log` k zavedení pro plné zdůvodnění u
+každého testu):
+
+| Tag | Význam |
+|---|---|
+| `smoke` | pár nejrychlejších/nejdůležitějších testů – rychlá kontrola „appka žije“ po nasazení |
+| `zapis` | skutečně zapisuje do produkčních dat (notifikace, ★/✓/🏛 toggle, kontaktní formulář) |
+| `krehky` | historicky prokázaně náchylné na timing/flake (mapa/kalendář testy z „testovací dluh #14-19“, viz CHANGELOG.md; zápisové testy pod zátěží, viz sekce 8 výš) |
+| `mapa` | vše kolem Leaflet mapy a pinů (frontend i `lat`/`lng` schema v API) |
+| `kalendar` | vše kolem kalendářního widgetu |
+| `filtr` | čistě klientské chip/kategorie filtry, bez zápisu |
+| `notifikace` | dialog osobního nastavení notifikací |
+| `kontakt` | kontaktní formulář |
+| `regrese` | regresní pojistka na konkrétní zdokumentovaný historický bug |
+| `ui` | ostatní bezpečné, nezapisující UI kontroly |
+| `api` | všechny testy v `api.robot` (kontraktové, ne E2E) |
+
+```powershell
+# Rychlá sanity kontrola po nasazení (pár vteřin, ne celá sada)
+robot --variable BASE_URL:$URL --include smoke tests/robot/
+
+# Celá sada KROMĚ zápisových testů – bezpečné spustit i automaticky/opakovaně
+robot --variable BASE_URL:$URL --exclude zapis tests/robot/
+
+# Jen mapa a kalendář (po zásahu do těchhle částí Index.html)
+robot --variable BASE_URL:$URL --include mapa --include kalendar tests/robot/
+```
+Víc tagů v jednom `--include` jde spojit i inline: `--include mapaORkalendar`.
+
 ### Drobnosti, na které jsme narazili jen jednou, ale stojí za zapsání
 - `Wait For Elements State` (knihovna Browser) **nepodporuje** pojmenovaný
   argument `msg=` (na rozdíl od `Should Be Equal` a podobných) —
