@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.33 (21. 8. 2026) – Notifikace: API wrappery pro frontend (krok E, backend část)
- * (předchozí: 3.32 – Notifikace: trigger + odesílací smyčka + dry-run, krok D)
+ * Verze: 3.34 (31. 8. 2026) – najdiDuplicity_: tolerance ±2 dny v datu (úklid/samotest)
+ * (předchozí: 3.33 – Notifikace: API wrappery pro frontend, krok E, backend část)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -68,7 +68,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.33';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.34';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -2593,20 +2593,49 @@ function upsertMista_(ss, cfg, places) {
 // SAMOTEST + WATCHDOG + DATOVÁ HYGIENA
 // ---------------------------------------------------------------------------
 
-/** Najde duplicitní řádky AKCÍ (stejná logika jako úklid, bez mazání). */
+/** Toleranční okno (dny) pro shodu data v najdiDuplicity_ – viz komentář tam. */
+const DUPLICITY_OKNO_DNI = 2;
+
+/** Dvě data jsou si "blízko" pro účely detekce duplicit (viz DUPLICITY_OKNO_DNI).
+ *  Když se ani jedno nepodaří naparsovat na Date, spadne zpět na přesnou shodu
+ *  textového klíče (stejné chování jako dřív pro neparsovatelné hodnoty). */
+function jsouDataBlizkoProDuplicitu_(rawA, rawB) {
+  const a = parseCzDate_(rawA), b = parseCzDate_(rawB);
+  if (a && b) return Math.abs(a - b) / 86400000 <= DUPLICITY_OKNO_DNI;
+  return dateKey_(rawA) === dateKey_(rawB);
+}
+
+/**
+ * Najde duplicitní řádky AKCÍ (stejná logika jako úklid, bez mazání).
+ *
+ * v3.34: dřív se kandidáti bucketovali podle PŘESNÉ shody profil+datum_od,
+ * teprve uvnitř bucketu se porovnávaly názvy (isSameName_). To přehlédlo
+ * duplicitu, kde dva nezávislé zdroje popsaly TUTÉŽ akci s datem_od
+ * posunutým o 1 den (viz BACKLOG.md, "Light Up Tugendhat" 6.8. vs. 7.8.2026)
+ * – isSameName_ by shodu názvů odhalil, ale k porovnání vůbec nedošlo, protože
+ * záznamy skončily v různých bucketech. Teď se skupina tvoří jen podle
+ * profilu a shoda data se ověřuje tolerančním oknem ±DUPLICITY_OKNO_DNI dní
+ * (jsouDataBlizkoProDuplicitu_) až při samotném porovnání kandidátů – dvě
+ * akce se stejným názvem/místem o měsíc od sebe (jiný běh, jiný termín)
+ * se tak pořád správně NEspojí.
+ *
+ * upsertEvents_ (zápisová cesta) záměrně zůstává na přesné shodě data beze
+ * změny – vyšší cena chybného sloučení dvou různých akcí při zápisu, tenhle
+ * úklid/samotest naopak běží periodicky a dá se bez rizika spustit znovu.
+ */
 function najdiDuplicity_(data) {
   const groups = {};
   const toDelete = [];
   data.forEach((row, i) => {
     if (!norm_(row[4])) return;                       // bez názvu ignorovat
-    const gk = norm_(row[24]) + '|' + dateKey_(row[1]);
+    const gk = norm_(row[24]);
     const tokens = nazevTokens_(row[4]);
     const g = (groups[gk] = groups[gk] || []);
-    const dup = g.find(c => isSameName_(c.tokens, tokens));
+    const dup = g.find(c => jsouDataBlizkoProDuplicitu_(c.datumRaw, row[1]) && isSameName_(c.tokens, tokens));
     if (dup) {
       toDelete.push({ rowNum: i + 2, nazev: String(row[4]), keptRow: dup.rowNum });
     } else {
-      g.push({ rowNum: i + 2, tokens: tokens });
+      g.push({ rowNum: i + 2, tokens: tokens, datumRaw: row[1] });
     }
   });
   return toDelete;

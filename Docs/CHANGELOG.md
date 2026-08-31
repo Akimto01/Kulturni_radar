@@ -1,5 +1,14 @@
 # Changelog
 
+## Backend v3.34 — najdiDuplicity_: tolerační okno ±2 dny v datu (úklid/samotest) — 31. 8. 2026
+### Změněno
+- **`najdiDuplicity_`** — kandidáti se dřív bucketovali podle PŘESNÉ shody profil+datum_od, teprve uvnitř bucketu se porovnávaly názvy (`isSameName_`). Nová **`jsouDataBlizkoProDuplicitu_`** (toleranční okno `DUPLICITY_OKNO_DNI = 2` dny) posouvá porovnání data z klíče bucketu na podmínku uvnitř porovnání kandidátů — skupina se teď tvoří jen podle profilu, shoda data (±2 dny) i shoda názvu se ověřují až při srovnání dvojice. Fallback na přesnou textovou shodu zůstává pro nezpracovatelná data.
+- **`upsertEvents_`** (zápisová cesta) — vědomě beze změny, zůstává na přesné shodě data. Vyšší cena chybného sloučení dvou různých akcí při zápisu než u periodického úklidu, který se dá bez rizika spustit znovu.
+### Poznámka k architektuře
+- Vychází z diagnostiky reálné duplicity v listu AKCE: „Light Up Tugendhat" (zahrada vily Tugendhat, Brno) měla dva řádky pro tutéž akci (7.–9. 8. 2026) — jeden zdroj ji zapsal jako součást „Maratonu hudby" s `datum_od` 6. 8. 2026, druhý samostatně s `datum_od` 7. 8. 2026. `isSameName_` by shodu názvů rozeznal (ověřeno přesným výpočtem tokenů), ale k porovnání vůbec nedošlo, protože oba záznamy skončily v různých bucketech přesné shody data. Zářijový výskyt téhož názvu (`2026-09-07-light-up-tugendhat`, jiný termín) zůstává správně NEspárovaný i po rozšíření okna.
+- 5 nových Node testů (441 → 446): nalezený případ (posun o 1 den, jiné znění názvu), hraniční okno (přesně 2 dny = duplicita, 3 dny = ne), tolerance nepřebíjí oddělení podle profilu, zrcadlo zářijového případu (stejný název/profil, termín o měsíc jinam).
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Index v3.34 - najdiDuplicity tolerance"`). Po nasazení ručně spuštěno „Odstranit duplicity" z menu Kulturní radar v Sheetu — viz výsledek níže.
+
 ## Index.html v3.58 — Indexace pro Google/AI crawlery, část (a) — 23. 8. 2026
 ### Přidáno
 - **Meta tagy v `<head>`** — `description`, Open Graph (`og:type`/`site_name`/`title`/`description`/`url`/`locale`), Twitter card (`summary`). Statické, obecné pro celou appku (appka je client-side rendered — dynamický OG obsah pro konkrétní sdílenou akci by viděl jen JS-aware crawler, ne link-preview boty jako Facebook/Slack, viz `Docs/AUDIT-INDEXACE.md`).

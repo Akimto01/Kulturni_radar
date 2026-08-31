@@ -708,6 +708,55 @@ test('najdiDuplicity_: stejný název, ale jiný den → NENÍ duplicita', () =>
   assert.equal(r.najdiDuplicity_(data).length, 0);
 });
 
+// v3.34: tolerance ±2 dny v datu – viz BACKLOG.md, případ "Light Up Tugendhat"
+// (dva zdroje popsaly tutéž akci s datem_od posunutým o 1 den, 6.8. vs. 7.8.2026,
+// takže přesná shoda data duplicitu přehlédla i při shodném/podobném názvu).
+
+test('najdiDuplicity_: stejný název/profil, datum posunuté o 1 den → JE duplicita (tolerance ±2 dny)', () => {
+  const data = [
+    akceRadek({ nazev: 'Light Up Tugendhat', datumOd: '6. 8. 2026' }),
+    akceRadek({ nazev: 'Light Up Tugendhat – 25 let UNESCO (součást Maratonu hudby)', datumOd: '7. 8. 2026' }),
+  ];
+  const dup = r.najdiDuplicity_(data);
+  assert.equal(dup.length, 1);
+  assert.equal(dup[0].keptRow, 2);
+  assert.equal(dup[0].rowNum, 3);
+});
+
+test('najdiDuplicity_: stejný název, datum přesně na hraně okna (2 dny) → JE duplicita', () => {
+  const data = [
+    akceRadek({ nazev: 'Balkan Night', datumOd: '3. 8. 2026' }),
+    akceRadek({ nazev: 'Balkan Night', datumOd: '5. 8. 2026' }),
+  ];
+  assert.equal(r.najdiDuplicity_(data).length, 1);
+});
+
+test('najdiDuplicity_: stejný název, datum těsně za oknem (3 dny) → NENÍ duplicita', () => {
+  const data = [
+    akceRadek({ nazev: 'Balkan Night', datumOd: '3. 8. 2026' }),
+    akceRadek({ nazev: 'Balkan Night', datumOd: '6. 8. 2026' }),
+  ];
+  assert.equal(r.najdiDuplicity_(data).length, 0);
+});
+
+test('najdiDuplicity_: stejný název, blízké datum (1 den), ale jiný profil → NENÍ duplicita', () => {
+  const data = [
+    akceRadek({ nazev: 'Light Up Tugendhat', datumOd: '6. 8. 2026', profil: 'Brno' }),
+    akceRadek({ nazev: 'Light Up Tugendhat', datumOd: '7. 8. 2026', profil: 'Ostrava' }),
+  ];
+  assert.equal(r.najdiDuplicity_(data).length, 0);
+});
+
+test('najdiDuplicity_: stejný název/profil, ale termín o měsíc jinam (jiný běh akce) → NENÍ duplicita', () => {
+  // Zrcadlí reálný případ "Light Up Tugendhat" 7.-9. 9. 2026 vs. 7.-9. 8. 2026 –
+  // stejná akce/místo, ale skutečně jiný termín, ne duplicitní zápis.
+  const data = [
+    akceRadek({ nazev: 'Light Up Tugendhat', datumOd: '7. 8. 2026' }),
+    akceRadek({ nazev: 'Light Up Tugendhat', datumOd: '7. 9. 2026' }),
+  ];
+  assert.equal(r.najdiDuplicity_(data).length, 0);
+});
+
 test('najdiDuplicity_: mírně odlišné znění stejné akce se chytí (fuzzy shoda přes tokeny)', () => {
   const data = [
     akceRadek({ nazev: 'Balkan Night: Fanfare Ciocărlia + Džambo Aguševi Orchestra' }),
