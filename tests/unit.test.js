@@ -674,6 +674,15 @@ test('isSameName_: prázdné tokeny (žádné slovo 3+ znaky) nikdy neshodují',
   assert.equal(r.isSameName_({}, r.nazevTokens_('Cokoli')), false);
 });
 
+// v3.35: stopwords + poměrový práh – viz BACKLOG.md, "Balkan Soirée" vs. "Balkan
+// Night" (sdílená jen brandingová slova série "Maraton hudby", jinak různí umělci).
+
+test('isSameName_: sdílená jen brandingová slova série ("maraton hudby") u jinak odlišných umělců = různé akce', () => {
+  const a = r.nazevTokens_('Balkan Soirée – Dunja Knebl & Xanthoula Dakovanou (Maraton hudby)');
+  const b = r.nazevTokens_('Balkan Night: Fanfare Ciocărlia + Džambo Aguševi Orchestra – Maraton hudby');
+  assert.equal(r.isSameName_(a, b), false);
+});
+
 /** Minimální řádek AKCE pro najdiDuplicity_: jen sloupce, které funkce čte. */
 function akceRadek({ nazev = '', profil = 'Brno', datumOd = '3. 8. 2026' } = {}) {
   const row = new Array(25).fill('');
@@ -753,6 +762,28 @@ test('najdiDuplicity_: stejný název/profil, ale termín o měsíc jinam (jiný
   const data = [
     akceRadek({ nazev: 'Light Up Tugendhat', datumOd: '7. 8. 2026' }),
     akceRadek({ nazev: 'Light Up Tugendhat', datumOd: '7. 9. 2026' }),
+  ];
+  assert.equal(r.najdiDuplicity_(data).length, 0);
+});
+
+// v3.35: stopwords + poměrový práh (isSameName_) – oba nové případy zrcadlí
+// reálná chybná sloučení nalezená na produkci po nasazení v3.34 (viz BACKLOG.md).
+
+test('najdiDuplicity_: různí umělci sdílející jen "Maraton hudby" branding → NENÍ duplicita', () => {
+  const data = [
+    akceRadek({ nazev: 'Balkan Soirée – Dunja Knebl & Xanthoula Dakovanou (Maraton hudby)', datumOd: '9. 8. 2026' }),
+    akceRadek({ nazev: 'Balkan Night: Fanfare Ciocărlia + Džambo Aguševi Orchestra – Maraton hudby', datumOd: '7. 8. 2026' }),
+  ];
+  assert.equal(r.najdiDuplicity_(data).length, 0);
+});
+
+test('najdiDuplicity_: denní seriál se stejným obecným názvem (různé dny) → NENÍ duplicita', () => {
+  const data = [
+    akceRadek({ nazev: 'Letní kulturní program Ostrava', datumOd: '2. 8. 2026', profil: 'Ostrava' }),
+    akceRadek({ nazev: 'Letní kulturní program Ostrava', datumOd: '8. 8. 2026', profil: 'Ostrava' }),
+    akceRadek({ nazev: 'Letní kulturní program Ostrava', datumOd: '12. 8. 2026', profil: 'Ostrava' }),
+    akceRadek({ nazev: 'Letní kulturní program Ostrava', datumOd: '13. 8. 2026', profil: 'Ostrava' }),
+    akceRadek({ nazev: 'Letní kulturní program Ostrava', datumOd: '16. 8. 2026', profil: 'Ostrava' }),
   ];
   assert.equal(r.najdiDuplicity_(data).length, 0);
 });

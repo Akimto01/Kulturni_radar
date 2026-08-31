@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.34 (31. 8. 2026) – najdiDuplicity_: tolerance ±2 dny v datu (úklid/samotest)
- * (předchozí: 3.33 – Notifikace: API wrappery pro frontend, krok E, backend část)
+ * Verze: 3.35 (31. 8. 2026) – isSameName_: stopwords + poměrový práh (oprava chybných slučování)
+ * (předchozí: 3.34 – najdiDuplicity_: tolerance ±2 dny v datu, úklid/samotest)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -68,7 +68,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.34';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.35';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -3364,19 +3364,49 @@ function normNazev_(v) {
     .trim();
 }
 
-/** Množina významových tokenů názvu (slova o 3+ znacích). */
+/** Obecná/brandingová slova bez vlastní identifikační hodnoty — vyloučena
+ *  z fuzzy shody názvů (isSameName_). Záměrně malý seznam: jen slova,
+ *  která už prokazatelně způsobila chybné sloučení různých akcí (v3.35 —
+ *  "Balkan Soirée" vs. "Balkan Night", denní seriál "Letní kulturní
+ *  program Ostrava"). NEobsahuje obecnější slova jako "festival"/
+ *  "slavnosti" — ta bývají legitimní součást vlastního jména akce
+ *  (viz test se Shakespearovskými slavnostmi), jejich vynechání by mohlo
+ *  přehlédnout skutečné duplicity. */
+const NAZEV_STOPWORDS_ = { maraton: true, maratonu: true, hudba: true, hudby: true,
+  letni: true, kulturni: true, program: true };
+
+/** Množina významových tokenů názvu (slova o 3+ znacích, bez NAZEV_STOPWORDS_). */
 function nazevTokens_(v) {
   const out = {};
-  normNazev_(v).split(' ').forEach(w => { if (w.length >= 3) out[w] = true; });
+  normNazev_(v).split(' ').forEach(w => {
+    if (w.length >= 3 && !NAZEV_STOPWORDS_[w]) out[w] = true;
+  });
   return out;
 }
 
-/** Dva názvy = tatáž akce, pokud je menší množina podmnožinou větší, nebo mají 3+ společných slov. */
+/** Práh poměru sdílených slov k menší z obou množin (viz isSameName_ níže). */
+const NAZEV_SHODA_POMER_PRAH = 0.5;
+
+/**
+ * Dva názvy = tatáž akce, pokud je menší množina PODMNOŽINOU větší
+ * (zkrácený název — poměr je tam vždy 100 % z definice), NEBO mají 3+
+ * společných slov A ZÁROVEŇ ta tvoří aspoň NAZEV_SHODA_POMER_PRAH (50 %)
+ * menší z obou množin.
+ *
+ * v3.35: dřív stačila samotná podmínka `inter >= 3` bez ohledu na to, jak
+ * velký podíl porovnávaných názvů ta 3 slova tvoří — u dvou jinak zcela
+ * odlišných, mnohem delších názvů to procházelo i s jen náhodným/
+ * brandingovým překryvem (viz BACKLOG.md, "Balkan Soirée" vs. "Balkan
+ * Night": sdílený "maraton"+"hudby"+"balkan" byl jen 3 z 8, resp. 9 slov).
+ */
 function isSameName_(tokA, tokB) {
   const a = Object.keys(tokA), b = Object.keys(tokB);
   if (!a.length || !b.length) return false;
   const inter = a.filter(w => tokB[w]).length;
-  return inter >= 2 && (inter === Math.min(a.length, b.length) || inter >= 3);
+  if (inter < 2) return false;
+  const mensi = Math.min(a.length, b.length);
+  if (inter === mensi) return true;
+  return inter >= 3 && (inter / mensi) >= NAZEV_SHODA_POMER_PRAH;
 }
 
 function parseCzDate_(v) {

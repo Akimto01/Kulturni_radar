@@ -7,7 +7,22 @@
 ### Poznámka k architektuře
 - Vychází z diagnostiky reálné duplicity v listu AKCE: „Light Up Tugendhat" (zahrada vily Tugendhat, Brno) měla dva řádky pro tutéž akci (7.–9. 8. 2026) — jeden zdroj ji zapsal jako součást „Maratonu hudby" s `datum_od` 6. 8. 2026, druhý samostatně s `datum_od` 7. 8. 2026. `isSameName_` by shodu názvů rozeznal (ověřeno přesným výpočtem tokenů), ale k porovnání vůbec nedošlo, protože oba záznamy skončily v různých bucketech přesné shody data. Zářijový výskyt téhož názvu (`2026-09-07-light-up-tugendhat`, jiný termín) zůstává správně NEspárovaný i po rozšíření okna.
 - 5 nových Node testů (441 → 446): nalezený případ (posun o 1 den, jiné znění názvu), hraniční okno (přesně 2 dny = duplicita, 3 dny = ne), tolerance nepřebíjí oddělení podle profilu, zrcadlo zářijového případu (stejný název/profil, termín o měsíc jinam).
-- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Index v3.34 - najdiDuplicity tolerance"`). Po nasazení ručně spuštěno „Odstranit duplicity" z menu Kulturní radar v Sheetu — viz výsledek níže.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Index v3.34 - najdiDuplicity tolerance"`). Po nasazení ručně spuštěno „Odstranit duplicity" z menu Kulturní radar v Sheetu — výsledek a náprava viz „Backend v3.35" níže.
+
+## Backend v3.35 — isSameName_: stopwords + poměrový práh (oprava chybných slučování) — 31. 8. 2026
+### Incident (produkce, mezi v3.34 a v3.35)
+- První běh opraveného `najdiDuplicity_` (tolerance ±2 dny, v3.34) na produkčních datech odhalil 12 „duplicit". Ruční ověření přímo v datech (Google Sheets Historie verzí) potvrdilo, že jde skutečně o duplicitu jen u 1 z nich (Light Up Tugendhat) — zbylé smazané řádky byly **chybná sloučení opravdu odlišných akcí**, konkrétně minimálně:
+  1. „Balkan Soirée – Dunja Knebl & Xanthoula Dakovanou (Maraton hudby)" (9. 8., vágní místo) sloučeno s „Balkan Night: Fanfare Ciocărlia + Džambo Aguševi Orchestra – Maraton hudby" (7. 8., Hrad Špilberk nádvoří) — různí umělci, sdílená jen obecná/brandingová slova „balkan"/"maraton"/"hudby".
+  2. „Letní kulturní program Ostrava" — denní seriál, KAŽDÝ den má vlastní legitimní řádek (2., 8., 12., 13., 16. 8. ověřeny jako samostatné). Rozšířené datumové okno (±2 dny) + slabé pravidlo „3+ společných slov" sloučilo sousední dny, ačkoli má každý den jiný konkrétní program.
+- **Náprava dat**: produkční AKCE obnoveny přes Google Sheets „Historie verzí" → „Obnovit tuto verzi" (verze před úklidem, 31. 8. 2026 8:14) — všech 12 smazaných řádků vráceno zpět, včetně jediné správné duplicity (Light Up Tugendhat, dočasně zpět jako neuklizená, do doby opraveného algoritmu).
+### Změněno
+- **`NAZEV_STOPWORDS_`** — malý, cílený seznam obecných/brandingových slov bez vlastní identifikační hodnoty (`maraton`, `maratonu`, `hudba`, `hudby`, `letni`, `kulturni`, `program`), vyloučených z `nazevTokens_`. Záměrně NEobsahuje širší slova jako „festival"/„slavnosti" — ta bývají legitimní součást vlastního jména akce (viz regresní test „Shakespearovské slavnosti" níže).
+- **`isSameName_`** — podmnožinová větev (zkrácený název) beze změny. Větev „3+ společných slov" teď navíc vyžaduje **poměrový práh** `NAZEV_SHODA_POMER_PRAH = 0.5`: sdílená slova musí tvořit aspoň 50 % menší z obou porovnávaných množin, ne jen absolutní počet 3+ v libovolně dlouhých názvech.
+- Sdílená verze pro obě cesty (`upsertEvents_` i `najdiDuplicity_`) — žádná oddělená „přísnější" varianta, vědomé rozhodnutí (přísnější porovnání jen snižuje riziko chybného sloučení, nikdy ho nezvyšuje).
+### Poznámka k architektuře
+- 3 nové Node testy (446 → 449): `isSameName_` přímo na páru Balkan Soirée/Balkan Night, `najdiDuplicity_` integrační test na stejném páru, `najdiDuplicity_` na denním seriálu Ostrava (5 po sobě jdoucích/blízkých dnů, žádná duplicita).
+- Živě izolovaně ověřeno (`node --test --test-name-pattern`), že regresní test „3+ společných slov… Shakespearovské slavnosti" po zavedení stopwords pořád prochází jako duplicita — hlavní důvod, proč byl zvolen malý cílený seznam místo širokého.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Index v3.35 - oprava detekce duplicit"`). Po nasazení znovu spuštěno „Odstranit duplicity" na produkci — tentokrát očekávána jen 1 skutečná duplicita (Light Up Tugendhat), Balkan pár a Ostravský seriál by měly zůstat NEODSTRANĚNY.
 
 ## Index.html v3.58 — Indexace pro Google/AI crawlery, část (a) — 23. 8. 2026
 ### Přidáno
