@@ -2359,6 +2359,9 @@ class MemSheet {
   setFrozenRows() {}
   // v3.56: getDataRange (readSources_/ZDROJE – dřív nikdy testováno).
   getDataRange() { return { getValues: () => this.rows.map(r => r.slice()) }; }
+  // v3.37: deleteRow (smazatPotvrzeneDuplicity_ – 1-indexované číslo řádku
+  // v CELÉM listu, včetně hlavičky, stejně jako skutečný Apps Script Sheet).
+  deleteRow(rowNum) { this.rows.splice(rowNum - 1, 1); }
 }
 
 function fakeSpreadsheet(pocatecni) {
@@ -2895,4 +2898,147 @@ test('zpracovatEmailTipy_: víc řádků – zpracují se jen ty "nové", stats 
   const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([respOk, GEOKOD_PRAZDNY, respPrazdne]) });
   const stats = ctx.zpracovatEmailTipy_(ss);
   shodneNapricRealmy(stats, { celkem: 2, ok: 1, chyba: 0, nelzeOverit: 1 });
+});
+
+// ---------------------------------------------------------------------------
+// v3.37: navrhniDuplicity_ / smazatPotvrzeneDuplicity_ – "Odstranit duplicity"
+// nahrazeno režimem návrhu k ručnímu schválení (viz BACKLOG.md – tři po sobě
+// jdoucí kola false positive nálezů u automatického mazání, v3.34–v3.36).
+// ---------------------------------------------------------------------------
+
+/** Plný (25sloupcový) řádek AKCE s ID – na rozdíl od akceRadek() výš (jen
+ *  sloupce pro najdiDuplicity_) potřebujeme ID pro najdiAkciPodleId_. */
+function akceRadekId_({ id, nazev = '', datumOd = '3. 8. 2026', profil = 'Brno', misto = '' } = {}) {
+  const row = new Array(25).fill('');
+  row[0] = id; row[1] = datumOd; row[4] = nazev; row[5] = misto; row[13] = 'potvrzeno'; row[24] = profil;
+  return row;
+}
+
+// Lokální kopie – `const` z .gs sandboxu se (na rozdíl od `function`) na ctx
+// nepřenáší, stejný gotcha jako EMAIL_TIPY_HLAVICKA_TEST výš v souboru.
+const NAVRH_DUPLICIT_HLAVICKA_TEST = ['Datum návrhu', 'ID (ponechat)', 'Název (ponechat)',
+  'ID (smazat)', 'Název (smazat)', 'Datum od (obou)', 'Profil', 'Stav', 'Poznámka'];
+const NAVRH_DUPLICIT_STAV_TEST = {
+  POTVRZENO: 'Potvrzeno ke smazání',
+  ZAMITNUTO: 'Zamítnuto',
+  SMAZANO: 'Smazáno',
+  CHYBA: 'Chyba: řádek nenalezen',
+};
+
+test('navrhniDuplicity_: najde kandidáty a zapíše je do NÁVRH DUPLICIT, AKCE zůstane beze změny', () => {
+  const akce = [
+    akceRadekId_({ id: 'a1', nazev: 'Balkan Night', datumOd: '7. 8. 2026' }),
+    akceRadekId_({ id: 'a2', nazev: 'Balkan Night', datumOd: '8. 8. 2026' }),
+  ];
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat(akce)), KONTROLY: new MemSheet([[]]) });
+  const ctx = nactiRadar();
+  const vysledek = ctx.navrhniDuplicity_(ss);
+  assert.equal(vysledek.navrzeno, 1);
+
+  const navrhSh = ss.getSheetByName('NÁVRH DUPLICIT');
+  assert.ok(navrhSh, 'list NÁVRH DUPLICIT se má vytvořit');
+  const radek = navrhSh.getRange(2, 1, 1, 9).getValues()[0];
+  assert.equal(radek[1], 'a1');   // ID (ponechat)
+  assert.equal(radek[3], 'a2');   // ID (smazat)
+  assert.equal(radek[7], '');     // Stav prázdný – čeká na rozhodnutí
+
+  const akceData = ss.getSheetByName('AKCE').getRange(2, 1, 2, 25).getValues();
+  assert.equal(akceData.length, 2, 'AKCE si zachovalo oba řádky – nic se nesmazalo');
+  assert.equal(akceData[1][0], 'a2', 'druhý řádek (kandidát na smazání) v AKCE pořád existuje');
+});
+
+test('navrhniDuplicity_: pár už v NÁVRH DUPLICIT existuje (i s prázdným Stav) → znovu nepřidá', () => {
+  const akce = [
+    akceRadekId_({ id: 'a1', nazev: 'Balkan Night', datumOd: '7. 8. 2026' }),
+    akceRadekId_({ id: 'a2', nazev: 'Balkan Night', datumOd: '8. 8. 2026' }),
+  ];
+  const ctx = nactiRadar();
+  const existujiciRadek = ['31. 8. 2026', 'a1', 'Balkan Night', 'a2', 'Balkan Night', '7. 8. 2026 / 8. 8. 2026', 'Brno', '', ''];
+  const ss = fakeSpreadsheet({
+    AKCE: new MemSheet([[]].concat(akce)),
+    'NÁVRH DUPLICIT': new MemSheet([NAVRH_DUPLICIT_HLAVICKA_TEST, existujiciRadek]),
+    KONTROLY: new MemSheet([[]]),
+  });
+  const vysledek = ctx.navrhniDuplicity_(ss);
+  assert.equal(vysledek.navrzeno, 0);
+  assert.equal(ss.getSheetByName('NÁVRH DUPLICIT').getLastRow(), 2, 'zůstal jen ten jeden existující řádek');
+});
+
+test('smazatPotvrzeneDuplicity_: smaže jen řádky se Stav "Potvrzeno ke smazání", ostatní ignoruje', () => {
+  const akce = [
+    akceRadekId_({ id: 'a1', nazev: 'Balkan Night', datumOd: '7. 8. 2026' }),
+    akceRadekId_({ id: 'a2', nazev: 'Balkan Night', datumOd: '8. 8. 2026' }),
+    akceRadekId_({ id: 'a3', nazev: 'Jiná akce', datumOd: '9. 8. 2026' }),
+    akceRadekId_({ id: 'a4', nazev: 'Jiná akce 2', datumOd: '9. 8. 2026' }),
+  ];
+  const ctx = nactiRadar();
+  const navrh = [
+    NAVRH_DUPLICIT_HLAVICKA_TEST,
+    ['31. 8. 2026', 'a1', 'Balkan Night', 'a2', 'Balkan Night', '...', 'Brno', NAVRH_DUPLICIT_STAV_TEST.POTVRZENO, ''],
+    ['31. 8. 2026', 'a3', 'Jiná akce', 'a4', 'Jiná akce 2', '...', 'Brno', NAVRH_DUPLICIT_STAV_TEST.ZAMITNUTO, ''],
+  ];
+  const ss = fakeSpreadsheet({
+    AKCE: new MemSheet([[]].concat(akce)),
+    'NÁVRH DUPLICIT': new MemSheet(navrh),
+    KONTROLY: new MemSheet([[]]),
+  });
+  const vysledek = ctx.smazatPotvrzeneDuplicity_(ss);
+  assert.equal(vysledek.smazano, 1);
+
+  const akceIds = ss.getSheetByName('AKCE').getRange(2, 1, 3, 25).getValues().map(r => r[0]);
+  shodneNapricRealmy(akceIds, ['a1', 'a3', 'a4']);   // a2 smazáno, ostatní zůstaly
+
+  const navrhStavy = ss.getSheetByName('NÁVRH DUPLICIT').getRange(2, 8, 2, 1).getValues().map(r => r[0]);
+  assert.equal(navrhStavy[0], NAVRH_DUPLICIT_STAV_TEST.SMAZANO);
+  assert.equal(navrhStavy[1], NAVRH_DUPLICIT_STAV_TEST.ZAMITNUTO, 'zamítnutý řádek zůstal beze změny');
+});
+
+test('smazatPotvrzeneDuplicity_: najde řádek podle ID správně i po posunu pořadí v AKCE (ne podle uloženého čísla řádku)', () => {
+  // Simulace: mezi navrhniDuplicity_ a potvrzením přibyl na začátek nový
+  // řádek, takže se všechno posunulo o 1 – identifikace musí jít přes ID,
+  // ne přes dřív zapamatované/domnělé číslo řádku.
+  const akce = [
+    akceRadekId_({ id: 'novy', nazev: 'Něco úplně jiného', datumOd: '1. 8. 2026' }),
+    akceRadekId_({ id: 'a1', nazev: 'Balkan Night', datumOd: '7. 8. 2026' }),
+    akceRadekId_({ id: 'a2', nazev: 'Balkan Night', datumOd: '8. 8. 2026' }),
+  ];
+  const ctx = nactiRadar();
+  const navrh = [
+    NAVRH_DUPLICIT_HLAVICKA_TEST,
+    ['31. 8. 2026', 'a1', 'Balkan Night', 'a2', 'Balkan Night', '...', 'Brno', NAVRH_DUPLICIT_STAV_TEST.POTVRZENO, ''],
+  ];
+  const ss = fakeSpreadsheet({
+    AKCE: new MemSheet([[]].concat(akce)),
+    'NÁVRH DUPLICIT': new MemSheet(navrh),
+    KONTROLY: new MemSheet([[]]),
+  });
+  const vysledek = ctx.smazatPotvrzeneDuplicity_(ss);
+  assert.equal(vysledek.smazano, 1);
+  const akceIds = ss.getSheetByName('AKCE').getRange(2, 1, 2, 25).getValues().map(r => r[0]);
+  shodneNapricRealmy(akceIds, ['novy', 'a1']);   // a2 smazáno, ne 'a1' ani 'novy' omylem
+});
+
+test('smazatPotvrzeneDuplicity_: potvrzený řádek, jehož ID už v AKCE neexistuje → označí Chyba, nespadne', () => {
+  const akce = [akceRadekId_({ id: 'a1', nazev: 'Balkan Night', datumOd: '7. 8. 2026' })];
+  const ctx = nactiRadar();
+  const navrh = [
+    NAVRH_DUPLICIT_HLAVICKA_TEST,
+    ['31. 8. 2026', 'a1', 'Balkan Night', 'uz-nexistuje', 'Něco', '...', 'Brno', NAVRH_DUPLICIT_STAV_TEST.POTVRZENO, ''],
+  ];
+  const ss = fakeSpreadsheet({
+    AKCE: new MemSheet([[]].concat(akce)),
+    'NÁVRH DUPLICIT': new MemSheet(navrh),
+    KONTROLY: new MemSheet([[]]),
+  });
+  const vysledek = ctx.smazatPotvrzeneDuplicity_(ss);
+  assert.equal(vysledek.smazano, 0);
+  const stav = ss.getSheetByName('NÁVRH DUPLICIT').getRange(2, 8, 1, 1).getValues()[0][0];
+  assert.equal(stav, NAVRH_DUPLICIT_STAV_TEST.CHYBA);
+});
+
+test('smazatPotvrzeneDuplicity_: chybějící list NÁVRH DUPLICIT → nulový výsledek, nespadne', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]]) });
+  const ctx = nactiRadar();
+  const vysledek = ctx.smazatPotvrzeneDuplicity_(ss);
+  assert.equal(vysledek.smazano, 0);
 });

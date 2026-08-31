@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.36 (31. 8. 2026) – ruznyDenSerie_: rozpoznání "N. měsíc" v názvu (denní série)
- * (předchozí: 3.35 – isSameName_: stopwords + poměrový práh, oprava chybných slučování)
+ * Verze: 3.37 (31. 8. 2026) – Odstranit duplicity → Návrh duplicit (ruční schválení, ne auto-mazání)
+ * (předchozí: 3.36 – ruznyDenSerie_: rozpoznání "N. měsíc" v názvu, denní série)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -49,6 +49,7 @@ const SHEET = {
   UZIVATELE: 'UŽIVATELÉ',
   POCASI: 'POČASÍ',
   EMAIL_TIPY: 'EMAIL_TIPY',
+  NAVRH_DUPLICIT: 'NÁVRH DUPLICIT',
 };
 
 const KRIT = {           // adresy v listu KRITÉRIA
@@ -68,7 +69,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.36';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.37';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -538,7 +539,8 @@ function onOpen() {
     .createMenu('Kulturní radar')
     .addItem('Spustit kontrolu teď', 'menuRunNow')
     .addItem('Označit proběhlé akce', 'markPastEvents')
-    .addItem('Odstranit duplicity', 'cleanupDuplicates')
+    .addItem('Najít možné duplicity', 'menuNavrhniDuplicity_')
+    .addItem('Smazat potvrzené duplicity', 'menuSmazatPotvrzeneDuplicity_')
     .addItem('Test notifikací', 'testNtfy')
     .addItem('Notifikace: suchý běh (test)', 'sendUserNotificationsDryRun_')
     .addSeparator()
@@ -1227,43 +1229,159 @@ function eventToRow_(ev, today) {
   ];
 }
 
+const NAVRH_DUPLICIT_HLAVICKA = ['Datum návrhu', 'ID (ponechat)', 'Název (ponechat)',
+  'ID (smazat)', 'Název (smazat)', 'Datum od (obou)', 'Profil', 'Stav', 'Poznámka'];
+
+/** Stavy sloupce Stav v NÁVRH DUPLICIT – prázdné = čeká na ruční rozhodnutí. */
+const NAVRH_DUPLICIT_STAV = {
+  POTVRZENO: 'Potvrzeno ke smazání',
+  ZAMITNUTO: 'Zamítnuto',
+  SMAZANO: 'Smazáno',
+  CHYBA: 'Chyba: řádek nenalezen',
+};
+
+function ensureNavrhDuplicitSheet_(ss) {
+  let sh = ss.getSheetByName(SHEET.NAVRH_DUPLICIT);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET.NAVRH_DUPLICIT);
+    sh.getRange(1, 1, 1, NAVRH_DUPLICIT_HLAVICKA.length).setValues([NAVRH_DUPLICIT_HLAVICKA])
+      .setFontWeight('bold').setBackground('#8a2e2e').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
 /**
- * Jednorázový úklid: najde v AKCE duplicitní záznamy (stejný profil + datum
- * + překrývající se název), ponechá STARŠÍ řádek, u něj aktualizuje Poslední
- * kontrolu, a novější duplicitní řádky smaže. Zaloguje do KONTROL.
+ * v3.37: NAHRAZUJE dřívější automatické mazání (cleanupDuplicates, do
+ * v3.36). Tři po sobě jdoucí kola oprav najdiDuplicity_/isSameName_
+ * (v3.34–v3.36) pokaždé vyřešila jen JIŽ NALEZENÝ vzorec chybné shody a
+ * hned nato se objevil další (viz BACKLOG.md – "kategorie D": konkrétní
+ * akce v rámci sezónní/deštníkové série má název série jako součást svého
+ * názvu, což fuzzy shodu obelstí STRUKTURÁLNĚ, ne jen náhodou – žádný
+ * syntaktický signál ji nerozliší od legitimně zkráceného názvu téže akce).
+ * Automatické NEVRATNÉ mazání na základě fuzzy shody je proto vypnuté –
+ * tahle funkce jen NAVRHUJE kandidáty do listu NÁVRH DUPLICIT k ručnímu
+ * rozhodnutí, na AKCE nesahá.
+ *
+ * Nepřidává znovu páry (ID ponechat + ID smazat), které v NÁVRH DUPLICIT
+ * už existují v JAKÉMKOLI stavu (čeká/Potvrzeno/Zamítnuto/Smazáno) –
+ * append-only, žádné mazání/přepis listu, takže dřívější rozhodnutí
+ * zůstávají navždy zachovaná.
  */
-function cleanupDuplicates() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function navrhniDuplicity_(ss) {
   const sh = ss.getSheetByName(SHEET.AKCE);
-  const lastRow = sh.getLastRow();
-  if (lastRow < 3) return;
+  const lastRow = sh ? sh.getLastRow() : 1;
+  if (lastRow < 3) return { navrzeno: 0 };
 
   const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
-  const toDelete = najdiDuplicity_(data);
+  const kandidati = najdiDuplicity_(data);
 
-  if (toDelete.length === 0) {
-    Logger.log('Žádné duplicity nenalezeny.');
-    try { ss.toast('Žádné duplicity nenalezeny.', 'Kulturní radar'); } catch (e) {}
-    return;
+  const navrhSh = ensureNavrhDuplicitSheet_(ss);
+  const navrhLastRow = navrhSh.getLastRow();
+  const existujici = navrhLastRow > 1
+    ? navrhSh.getRange(2, 1, navrhLastRow - 1, NAVRH_DUPLICIT_HLAVICKA.length).getValues()
+    : [];
+  const existujiciKlic = new Set(existujici.map(row => String(row[1]) + '|' + String(row[3])));
+
+  const dnes = formatDateOnly_(new Date());
+  const nove = [];
+  kandidati.forEach(c => {
+    const ponechatRow = data[c.keptRow - 2];
+    const smazatRow = data[c.rowNum - 2];
+    const idPonechat = String(ponechatRow[0] || '');
+    const idSmazat = String(smazatRow[0] || '');
+    if (!idPonechat || !idSmazat) return;   // bez ID nejde bezpečně dohledat později
+    const klic = idPonechat + '|' + idSmazat;
+    if (existujiciKlic.has(klic)) return;   // už navrženo dřív (bez ohledu na Stav)
+    existujiciKlic.add(klic);
+    nove.push([
+      dnes, idPonechat, String(ponechatRow[4] || ''),
+      idSmazat, String(smazatRow[4] || ''),
+      cellText_(ponechatRow[1]) + ' / ' + cellText_(smazatRow[1]),
+      String(ponechatRow[24] || ''), '', '',
+    ]);
+  });
+
+  nove.forEach(row => navrhSh.appendRow(row));
+
+  const ksh = ss.getSheetByName(SHEET.KONTROLY);
+  if (ksh) {
+    ksh.appendRow([
+      formatDate_(new Date()), 'návrh duplicit', 'AKCE – celý list',
+      nove.length, 0, 0, 0, 0, 0, 0,
+      'Nové návrhy k ručnímu schválení (list NÁVRH DUPLICIT): ' + nove.length,
+      'Apps Script automatizace',
+    ]);
+  }
+  Logger.log('Nové návrhy duplicit: ' + nove.length);
+  try { ss.toast('Nové návrhy duplicit: ' + nove.length + ' (viz list NÁVRH DUPLICIT)', 'Kulturní radar'); } catch (e) {}
+  return { navrzeno: nove.length };
+}
+
+/**
+ * v3.37: smaže z AKCE jen řádky, které jsou v NÁVRH DUPLICIT ručně označené
+ * jako Stav = "Potvrzeno ke smazání" – žádné automatické mazání na základě
+ * fuzzy shody, viz navrhniDuplicity_ výše.
+ *
+ * Identifikace přes ID (najdiAkciPodleId_), NE přes uložené číslo řádku –
+ * mezi návrhem a potvrzením mohlo v AKCE proběhnout jiné psaní/mazání a
+ * číslo řádku by neodpovídalo.
+ */
+function smazatPotvrzeneDuplicity_(ss) {
+  const navrhSh = ss.getSheetByName(SHEET.NAVRH_DUPLICIT);
+  const lastRow = navrhSh ? navrhSh.getLastRow() : 1;
+  if (lastRow < 2) return { smazano: 0 };
+
+  const akceSh = ss.getSheetByName(SHEET.AKCE);
+  const radky = navrhSh.getRange(2, 1, lastRow - 1, NAVRH_DUPLICIT_HLAVICKA.length).getValues();
+  const today = formatDateOnly_(new Date());
+  const kSmazani = [];   // { navrhRadek, akceRadek, idSmazat }
+
+  radky.forEach((row, i) => {
+    if (String(row[7] || '').trim() !== NAVRH_DUPLICIT_STAV.POTVRZENO) return;
+    const idPonechat = String(row[1] || '');
+    const idSmazat = String(row[3] || '');
+    const info = najdiAkciPodleId_(ss, idSmazat);
+    if (!info) {
+      navrhSh.getRange(i + 2, 8).setValue(NAVRH_DUPLICIT_STAV.CHYBA);
+      return;
+    }
+    kSmazani.push({ navrhRadek: i + 2, akceRadek: info.radek, idSmazat: idSmazat });
+    const ponechatInfo = najdiAkciPodleId_(ss, idPonechat);
+    if (ponechatInfo) akceSh.getRange(ponechatInfo.radek, 18).setValue(today);
+  });
+
+  if (kSmazani.length === 0) {
+    try { ss.toast('Žádné potvrzené duplicity ke smazání.', 'Kulturní radar'); } catch (e) {}
+    return { smazano: 0 };
   }
 
-  const today = formatDateOnly_(new Date());
-  // u ponechaných řádků aktualizovat Poslední kontrolu
-  toDelete.forEach(d => sh.getRange(d.keptRow, 18).setValue(today));
-  // mazat odspodu, aby se neposunula čísla řádků
-  toDelete.sort((a, b) => b.rowNum - a.rowNum).forEach(d => sh.deleteRow(d.rowNum));
+  // mazat odspodu (podle čísla řádku v okamžiku sběru výše), aby se
+  // neposunula čísla řádků ostatním kandidátům v TOMHLE běhu
+  kSmazani.sort((a, b) => b.akceRadek - a.akceRadek).forEach(d => akceSh.deleteRow(d.akceRadek));
+  kSmazani.forEach(d => navrhSh.getRange(d.navrhRadek, 8).setValue(NAVRH_DUPLICIT_STAV.SMAZANO));
 
-  const detail = toDelete.map(d => d.nazev + ' (ř. ' + d.rowNum + ' → ponechán ř. ' + d.keptRow + ')').join('; ');
+  invalidovatCacheEventu_();   // v3.37: AKCE se změnilo (smazané řádky)
+
   const ksh = ss.getSheetByName(SHEET.KONTROLY);
-  ksh.appendRow([
-    formatDate_(new Date()), 'úklid duplicit', 'AKCE – celý list',
-    toDelete.length, 0, 0, 0, 0, 0, 0,
-    'Odstraněny duplicitní řádky: ' + detail,
-    'Apps Script automatizace',
-  ]);
-  Logger.log('Odstraněno duplicit: ' + toDelete.length + ' — ' + detail);
-  try { ss.toast('Odstraněno duplicit: ' + toDelete.length, 'Kulturní radar'); } catch (e) {}
+  if (ksh) {
+    ksh.appendRow([
+      formatDate_(new Date()), 'smazání potvrzených duplicit', 'AKCE – celý list',
+      kSmazani.length, 0, 0, 0, 0, 0, 0,
+      'Smazáno potvrzených duplicit: ' + kSmazani.length + ' (ID: ' + kSmazani.map(d => d.idSmazat).join(', ') + ')',
+      'Apps Script automatizace',
+    ]);
+  }
+  Logger.log('Smazáno potvrzených duplicit: ' + kSmazani.length);
+  try { ss.toast('Smazáno potvrzených duplicit: ' + kSmazani.length, 'Kulturní radar'); } catch (e) {}
+  return { smazano: kSmazani.length };
 }
+
+/** Tenké menu-vázané obálky (Apps Script menu volá funkce BEZ argumentů) –
+ *  logika samotná bere `ss` jako parametr, ať jde přímo testovat, stejný
+ *  vzorec jako apiMeta()/zpracovatEmailTipy_(ss) v tomhle souboru. */
+function menuNavrhniDuplicity_() { navrhniDuplicity_(SpreadsheetApp.getActiveSpreadsheet()); }
+function menuSmazatPotvrzeneDuplicity_() { smazatPotvrzeneDuplicity_(SpreadsheetApp.getActiveSpreadsheet()); }
 
 /** Označí akce s "Datum do" (příp. "Datum od") v minulosti jako proběhlé. */
 function markPastEvents() {
@@ -1385,15 +1503,19 @@ function sirotciOznaceni_(rows, platnaId) {
   return rows.filter(r => !platnaId.has(r.id));
 }
 
-/** Najde v listu AKCE řádek se zadaným ID; vrací {nazev, misto} nebo null. */
+/** Najde v listu AKCE řádek se zadaným ID; vrací {nazev, misto, radek} nebo
+ *  null. `radek` (v3.37) = aktuální 1-indexované číslo řádku v listu –
+ *  DŮLEŽITÉ počítat ho znovu při KAŽDÉM volání, ne cachovat/předávat dál,
+ *  protože se může mezi dvěma akcemi posunout (jiný zápis/smazání). */
 function najdiAkciPodleId_(ss, id) {
+  if (!id) return null;
   const sh = ss.getSheetByName(SHEET.AKCE);
   const lastRow = sh ? sh.getLastRow() : 1;
   if (lastRow < 2) return null;
   const data = sh.getRange(2, 1, lastRow - 1, AKCE_COLS).getValues();
   for (let i = 0; i < data.length; i++) {
     if (String(data[i][0] || '') === id) {
-      return { nazev: String(data[i][4] || ''), misto: String(data[i][5] || '') };
+      return { nazev: String(data[i][4] || ''), misto: String(data[i][5] || ''), radek: i + 2 };
     }
   }
   return null;
