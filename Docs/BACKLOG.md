@@ -1,6 +1,6 @@
 # Backlog — Kulturní radar
 
-Poslední aktualizace: 28. 8. 2026. Neplánované nápady a rozpracované položky —
+Poslední aktualizace: 31. 8. 2026. Neplánované nápady a rozpracované položky —
 na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 
 ## Doporučené pořadí
@@ -117,8 +117,23 @@ změně BACKLOGu.
 - ~~Zjistit, proč Claude Code nenachází skill kulturni-radar-workflow automaticky~~ — VYŘEŠENO 19. 8. 2026: příčina potvrzena — Claude Code hledá skilly v `.claude/skills/<jméno>/SKILL.md`, ne v `Docs/`. Skill fyzicky existoval jen na `Docs/kulturni-radar-workflow/SKILL.md` (odkud ho čte Claude v hlavním chatu), proto ho Claude Code nenašel automaticky. Řešení: `SKILL.md` zkopírován (ne přesunut) do `.claude/skills/kulturni-radar-workflow/SKILL.md`. Zvažován symlink místo kopie (aby se do budoucna nerozjely dvě nezávislé verze), ale ověřeno, že `ln -s` v tomhle Windows prostředí bez zvýšených oprávnění tiše spadne zpět na plnou kopii adresáře (jiné inode, žádný `ReparsePoint` atribut) — spolehlivý symlink tu tedy není k dispozici, zůstává prostá kopie. **Důsledek: `Docs/…/SKILL.md` je zdroj pravdy, `.claude/skills/…/SKILL.md` je jeho ruční kopie — při každé budoucí úpravě SKILL.md aktualizovat OBĚ kopie, jinak se rozjedou.**
 
 ## Probíhající měření
-- **Haiku vs. Sonnet na denní kontrole** — SPUŠTĚNO 20. 8. 2026 (backend v3.27, viz CHANGELOG.md): denní automatická kontrola (`dailyCheck` → typ `'denní kontrola'`) běží na `claude-haiku-4-5`, všechny ostatní běhy (mimořádné z menu/webu, osobní hledání, sledovaná města, měsíční kontrola stálých míst) zůstávají na Sonnetu (`vyberModelProKontrolu_`). List KONTROLY (sloupec K) teď zaznamenává skutečně použitý model pro každý běh, ne jen globální konstantu — díky tomu jde řádky zpětně rozlišit podle modelu. **Vyhodnocení a rozhodnutí: 27. 8. 2026** — porovnat kvalitu úlovků denní kontroly (Haiku) proti ostatním běhům (Sonnet) v listu KONTROLY a rozhodnout, jestli Haiku pro denní běh trvale stačí, nebo se vrátit k Sonnetu.
-  PŘIPOMÍNKA: vyhodnotit 27. 8. 2026 — zkontrolovat sloupec K v listu KONTROLY (filtrovat řádky typu 'denní kontrola' za 20.–27. 8. 2026, porovnat kvalitu/počet nalezených akcí s předchozími Sonnet běhy), rozhodnout, jestli Haiku pro denní kontrolu zůstává natrvalo, nebo se vrací na Sonnet.
+- ~~**Haiku vs. Sonnet na denní kontrole**~~ — **VYŘEŠENO/UZAVŘENO 31. 8. 2026**: SPUŠTĚNO 20. 8. 2026 (backend v3.27, viz CHANGELOG.md), denní automatická kontrola (`dailyCheck` → typ `'denní kontrola'`) běží na `claude-haiku-4-5`, ostatní běhy zůstávají na Sonnetu (`vyberModelProKontrolu_`). Vyhodnocení provedeno ručně přímo z listu KONTROLY (Claude v hlavním chatu, claude-in-chrome, 31. 8. 2026), sloupec „Nalezeno celkem / Nové":
+  - 17. 8. Sonnet: 15/10 (před oknem měření)
+  - 18. 8. Sonnet: 3/0
+  - 19. 8. Sonnet: 2/0
+  - 20. 8. Haiku: 9/0 (start měření)
+  - 21. 8. Haiku: 4/2
+  - 22. 8. Haiku: 5/0
+  - 23. 8. Haiku: 7/0
+  - 24. 8. Haiku: 6/0
+  - 25. 8. Haiku: 8/0
+  - 26. 8. Haiku: 8/2
+  - 27. 8. Haiku: 3/0 (konec měření)
+  - 28.–31. 8. Haiku (pokračuje beze změny): 4/0, 3/0, 0/0, 3/0
+
+  **Zjištění**: žádné chybové hlášky ve sloupci K u žádného Haiku běhu; rozsah „nalezeno celkem" srovnatelný s (limitovaným) Sonnet baseline; model nebyl v kódu nikdy vrácen zpět — běží na Haiku neprerušeně od 20. 8. dodnes.
+
+  **Závěr/doporučení**: POKRAČOVAT s Haiku pro `dailyCheck` (úspora nákladů bez viditelného zhoršení). **Omezení vyhodnocení**: vzorek malý (jen 3 dny čistého Sonnet baseline, přirozené kolísání den ode dne), obsahová kvalita nalezených akcí (ne jen počty) nebyla kontrolována — jen kvantitativní metriky a chybovost. Sloupec K logování zůstává aktivní pro průběžnou kontrolu do budoucna.
 
 ## Větší témata
 - ~~Plnohodnotná interaktivní mapa akcí (víc pinů najednou)~~ — **HOTOVO 17.–18. 8. 2026** (fáze 3 redesignu, Index.html v3.35–v3.38, viz CHANGELOG.md): vestavěná Leaflet mapa se všemi piny najednou, akce na stejném místě seskupené do jednoho pinu, popup s odkazem zpět do seznamu. Odkaz „📍 Mapa" na kartě (v3.10, jedna akce, garantovaný pin díky souřadnicím z Nominatim) zůstává beze změny vedle ní — dvě různé věci.
