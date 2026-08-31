@@ -582,3 +582,42 @@ kód, je dělá těžko prokazatelnými.
   session počítat s tímhle typem nestability u zápisových testů,
   nepanikařit, diagnostikovat izolovanou reprodukci PŘED závěrem
   "regrese".
+
+## 9. GitHub Issues + Projects (v2) — doplněk k BACKLOG.md
+
+Zavedeno 31. 8. 2026 jako portfolio-ready ukázka Kanban workflow
+(pohovory) + osobní přehlednost pro aktuálně řešené úkoly. Board:
+`gh project view 1 --owner Akimto01 --web` (title „Kulturní radar -
+práce", 3 sloupce Todo/In Progress/Done). Labely: `feature`, `bug`,
+`docs`, `testing`, `research` (+ výchozí GitHub labely, nepoužívané
+pro tenhle projekt).
+
+**BACKLOG.md zůstává hlavní znalostní bází, Kanban je jen doplněk pro
+aktuálně rozpracované/vybrané úkoly:**
+- Položka jde do Kanbanu (nová GitHub issue + přidání na board) ve
+  chvíli, kdy Vojta vybere „tohle teď/příště řešíme" — ne dřív, ne
+  automaticky pro každý nápad v BACKLOGu.
+- Zůstává JEN v BACKLOG.md, nikdy nezakládat issue: výzkumné poznámky,
+  odložené/watch-only položky (sekce „Sledovat, bez akce"),
+  dlouhodobé nápady (sekce „Větší témata" / „Dlouhodobá vize"),
+  blokované položky (čekají na cizí krok, např. „ÚKOL PRO VOJTU").
+- BACKLOG.md záznam se PŘESTO **pořád** označuje `~~přeškrtnuto~~` +
+  HOTOVO/VYŘEŠENO/UZAVŘENO jako doteď, i když má i GitHub issue —
+  BACKLOG.md je historický/znalostní záznam s kontextem a odůvodněním,
+  Kanban je jen stavový nástroj pro „co se řeší teď". Jedno
+  nenahrazuje druhé.
+- Když položka dostane issue, přidat do BACKLOG.md poznámku
+  `→ issue #N` u příslušné položky, ať je vidět provázání oběma
+  směry.
+- Commit obsahující `Closes #N` (nebo `Fixes #N`/`Resolves #N`)
+  automaticky uzavře odpovídající issue při mergi/pushi do výchozí
+  větve.
+- **Automatizace „issue closed → přesun do Done" je aktivní bez
+  ručního nastavení** — nový GitHub Projects (v2) board má ve
+  výchozím stavu zapnutý workflow „Item closed" (ověřeno přes
+  `gh api graphql`, `enabled: true` hned po `gh project create`), který
+  při zavření issue sám nastaví Status na Done. Podobně „Item added to
+  project" sám nastaví nově přidané položky na Todo. Ruční
+  nastavování přes web UI (Project → Settings → Workflows) potřeba
+  jen pokud by se v budoucnu chovaly jinak, než se očekává — zatím
+  ověřeno funkční přímo přes `gh` CLI, žádný krok navíc.
