@@ -22,7 +22,20 @@
 ### Poznámka k architektuře
 - 3 nové Node testy (446 → 449): `isSameName_` přímo na páru Balkan Soirée/Balkan Night, `najdiDuplicity_` integrační test na stejném páru, `najdiDuplicity_` na denním seriálu Ostrava (5 po sobě jdoucích/blízkých dnů, žádná duplicita).
 - Živě izolovaně ověřeno (`node --test --test-name-pattern`), že regresní test „3+ společných slov… Shakespearovské slavnosti" po zavedení stopwords pořád prochází jako duplicita — hlavní důvod, proč byl zvolen malý cílený seznam místo širokého.
-- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Index v3.35 - oprava detekce duplicit"`). Po nasazení znovu spuštěno „Odstranit duplicity" na produkci — tentokrát očekávána jen 1 skutečná duplicita (Light Up Tugendhat), Balkan pár a Ostravský seriál by měly zůstat NEODSTRANĚNY.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Index v3.35 - oprava detekce duplicit"`). Po nasazení znovu spuštěno „Odstranit duplicity" na produkci — **Ostravský seriál se PORÁD chybně sloučil** (viz „Backend v3.36" níže pro kořenovou příčinu a opravu), Balkan pár byl tímhle kolem opravy už správně NEODSTRANĚN. Data znovu ručně obnovena přes Historii verzí do čistého stavu.
+
+## Backend v3.36 — ruznyDenSerie_: rozpoznání „N. měsíc" v názvu (druhé kolo opravy detekce duplicit) — 31. 8. 2026
+### Navazující incident (produkce, po nasazení v3.35)
+- v3.35 (stopwords + poměrový práh) opravil Balkan pár, ale **Ostravský denní seriál se sloučil znovu**. Kořenová příčina: `normNazev_`/`nazevTokens_` maže všechny číslice — skutečný produkční formát názvu je „Letní kulturní program Ostrava **– 12. srpna**" (s příponou konkrétního dne), ne zjednodušený název beze dne, jaký byl testován v v3.35. Po odstranění stopwords (`letni`/`kulturni`/`program`) zbyde na OBOU stranách identická sada `{ostrava, srpna}` — bez čísla dne, protože to `normNazev_` smazal. Shoda prochází přes **podmnožinovou větev** `isSameName_` (100 % z definice), která poměrový práh z v3.35 úplně obchází.
+- Data znovu ručně obnovena přes Google Sheets „Historie verzí" na čistý stav, žádný další zásah do produkce před schválením opravy.
+### Změněno
+- **`RE_DEN_SERIE_`/`denZeSerie_`** — nová raná kontrola na NEnormalizovaném názvu (dřív, než `normNazev_` smaže číslice): rozpozná vzor „N. měsíc v genitivu" (např. „13. srpna") a vrátí číslo dne, nebo `null`. Vzor je specifický (číslo + tečka + volitelná mezera + měsíc v genitivu) — „25 let UNESCO" (Light Up Tugendhat) na něj neudeří, protože za „25" není tečka.
+- **`ruznyDenSerie_`** — když OBĚ porovnávaná jména mají vzor „N. měsíc" a čísla dne se LIŠÍ, nikdy nepovažovat za duplicitu bez ohledu na jinou shodu. Když aspoň jedna strana vzor nemá, nebo je číslo stejné (duplicitní zápis TÉHOŽ dne), nerozhoduje o ničem — `isSameName_` rozhodne jako dřív.
+- Guard `!ruznyDenSerie_(...)` doplněn do `najdiDuplicity_` i `upsertEvents_` (sdílená logika, stejně jako v3.35) — kandidáti teď nesou i syrový `nazev`, ne jen tokeny.
+### Poznámka k architektuře
+- 3 nové Node testy (449 → 452): `najdiDuplicity_` na SKUTEČNÉM produkčním formátu („– N. srpna"), přímé testy `denZeSerie_` (včetně ověření, že „25 let" regex nespustí), `ruznyDenSerie_` na stejném čísle dne (nesmí blokovat opravdovou shodu).
+- Regresně živě izolovaně ověřeny (`node --test --test-name-pattern`) všechny předchozí případy: Tugendhat (6 testů), Balkan (2 testy), Shakespearovské slavnosti, starší zjednodušený Ostrava test bez přípony dne — všechny beze změny prošly.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Index v3.36 - ruznyDenSerie_ oprava"`). Po nasazení potřetí spuštěno „Odstranit duplicity" na produkci.
 
 ## Index.html v3.58 — Indexace pro Google/AI crawlery, část (a) — 23. 8. 2026
 ### Přidáno

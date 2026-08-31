@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.35 (31. 8. 2026) – isSameName_: stopwords + poměrový práh (oprava chybných slučování)
- * (předchozí: 3.34 – najdiDuplicity_: tolerance ±2 dny v datu, úklid/samotest)
+ * Verze: 3.36 (31. 8. 2026) – ruznyDenSerie_: rozpoznání "N. měsíc" v názvu (denní série)
+ * (předchozí: 3.35 – isSameName_: stopwords + poměrový práh, oprava chybných slučování)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -68,7 +68,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.35';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.36';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -1124,7 +1124,7 @@ function upsertEvents_(ss, cfg, events) {
     if (id) byId[id] = i;
     byKey[dedupKey_(row[24], row[1], row[4], row[5])] = i;
     const pd = norm_(row[24]) + '|' + dateKey_(row[1]);
-    (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: i, tokens: nazevTokens_(row[4]) });
+    (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: i, tokens: nazevTokens_(row[4]), nazev: String(row[4]) });
   });
 
   const today = formatDateOnly_(new Date());
@@ -1147,7 +1147,8 @@ function upsertEvents_(ss, cfg, events) {
     if (idx === undefined) idx = byKey[key];
     if (idx === undefined) {
       // Fuzzy: stejný profil + stejné datum + dostatečný překryv názvů
-      const hit = (byProfilDatum[pd] || []).find(c => isSameName_(c.tokens, evTokens));
+      // (ale ne když jde jen o jiný den téže denní série, viz ruznyDenSerie_)
+      const hit = (byProfilDatum[pd] || []).find(c => !ruznyDenSerie_(c.nazev, ev.nazev) && isSameName_(c.tokens, evTokens));
       if (hit) idx = hit.i;
     }
 
@@ -1163,7 +1164,7 @@ function upsertEvents_(ss, cfg, events) {
       existing.push(rowVals.concat(['', '', cfg.profil]));
       if (norm_(ev.id)) byId[norm_(ev.id)] = ni;
       byKey[key] = ni;
-      (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: ni, tokens: evTokens });
+      (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: ni, tokens: evTokens, nazev: String(ev.nazev || '') });
       stats.noveNazvy.push(polozka(ev));
       stats.nove++;
     } else {
@@ -2629,13 +2630,18 @@ function najdiDuplicity_(data) {
   data.forEach((row, i) => {
     if (!norm_(row[4])) return;                       // bez názvu ignorovat
     const gk = norm_(row[24]);
-    const tokens = nazevTokens_(row[4]);
+    const nazev = String(row[4]);
+    const tokens = nazevTokens_(nazev);
     const g = (groups[gk] = groups[gk] || []);
-    const dup = g.find(c => jsouDataBlizkoProDuplicitu_(c.datumRaw, row[1]) && isSameName_(c.tokens, tokens));
+    const dup = g.find(c =>
+      jsouDataBlizkoProDuplicitu_(c.datumRaw, row[1]) &&
+      !ruznyDenSerie_(c.nazev, nazev) &&
+      isSameName_(c.tokens, tokens)
+    );
     if (dup) {
-      toDelete.push({ rowNum: i + 2, nazev: String(row[4]), keptRow: dup.rowNum });
+      toDelete.push({ rowNum: i + 2, nazev: nazev, keptRow: dup.rowNum });
     } else {
-      g.push({ rowNum: i + 2, tokens: tokens, datumRaw: row[1] });
+      g.push({ rowNum: i + 2, tokens: tokens, datumRaw: row[1], nazev: nazev });
     }
   });
   return toDelete;
@@ -3407,6 +3413,39 @@ function isSameName_(tokA, tokB) {
   const mensi = Math.min(a.length, b.length);
   if (inter === mensi) return true;
   return inter >= 3 && (inter / mensi) >= NAZEV_SHODA_POMER_PRAH;
+}
+
+/** Vzor "N. měsíc v genitivu" (např. "13. srpna") v NEnormalizovaném názvu —
+ *  narozdíl od normNazev_/nazevTokens_ (ty číslice i tečky maží úplně) tenhle
+ *  vzor potřebuje číslice i tečku zachované, proto samostatná funkce na
+ *  syrovém textu, jen s odstraněnou diakritikou. */
+const RE_DEN_SERIE_ = /\b(\d{1,2})\.\s*(?:ledna|unora|brezna|dubna|kvetna|cervna|cervence|srpna|zari|rijna|listopadu|prosince)\b/;
+
+/** Vrátí číslo dne z "N. měsíc" vzoru v názvu (RE_DEN_SERIE_), nebo null,
+ *  když vzor chybí. "25 let" NEMÁ tečku hned za číslem ani měsíc hned po ní
+ *  (Light Up Tugendhat, "25 let UNESCO") — regex na to bezpečně neudeří. */
+function denZeSerie_(nazev) {
+  const bezDiakritiky = String(nazev || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const m = bezDiakritiky.match(RE_DEN_SERIE_);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Když OBĚ porovnávaná jména mají vzor "N. měsíc" a čísla dne se LIŠÍ,
+ * nikdy nepovažovat za duplicitu bez ohledu na jinou shodu — jasný signál
+ * dvou různých dnů denní série (v3.36, viz BACKLOG.md, "Letní kulturní
+ * program Ostrava – N. srpna": normNazev_ maže číslice, takže bez tohohle
+ * by na obou stranách zbyla identická sada {ostrava, srpna} a podmnožinová
+ * větev isSameName_ by poměrový práh z v3.35 úplně obešla).
+ *
+ * Když aspoň jedna strana vzor nemá, nebo je číslo stejné (typicky
+ * duplicitní zápis TÉHOŽ dne), o ničem to nerozhoduje — vrací false,
+ * isSameName_ rozhodne jako dřív.
+ */
+function ruznyDenSerie_(nazevA, nazevB) {
+  const dA = denZeSerie_(nazevA), dB = denZeSerie_(nazevB);
+  return dA !== null && dB !== null && dA !== dB;
 }
 
 function parseCzDate_(v) {

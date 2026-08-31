@@ -788,6 +788,35 @@ test('najdiDuplicity_: denní seriál se stejným obecným názvem (různé dny)
   assert.equal(r.najdiDuplicity_(data).length, 0);
 });
 
+// v3.36: normNazev_/nazevTokens_ maže číslice úplně, takže denní seriál se
+// SKUTEČNÝM formátem produkčního názvu ("… – N. srpna") měl po stopwords
+// filtru na obou stranách identickou sadu tokenů {ostrava, srpna} – shoda
+// procházela přes podmnožinovou větev (100 % z definice), která poměrový
+// práh z v3.35 úplně obchází. denZeSerie_/ruznyDenSerie_ čte číslo dne
+// PŘED normalizací (dokud číslice ještě nejsou smazané) jako samostatnou
+// ranou kontrolu, viz BACKLOG.md.
+
+test('najdiDuplicity_: denní seriál se SKUTEČNÝM formátem názvu z produkce ("– N. srpna") → NENÍ duplicita', () => {
+  const data = [
+    akceRadek({ nazev: 'Letní kulturní program Ostrava – 12. srpna', datumOd: '12. 8. 2026', profil: 'Ostrava' }),
+    akceRadek({ nazev: 'Letní kulturní program Ostrava – 13. srpna', datumOd: '13. 8. 2026', profil: 'Ostrava' }),
+  ];
+  assert.equal(r.najdiDuplicity_(data).length, 0);
+});
+
+test('denZeSerie_: rozpozná "N. měsíc" v názvu, "25 let" (bez tečky/měsíce hned po čísle) nespustí', () => {
+  assert.equal(r.denZeSerie_('Letní kulturní program Ostrava – 13. srpna'), 13);
+  assert.equal(r.denZeSerie_('Light Up Tugendhat – 25 let UNESCO (součást Maratonu hudby)'), null);
+  assert.equal(r.denZeSerie_('Balkan Night: Fanfare Ciocărlia'), null);
+});
+
+test('ruznyDenSerie_: stejné číslo dne (2× stejný den) → false, neblokuje skutečnou shodu', () => {
+  assert.equal(r.ruznyDenSerie_(
+    'Letní kulturní program Ostrava – 13. srpna',
+    'Letní kulturní program Ostrava – 13. srpna'
+  ), false);
+});
+
 test('najdiDuplicity_: mírně odlišné znění stejné akce se chytí (fuzzy shoda přes tokeny)', () => {
   const data = [
     akceRadek({ nazev: 'Balkan Night: Fanfare Ciocărlia + Džambo Aguševi Orchestra' }),
