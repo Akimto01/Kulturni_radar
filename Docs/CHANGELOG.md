@@ -1,5 +1,16 @@
 # Changelog
 
+## Backend v3.38 — zpracovatSledovanaMesta: řazení podle stáří poslední kontroly — 31. 8. 2026
+### Diagnóza
+- Navazuje na BACKLOG.md „Rozšíření zdrojů pro objevování akcí" — ruční ověření v datech (list KONTROLY, typ „sledované město") ukázalo silně nerovnoměrnou frekvenci zpracování sledovaných měst za 11 dní od 20. 8.: Olomouc běžela spolehlivě (4+ běhů), Plzeň jen 2×, **Třinec ani jednou**.
+- Kořenová příčina: `zpracovatSledovanaMesta` procházela seznam SLEDOVANÁ MĚSTA v PEVNÉM pořadí řádků, s časovým rozpočtem ~4,5 min na běh. Ochrana `jeDnesJizZpracovano_` řeší jen „bylo to zpracované DNES" — pomáhá při více spuštěních TÉHOŽ dne, ale triggery běží ve čtvrtek a v neděli (dva různé dny), takže nedělní běh vždy znovu začínal od indexu 0. Město na konci seznamu se tak při dost dlouhém seznamu nemuselo dostat na řadu nikdy — ne náhodná nespolehlivost, ale deterministický důsledek pozice v seznamu.
+### Změněno
+- **`serazenaSledovanaMesta_(mesta, kontroly)`** (nová, čistá) — řadí sledovaná města podle stáří poslední kontroly (`readPosledniKontrolyLokalit_`, už dřív čtena, jen se nepoužívala k řazení), nejstarší/nikdy-kontrolované první. Samoopravné řešení: když nějaký běh skončí dřív kvůli časovému limitu, příští běh automaticky upřednostní právě přeskočená města, bez nutnosti ukládat si samostatný rotační stav.
+- `zpracovatSledovanaMesta` — jen přeházené pořadí čtení (`kontroly` před `mesta`) + zapojení řazení. Skip-dnes logika, časový limit i per-město try/catch beze změny.
+### Poznámka k architektuře
+- 4 nové Node testy (458 → 462): základní řazení podle stáří, nikdy-kontrolované město první, nerozparsovatelný text v mapě = nikdy-kontrolované, funkce nemutuje vstupní pole. Existující wiring test (Praha/Ostrava skip-dnes scénář) prošel beze změny — potvrzuje, že přeřazení pořadí zpracování nerozbilo skip logiku.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Backend v3.38 - razeni sledovanych mest podle stari"`). Bez frontendového zásahu.
+
 ## Backend v3.37 — Odstranit duplicity → Návrh duplicit (ruční schválení, ne auto-mazání) — 31. 8. 2026
 ### Navazující incident (produkce, po nasazení v3.36)
 - Po v3.36 spuštěno „Odstranit duplicity" potřetí — smazáno **9 řádků místo očekávané 1**. Ruční audit všech párů (Google Sheets Historie verzí) potvrdil: Ostravský seriál i Balkan Soirée/Dunja Knebl (oba false positivy z v3.35/v3.36) se už NEobjevily — obě předchozí opravy fungují správně na produkci. 5 párů bylo skutečných duplicit (Rivec Fest, Den Brna, Velhartice, Na prknech, Balkan Night/Fanfare — všechny 1 den posunuté termíny stejné akce). Ale objevil se **ČTVRTÝ mechanismus chybné shody**: „Festival planet Brno 2026 – Gigalon (2. turnus)" vs. „…– srpnový turnus" a „Pražský výběr tribute – Kulturní léto na Poděbradech" vs. „Kulturní léto na Poděbradech" (celá sezónní série).

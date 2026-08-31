@@ -1424,6 +1424,49 @@ function dnesCz_() {
   return d.getDate() + '. ' + (d.getMonth() + 1) + '. ' + d.getFullYear();
 }
 
+// ---------------------------------------------------------------------------
+// v3.38: serazenaSledovanaMesta_ – řazení podle stáří poslední kontroly
+// (oprava mezery, kdy město na konci seznamu SLEDOVANÁ MĚSTA se nemuselo
+// dostat na řadu nikdy – jeDnesJizZpracovano_ nepomáhá napříč RŮZNÝMI dny,
+// viz BACKLOG.md, diagnostika 31. 8. 2026: Třinec 0 běhů za 11 dní).
+// ---------------------------------------------------------------------------
+
+test('serazenaSledovanaMesta_: seřadí města podle stáří poslední kontroly, nejstarší první', () => {
+  const kontroly = new Map([
+    [r.norm_('Olomouc'), '30. 8. 2026'],
+    [r.norm_('Plzeň'), '20. 8. 2026'],
+    [r.norm_('Třinec'), '5. 8. 2026'],
+  ]);
+  const serazene = r.serazenaSledovanaMesta_(['Olomouc', 'Plzeň', 'Třinec'], kontroly);
+  shodneNapricRealmy(serazene, ['Třinec', 'Plzeň', 'Olomouc']);
+});
+
+test('serazenaSledovanaMesta_: nikdy nekontrolované město (chybí v mapě) se řadí úplně první', () => {
+  const kontroly = new Map([
+    [r.norm_('Olomouc'), '30. 8. 2026'],
+    [r.norm_('Plzeň'), '20. 8. 2026'],
+    // 'Třinec' v mapě vůbec není – nikdy nekontrolováno
+  ]);
+  const serazene = r.serazenaSledovanaMesta_(['Olomouc', 'Plzeň', 'Třinec'], kontroly);
+  shodneNapricRealmy(serazene, ['Třinec', 'Plzeň', 'Olomouc']);
+});
+
+test('serazenaSledovanaMesta_: nerozparsovatelný text v mapě se chová jako nikdy nekontrolované', () => {
+  const kontroly = new Map([
+    [r.norm_('Olomouc'), '30. 8. 2026'],
+    [r.norm_('Plzeň'), ''],   // prázdný text, jako u profilu bez historie v LOKALITY
+  ]);
+  const serazene = r.serazenaSledovanaMesta_(['Olomouc', 'Plzeň'], kontroly);
+  shodneNapricRealmy(serazene, ['Plzeň', 'Olomouc']);
+});
+
+test('serazenaSledovanaMesta_: nemutuje vstupní pole', () => {
+  const puvodni = ['Olomouc', 'Plzeň'];
+  const kontroly = new Map([[r.norm_('Olomouc'), '1. 8. 2026'], [r.norm_('Plzeň'), '2. 8. 2026']]);
+  r.serazenaSledovanaMesta_(puvodni, kontroly);
+  shodneNapricRealmy(puvodni, ['Olomouc', 'Plzeň'], 'původní pole se nezměnilo');
+});
+
 test('v3.56 (testovací dluh, krok 2 auditu): zpracovatSledovanaMesta – přeskočí dnes už zpracované město, AI se zavolá jen pro nezpracované', () => {
   // Regresní test na WIRING orchestrátoru (ne jen na jeDnesJizZpracovano_
   // samotné výš) – i kdyby se pure funkce kdykoli v budoucnu porouchala

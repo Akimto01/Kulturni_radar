@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.37 (31. 8. 2026) – Odstranit duplicity → Návrh duplicit (ruční schválení, ne auto-mazání)
- * (předchozí: 3.36 – ruznyDenSerie_: rozpoznání "N. měsíc" v názvu, denní série)
+ * Verze: 3.38 (31. 8. 2026) – zpracovatSledovanaMesta: řazení podle stáří poslední kontroly
+ * (předchozí: 3.37 – Odstranit duplicity → Návrh duplicit, ruční schválení, ne auto-mazání)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -69,7 +69,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.37';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.38';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -2513,12 +2513,42 @@ function readPosledniKontrolyLokalit_(ss) {
   return mapa;
 }
 
+/**
+ * PURE: seřadí sledovaná města podle stáří poslední kontroly – nejstarší
+ * (nebo NIKDY nekontrolované) první.
+ *
+ * v3.38: zpracovatSledovanaMesta dřív procházela mesta v pevném pořadí
+ * řádků listu SLEDOVANÁ MĚSTA, s časovým rozpočtem ~4,5 min na běh a BEZ
+ * paměti mezi různými dny (jeDnesJizZpracovano_ řeší jen "bylo to dnes",
+ * ne "kdy naposledy") – triggery běží ve čtvrtek a v neděli, takže neděle
+ * začínala zase od indexu 0. Město na konci seznamu se tak nemuselo dostat
+ * na řadu NIKDY (nalezeno diagnostikou 31. 8. 2026 – Třinec 0 běhů za 11
+ * dní, zatímco město na začátku seznamu běželo spolehlivě při každém
+ * triggeru). Řazení podle stáří kontroly je samoopravné – když nějaký běh
+ * skončí dřív kvůli časovému limitu, příští běh automaticky upřednostní
+ * právě ty přeskočené, bez nutnosti ukládat si zvlášť nějaký rotační stav.
+ */
+function serazenaSledovanaMesta_(mesta, kontroly) {
+  return mesta.slice().sort((a, b) => {
+    const da = parseCzDate_(kontroly.get(norm_(a))) || new Date(0);
+    const db = parseCzDate_(kontroly.get(norm_(b))) || new Date(0);
+    return da - db;
+  });
+}
+
 /** Hlavní běh: projde sledovaná města, pro každé (mimo domácí profil, mimo
  *  ty už dnes zpracované) spustí hledání – stejná kritéria (dojezd/horizont/
  *  kategorie) jako domácí profil, jen jiné město. Časově rozpočtováno
  *  (~4,5 min) jako doplnitSouradniceZpetne; PŘESKAKUJE dnes už hotová města
  *  (viz jeDnesJizZpracovano_), takže opakované ruční spuštění postupně
- *  projde celý seznam, ne pořád jen jeho začátek. Bez notifikace. */
+ *  projde celý seznam, ne pořád jen jeho začátek. Bez notifikace.
+ *
+ *  v3.38: pořadí měst v RÁMCI běhu už není pevné pořadí řádků listu – řadí
+ *  se podle stáří poslední kontroly (serazenaSledovanaMesta_), nejstarší/
+ *  nikdy-kontrolované první. Řeší to mezeru v PŘEDCHOZÍM řešení: skip-dnes
+ *  kontrola nepomáhala napříč RŮZNÝMI dny (čtvrteční a nedělní trigger obě
+ *  dřív začínaly od indexu 0), takže město na konci seznamu se při dost
+ *  dlouhém seznamu nemuselo v časovém rozpočtu dostat na řadu nikdy. */
 function zpracovatSledovanaMesta() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) { Logger.log('zpracovatSledovanaMesta: jiný běh právě probíhá – končím.'); return; }
@@ -2526,8 +2556,8 @@ function zpracovatSledovanaMesta() {
   try {
     const krit = ss.getSheetByName(SHEET.KRITERIA);
     const zakladniCfg = readCriteria_(krit);
-    const mesta = readSledovanaMesta_(ss);
     const kontroly = readPosledniKontrolyLokalit_(ss);
+    const mesta = serazenaSledovanaMesta_(readSledovanaMesta_(ss), kontroly);
     const dnes = new Date();
     const t0 = Date.now();
     let zpracovano = 0, preskocenoDnes = 0;
