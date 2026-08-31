@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.38 (31. 8. 2026) – zpracovatSledovanaMesta: řazení podle stáří poslední kontroly
- * (předchozí: 3.37 – Odstranit duplicity → Návrh duplicit, ruční schválení, ne auto-mazání)
+ * Verze: 3.39 (31. 8. 2026) – DOPORUCENE_ZDROJE_NAPOVEDA: cílené doporučení zdroje v promptu (Olomouc)
+ * (předchozí: 3.38 – zpracovatSledovanaMesta: řazení podle stáří poslední kontroly)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -69,7 +69,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.38';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.39';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -966,6 +966,28 @@ function volatAnthropicSTool_(apiKey, model, system, userMsg, maxWebSearches) {
   return events;
 }
 
+/**
+ * v3.39: cílené doporučení konkrétních zdrojů jako primarni_zdroj pro
+ * konkrétní profily – výjimka z obecné instrukce „agregátory jen jako
+ * doplňkové ověření" (viz system prompt níže). Zavedeno po diagnostice
+ * (BACKLOG.md, 31. 8. 2026): olomouckadrbna.cz je v ZDROJE se správným
+ * profilem a kontrola pro Olomouc běží spolehlivě, ale AI ho nikdy
+ * nevybrala jako primarni_zdroj ani dalsi_zdroj – sloupec Typ z listu
+ * ZDROJE (agregátor/oficiální) se do promptu vůbec nepřenáší (readSources_
+ * ho čte jen na filtr), takže roli zdroje si AI musí odvodit sama.
+ *
+ * Záměrně cílená výjimka jen pro tenhle konkrétní zdroj/město, NE plošné
+ * zjemnění pravidla pro všechny agregátory/města – u měst se silným
+ * oficiálním pokrytím (Brno, Praha) je dnešní chování žádoucí, regionální
+ * zdroje se přidávaly právě PROTO, že oficiální pokrytí je tam řídké.
+ * Klíč = norm_(profil), stejně jako matchuje readSources_.
+ */
+const DOPORUCENE_ZDROJE_NAPOVEDA = {
+  olomouc: 'U Olomouce klidně uváděj olomouckadrbna.cz jako primarni_zdroj ' +
+    '(ne jen jako doplňkové ověření), pokud na něm najdeš konkrétní ověřenou akci ' +
+    '– oficiální pokrytí kulturních akcí v Olomouci je řídké.',
+};
+
 function callAnthropic_(cfg, zdroje, typKontroly) {
   const apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('Chybí Script Property ANTHROPIC_API_KEY.');
@@ -974,6 +996,7 @@ function callAnthropic_(cfg, zdroje, typKontroly) {
   const sourcesList = zdroje
     .map(z => '- ' + z.nazev + (z.priorita ? ' [' + z.priorita + ']' : '') + ': ' + z.url)
     .join('\n');
+  const napoveda = DOPORUCENE_ZDROJE_NAPOVEDA[norm_(cfg.profil)];
 
   const system = [
     'Jsi Kulturní radar – asistent, který vyhledává kulturní akce v ČR.',
@@ -992,7 +1015,7 @@ function callAnthropic_(cfg, zdroje, typKontroly) {
     '(města, pořadatelé, instituce); agregátory jen jako doplňkové ověření.',
   ]).join('\n');
 
-  const userMsg = [
+  const userMsgRadky = [
     'Vyhledej kulturní akce podle těchto kritérií:',
     '- Profil lokality (střed hledání): ' + cfg.profil,
     '- Období: ' + cfg.rozsah,
@@ -1011,12 +1034,16 @@ function callAnthropic_(cfg, zdroje, typKontroly) {
     '',
     'Prioritní zdroje ke kontrole:',
     sourcesList,
+  ];
+  if (napoveda) userMsgRadky.push(napoveda);
+  userMsgRadky.push(
     '',
     'Odevzdej max 15 nejrelevantnějších akcí zavoláním nástroje report_events.',
     'Uváděj pouze KONKRÉTNÍ pojmenované akce; nikdy obecné souhrny typu',
     '"letní kulturní akce města" nebo "víkendový program" bez vlastního názvu.',
     'Pole "popis" drž STRUČNÉ – maximálně 1–2 krátké věty. Pokud nic, odevzdej prázdný seznam.',
-  ].join('\n');
+  );
+  const userMsg = userMsgRadky.join('\n');
 
   return volatAnthropicSTool_(apiKey, model, system, userMsg, MAX_WEB_SEARCHES);
 }

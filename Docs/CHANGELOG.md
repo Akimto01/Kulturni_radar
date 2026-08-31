@@ -1,5 +1,16 @@
 # Changelog
 
+## Backend v3.39 — DOPORUCENE_ZDROJE_NAPOVEDA: cílené doporučení zdroje v promptu (Olomouc) — 1. 9. 2026
+### Diagnóza
+- Navazuje na BACKLOG.md „Rozšíření zdrojů pro objevování akcí" — třetí a poslední ze tří samostatných příčin nalezených diagnostikou 31. 8. 2026. Olomoucká kontrola běží spolehlivě (4+ běhů, 13-15 akcí/běh), ale `olomouckadrbna.cz` se ani jednou neobjevil jako `primarni_zdroj`, ani jako `dalsi_zdroj` (ověřeno přímo v AKCE) — přestože je v ZDROJE se správným profilem. Ne bug, preferenční chování AI: systémový prompt v `callAnthropic_` říká „agregátory jen jako doplňkové ověření", ale sloupec Typ z listu ZDROJE (agregátor u Olomoucké Drbny i Žurnálu Plzeň, „oficiální kulturní organizace" u fungujícího Zlína) se do promptu vůbec nepřenáší — AI si roli zdroje musí odvodit sama.
+### Změněno
+- **`DOPORUCENE_ZDROJE_NAPOVEDA`** — mapa `norm_(profil) → text`, zatím jen `olomouc`. Cílená výjimka z obecné instrukce o agregátorech, NE plošné zjemnění pravidla pro všechny agregátory/města — u měst se silným oficiálním pokrytím (Brno, Praha) je dnešní chování žádoucí, regionální zdroje se přidávaly právě PROTO, že oficiální pokrytí je v menších městech řídké.
+- `callAnthropic_` — `userMsg` refaktorováno na pole (`userMsgRadky`) s podmíněným vložením nápovědy mezi seznam zdrojů a zbytek promptu. Pro profily bez záznamu v mapě je výstupní prompt bajt přesně stejný jako dřív.
+### Poznámka k architektuře
+- 2 nové Node testy (462 → 464): profil Olomouc → prompt obsahuje doporučení; jiný profil (Brno) → prompt nápovědu neobsahuje (ověřeno na skutečném odeslaném payloadu, ne jen na počtu volání — vlastní lokální stub `frontaFetchuSPayloadem_`, sdílený `frontaFetchu` payload nezaznamenává).
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Backend v3.39 - cilene doporuceni zdroje (Olomouc)"`), samostatně od v3.38. Bez frontendového zásahu.
+- **Ještě nepotvrzeno v produkčních datech** — čeká se několik dní, než se dá v AKCE ověřit, jestli se `olomouckadrbna.cz` konečně objeví jako `primarni_zdroj`.
+
 ## Backend v3.38 — zpracovatSledovanaMesta: řazení podle stáří poslední kontroly — 31. 8. 2026
 ### Diagnóza
 - Navazuje na BACKLOG.md „Rozšíření zdrojů pro objevování akcí" — ruční ověření v datech (list KONTROLY, typ „sledované město") ukázalo silně nerovnoměrnou frekvenci zpracování sledovaných měst za 11 dní od 20. 8.: Olomouc běžela spolehlivě (4+ běhů), Plzeň jen 2×, **Třinec ani jednou**.

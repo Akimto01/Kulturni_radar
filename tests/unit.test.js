@@ -1175,6 +1175,49 @@ test('callAnthropic_: model rovnou zavolá report_events → akce se vrátí př
   assert.equal(volane.length, 1);
 });
 
+// v3.39: DOPORUCENE_ZDROJE_NAPOVEDA – cílené doporučení konkrétního zdroje
+// v promptu pro konkrétní profil (Olomouc), viz BACKLOG.md diagnostika
+// 31. 8. 2026 (olomouckadrbna.cz se nikdy nevybral jako primarni_zdroj).
+
+/** Stub UrlFetchApp.fetch, co si navíc pamatuje POSLANÝ payload (na rozdíl
+ *  od sdíleného frontaFetchu výš, který zaznamenává jen URL) – potřeba pro
+ *  ověření obsahu promptu, ne jen počtu/URL volání. */
+function frontaFetchuSPayloadem_(fronta) {
+  const zachycene = [];
+  const fetch = (url, options) => {
+    zachycene.push(options);
+    const dalsi = fronta.shift();
+    if (dalsi === undefined) throw new Error('Stub: fronta odpovědí je prázdná');
+    return { getResponseCode: () => dalsi.code, getContentText: () => JSON.stringify(dalsi.body) };
+  };
+  fetch.zachycene = zachycene;
+  return fetch;
+}
+
+test('callAnthropic_: profil Olomouc → prompt obsahuje doporučení olomouckadrbna.cz', () => {
+  const resp = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [] } }],
+  });
+  const fetchStub = frontaFetchuSPayloadem_([resp]);
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: fetchStub });
+  ctx.callAnthropic_(Object.assign({}, CFG_TEST, { profil: 'Olomouc' }), ZDROJE_TEST, 'sledované město');
+  const payload = JSON.parse(fetchStub.zachycene[0].payload);
+  assert.match(payload.messages[0].content, /olomouckadrbna\.cz/);
+});
+
+test('callAnthropic_: jiný profil (Brno) → prompt NEOBSAHUJE olomouckou nápovědu (zásah je cílený)', () => {
+  const resp = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [] } }],
+  });
+  const fetchStub = frontaFetchuSPayloadem_([resp]);
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: fetchStub });
+  ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');   // CFG_TEST.profil === 'Brno'
+  const payload = JSON.parse(fetchStub.zachycene[0].payload);
+  assert.doesNotMatch(payload.messages[0].content, /olomouckadrbna\.cz/);
+});
+
 test('callAnthropic_: pause_turn pokračuje druhým dotazem, report_events přijde až tam', () => {
   const pauza = anthropicResp({ stop_reason: 'pause_turn', content: [{ type: 'text', text: 'hledám dál…' }] });
   const finale = anthropicResp({
