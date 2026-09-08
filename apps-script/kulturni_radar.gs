@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.39 (31. 8. 2026) – DOPORUCENE_ZDROJE_NAPOVEDA: cílené doporučení zdroje v promptu (Olomouc)
- * (předchozí: 3.38 – zpracovatSledovanaMesta: řazení podle stáří poslední kontroly)
+ * Verze: 3.40 (8. 9. 2026) – auditDat_: nehlásit znovu duplicitní páry už ručně posouzené v NÁVRH DUPLICIT
+ * (předchozí: 3.39 – DOPORUCENE_ZDROJE_NAPOVEDA: cílené doporučení zdroje v promptu (Olomouc))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -69,7 +69,7 @@ const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
 
-const VERZE = '3.39';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.40';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -1279,6 +1279,21 @@ function ensureNavrhDuplicitSheet_(ss) {
 }
 
 /**
+ * v3.40: množina párů (ID ponechat|ID smazat) z NÁVRH DUPLICIT, bez ohledu
+ * na Stav – sdílené mezi navrhniDuplicity_ (append-only kontrola) a
+ * auditDat_ (samotest nemá znovu hlásit už jednou ručně posouzený pár).
+ * Čte přes getSheetByName, ne ensureNavrhDuplicitSheet_ – čtení nesmí mít
+ * vedlejší účinek založení listu, pokud ještě neexistuje.
+ */
+function nactiPosouzenePary_(ss) {
+  const navrhSh = ss.getSheetByName(SHEET.NAVRH_DUPLICIT);
+  const lastRow = navrhSh ? navrhSh.getLastRow() : 1;
+  if (lastRow < 2) return new Set();
+  const existujici = navrhSh.getRange(2, 1, lastRow - 1, NAVRH_DUPLICIT_HLAVICKA.length).getValues();
+  return new Set(existujici.map(row => String(row[1]) + '|' + String(row[3])));
+}
+
+/**
  * v3.37: NAHRAZUJE dřívější automatické mazání (cleanupDuplicates, do
  * v3.36). Tři po sobě jdoucí kola oprav najdiDuplicity_/isSameName_
  * (v3.34–v3.36) pokaždé vyřešila jen JIŽ NALEZENÝ vzorec chybné shody a
@@ -1304,11 +1319,7 @@ function navrhniDuplicity_(ss) {
   const kandidati = najdiDuplicity_(data);
 
   const navrhSh = ensureNavrhDuplicitSheet_(ss);
-  const navrhLastRow = navrhSh.getLastRow();
-  const existujici = navrhLastRow > 1
-    ? navrhSh.getRange(2, 1, navrhLastRow - 1, NAVRH_DUPLICIT_HLAVICKA.length).getValues()
-    : [];
-  const existujiciKlic = new Set(existujici.map(row => String(row[1]) + '|' + String(row[3])));
+  const existujiciKlic = nactiPosouzenePary_(ss);
 
   const dnes = formatDateOnly_(new Date());
   const nove = [];
@@ -2833,14 +2844,25 @@ function jeVycpavka_(nazev) {
   return /(kulturní akce|víkendová akce|víkendové akce|víkendový program|vícedenní akce|letní akce)/.test(n);
 }
 
-/** Datová hygiena AKCÍ: duplicity (suchý běh), vycpávky, budoucí akce bez URL. */
+/**
+ * Datová hygiena AKCÍ: duplicity (suchý běh), vycpávky, budoucí akce bez URL.
+ * v3.40: kandidáty na duplicitu, které už mají záznam v NÁVRH DUPLICIT
+ * (bez ohledu na Stav – tedy i ručně "Zamítnuto"), znovu nehlásí jako
+ * problém – jednou ručně posouzeno, navždy ticho, viz nactiPosouzenePary_.
+ */
 function auditDat_(ss) {
   const out = { duplicity: [], vycpavky: [], bezUrl: 0 };
   const sh = ss.getSheetByName(SHEET.AKCE);
   if (!sh || sh.getLastRow() < 2) return out;
   const data = sh.getRange(2, 1, sh.getLastRow() - 1, AKCE_COLS).getValues();
 
-  najdiDuplicity_(data).forEach(d => out.duplicity.push(d.nazev));
+  const posouzenePary = nactiPosouzenePary_(ss);
+  najdiDuplicity_(data).forEach(d => {
+    const idPonechat = String(data[d.keptRow - 2][0] || '');
+    const idSmazat = String(data[d.rowNum - 2][0] || '');
+    if (posouzenePary.has(idPonechat + '|' + idSmazat)) return;
+    out.duplicity.push(d.nazev);
+  });
 
   const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
   data.forEach(row => {

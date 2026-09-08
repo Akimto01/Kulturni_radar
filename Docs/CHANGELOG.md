@@ -1,5 +1,19 @@
 # Changelog
 
+## Backend v3.40 — auditDat_: nehlásit znovu duplicitní páry už ručně posouzené v NÁVRH DUPLICIT — 8. 9. 2026
+### Incident (produkce, 1.–7. 9. 2026)
+- Tři páry ručně posouzené 31. 8. 2026 (backend v3.37, kategorie D — sdílejí jen obecné brandingové slovo, legitimně jiné akce) a označené `Stav = "Zamítnuto"` v listu `NÁVRH DUPLICIT` (Festival planet Brno 2026 — srpen/srpnový turnus, dvakrát, a Kulturní léto na Poděbradech — konkrétní koncert vs. celá série) se den co den znovu objevovaly jako „duplicity v AKCÍCH" v denním e-mailu „Samotest: 1 problém".
+### Diagnóza
+- `auditDat_` volala `najdiDuplicity_(data)` a všechny výsledky reportovala jako problém přímo, BEZ křížové kontroly proti už existujícím zaznamenaným párům v `NÁVRH DUPLICIT` (bez ohledu na jejich `Stav`) — na rozdíl od `navrhniDuplicity_`, která tuhle kontrolu už měla (append-only chování zavedené v v3.37).
+### Změněno
+- **`nactiPosouzenePary_(ss)`** — nová sdílená funkce, extrahovaná z `navrhniDuplicity_`: množina párů `ID(ponechat)|ID(smazat)` z `NÁVRH DUPLICIT`, bez ohledu na `Stav`. Čte přes `getSheetByName` (ne `ensureNavrhDuplicitSheet_`) — čtení nesmí mít vedlejší účinek založení listu.
+- `navrhniDuplicity_` — inline výpočet nahrazen voláním `nactiPosouzenePary_(ss)`, chování beze změny.
+- `auditDat_` — kandidáty z `najdiDuplicity_` filtruje proti `nactiPosouzenePary_(ss)` před přidáním do `out.duplicity`. Pravidlo: „jednou ručně posouzeno (jakýkoli Stav) = samotest ho už nikdy nehlásí" — konzistentní s append-only filozofií `NÁVRH DUPLICIT`. Klíč je vázaný na konkrétní dvojici ID, ne na název/datum, takže nový pár se stejným názvem ale jinými řádky (jiná ID) se pořád správně nahlásí.
+### Poznámka k architektuře
+- 2 nové Node testy (464 → 466): pár se `Stav = "Zamítnuto"` v `NÁVRH DUPLICIT` → `auditDat_` ho nereportuje; zcela nový, dosud neznámý pár → `auditDat_` ho pořád správně reportuje (pojistka, že oprava nezpůsobila, že samotest přestane hlásit duplicity úplně).
+- Existující testy `navrhniDuplicity_` ověřeny izolovaně (`--test-name-pattern`) — extrakce `nactiPosouzenePary_` chování nezměnila.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Backend v3.40 - auditDat_ nehlasi jiz posouzene pary"`). Bez frontendového zásahu.
+
 ## Backend v3.39 — DOPORUCENE_ZDROJE_NAPOVEDA: cílené doporučení zdroje v promptu (Olomouc) — 1. 9. 2026
 ### Diagnóza
 - Navazuje na BACKLOG.md „Rozšíření zdrojů pro objevování akcí" — třetí a poslední ze tří samostatných příčin nalezených diagnostikou 31. 8. 2026. Olomoucká kontrola běží spolehlivě (4+ běhů, 13-15 akcí/běh), ale `olomouckadrbna.cz` se ani jednou neobjevil jako `primarni_zdroj`, ani jako `dalsi_zdroj` (ověřeno přímo v AKCE) — přestože je v ZDROJE se správným profilem. Ne bug, preferenční chování AI: systémový prompt v `callAnthropic_` říká „agregátory jen jako doplňkové ověření", ale sloupec Typ z listu ZDROJE (agregátor u Olomoucké Drbny i Žurnálu Plzeň, „oficiální kulturní organizace" u fungujícího Zlína) se do promptu vůbec nepřenáší — AI si roli zdroje musí odvodit sama.

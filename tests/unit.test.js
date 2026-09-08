@@ -3050,6 +3050,39 @@ test('navrhniDuplicity_: pár už v NÁVRH DUPLICIT existuje (i s prázdným Sta
   assert.equal(ss.getSheetByName('NÁVRH DUPLICIT').getLastRow(), 2, 'zůstal jen ten jeden existující řádek');
 });
 
+// v3.40: auditDat_ nemá znovu hlásit jako problém páry, které už byly
+// ručně posouzené v NÁVRH DUPLICIT (bez ohledu na Stav) – viz BACKLOG.md.
+test('auditDat_: pár už posouzený v NÁVRH DUPLICIT (Stav "Zamítnuto") se znovu nehlásí jako problém', () => {
+  const akce = [
+    akceRadekId_({ id: 'a1', nazev: 'Balkan Night', datumOd: '7. 8. 2026' }),
+    akceRadekId_({ id: 'a2', nazev: 'Balkan Night', datumOd: '8. 8. 2026' }),
+  ];
+  const zamitnutyRadek = ['31. 8. 2026', 'a1', 'Balkan Night', 'a2', 'Balkan Night',
+    '7. 8. 2026 / 8. 8. 2026', 'Brno', NAVRH_DUPLICIT_STAV_TEST.ZAMITNUTO, ''];
+  const ss = fakeSpreadsheet({
+    AKCE: new MemSheet([[]].concat(akce)),
+    'NÁVRH DUPLICIT': new MemSheet([NAVRH_DUPLICIT_HLAVICKA_TEST, zamitnutyRadek]),
+    KONTROLY: new MemSheet([[]]),
+  });
+  const ctx = nactiRadar();
+  const vysledek = ctx.auditDat_(ss);
+  assert.equal(vysledek.duplicity.length, 0, 'zamítnutý pár se nemá hlásit jako problém');
+});
+
+test('auditDat_: zcela nový, dosud neznámý pár duplicit se pořád správně hlásí', () => {
+  const akce = [
+    akceRadekId_({ id: 'b1', nazev: 'Nová akce X', datumOd: '10. 9. 2026' }),
+    akceRadekId_({ id: 'b2', nazev: 'Nová akce X', datumOd: '10. 9. 2026' }),
+  ];
+  const ss = fakeSpreadsheet({
+    AKCE: new MemSheet([[]].concat(akce)),
+    KONTROLY: new MemSheet([[]]),
+  });
+  const ctx = nactiRadar();
+  const vysledek = ctx.auditDat_(ss);
+  assert.equal(vysledek.duplicity.length, 1, 'nový pár se má pořád hlásit');
+});
+
 test('smazatPotvrzeneDuplicity_: smaže jen řádky se Stav "Potvrzeno ke smazání", ostatní ignoruje', () => {
   const akce = [
     akceRadekId_({ id: 'a1', nazev: 'Balkan Night', datumOd: '7. 8. 2026' }),
