@@ -1,5 +1,19 @@
 # Changelog
 
+## Index.html v3.59 — dropdown + prázdný stav rozlišují „nikdy neprohledáno" od „prohledáno, nic nenalezeno" — 9. 9. 2026
+### Kontext
+- Navazuje na BACKLOG.md, sekce „Zpětná vazba syna — 5. 8. 2026": appka pro některá sledovaná města ukazovala 0 akcí, aniž by šlo poznat, jestli je to proto, že appka to město ještě nikdy neprohledala (žádná automatická kontrola nikdy neproběhla), nebo proto, že ho opakovaně kontrolovala a fakt tam nic není. Data pro rozlišení už existovala v API (`readMetaApi_` posílá `posledniKontrola` per profil, prázdný řetězec = nikdy nekontrolováno), jen se ve frontendu nikde nepoužívala.
+### Přidáno
+- **`sestavOznaceniProfiluDropdown_(profil, kraj, posledniKontrola)`** — text volby v `#profil-select`, přidává krátký marker „ (nikdy neprohledáno)" u měst s prázdným `posledniKontrola`.
+- **`sestavHlaskuPrazdnehoStavu_(posledniKontrola)`** — hláška prázdného stavu v `renderAkce()` (`filtrovane.length === 0`), nahradila jednu univerzální hlášku dvěma: „Tohle město appka ještě nikdy neprohledala." (nikdy nekontrolováno) vs. „Žádné akce pro vybraný filtr (naposledy zkontrolováno: D. M. RRRR H:mm)." (kontrolováno, beze změny formátu data ze serveru).
+- Obě jako pojmenované čisté funkce (ne inline v DOM kódu) — stejný vzor jako `sestavPopupDataMapy_`/`sestavTextSdileni_`, testovatelné bez DOM.
+- Nová modulová proměnná `posledniKontrolaProfilu_` (mapa `profil → posledniKontrola`) — plní se při stavbě `#profil-select`, čte ji `renderAkce()`. Záměrně jen tahle mapa, ne celé `meta.profily`, ať se globální stav zbytečně nerozšiřuje.
+### Poznámka k architektuře
+- 5 nových Node testů (472 → 477): marker přidán u nikdy nekontrolovaného města / nepřidán u kontrolovaného / chybějící kraj se vynechá beze změny chování; obě varianty hlášky prázdného stavu.
+- Čistě frontendová změna — `readMetaApi_` v `.gs` posílal `posledniKontrola` per profil už dřív, žádný zásah do Apps Scriptu ani bump `VERZE` (backend zůstává 3.42).
+- RF testy pracující s `#profil-select`/`#status` (`Přepínač profilů je naplněn z meta API`, `Opakované přepnutí profilu v dropdownu…`, `Chip Oblíbené/Neověřeno filtruje…`) ověřeny beze změny — čtou jen `value`/počet elementů, ne text, takže marker/nová hláška je neovlivnily. Nový RF test se záměrně nepsal — jestli existuje „nikdy nekontrolované" město, závisí na živých produkčních datech (SLEDOVANÁ MĚSTA), ne na deterministické fixtuře.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Frontend v3.59 - rozliseni nikdy neprohledano/prohledano"`).
+
 ## Backend v3.42 — upsertEvents_: fuzzy shoda už nezahazuje tiše odlišná data — 9. 9. 2026
 ### Kontext
 - Navazuje na v3.41 (audit log fuzzy sloučení) — vedlejší zjištění z testu „fuzzy shoda BEZE změny obsahu nezapisuje log" odhalilo DRUHÝ, samostatný mechanismus zapsaný do BACKLOG.md jako nová „K PROŠETŘENÍ": když `upsertEvents_` najde fuzzy shodu, ale nová akce má stejné `datum_do` i `stav` jako existující řádek, `changed` vyjde `false` — a v tom případě se nepřevezme vůbec nic z nových dat (ani `misto`, `cena`, `kategorie`, `popis`), jen se bumpne „Poslední kontrola". Skutečně jiná konkrétní akce se tak potichu ZAHODÍ, ne smíchá s cizími daty jako u v3.41 — jde o ztrátu informace, ne o její záměnu.

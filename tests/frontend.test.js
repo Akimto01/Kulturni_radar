@@ -24,6 +24,7 @@ const f = nactiFrontendFunkce([
   'vypocitejPoziciTooltipuKalendare_',
   'klicSouradnic_', 'sestavSeznamMist_', 'prepnoutVyberPinu_',
   'spocitejStatistikuVyberu_', 'vycistitVyberPinu_',
+  'sestavOznaceniProfiluDropdown_', 'sestavHlaskuPrazdnehoStavu_',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -1395,4 +1396,41 @@ test('sestavEventJsonLd_: chybějící volitelná pole (datumDo/popis/url/lat/ln
   assert.equal('description' in jsonLd, false);
   assert.equal('url' in jsonLd, false);
   assert.equal('geo' in jsonLd.location, false);
+});
+
+// ---------------------------------------------------------------------------
+// v3.59: sestavOznaceniProfiluDropdown_ / sestavHlaskuPrazdnehoStavu_ – viz
+// BACKLOG.md „UX: rozlišit 0 akcí nikdy neprohledáno od prohledáno, nic
+// nenalezeno" (zpětná vazba syna, 5. 8. 2026).
+// ---------------------------------------------------------------------------
+
+test('sestavOznaceniProfiluDropdown_: nikdy nekontrolované město (posledniKontrola prázdné) dostane marker', () => {
+  assert.equal(
+    f.sestavOznaceniProfiluDropdown_('Třinec', 'Moravskoslezský kraj', ''),
+    'Třinec · Moravskoslezský kraj (nikdy neprohledáno)'
+  );
+});
+
+test('sestavOznaceniProfiluDropdown_: už kontrolované město marker nedostane', () => {
+  assert.equal(
+    f.sestavOznaceniProfiluDropdown_('Brno', 'Jihomoravský kraj', '9. 9. 2026 8:12'),
+    'Brno · Jihomoravský kraj'
+  );
+});
+
+test('sestavOznaceniProfiluDropdown_: chybějící kraj se prostě vynechá (beze změny oproti dřívějšímu chování)', () => {
+  assert.equal(f.sestavOznaceniProfiluDropdown_('Brno', '', '9. 9. 2026 8:12'), 'Brno');
+  assert.equal(f.sestavOznaceniProfiluDropdown_('Brno', '', ''), 'Brno (nikdy neprohledáno)');
+});
+
+test('sestavHlaskuPrazdnehoStavu_: bez posledniKontrola → hláška "nikdy neprohledala"', () => {
+  assert.equal(f.sestavHlaskuPrazdnehoStavu_(''), 'Tohle město appka ještě nikdy neprohledala.');
+  assert.equal(f.sestavHlaskuPrazdnehoStavu_(undefined), 'Tohle město appka ještě nikdy neprohledala.');
+});
+
+test('sestavHlaskuPrazdnehoStavu_: s posledniKontrola → hláška s datem, beze změny formátu ze serveru', () => {
+  assert.equal(
+    f.sestavHlaskuPrazdnehoStavu_('9. 9. 2026 8:12'),
+    'Žádné akce pro vybraný filtr (naposledy zkontrolováno: 9. 9. 2026 8:12).'
+  );
 });

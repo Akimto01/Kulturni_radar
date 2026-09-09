@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.58 – Indexace pro Google/AI crawlery (a): meta/OG/Twitter tagy, favicon, robots.txt, sitemap.xml, Schema.org Event JSON-LD pro sdílené akce -->
+<!-- Kulturní radar Index.html v3.59 – dropdown + prázdný stav rozlišují "nikdy neprohledáno" od "prohledáno, nic nenalezeno" -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1023,6 +1023,30 @@
   // v3.33: aktuální ntfy téma pro #filtry-dialog (mimo formulářová pole –
   // needitovatelné, jen zobrazené jako odkaz, viz validovatNotifikaceKlient_).
   let aktualniNtfyTema_ = '';
+  // v3.59: profil → posledniKontrola (řetězec z apiMeta, '' = nikdy
+  // nekontrolováno) – jen tahle mapa, ne celé meta.profily, ať se
+  // globální stav zbytečně nerozšiřuje. Plní se při stavbě #profil-select,
+  // čte renderAkce() (viz BACKLOG.md „UX: rozlišit 0 akcí nikdy
+  // neprohledáno od prohledáno, nic nenalezeno").
+  let posledniKontrolaProfilu_ = {};
+
+  // ── v3.59: čisté funkce pro rozlišení "nikdy neprohledáno" od "prohledáno,
+  // nic nenalezeno" (testovatelné bez DOM, viz BACKLOG.md) ──
+  /** Text volby v #profil-select – krátký marker u měst, která appka ještě
+   *  nikdy nekontrolovala (posledniKontrola prázdné), ať je rozdíl vidět už
+   *  při výběru profilu, ne až po kliknutí na prázdný seznam. */
+  function sestavOznaceniProfiluDropdown_(profil, kraj, posledniKontrola) {
+    return profil + (kraj ? ' · ' + kraj : '') + (posledniKontrola ? '' : ' (nikdy neprohledáno)');
+  }
+
+  /** Hláška prázdného stavu (renderAkce(), filtrovane.length === 0) –
+   *  rozlišuje "appka tohle město ještě nikdy neprohledala" od "prohledala,
+   *  ale pro tenhle filtr nic nenašla". */
+  function sestavHlaskuPrazdnehoStavu_(posledniKontrola) {
+    return posledniKontrola
+      ? 'Žádné akce pro vybraný filtr (naposledy zkontrolováno: ' + posledniKontrola + ').'
+      : 'Tohle město appka ještě nikdy neprohledala.';
+  }
 
   // ── v3.13: čisté funkce uživatelských profilů (testovatelné bez DOM) ──
   /** Z textových polí formuláře sestaví objekt filtrů; prázdné hodnoty se
@@ -1497,10 +1521,12 @@
       sel.innerHTML = '';   // v3.13→oprava: jinak se možnosti při druhém init() zdvojí
       const profilySerazene = [...(meta.profily || [])].sort((a, b) =>
         String(a.profil).localeCompare(String(b.profil), 'cs'));
+      posledniKontrolaProfilu_ = {};   // v3.59: přestavět při každém načtení meta
       profilySerazene.forEach(p => {
+        posledniKontrolaProfilu_[p.profil] = p.posledniKontrola || '';
         const opt = document.createElement('option');
         opt.value = p.profil;
-        opt.textContent = p.profil + (p.kraj ? ' · ' + p.kraj : '');
+        opt.textContent = sestavOznaceniProfiluDropdown_(p.profil, p.kraj, p.posledniKontrola);
         if (p.profil === aktivniProfil) opt.selected = true;
         sel.appendChild(opt);
       });
@@ -1716,7 +1742,7 @@
     if (filtrovane.length === 0) {
       const el = document.createElement('div');
       el.id = 'status';
-      el.textContent = 'Žádné akce pro vybraný filtr.';
+      el.textContent = sestavHlaskuPrazdnehoStavu_(posledniKontrolaProfilu_[aktivniProfil]);
       main.prepend(el);
       return;
     }
