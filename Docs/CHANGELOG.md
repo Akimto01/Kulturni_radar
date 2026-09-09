@@ -1,5 +1,20 @@
 # Changelog
 
+## Backend v3.42 — upsertEvents_: fuzzy shoda už nezahazuje tiše odlišná data — 9. 9. 2026
+### Kontext
+- Navazuje na v3.41 (audit log fuzzy sloučení) — vedlejší zjištění z testu „fuzzy shoda BEZE změny obsahu nezapisuje log" odhalilo DRUHÝ, samostatný mechanismus zapsaný do BACKLOG.md jako nová „K PROŠETŘENÍ": když `upsertEvents_` najde fuzzy shodu, ale nová akce má stejné `datum_do` i `stav` jako existující řádek, `changed` vyjde `false` — a v tom případě se nepřevezme vůbec nic z nových dat (ani `misto`, `cena`, `kategorie`, `popis`), jen se bumpne „Poslední kontrola". Skutečně jiná konkrétní akce se tak potichu ZAHODÍ, ne smíchá s cizími daty jako u v3.41 — jde o ztrátu informace, ne o její záměnu.
+- Diagnostika (9. 9. 2026) ukázala, že tenhle případ je pravděpodobně ČASTĚJŠÍ, ne vzácnější, než přepis opravený v3.41: jednodenní akce mají `datum_od == datum_do`, takže dvě jednodenní akce se stejným datem mají shodné `datum_do` STRUKTURÁLNĚ (ne náhodou); `stav = "potvrzeno"` je naprostá většina aktivních akcí. ID navíc generuje AI nanovo každý běh (`RRRR-MM-DD-slug-názvu`, žádná kontinuita s předchozím dnem, appka existující ID do promptu nedává) — i genuinně TATÁŽ akce může snadno spadnout do fuzzy větve místo přesné shody ID, jakmile AI mírně přeformuluje název.
+### Rozhodnutí
+- Zváženy 3 varianty (rozšířit `changed` všude; u fuzzy nikdy nepovolit `changed=false`; rozšířit `changed` jen pro fuzzy větev). Zvolena třetí — nejpřesnější zásah, žádná regrese na exaktní cestě.
+### Změněno
+- `upsertEvents_` — `changed` se teď počítá jinak podle toho, jak se řádek našel. Pro PŘESNOU shodu ID/klíče beze změny (`datum_od`/`datum_do`/`stav`) — vědomý záměr z v2.8 (ignorovat kosmetickou přeformulaci AI u jistě téže akce) zůstává nedotčen. Pro FUZZY shodu (`viaFuzzy`) se `changed` počítá přes už existující `zjistiZmenenaPole_`/`POLE_PRO_FUZZY_LOG_` z v3.41 (i `misto`/`kategorie`/`cena`/`popis`, ne jen `datum_do`/`stav`) — cokoli obsahového se liší, bere se jako změna, data se převezmou a zaloguje se do sloupce Z (v3.41 log teď pokrývá i tenhle dřív neviditelný případ).
+- Výsledek `zjistiZmenenaPole_` se počítá jednou a znovu použije i pro zápis do logu (žádné duplicitní volání).
+### Poznámka k architektuře
+- 3 nové Node testy (470 → 472): exaktní shoda ID s kosmetickou přeformulací popisu/ceny (žádná změna data/stavu) → `changed=false` jako dosud — chrání záměr z v2.8 před regresí; fuzzy shoda se stejným `datum_do`/`stav`, ale jiným místem/kategorií/cenou/popisem → `changed=true`, data převzata a zalogována; fuzzy shoda s úplně stejným obsahem (jen jiné ID a mírně jiný název) → `changed=false`, žádný log — potvrzuje, že `zjistiZmenenaPole_` správně vrací prázdno, když se opravdu nic neliší.
+- **Vědomý zbytkový kompromis** (zapsáno i do BACKLOG.md): tahle oprava nesnižuje, jak často `isSameName_` falešně shodí dvě různé akce (kategorie D) — to řeší jen budoucí změna samotné shody/modelu zápisu. Mění jen důsledek: falešná shoda, která dřív (má-li náhodou stejné `datum_do`+`stav`) skončila neškodně (tiché zahození, řádek netknutý), teď skončí jako přepsání — zalogované a opravitelné přes Historii verzí, ale pořád přepsání. Cena za odstranění tiché ztráty dat u genuinně stejných akcí.
+- BACKLOG.md „K PROŠETŘENÍ" (tiché zahození) označeno VYŘEŠENO 9. 9. 2026, s odkazem na tuhle opravu.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "Backend v3.42 - fuzzy shoda uz nezahazuje odlisna data"`). Bez frontendového zásahu.
+
 ## Backend v3.41 — upsertEvents_: audit log fuzzy sloučení do sloupce Z (beze změny chování) — 9. 9. 2026
 ### Kontext
 - Navazuje na BACKLOG.md „K PROŠETŘENÍ" (zapsáno 31. 8. 2026 u v3.37): `upsertEvents_` (zápisová cesta) sdílí `isSameName_`/`nazevTokens_`/`ruznyDenSerie_` s `najdiDuplicity_`, ale narozdíl od `najdiDuplicity_` (přes `navrhniDuplicity_`, v3.37 — návrh k ručnímu schválení) sám automaticky přepisuje řádek existující akce při fuzzy shodě, bez lidské kontroly a bez jakékoli stopy.

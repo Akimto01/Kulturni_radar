@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.41 (9. 9. 2026) – upsertEvents_: audit log fuzzy sloučení do sloupce Z (AKCE), beze změny chování
- * (předchozí: 3.40 – auditDat_: nehlásit znovu duplicitní páry už ručně posouzené v NÁVRH DUPLICIT)
+ * Verze: 3.42 (9. 9. 2026) – upsertEvents_: fuzzy shoda už nezahazuje tiše odlišná data (širší changed)
+ * (předchozí: 3.41 – upsertEvents_: audit log fuzzy sloučení do sloupce Z (AKCE), beze změny chování)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.41';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.42';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -1211,11 +1211,26 @@ function upsertEvents_(ss, cfg, events) {
       if (norm_(old[24]) !== norm_(cfg.profil)) return;  // cizí profil neměnit
 
       // Změna = jen posun termínu nebo změna stavu (zrušení apod.);
-      // přeformulace textů (čas/cena/popis) mezi běhy se nepočítá.
-      const changed =
-        dateKey_(old[1]) !== dateKey_(ev.datum_od) ||
-        dateKey_(old[2]) !== dateKey_(ev.datum_do) ||
-        norm_(old[13]) !== norm_(ev.stav);
+      // přeformulace textů (čas/cena/popis) mezi běhy se nepočítá. Platí
+      // BEZE ZMĚNY pro přesnou shodu ID/klíče – jsme si jistí, že je to
+      // táž akce, takže kosmetickou přeformulaci AI záměrně ignorujeme
+      // (viz git historie, tenhle záměr je v kódu od úplně první verze).
+      //
+      // v3.42: pro FUZZY shodu (viaFuzzy) je užší definice nebezpečná –
+      // nejsme si jistí, že jde o tutéž akci, takže "beze změny" tu dřív
+      // znamenalo TICHÉ ZAHOZENÍ dat jiné konkrétní akce, kdykoli měla
+      // náhodou/strukturálně stejné datum_do+stav jako existující řádek
+      // (u jednodenních akcí se stejným datem je to spíš pravidlo než
+      // výjimka – viz BACKLOG.md, "K PROŠETŘENÍ" – ticke zahozeni dat).
+      // Fuzzy větev proto používá širší zjistiZmenenaPole_/
+      // POLE_PRO_FUZZY_LOG_ (i misto/kategorie/cena/popis, ne jen
+      // datum_do/stav) – cokoli obsahového se liší, bere se jako změna.
+      let zmenenaPoleFuzzy = null;
+      const changed = viaFuzzy
+        ? (zmenenaPoleFuzzy = zjistiZmenenaPole_(old, rowVals)).length > 0
+        : dateKey_(old[1]) !== dateKey_(ev.datum_od) ||
+          dateKey_(old[2]) !== dateKey_(ev.datum_do) ||
+          norm_(old[13]) !== norm_(ev.stav);
 
       if (changed) {
         rowVals[0] = old[0];                     // ID zachovat
@@ -1224,7 +1239,7 @@ function upsertEvents_(ss, cfg, events) {
         rowVals[16] = old[16];                   // První nález zachovat
         sh.getRange(r, 1, 1, AKCE_WRITE_AV).setValues([rowVals.slice(0, AKCE_WRITE_AV)]);
         if (viaFuzzy) {
-          zapsatFuzzyMergeLog_(sh, r, String(old[4] || ''), String(ev.nazev || ''), zjistiZmenenaPole_(old, rowVals));
+          zapsatFuzzyMergeLog_(sh, r, String(old[4] || ''), String(ev.nazev || ''), zmenenaPoleFuzzy);
         }
         if (norm_(ev.stav) === 'zrušeno') { stats.zrusene++; stats.zruseneNazvy.push(polozka(ev)); }
         else { stats.zmenene++; stats.zmeneneNazvy.push(polozka(ev)); }
