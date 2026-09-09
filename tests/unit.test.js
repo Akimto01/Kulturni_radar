@@ -3161,3 +3161,119 @@ test('smazatPotvrzeneDuplicity_: chybějící list NÁVRH DUPLICIT → nulový v
   const vysledek = ctx.smazatPotvrzeneDuplicity_(ss);
   assert.equal(vysledek.smazano, 0);
 });
+
+// ---------------------------------------------------------------------------
+// v3.41: upsertEvents_ – audit log fuzzy sloučení (sloupec Z), viz BACKLOG.md
+// "K PROŠETŘENÍ" (31. 8. 2026) – upsertEvents_ sdílí isSameName_/
+// nazevTokens_/ruznyDenSerie_ s najdiDuplicity_, ale narozdíl od
+// najdiDuplicity_ (přes navrhniDuplicity_, v3.37 – návrh k ručnímu
+// schválení) sám automaticky přepisuje řádek existující akce, bez lidské
+// kontroly. Log NEMĚNÍ chování, jen dělá tiché přepsání viditelným.
+// ---------------------------------------------------------------------------
+
+/** Plný (25sloupcový) řádek AKCE se všemi poli potřebnými pro test fuzzy
+ *  sloučení – na rozdíl od akceRadek()/akceRadekId_() výš (jen sloupce pro
+ *  najdiDuplicity_) potřebujeme i misto/kategorii/cenu/popis/datum_do, ať
+ *  jde ověřit, co přesně upsertEvents_ tiše přepíše. */
+function akceRadekFuzzy_({ id, nazev, datumOd, datumDo, misto, kategorie, cena, popis, stav = 'potvrzeno', profil = 'Brno' }) {
+  const row = new Array(25).fill('');
+  row[0] = id; row[1] = datumOd; row[2] = datumDo; row[4] = nazev; row[5] = misto;
+  row[8] = kategorie; row[10] = cena; row[11] = popis; row[13] = stav;
+  row[14] = 'NE'; row[15] = 'NE'; row[16] = '1. 6. 2026'; row[17] = '1. 6. 2026';
+  row[24] = profil;
+  return row;
+}
+
+/** Existující řádek: bezpříznaková "deštníková" položka série (krátký
+ *  název, jen 2 významové tokeny po odečtení stopwordu "kulturni") –
+ *  archetyp "kategorie D" z BACKLOG.md (v3.37): série vs. konkrétní akce. */
+function existujiciAkceFuzzy_(overrides = {}) {
+  return akceRadekFuzzy_(Object.assign({
+    id: 'stary-1', datumOd: '15. 6. 2026', datumDo: '15. 6. 2026',
+    nazev: 'Kulturní léto na Poděbradech', misto: 'Poděbradské nábřeží',
+    kategorie: 'ostatní', cena: 'zdarma', popis: 'Celoletní kulturní program města.',
+  }, overrides));
+}
+
+/** Nová akce (z AI vyhledávání téhož běhu) – jiné ID, stejné profil+datum_od
+ *  (nutná podmínka fuzzy větve v upsertEvents_), ale jinak jiná KONKRÉTNÍ
+ *  akce, jejíž název pouze OBSAHUJE název existujícího řádku jako
+ *  podřetězec → isSameName_ podmnožinová větev shodu potvrdí bez ohledu na
+ *  poměrový práh z v3.35 (ten chrání jen druhou, neporomnožinovou větev). */
+const NOVA_AKCE_FUZZY_ = {
+  id: 'novy-2', datum_od: '15. 6. 2026', datum_do: '16. 6. 2026',
+  nazev: 'Divadelní představení – Kulturní léto na Poděbradech',
+  misto: 'Zámecká zahrada', obec: 'Poděbrady', kategorie: 'divadlo',
+  cena: '150 Kč', popis: 'Divadlo Continuo uvádí pohádku pro děti.',
+  stav: 'potvrzeno',
+};
+
+test('upsertEvents_: fuzzy shoda názvu (podmnožinová větev isSameName_) tiše přepíše CELÝ obsah řádku, ne jen datum_do/stav', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciAkceFuzzy_()])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [NOVA_AKCE_FUZZY_]);
+
+  assert.equal(stats.zmenene, 1);
+  assert.equal(stats.nove, 0, 'nesmí založit nový řádek – musí najít existující fuzzy shodou');
+
+  const row = ss.getSheetByName('AKCE').getRange(2, 1, 1, 25).getValues()[0];
+  assert.equal(row[0], 'stary-1', 'ID zůstává původní (fuzzy merge do existujícího řádku, ne nová akce)');
+  assert.equal(row[4], NOVA_AKCE_FUZZY_.nazev, 'název tiše přepsán novým');
+  assert.equal(row[5], NOVA_AKCE_FUZZY_.misto, 'místo tiše přepsáno – ne jen datum_do/stav, jak by se dalo čekat');
+  assert.equal(row[8], NOVA_AKCE_FUZZY_.kategorie, 'kategorie tiše přepsána');
+  assert.equal(row[10], NOVA_AKCE_FUZZY_.cena, 'cena tiše přepsána');
+  assert.equal(row[11], NOVA_AKCE_FUZZY_.popis, 'popis tiše přepsán');
+  assert.equal(row[2], NOVA_AKCE_FUZZY_.datum_do);
+  assert.equal(row[14], 'NE', 'Novinka zůstává zachovaná z původního řádku');
+});
+
+test('upsertEvents_: při fuzzy merge s přepsáním obsahu zapíše do sloupce Z (26) audit log se starým i novým názvem', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciAkceFuzzy_()])) });
+  const ctx = nactiRadar();
+  ctx.upsertEvents_(ss, { profil: 'Brno' }, [NOVA_AKCE_FUZZY_]);
+
+  const hlavicka = ss.getSheetByName('AKCE').getRange(1, 26, 1, 1).getValues()[0][0];
+  assert.equal(hlavicka, 'Log sloučení (fuzzy)');
+
+  const log = ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0];
+  assert.match(log, /^\[fuzzy merge \d{1,2}\.\s?\d{1,2}\.\s?\d{4} \d{1,2}:\d{2}\] "Kulturní léto na Poděbradech" → "Divadelní představení – Kulturní léto na Poděbradech"; přepsáno: /);
+  assert.match(log, /datum do/);
+  assert.match(log, /místo/);
+  assert.match(log, /kategorie/);
+  assert.match(log, /cena/);
+  assert.match(log, /popis/);
+});
+
+test('upsertEvents_: update přes PŘESNOU shodu ID (ne fuzzy) nezapisuje žádný log do sloupce Z', () => {
+  const existujici = existujiciAkceFuzzy_({ id: 'a1', nazev: 'Normální akce' });
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujici])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'a1', datum_od: '15. 6. 2026', datum_do: '17. 6. 2026',   // posun termínu → changed=true
+    nazev: 'Normální akce', misto: 'Poděbradské nábřeží', obec: 'Poděbrady',
+    kategorie: 'ostatní', cena: 'zdarma', popis: 'Celoletní kulturní program města.',
+    stav: 'potvrzeno',
+  }]);
+
+  assert.equal(stats.zmenene, 1);
+  const log = ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0];
+  assert.equal(log, '', 'přesná shoda ID – žádný fuzzy log, i když se obsah legitimně změnil');
+});
+
+test('upsertEvents_: fuzzy shoda beze změny (changed=false, jen legitimní refresh) nezapisuje log', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciAkceFuzzy_()])) });
+  const ctx = nactiRadar();
+  // Stejný datum_do/stav jako existující řádek → changed=false (viz upsertEvents_),
+  // i když jde o fuzzy shodu – proto beze změny obsahu a beze zápisu do logu.
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'jiny-id', datum_od: '15. 6. 2026', datum_do: '15. 6. 2026',
+    nazev: 'Divadelní představení – Kulturní léto na Poděbradech',
+    misto: 'Zámecká zahrada', obec: 'Poděbrady', kategorie: 'divadlo',
+    cena: '150 Kč', popis: 'Divadlo Continuo uvádí pohádku pro děti.',
+    stav: 'potvrzeno',
+  }]);
+
+  assert.equal(stats.bezZmeny, 1);
+  const log = ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0];
+  assert.equal(log, '', 'fuzzy shoda beze změny obsahu se neloguje – žádné riziko tichého přepsání');
+});

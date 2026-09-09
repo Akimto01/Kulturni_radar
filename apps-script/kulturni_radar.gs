@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.40 (8. 9. 2026) – auditDat_: nehlásit znovu duplicitní páry už ručně posouzené v NÁVRH DUPLICIT
- * (předchozí: 3.39 – DOPORUCENE_ZDROJE_NAPOVEDA: cílené doporučení zdroje v promptu (Olomouc))
+ * Verze: 3.41 (9. 9. 2026) – upsertEvents_: audit log fuzzy sloučení do sloupce Z (AKCE), beze změny chování
+ * (předchozí: 3.40 – auditDat_: nehlásit znovu duplicitní páry už ručně posouzené v NÁVRH DUPLICIT)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -14,7 +14,8 @@
  *  - Menu "Kulturní radar" v tabulce pro ruční spuštění.
  *
  * Zásady (dle dohodnutých pravidel tabulky):
- *  - Zapisuje se POUZE do sloupců A:V a Y listu AKCE. W:X (vzorce) se nedotýká.
+ *  - Zapisuje se POUZE do sloupců A:V, Y a Z listu AKCE. W:X (vzorce) se
+ *    nedotýká. Z se zapisuje jen výjimečně (viz níže).
  *  - Deduplikace: profil + datum od + název + místo (normalizovaně) + ID.
  *  - Akce jiných profilů se nemění. Akce se nemažou (jen stav proběhlo/zrušeno).
  *  - Každý běh se zaloguje do KONTROL vč. sloupce "Vykonavatel".
@@ -68,8 +69,14 @@ const KRIT = {           // adresy v listu KRITÉRIA
 const AKCE_COLS = 25;    // A..Y
 const AKCE_WRITE_AV = 22; // A..V
 const COL_Y = 25;        // Profil lokality
+/** v3.41: audit log fuzzy sloučení v upsertEvents_ (viz BACKLOG.md,
+ *  "K PROŠETŘENÍ" – upsertEvents_ tiše přepisuje řádek při fuzzy shodě
+ *  názvu, bez stopy). Mimo AKCE_COLS/AKCE_WRITE_AV záměrně – čte/zapisuje
+ *  se jen adresovaně, stejně jako COL_Y, nikdy se nečte do "existing"
+ *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
+const COL_Z = 26;
 
-const VERZE = '3.40';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.41';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -1173,12 +1180,13 @@ function upsertEvents_(ss, cfg, events) {
     const pd = norm_(cfg.profil) + '|' + dateKey_(ev.datum_od);
     const evTokens = nazevTokens_(ev.nazev);
     let idx = byId[norm_(ev.id)];
+    let viaFuzzy = false;
     if (idx === undefined) idx = byKey[key];
     if (idx === undefined) {
       // Fuzzy: stejný profil + stejné datum + dostatečný překryv názvů
       // (ale ne když jde jen o jiný den téže denní série, viz ruznyDenSerie_)
       const hit = (byProfilDatum[pd] || []).find(c => !ruznyDenSerie_(c.nazev, ev.nazev) && isSameName_(c.tokens, evTokens));
-      if (hit) idx = hit.i;
+      if (hit) { idx = hit.i; viaFuzzy = true; }
     }
 
     if (idx === undefined) {
@@ -1215,6 +1223,9 @@ function upsertEvents_(ss, cfg, events) {
         rowVals[15] = 'ANO';                     // Změna
         rowVals[16] = old[16];                   // První nález zachovat
         sh.getRange(r, 1, 1, AKCE_WRITE_AV).setValues([rowVals.slice(0, AKCE_WRITE_AV)]);
+        if (viaFuzzy) {
+          zapsatFuzzyMergeLog_(sh, r, String(old[4] || ''), String(ev.nazev || ''), zjistiZmenenaPole_(old, rowVals));
+        }
         if (norm_(ev.stav) === 'zrušeno') { stats.zrusene++; stats.zruseneNazvy.push(polozka(ev)); }
         else { stats.zmenene++; stats.zmeneneNazvy.push(polozka(ev)); }
       } else {
@@ -1227,6 +1238,70 @@ function upsertEvents_(ss, cfg, events) {
 
   invalidovatCacheEventu_();   // v3.26: AKCE se změnilo – cache apiEvents by ukazovala staré akce
   return stats;
+}
+
+/**
+ * v3.41: pole porovnávaná mezi starým řádkem (`old`) a novým (`rowVals`)
+ * pro účely fuzzy-merge auditu (viz zapsatFuzzyMergeLog_) – BEZ názvu
+ * (index 4), ten se loguje zvlášť jako starý→nový v hlavičce záznamu, a
+ * BEZ bookkeeping polí (ID, Novinka, Změna, První nález, Poslední
+ * kontrola), která se buď zachovávají, nebo se u nich změna očekává a
+ * nic neznamenají o tichém přepsání OBSAHU akce.
+ */
+const POLE_PRO_FUZZY_LOG_ = [
+  { i: 1, nazev: 'datum od', datum: true },
+  { i: 2, nazev: 'datum do', datum: true },
+  { i: 3, nazev: 'čas' },
+  { i: 5, nazev: 'místo' },
+  { i: 6, nazev: 'obec' },
+  { i: 7, nazev: 'dojezd' },
+  { i: 8, nazev: 'kategorie' },
+  { i: 9, nazev: 'podkategorie' },
+  { i: 10, nazev: 'cena' },
+  { i: 11, nazev: 'popis' },
+  { i: 12, nazev: 'skóre', cislo: true },
+  { i: 13, nazev: 'stav' },
+  { i: 18, nazev: 'primární zdroj' },
+  { i: 19, nazev: 'url' },
+  { i: 20, nazev: 'další zdroj' },
+  { i: 21, nazev: 'poznámka' },
+];
+
+/** Vrátí seznam názvů polí (viz POLE_PRO_FUZZY_LOG_), která se mezi
+ *  starým řádkem a novým obsahem skutečně liší. */
+function zjistiZmenenaPole_(old, rowVals) {
+  return POLE_PRO_FUZZY_LOG_.filter(p => {
+    if (p.datum) return dateKey_(old[p.i]) !== dateKey_(rowVals[p.i]);
+    if (p.cislo) return (Number(old[p.i]) || 0) !== (Number(rowVals[p.i]) || 0);
+    return norm_(old[p.i]) !== norm_(rowVals[p.i]);
+  }).map(p => p.nazev);
+}
+
+/** Zajistí hlavičku sloupce Z (viz COL_Z), jen když ještě není nastavená –
+ *  stejný vzor jako "Vykonavatel" v KONTROLY (logKontrola_). */
+function zajistitHlavickuLogSlouceni_(sh) {
+  if (norm_(sh.getRange(1, COL_Z).getValue()) !== 'log sloučení (fuzzy)') {
+    sh.getRange(1, COL_Z).setValue('Log sloučení (fuzzy)');
+  }
+}
+
+/**
+ * v3.41: audit log pro upsertEvents_ – zapisuje se JEN když fuzzy shoda
+ * názvu (ne přesná shoda ID/klíče) vedla ke skutečnému přepsání obsahu
+ * řádku (viz zjistiZmenenaPole_). Append (ne overwrite) do sloupce Z
+ * daného řádku – historie víc sloučení za život akce zůstává čitelná.
+ * Nemění chování upsertEvents_, jen dává viditelnost do budoucna (viz
+ * BACKLOG.md, "K PROŠETŘENÍ" – upsertEvents_ sdílí isSameName_ s
+ * najdiDuplicity_, ale bez lidské kontroly jako navrhniDuplicity_).
+ */
+function zapsatFuzzyMergeLog_(sh, r, staryNazev, novyNazev, zmenenaPole) {
+  if (!zmenenaPole.length) return;
+  zajistitHlavickuLogSlouceni_(sh);
+  const zaznam = '[fuzzy merge ' + formatDate_(new Date()) + '] "' + staryNazev +
+    '" → "' + novyNazev + '"; přepsáno: ' + zmenenaPole.join(', ');
+  const bunka = sh.getRange(r, COL_Z);
+  const stary = String(bunka.getValue() || '');
+  bunka.setValue(stary ? stary + '\n' + zaznam : zaznam);
 }
 
 function eventToRow_(ev, today) {
