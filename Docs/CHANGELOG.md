@@ -1,5 +1,13 @@
 # Changelog
 
+## Docs: TESTY.md přepracován na testovací plán a strategii, nová složka Quality Check — 30. 9. 2026
+### Změněno
+- `Docs/TESTY.md` přepracován na testovací plán a strategii podle ISO/IEC/IEEE 29119-3 (zpětná rekonstrukce ze stavu repa).
+### Přidáno
+- Nová složka `Docs/Quality Check/` (s `README.md`) pro podklady k internímu quality checku role TAE II (říjen 2026).
+### Poznámka
+- Jen dokumentace, žádná změna kódu ani testů, bez bumpu verze (backend i frontend beze změny).
+
 ## Index.html v3.59 — dropdown + prázdný stav rozlišují „nikdy neprohledáno" od „prohledáno, nic nenalezeno" — 9. 9. 2026
 ### Kontext
 - Navazuje na BACKLOG.md, sekce „Zpětná vazba syna — 5. 8. 2026": appka pro některá sledovaná města ukazovala 0 akcí, aniž by šlo poznat, jestli je to proto, že appka to město ještě nikdy neprohledala (žádná automatická kontrola nikdy neproběhla), nebo proto, že ho opakovaně kontrolovala a fakt tam nic není. Data pro rozlišení už existovala v API (`readMetaApi_` posílá `posledniKontrola` per profil, prázdný řetězec = nikdy nekontrolováno), jen se ve frontendu nikde nepoužívala.
