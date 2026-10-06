@@ -1,5 +1,14 @@
 # Changelog
 
+## Docs: matice pokrytí POKRYTI.md — 6. 10. 2026
+### Přidáno
+- Nový dokument `Docs/POKRYTI.md` (matice pokrytí): pokrytí testy podle rizik R1–R8 (z `Docs/TESTY.md`) a podle 18 funkčních oblastí, s vrstvami testů (Node unit, RF API, RF frontend, worker).
+- Seznam nalezených mezer, mj. netestovaná verze frontendu (`Index.html`) nasazeného na Cloudflare Pages – API test hlídá jen verzi backendu (riziko R2).
+### Změněno
+- `Docs/Quality Check/README.md`: zmínka o `POKRYTI.md` změněna z „(připravuje se)“ na funkční odkaz.
+### Poznámka
+- Jen dokumentace, žádná změna kódu ani testů, bez bumpu verze (backend i frontend beze změny).
+
 ## Docs: TESTY.md přepracován na testovací plán a strategii, nová složka Quality Check — 30. 9. 2026
 ### Změněno
 - `Docs/TESTY.md` přepracován na testovací plán a strategii podle ISO/IEC/IEEE 29119-3 (zpětná rekonstrukce ze stavu repa).
