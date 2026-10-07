@@ -217,8 +217,9 @@ invarianty**, ne konkrétní hodnoty: schéma odpovědi (`lat`/`lng`), regex
 Testy závislé na datech se chovají dvojím způsobem:
 
 - `Skip If`, když data chybí (např. počasí, ikona první karty),
-- `Log … level=WARN` a projití (chipy typů míst ř. 498, seznam míst pod
-  mapou ř. 877 ve `frontend.robot`).
+- `Log … level=WARN` a projití, celkem v 10 testech ve `frontend.robot`
+  (např. chipy typů míst a podkategorií, přepínání profilů, kalendář
+  a většina testů mapy).
 
 Varianta s `WARN` je starší a dnes ji nepovažuju za ideální. Když potřebná
 data nejsou k dispozici, test sice projde, ale reálně nic neověří a v souhrnu
@@ -273,6 +274,49 @@ venku. Jako křehký ho označím až ve chvíli, kdy se podaří prokázat vně
 příčinu, kterou nedává smysl nebo nejde rozumně odstranit – typicky zátěž
 platformy nebo závislost na externím zdroji. Pokud je problém v testu nebo v
 aplikaci, radši ho opravím, než abych ho schoval za označení „flaky“.
+
+### 4.9 Volba nástrojů
+
+S Robot Frameworkem jsem pracoval už v předchozí práci, tehdy se
+SeleniumLibrary. Na projektech kolem sebe teď ale vídám čím dál častěji RF
+s Browser Library a v požadavcích na klientské projekty, do kterých jsem
+se mohl přihlásit, se objevovala častěji než Selenium. Do té doby jsem
+v ní nepracoval, takže Kulturní radar byl i příležitost naučit se ji na
+reálném projektu.
+
+Zpětně se ukázalo, že volba sedí i technicky. Nejvíc se to projevilo na
+třech věcech, které tenhle projekt konkrétně potřebuje:
+
+- **Frame-piercing.** Apps Script varianta appky běží ve dvou vnořených
+  iframech. Browser Library je projde jedním prefixem
+  `id=sandboxFrame >>> id=userHtmlFrame >>>` a stejné testy tak běží proti
+  oběma prostředím. Se SeleniumLibrary bych musel před akcemi přepínat
+  kontext přes `Select Frame` a zase zpátky.
+- **Čekání.** Appka načítá data asynchronně a mapa čeká na Leaflet z CDN.
+  Browser Library na prvky čeká sama, explicitní čekání řeším jen tam, kde
+  jde o stav aplikace (např. ověření zápisu reloadem).
+- **Kontexty a strict mode.** Mobilní viewport testuju přes `New Context`
+  bez spouštění nového prohlížeče. Strict mode mi odhalil nejednoznačný
+  selektor u chipu „Vše“, který by Selenium potichu vzalo za první
+  nalezený prvek.
+
+| Možnost | Výhody | Nevýhody pro tento projekt |
+|---|---|---|
+| **RF + Browser Library** (zvoleno) | Výhody výše; pod sebou Playwright | Závislost na Node.js procesu, menší komunita než u Selenia |
+| RF + SeleniumLibrary | Nejrozšířenější, širší podpora prohlížečů a gridů, běžné u starších klientských projektů | Explicitní čekání téměř všude, přepínání iframů, bez strict mode |
+| Čistý Playwright (TS nebo Python) | Nativní test runner s paralelizací, codegen, trace viewer, velká komunita | Druhý jazyk a ekosystém vedle RF pro API, ztráta jednotného reportu a sdílených proměnných v `resources.robot` |
+
+Proti čistému Playwrightu rozhodlo hlavně to, že API i UI testy běží
+v jednom nástroji, sdílejí proměnné a mají společný report. Playwright
+navíc v Browser Library stejně je, takže technicky o jeho výhody
+(auto-waiting, kontexty, tracing) nepřicházím.
+
+Pro jednotkové testy je použitý vestavěný `node:test` bez dalších
+závislostí. Backend v Apps Scriptu se do Node načítá přes `vm` sandbox,
+takže žádný další testovací framework není potřeba.
+
+Kdyby RF sada výrazně rostla, nejdřív bych řešil paralelní běh (pabot),
+ne změnu nástroje.
 
 ## 5. Kritéria
 
@@ -379,3 +423,4 @@ Seřazeno podle poměru přínos / cena.
 |---|---|
 | 2. 8. 2026 | Původní strategie (4 vrstvy, v2.9) |
 | 30. 9. 2026 | Přepracováno na test plan dle 29119-3, zpětná rekonstrukce |
+| 7. 10. 2026 | Doplněna sekce 4.9 Volba nástrojů, upřesněn rozsah testů s WARN (4.6) |

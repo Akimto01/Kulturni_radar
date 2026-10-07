@@ -1,5 +1,14 @@
 # Changelog
 
+## Docs: TESTY.md - sekce Volba nástrojů — 7. 10. 2026
+### Přidáno
+- `Docs/TESTY.md`: nová sekce 4.9 Volba nástrojů (proč RF s Browser Library, srovnání se SeleniumLibrary a čistým Playwrightem, `node:test` pro jednotkové testy).
+- Nový řádek v historii dokumentu (7. 10. 2026).
+### Změněno
+- `Docs/TESTY.md`, sekce 4.6: upřesněno, že `Log … level=WARN` a projití používá 10 testů ve `frontend.robot` (dřív popsány dva s odkazy na čísla řádků).
+### Poznámka
+- Jen dokumentace, žádná změna kódu ani testů, bez bumpu verze (backend i frontend beze změny).
+
 ## Docs: matice pokrytí POKRYTI.md — 6. 10. 2026
 ### Přidáno
 - Nový dokument `Docs/POKRYTI.md` (matice pokrytí): pokrytí testy podle rizik R1–R8 (z `Docs/TESTY.md`) a podle 18 funkčních oblastí, s vrstvami testů (Node unit, RF API, RF frontend, worker).
