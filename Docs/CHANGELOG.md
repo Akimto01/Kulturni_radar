@@ -1,5 +1,15 @@
 # Changelog
 
+## Docs: testovací analýza a ukázky testů pro quality check – 8. 10. 2026
+### Přidáno
+- `Docs/TESTOVACI-ANALYZA.md`: testovací analýza na příkladu přihlášení profilem s PINem.
+- `Docs/Quality Check/UKAZKY-TESTU.md`: rozbor tří testů (jak navrhuji testy).
+- `Docs/Quality Check/README.md`: odkazy na oba nové dokumenty.
+### Změněno
+- `Docs/BACKLOG.md`: položka „Unit testy `apiPrihlaseniUzivatele_`“ upřesněna – větev „chybí profil nebo PIN“ nemá test, neexistující profil se testuje jen přes `ok:false` bez ověření textu chyby (slabá aserce).
+### Poznámka
+- Jen dokumentace, žádná změna kódu ani testů, bez bumpu verze (backend i frontend beze změny).
+
 ## Docs: TESTY.md - tajné hodnoty a zabezpečení veřejného repa – 8. 10. 2026
 ### Přidáno
 - `Docs/TESTY.md`: v sekci 4.4 odstavec o tajných hodnotách (PIN testovacího profilu, tokeny, ntfy téma): v repu nejsou, lokálně jsou v proměnných prostředí, v CI v GitHub Secrets. Repo je od 8. 10. 2026 veřejné; před zveřejněním zapnuto GitHub Secret scanning (celá historie bez nálezu) a push protection.
