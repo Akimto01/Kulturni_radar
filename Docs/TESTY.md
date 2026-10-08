@@ -219,10 +219,18 @@ samostatného monitoringu.
 - Konfigurace přes proměnné prostředí: `RADAR_URL`, `RADAR_SITE_URL`,
   `RF_FRAME`, `RF_TEST_USER_ID`, `RF_TEST_PIN`, `NTFY_TOPIC`.
 
+**Tajné hodnoty** (PIN testovacího profilu, tokeny, ntfy téma) nejsou
+v repu nikdy: lokálně jsou v proměnných prostředí, v CI v GitHub Secrets.
+Repo je od 8. 10. 2026 veřejné. Před zveřejněním jsem zapnul GitHub
+Secret scanning, který prošel celou historii bez nálezu, a push
+protection, která zablokuje push obsahující rozpoznaný tajný klíč.
+Zapnutí Dependabot alerts pro závislosti (`requirements.txt`,
+`package.json` workeru) je v sekci 10.
+
 Samostatné testovací prostředí by tady znamenalo druhý Google Sheet, druhé
 nasazení Apps Scriptu, další Cloudflare Pages prostředí a zároveň řešit, jak
-udržovat testovací data. U rodinné aplikace s několika uživateli mi to zatím
-ten poměr přínos/cena zatím nevychází.
+udržovat testovací data. U rodinné aplikace s několika uživateli mi ten
+poměr přínos/cena zatím nevychází.
 
 Riziko testování proti produkci proto omezuju jinak: mám vyhrazený testovací
 profil, zápisové testy jsou oddělené tagem `zapis`, po testu vracím původní
@@ -462,7 +470,8 @@ Seřazeno podle poměru přínos / cena.
    `zpracovatSledovanaMesta`.
 5. Browser matrix (Chromium, Firefox, WebKit) v `rf-tests.yml`.
 6. Spouštění RF v Dockeru pro shodné prostředí lokálně i v CI.
-7. Základní kontrola přístupnosti (axe-core přes Browser Library), nízká
+7. Zapnout Dependabot alerts a projít nalezené zranitelnosti v závislostech.
+8. Základní kontrola přístupnosti (axe-core přes Browser Library), nízká
    priorita.
 
 ## Historie dokumentu
@@ -472,3 +481,4 @@ Seřazeno podle poměru přínos / cena.
 | 2. 8. 2026 | Původní strategie (4 vrstvy, v2.9) |
 | 30. 9. 2026 | Přepracováno na test plan dle 29119-3, zpětná rekonstrukce |
 | 7. 10. 2026 | Doplněna sekce 1.1 Platforma a dvě prostředí, 4.9 Volba nástrojů, upřesněn rozsah testů s WARN (4.6) |
+| 8. 10. 2026 | Doplněny tajné hodnoty a zabezpečení veřejného repa (4.4) |

@@ -1,5 +1,14 @@
 # Changelog
 
+## Docs: TESTY.md - tajné hodnoty a zabezpečení veřejného repa – 8. 10. 2026
+### Přidáno
+- `Docs/TESTY.md`: v sekci 4.4 odstavec o tajných hodnotách (PIN testovacího profilu, tokeny, ntfy téma): v repu nejsou, lokálně jsou v proměnných prostředí, v CI v GitHub Secrets. Repo je od 8. 10. 2026 veřejné; před zveřejněním zapnuto GitHub Secret scanning (celá historie bez nálezu) a push protection.
+- Do sekce 10 přidán krok „Zapnout Dependabot alerts“ (navazující bod přečíslován) a řádek v historii dokumentu.
+### Změněno
+- Drobná stylistická oprava věty o poměru přínos/cena v sekci 4.4.
+### Poznámka
+- Jen dokumentace, žádná změna kódu ani testů, bez bumpu verze (backend i frontend beze změny).
+
 ## Docs: BACKLOG - nálezy z přípravy quality checku — 8. 10. 2026
 ### Přidáno
 - `Docs/BACKLOG.md`: 5 nových položek z přípravy 7.–8. 10. 2026: duplicita „Punkevní jeskyně a propast Macocha“ vs. „… & propast Macocha“ ve stálých místech, `robot --dryrun` v `node-tests.yml`, jeden automatický retry při HTTP 404 z `script.googleusercontent.com/macros/echo`, chybějící limit pokusů na PIN, unit testy větví `apiPrihlaseniUzivatele_`.
