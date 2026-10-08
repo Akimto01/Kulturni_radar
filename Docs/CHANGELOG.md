@@ -1,5 +1,28 @@
 # Changelog
 
+## Docs: BACKLOG - nálezy z přípravy quality checku — 8. 10. 2026
+### Přidáno
+- `Docs/BACKLOG.md`: 5 nových položek z přípravy 7.–8. 10. 2026: duplicita „Punkevní jeskyně a propast Macocha“ vs. „… & propast Macocha“ ve stálých místech, `robot --dryrun` v `node-tests.yml`, jeden automatický retry při HTTP 404 z `script.googleusercontent.com/macros/echo`, chybějící limit pokusů na PIN, unit testy větví `apiPrihlaseniUzivatele_`.
+### Poznámka
+- Jen dokumentace, žádná změna kódu ani testů, bez bumpu verze (backend i frontend beze změny).
+
+## Docs: TESTY.md - sekce Platforma a dvě prostředí — 8. 10. 2026
+### Přidáno
+- `Docs/TESTY.md`: nová sekce 1.1 Platforma a dvě prostředí (Apps Script vs. statický web na Cloudflare Pages, sandbox ve dvou iframech, proměnná `${FRAME}`, dopady platformy na testy).
+- Upraven řádek v historii dokumentu (7. 10. 2026).
+### Poznámka
+- Jen dokumentace, žádná změna kódu ani testů, bez bumpu verze (backend i frontend beze změny).
+
+## RF testy: chip typu místa - Skip If, čekání na načtení, přísnější aserce — 8. 10. 2026
+### Změněno
+- `tests/robot/frontend.robot`, test „Chip typu stálého místa zúží seznam“: datová precondition (profil má 2+ typů míst) je nově `Skip If` místo `Log … level=WARN` + PASS, takže nesplněná precondition se ve výsledcích ukáže jako SKIP, ne jako zelený test.
+- Aserce `filtrovanych <= vsech` zpřísněna na `<`: původní by prošla i s nefunkčním filtrem, který nic nezúží.
+- Aktualizována dokumentace testu.
+### Opraveno
+- Přidáno `Wait For Elements State` na první kartu místa před počítáním chipů: test dřív závodil s asynchronním načítáním sekce míst. `Skip If` závod odhalil, `WARN` by ho schoval.
+### Poznámka
+- Jen testy, bez bumpu verze (backend i frontend beze změny). Lokálně ověřeno: dry run i ostrý běh, 1 test, 1 passed.
+
 ## Docs: TESTY.md - sekce Volba nástrojů — 7. 10. 2026
 ### Přidáno
 - `Docs/TESTY.md`: nová sekce 4.9 Volba nástrojů (proč RF s Browser Library, srovnání se SeleniumLibrary a čistým Playwrightem, `node:test` pro jednotkové testy).

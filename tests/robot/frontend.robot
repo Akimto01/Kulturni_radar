@@ -476,27 +476,33 @@ Chip typu stálého místa zúží seznam (pokud profil má 2+ typů)
     [Tags]    filtr
     [Documentation]    v3.10: chipy typů se vykreslí jen když má profil 2+
     ...    různé typy míst (viz Index.html renderMista – chip „Vše" + 1 typ by
-    ...    byl k ničemu). Test je proto podmíněný na DATECH profilu, ne na
-    ...    stavu aplikace – to není „Skip" ve smyslu, kterému jsme se dřív
-    ...    vyhýbali (skrývání nejistoty o kódu), ale korektní chování podle
-    ...    množství typů míst, které se den ze dne mění. Klik na chip je čistě
-    ...    klientský filtr, bez zápisu – bezpečné pro CI.
+    ...    byl k ničemu). Pokud aktuální data profilu tuto podmínku nesplňují,
+    ...    test se označí jako SKIP, protože v daném běhu nemá co ověřovat. 
+    ...    Nejde o skrývání nejistoty o kódu, ale o datovou precondition, 
+    ...    která se podle množství typů míst může den ze dne měnit. 
+    ...    Klik na chip je čistě klientský filtr, bez zápisu – bezpečné pro CI.
+    
+    Wait For Elements State    ${FRAME} .misto-karta >> nth=0  visible
     ${pocet_chipu}=    Get Element Count    ${FRAME} \#mista-sekce .chip
-    IF    ${pocet_chipu} >= 2
-        ${vsech}=    Get Element Count    ${FRAME} .misto-karta
-        Click    ${FRAME} \#mista-sekce .chip >> nth=1
-        Sleep    300ms
-        ${filtrovanych}=    Get Element Count    ${FRAME} .misto-karta
-        Should Be True    ${filtrovanych} <= ${vsech}
-        Should Be True    ${filtrovanych} >= 1
+    
+    Skip If    ${pocet_chipu} < 2
+        ...    Profil má aktuálně jen ${pocet_chipu} chip(y) typů míst (0 nebo 1 typ celkem) – chipy filtru se korektně nevykreslují, test nemá co ověřit v tomto běhu.
+    
+    ${vsech}=    Get Element Count    ${FRAME} .misto-karta
+    Click    ${FRAME} \#mista-sekce .chip >> nth=1
+    Sleep    300ms
+        
+    ${filtrovanych}=    Get Element Count    ${FRAME} .misto-karta
+    Should Be True    ${filtrovanych} < ${vsech}
+    Should Be True    ${filtrovanych} >= 1
         ...    msg=Vybraný typ místa by měl mít aspoň jedno místo (jinak by se chip nevykreslil)
-        Click    ${FRAME} \#mista-sekce .chip >> text=Vše
-        Sleep    300ms
-        ${zpet}=    Get Element Count    ${FRAME} .misto-karta
-        Should Be Equal As Integers    ${zpet}    ${vsech}
-    ELSE
-        Log    Profil má aktuálně jen ${pocet_chipu} chip(y) typů míst (0 nebo 1 typ celkem) – chipy filtru se korektně nevykreslují, test nemá co ověřit v tomto běhu.    level=WARN
-    END
+        
+    Click    ${FRAME} \#mista-sekce .chip >> text=Vše
+    Sleep    300ms
+        
+    ${zpet}=    Get Element Count    ${FRAME} .misto-karta
+    Should Be Equal As Integers    ${zpet}    ${vsech}
+    
 
 Karty mají ikony pro Oblíbené a Navštívené
     [Tags]    ui
