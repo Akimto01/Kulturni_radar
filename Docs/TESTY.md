@@ -48,6 +48,54 @@ a se správnými údaji – hlavně datum, místo a odkaz. Stejně důležité j
 se neztrácelo to, co si už označili. Vizuální detaily, počasí nebo mapa jsou
 užitečné, ale případná chyba v nich má menší dopad než chyba v datech.
 
+### 1.1 Platforma a dvě prostředí
+
+Backend běží v **Google Apps Script**, JavaScriptové platformě Googlu
+určené původně k automatizaci Google Workspace (Sheets, Gmail, Kalendář).
+Kód běží na serverech Googlu a má k dispozici hotové služby
+(`SpreadsheetApp`, `MailApp`, `UrlFetchApp`, `PropertiesService`)
+a časové i událostní triggery. Skript jde publikovat i jako webovou
+aplikaci: funkce `doGet`/`doPost` odpovídají na požadavky na adresu
+`/exec` a vracejí HTML stránku nebo JSON.
+
+Projekt začal 1. 8. 2026 (v2.8) jako čistá automatizace nad Google
+Sheetem – kontroly, přehledy a notifikace. Apps Script byl proto
+přirozená volba: běží přímo u dat, bez vlastního serveru a hostingu.
+Webová appka (v3.3) a JSON API přibyly později. Od v3.15 (8. 8.) běží
+stejný `Index.html` navíc jako statický web na `kulturniradar.cz`
+(Cloudflare Pages) a s backendem komunikuje přes `fetch()` na `/exec`.
+Důvodů bylo několik: chtěl jsem mít appku na vlastní doméně i jako
+vzdělávací projekt, mít možnost ji později dostat na další platformy
+(plán byl přes doménu a sdílení k Android aplikaci) a snadno ji ukázat
+přátelům, kteří ji mohou vyzkoušet. A v neposlední řadě vlastní adresa
+vypadá líp než dlouhá adresa `script.google.com/macros/s/…/exec`.
+
+Obě prostředí se pro testy podstatně liší. Apps Script z bezpečnostních
+důvodů nikdy nevrátí stránku přímo, ale vloží ji do sandboxu na jiné
+doméně, ve dvou vnořených iframech:
+
+```
+stránka script.google.com        ← hlavní dokument (Google)
+ └─ iframe id=sandboxFrame        ← sandbox (googleusercontent.com)
+     └─ iframe id=userHtmlFrame   ← teprve tady je Index.html
+```
+
+Na statickém webu je `Index.html` přímo hlavním dokumentem. Most mezi
+oběma režimy v kódu appky je funkce `gsr()`: uvnitř Apps Scriptu volá
+`google.script.run`, mimo něj stejné volání převede na `fetch()`
+(podrobněji `Docs/ARCHITEKTURA.md`).
+
+Co z toho plyne pro testování:
+
+| Vlastnost platformy | Dopad na testy | Kde v plánu |
+|---|---|---|
+| Appka v Apps Scriptu žije o dva iframy hlouběji | Selektory mají předponu `${FRAME}` (proměnná prostředí `RF_FRAME`, výchozí prázdná). Prázdná = statický web, s hodnotou `id=sandboxFrame >>> id=userHtmlFrame >>>` = Apps Script. Jedna sada tak běží proti oběma prostředím bez úprav | 4.4, 4.9 |
+| Sandbox mění chování appky, nejen umístění v DOM | Chyby se mohou projevit jen v jednom prostředí, např. odhlášení 7. 8. vedlo v iframu k prázdné stránce | R5 |
+| Dva nezávislé nasazovací kanály; `clasp push` jen nahraje kód, novou verzi nasazení vytvoří až `clasp deploy -i` | Test „Nasazená verze odpovídá repu“ porovnává verzi backendu | R2 |
+| Každý požadavek spouští skript na straně Googlu (běžně 1,4–2,9 s), pod opakovanou zátěží zpomaluje | Plná RF sada neběží opakovaně ani při každém push; bez automatického výkonnostního testu s pevným prahem | 4.7, 4.8, 8 |
+| Služby Googlu nejsou mimo Apps Script dostupné | Unit testy načítají `.gs` do Node `vm` sandboxu se stuby služeb | 4.2 |
+| Časový limit jednoho běhu skriptu | Zpracování sledovaných měst je rozdělené do dávek s orchestrátorem, ověřeným unit testem | `POKRYTI.md`, oblast 16 |
+
 ## 2. Rozsah
 
 **V rozsahu:** deterministická logika backendu a frontendu, API kontrakt,
@@ -423,4 +471,4 @@ Seřazeno podle poměru přínos / cena.
 |---|---|
 | 2. 8. 2026 | Původní strategie (4 vrstvy, v2.9) |
 | 30. 9. 2026 | Přepracováno na test plan dle 29119-3, zpětná rekonstrukce |
-| 7. 10. 2026 | Doplněna sekce 4.9 Volba nástrojů, upřesněn rozsah testů s WARN (4.6) |
+| 7. 10. 2026 | Doplněna sekce 1.1 Platforma a dvě prostředí, 4.9 Volba nástrojů, upřesněn rozsah testů s WARN (4.6) |
