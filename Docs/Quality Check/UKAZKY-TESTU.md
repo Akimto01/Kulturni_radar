@@ -2,22 +2,26 @@
 
 Tři testy z Kulturního radaru, každý ukazuje jiný typ návrhového
 rozhodnutí. Testy zůstávají na svém místě v sadě a běží v CI, tady je
-jen jejich rozbor. U každého stejná osnova:
+jen jejich rozbor. Odkazy vedou na kód v repu ve stavu z 8. 10. 2026
+(trvalé odkazy na konkrétní commit, řádky se proto neposunou).
+U každého stejná osnova:
 
 **co ověřuje → proč tahle úroveň → příprava dat → orákulum → čekání →
 co zachytí a co ne → co bych zlepšil**
 
 | # | Test | Soubor | Hlavní téma |
 |---|---|---|---|
-| 1 | Chip typu stálého místa zúží seznam | `tests/robot/frontend.robot` | datová precondition, síla aserce, čekání |
-| 2 | ★ Oblíbené: lze označit i odznačit (obojí ověřeno reloadem) | `tests/robot/frontend.robot` | zápis do produkce, úklid, ověření persistence |
-| 3 | Nasazená verze odpovídá repu | `tests/robot/api.robot` | test z reálného incidentu, volba úrovně |
+| 1 | [Chip typu stálého místa zúží seznam](https://github.com/Akimto01/Kulturni_radar/blob/2ac6d1ec16232487a1066d79d0167e8192ac63d2/tests/robot/frontend.robot#L475-L504) | `frontend.robot` ř. 475–504 | datová precondition, síla aserce, čekání |
+| 2 | [★ Oblíbené: lze označit i odznačit (obojí ověřeno reloadem)](https://github.com/Akimto01/Kulturni_radar/blob/2ac6d1ec16232487a1066d79d0167e8192ac63d2/tests/robot/frontend.robot#L592-L603) | `frontend.robot` ř. 592–603 | zápis do produkce, úklid, ověření persistence |
+| 3 | [Nasazená verze odpovídá repu](https://github.com/Akimto01/Kulturni_radar/blob/2ac6d1ec16232487a1066d79d0167e8192ac63d2/tests/robot/api.robot#L30-L53) | `api.robot` ř. 30–53 | test z reálného incidentu, volba úrovně |
 
 ---
 
 ## 1. Chip typu stálého místa zúží seznam
 
-Test jsem upravoval ručně 7.–8. 10. 2026 (commit `8ca3c96`).
+Test jsem upravoval ručně 7.–8. 10. 2026.
+
+**Kód:** [`frontend.robot`, ř. 475–504](https://github.com/Akimto01/Kulturni_radar/blob/2ac6d1ec16232487a1066d79d0167e8192ac63d2/tests/robot/frontend.robot#L475-L504) · **Změna před/po:** [commit `8ca3c96`](https://github.com/Akimto01/Kulturni_radar/commit/8ca3c96)
 
 ```robotframework
     Wait For Elements State    ${FRAME} .misto-karta >> nth=0  visible
@@ -68,6 +72,8 @@ případně projít všechny typy přes `Test Template`.
 
 ## 2. ★ Oblíbené: lze označit i odznačit (obojí ověřeno reloadem)
 
+**Kód:** [test, ř. 592–603](https://github.com/Akimto01/Kulturni_radar/blob/2ac6d1ec16232487a1066d79d0167e8192ac63d2/tests/robot/frontend.robot#L592-L603) · [sdílený keyword `Ověřit plný cyklus označení…`, ř. 1104–1155](https://github.com/Akimto01/Kulturni_radar/blob/2ac6d1ec16232487a1066d79d0167e8192ac63d2/tests/robot/frontend.robot#L1104-L1155) · [teardown keyword `Nastavit ikonu první karty na`, ř. 1092–1102](https://github.com/Akimto01/Kulturni_radar/blob/2ac6d1ec16232487a1066d79d0167e8192ac63d2/tests/robot/frontend.robot#L1092-L1102)
+
 ```robotframework
 ★ Oblíbené: lze označit i odznačit (obojí ověřeno reloadem)
     [Tags]    zapis    krehky
@@ -111,6 +117,8 @@ reloadu UI by bylo rychlejší a méně křehké.
 ---
 
 ## 3. Nasazená verze odpovídá repu
+
+**Kód:** [`api.robot`, ř. 30–53](https://github.com/Akimto01/Kulturni_radar/blob/2ac6d1ec16232487a1066d79d0167e8192ac63d2/tests/robot/api.robot#L30-L53)
 
 ```robotframework
 Nasazená verze odpovídá repu

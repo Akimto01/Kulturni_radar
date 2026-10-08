@@ -1,5 +1,11 @@
 # Changelog
 
+## Docs: ukázky testů - odkazy na kód – 8. 10. 2026
+### Změněno
+- `Docs/Quality Check/UKAZKY-TESTU.md`: u všech tří rozebraných testů přidány trvalé odkazy na kód testu na GitHubu (odkazy na konkrétní commit `2ac6d1e`, řádky se proto neposunou), u prvního testu i odkaz na změnu před/po (commit `8ca3c96`). Doplněna věta o tom, že odkazy míří na stav repa z 8. 10. 2026.
+### Poznámka
+- Jen dokumentace, žádná změna kódu ani testů, bez bumpu verze (backend i frontend beze změny).
+
 ## Docs: testovací analýza a ukázky testů pro quality check – 8. 10. 2026
 ### Přidáno
 - `Docs/TESTOVACI-ANALYZA.md`: testovací analýza na příkladu přihlášení profilem s PINem.
