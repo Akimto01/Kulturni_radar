@@ -1300,13 +1300,12 @@ test('callAnthropic_: prázdný seznam akcí ([]) je platný výsledek, ne chyba
 // kontrola' běží na Haiku, všechno ostatní zůstává na Sonnetu.
 // ---------------------------------------------------------------------------
 
-test('vyberModelProKontrolu_: "denní kontrola" → Haiku, vše ostatní → Sonnet', () => {
+test('v3.47: vyberModelProKontrolu_ – všechny typy běhů na Sonnet 5.5 (Haiku pro denní kontrolu ukončen)', () => {
   const ctx = nactiRadar({});
-  assert.equal(ctx.vyberModelProKontrolu_('denní kontrola'), 'claude-haiku-4-5');
-  assert.equal(ctx.vyberModelProKontrolu_('mimořádná kontrola'), 'claude-sonnet-4-6');
-  assert.equal(ctx.vyberModelProKontrolu_('mimořádná kontrola (menu)'), 'claude-sonnet-4-6');
-  assert.equal(ctx.vyberModelProKontrolu_('sledované město'), 'claude-sonnet-4-6');
-  assert.equal(ctx.vyberModelProKontrolu_('osobní hledání (Vojta)'), 'claude-sonnet-4-6');
+  ['denní kontrola', 'mimořádná kontrola', 'mimořádná kontrola (menu)', 'sledované město',
+    'osobní hledání (Vojta)', 'email-tip'].forEach(typ => {
+    assert.equal(ctx.vyberModelProKontrolu_(typ), 'claude-sonnet-5-5', typ);
+  });
 });
 
 function frontaFetchuSPayloadem(fronta, payloady = []) {
@@ -1318,7 +1317,7 @@ function frontaFetchuSPayloadem(fronta, payloady = []) {
   };
 }
 
-test('callAnthropic_: "denní kontrola" pošle v payloadu model claude-haiku-4-5', () => {
+test('v3.47: callAnthropic_: "denní kontrola" pošle v payloadu model claude-sonnet-5-5', () => {
   const resp = anthropicResp({
     stop_reason: 'tool_use',
     content: [{ type: 'tool_use', name: 'report_events', input: { events: [AKCE_REPORT] } }],
@@ -1326,10 +1325,10 @@ test('callAnthropic_: "denní kontrola" pošle v payloadu model claude-haiku-4-5
   const payloady = [];
   const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchuSPayloadem([resp], payloady) });
   ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');
-  assert.equal(payloady[0].model, 'claude-haiku-4-5');
+  assert.equal(payloady[0].model, 'claude-sonnet-5-5');
 });
 
-test('callAnthropic_: "mimořádná kontrola" pošle v payloadu model claude-sonnet-4-6 (nezměněno)', () => {
+test('v3.47: callAnthropic_: "mimořádná kontrola" pošle v payloadu model claude-sonnet-5-5', () => {
   const resp = anthropicResp({
     stop_reason: 'tool_use',
     content: [{ type: 'tool_use', name: 'report_events', input: { events: [AKCE_REPORT] } }],
@@ -1337,7 +1336,7 @@ test('callAnthropic_: "mimořádná kontrola" pošle v payloadu model claude-son
   const payloady = [];
   const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchuSPayloadem([resp], payloady) });
   ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'mimořádná kontrola');
-  assert.equal(payloady[0].model, 'claude-sonnet-4-6');
+  assert.equal(payloady[0].model, 'claude-sonnet-5-5');
 });
 
 test('logKontrola_: zapíše skutečně použitý model, ne globální konstantu', () => {
@@ -1364,7 +1363,7 @@ test('callAnthropicEmailTip_: chybí ANTHROPIC_API_KEY → chyba hned, žádný 
   assert.equal(volane.length, 0);
 });
 
-test('callAnthropicEmailTip_: vždy pošle Sonnet, i když by "denní kontrola" jinak použila Haiku', () => {
+test('v3.47: callAnthropicEmailTip_: pošle Sonnet 5.5', () => {
   const resp = anthropicResp({
     stop_reason: 'tool_use',
     content: [{ type: 'tool_use', name: 'report_events', input: { events: [AKCE_REPORT] } }],
@@ -1372,7 +1371,7 @@ test('callAnthropicEmailTip_: vždy pošle Sonnet, i když by "denní kontrola" 
   const payloady = [];
   const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchuSPayloadem([resp], payloady) });
   ctx.callAnthropicEmailTip_(EMAIL_TIP_TEXT_TEST);
-  assert.equal(payloady[0].model, 'claude-sonnet-4-6');
+  assert.equal(payloady[0].model, 'claude-sonnet-5-5');
 });
 
 test('callAnthropicEmailTip_: model rovnou zavolá report_events → akce se vrátí přímo', () => {
@@ -3767,4 +3766,128 @@ test('v3.46: upsertMista_ – stejné místo s jiným ID a „&“ místo „a�
   const sh = ss.getSheetByName('MÍSTA');
   assert.equal(sh.getLastRow(), 2, 'pořád jen hlavička + jeden řádek');
   assert.equal(sh.rows[1][1], 'Punkevní jeskyně & propast Macocha', 'řádek převzal novou verzi');
+});
+
+// ---------------------------------------------------------------------------
+// v3.47: spotřeba tokenů v KONTROLY + týdenní report kvality hledání
+// (poučení ze srpna 2026: Haiku se hodnotil jen podle „nalezeno celkem“,
+// propad NOVÝCH akcí zůstal přehlédnutý až do živé kontroly 26. 10.)
+// ---------------------------------------------------------------------------
+
+const USAGE = (vstup, vystup, hledani, cache = 0) => ({
+  input_tokens: vstup, output_tokens: vystup, cache_read_input_tokens: cache,
+  server_tool_use: { web_search_requests: hledani },
+});
+
+test('v3.47: zapocitatSpotrebu_ – sčítá vstup (vč. cache), výstup a vyhledávání; odebratSpotrebu_ vynuluje', () => {
+  const ctx = nactiRadar();
+  ctx.zapocitatSpotrebu_({ usage: USAGE(1000, 200, 2, 500) });
+  ctx.zapocitatSpotrebu_({ usage: USAGE(300, 50, 1) });
+  ctx.zapocitatSpotrebu_({});   // odpověď bez usage nesmí spadnout
+  const s = ctx.odebratSpotrebu_();
+  assert.equal(s.vstup, 1800);
+  assert.equal(s.vystup, 250);
+  assert.equal(s.hledani, 3);
+  assert.equal(ctx.odebratSpotrebu_().vstup, 0, 'druhé odebrání je prázdné');
+});
+
+test('v3.47: callAnthropic_ + logKontrola_ – spotřeba celé smyčky (pause_turn + tool_use) skončí v M–O, pak se vynuluje', () => {
+  const pauza = anthropicResp({ stop_reason: 'pause_turn', content: [{ type: 'text', text: 'hledám' }], usage: USAGE(4000, 300, 2) });
+  const hotovo = anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [AKCE_REPORT] } }],
+    usage: USAGE(6000, 700, 1),
+  });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([pauza, hotovo]) });
+  ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');
+  const ss = fakeSpreadsheet({ KONTROLY: [[]] });
+  const stats = { total: 1, nove: 1, zmenene: 0, zrusene: 0, bezZmeny: 0 };
+  ctx.logKontrola_(ss, 'denní kontrola', CFG_TEST, stats, 2, 'claude-sonnet-5-5');
+  const sh = ss.getSheetByName('KONTROLY');
+  assert.equal(sh.rows[1][12], 10000, 'tokeny vstup za obě volání');
+  assert.equal(sh.rows[1][13], 1000);
+  assert.equal(sh.rows[1][14], 3);
+  assert.equal(sh.rows[0][12], 'Tokeny vstup', 'hlavička M–O se doplní');
+  ctx.logKontrola_(ss, 'email-tip', CFG_TEST, stats, 0, 'claude-sonnet-5-5');
+  assert.equal(sh.rows[2][12], 0, 'další zápis nezdědí spotřebu předchozího běhu');
+});
+
+test('v3.47: odhadCenyUsd_ – Sonnet 5.5 $2/$10 za MTok; neznámý model → null', () => {
+  assert.equal(r.odhadCenyUsd_('claude-sonnet-5-5', 1e6, 1e6), 12);
+  assert.equal(r.odhadCenyUsd_('claude-haiku-4-5', 2e6, 0), 2);
+  assert.equal(r.odhadCenyUsd_('neznamy-model', 1e6, 1e6), null);
+});
+
+/** Řádek KONTROLY: [datum, typ, rozsah, nalezeno, nové, ..., K=poznámka, L, M, N, O]. */
+const radekKontroly_ = (datum, typ, nalezeno, nove, model = 'claude-sonnet-5-5', vstup = '', vystup = '', hledani = '') =>
+  [datum, typ, 'Brno; …', nalezeno, nove, 0, 0, 0, 0, 16,
+    'Automatický běh přes Anthropic API (' + model + ').', 'Apps Script automatizace', vstup, vystup, hledani];
+
+const TED_KVALITA = () => new r.__Date(2026, 10, 8, 18, 0);   // neděle 8. 11. 2026 18:00
+
+test('v3.47: hodnotitKvalituHledani_ – zářijový vzorec Haiku (nuly) spustí poplach', () => {
+  // týden reportu z neděle 8. 11. = 2.–8. 11. (7 kalendářních dní včetně dneška)
+  const radky = [2, 3, 4, 5, 6, 7, 8].map(d => radekKontroly_(d + '. 11. 2026 8:13', 'denní kontrola', d <= 5 ? 0 : 3, d <= 5 ? 0 : 1));
+  const h = r.hodnotitKvalituHledani_(radky, TED_KVALITA());
+  assert.equal(h.typy['denní kontrola'].aktualni.behu, 7);
+  assert.equal(h.typy['denní kontrola'].aktualni.nul, 4);
+  assert.ok(h.poplachy.some(p => /4 z 7 běhů/.test(p)), 'poplach na nulové běhy');
+  assert.ok(h.poplachy.some(p => /průměr nových akcí 0\.4/.test(p)), 'týden s nulami má zároveň málo nových (3 nové / 7 běhů)');
+});
+
+test('v3.47: hodnotitKvalituHledani_ – málo nových akcí (0,3 na běh, jako srpnový Haiku) spustí poplach i bez nul', () => {
+  const radky = [2, 3, 4, 5, 6, 7, 8].map(d => radekKontroly_(d + '. 11. 2026 8:13', 'denní kontrola', 5, d <= 3 ? 1 : 0));
+  const h = r.hodnotitKvalituHledani_(radky, TED_KVALITA());
+  assert.equal(h.poplachy.length, 1);
+  assert.match(h.poplachy[0], /průměr nových akcí 0\.3/);
+});
+
+test('v3.47: hodnotitKvalituHledani_ – zdravý týden (jako srpnový Sonnet) poplach nespustí', () => {
+  const radky = [2, 3, 4, 5, 6, 7, 8].map(d => radekKontroly_(d + '. 11. 2026 8:13', 'denní kontrola', 4, d === 3 ? 0 : 2));
+  assert.equal(r.hodnotitKvalituHledani_(radky, TED_KVALITA()).poplachy.length, 0);
+});
+
+test('v3.47: hodnotitKvalituHledani_ – méně než 3 běhy za týden poplach nespouští (málo dat)', () => {
+  const radky = [radekKontroly_('7. 11. 2026 8:13', 'denní kontrola', 0, 0), radekKontroly_('6. 11. 2026 8:13', 'denní kontrola', 0, 0)];
+  assert.equal(r.hodnotitKvalituHledani_(radky, TED_KVALITA()).poplachy.length, 0);
+});
+
+test('v3.47: hodnotitKvalituHledani_ – okna 7/14 dní, jiné typy a staré řádky se nezapočítají, cena z tokenů', () => {
+  const radky = [
+    radekKontroly_('5. 11. 2026 8:13', 'denní kontrola', 3, 2, 'claude-sonnet-5-5', 100000, 10000, 3),
+    radekKontroly_('29. 10. 2026 8:13', 'denní kontrola', 1, 0, 'claude-haiku-4-5'),          // předchozí týden, bez tokenů
+    radekKontroly_('15. 10. 2026 8:13', 'denní kontrola', 9, 9),                              // starší než 14 dní
+    radekKontroly_('4. 11. 2026 20:22', 'sledované město', 15, 12, 'claude-sonnet-5-5', 200000, 20000, 3),
+    radekKontroly_('4. 11. 2026 20:30', 'aktualizace počasí', 0, 0),
+  ];
+  const h = r.hodnotitKvalituHledani_(radky, TED_KVALITA());
+  const d = h.typy['denní kontrola'];
+  assert.equal(d.aktualni.behu, 1);
+  assert.equal(d.predchozi.behu, 1);
+  assert.equal(d.predchozi.behuSTokeny, 0, 'staré řádky bez tokenů nemají cenu');
+  assert.equal(d.aktualni.cena, 0.3, '100k × $2 + 10k × $10 za MTok');
+  assert.equal(h.typy['sledované město'].aktualni.nove, 12);
+  assert.equal(h.typy['sledované město'].aktualni.cena, 0.6);
+});
+
+test('v3.47: hodnotitKvalituHledani_ – hranice okna: 7 kalendářních dní včetně dneška, nezávisle na hodině', () => {
+  const radky = [
+    radekKontroly_('1. 11. 2026 23:59', 'denní kontrola', 1, 1),   // 7 dní zpět → předchozí týden
+    radekKontroly_('2. 11. 2026 0:01', 'denní kontrola', 1, 1),    // 6 dní zpět → aktuální
+    radekKontroly_('8. 11. 2026 8:13', 'denní kontrola', 1, 1),    // dnes ráno → aktuální
+    // Date s časem (Sheets ho tak často vrací): 1. 11. 20:00 je 6 dní 22 h před
+    // reportem – hodinové okno by ho bralo do aktuálního týdne, po dnech patří do předchozího
+    radekKontroly_(new r.__Date(2026, 10, 1, 20, 0), 'denní kontrola', 1, 1),
+  ];
+  const h = r.hodnotitKvalituHledani_(radky, TED_KVALITA());
+  assert.equal(h.typy['denní kontrola'].aktualni.behu, 2);
+  assert.equal(h.typy['denní kontrola'].predchozi.behu, 2);
+});
+
+test('v3.47: sestavReportKvality_ – oba typy, průměr nových, cena a „žádný běh“', () => {
+  const radky = [radekKontroly_('5. 11. 2026 8:13', 'denní kontrola', 3, 2, 'claude-sonnet-5-5', 100000, 10000, 3)];
+  const text = r.sestavReportKvality_(r.hodnotitKvalituHledani_(radky, TED_KVALITA()));
+  assert.match(text, /denní kontrola: 1 běhů, nové ø 2\.0, nulových 0, ~\$0\.30 \(100k\/10k tokenů, 3 vyhledávání\)/);
+  assert.match(text, /sledované město: žádný běh/);
+  assert.match(text, /bez poplatků za webové vyhledávání/);
 });

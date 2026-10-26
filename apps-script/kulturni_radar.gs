@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.46 (26. 10. 2026) – stálá místa: párování podle klíče názvu (bez „a“/„&“, obce, pořadí slov) + skrytí stávajících duplicit při čtení
- * (předchozí: 3.45 – přihlášení: limit pokusů na PIN (5 chyb → zámek 15 min, zdvojování, strop 24 h))
+ * Verze: 3.47 (26. 10. 2026) – všechny běhy na Sonnet 5.5 (konec Haiku pro denní kontrolu), spotřeba tokenů v KONTROLY, týdenní report kvality hledání v samotestu
+ * (předchozí: 3.46 – stálá místa: párování podle klíče názvu (bez „a“/„&“, obce, pořadí slov) + skrytí stávajících duplicit při čtení)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,9 +76,21 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.46';       // jediný zdroj pravdy – hlásí se v ?api=meta
-const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
-const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
+const VERZE = '3.47';       // jediný zdroj pravdy – hlásí se v ?api=meta
+// v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
+// vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
+// z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
+const ANTHROPIC_MODEL = 'claude-sonnet-5-5';
+
+/** v3.47: ceny modelů v USD za milion tokenů [vstup, výstup] pro odhad ceny
+ *  běhu v týdenním reportu. Zdroj: ceník Anthropic (říjen 2026) – při změně
+ *  ceníku aktualizovat. Webové vyhledávání se účtuje zvlášť a v odhadu NENÍ. */
+const CENY_MODELU_USD_MTOK = {
+  'claude-sonnet-5-5': [2, 10],
+  'claude-opus-5-5': [4, 20],
+  'claude-sonnet-4-6': [3, 15],
+  'claude-haiku-4-5': [1, 5],
+};
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
 const MAX_WEB_SEARCHES = 3;  // v3.6: úspora kreditů (bývalo 5)
@@ -862,7 +874,33 @@ function readSources_(ss, profil) {
  *  logKontrola_ (zapisuje, který model se skutečně použil), ať se logika
  *  nerozjede na dvou místech. */
 function vyberModelProKontrolu_(typKontroly) {
-  return typKontroly === 'denní kontrola' ? ANTHROPIC_MODEL_HAIKU : ANTHROPIC_MODEL;
+  // v3.47: jeden model pro všechny typy běhů; funkce zůstává jako jediné místo
+  // rozhodnutí, kdyby se v budoucnu zase měřilo s jiným modelem.
+  return ANTHROPIC_MODEL;
+}
+
+// ---------------------------------------------------------------------------
+// SPOTŘEBA TOKENŮ (v3.47) – sčítá usage ze všech odpovědí Anthropic API od
+// posledního zápisu do KONTROLY. Zápis (logKontrola_ / řádek stálých míst)
+// stav přečte a vynuluje („spotřebuje“). Apps Script má globální stav jen
+// v rámci jednoho spuštění, takže se nic nepřenáší mezi běhy triggerů.
+// ---------------------------------------------------------------------------
+
+let spotrebaApi_ = { vstup: 0, vystup: 0, hledani: 0 };
+
+/** Přičte usage z jedné odpovědi API (data.usage). Chybějící pole = 0. */
+function zapocitatSpotrebu_(data) {
+  const u = (data && data.usage) || {};
+  spotrebaApi_.vstup += (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
+  spotrebaApi_.vystup += (u.output_tokens || 0);
+  spotrebaApi_.hledani += (u.server_tool_use && u.server_tool_use.web_search_requests) || 0;
+}
+
+/** Vrátí nasčítanou spotřebu a vynuluje ji. */
+function odebratSpotrebu_() {
+  const s = spotrebaApi_;
+  spotrebaApi_ = { vstup: 0, vystup: 0, hledani: 0 };
+  return s;
 }
 
 /** v3.29: řádky instrukce pro pole `podkategorie` – identické ve
@@ -914,6 +952,7 @@ function volatAnthropicSTool_(apiKey, model, system, userMsg, maxWebSearches) {
     }
 
     data = JSON.parse(resp.getContentText());
+    zapocitatSpotrebu_(data);   // v3.47
     lastText = (data.content || [])
       .filter(b => b.type === 'text')
       .map(b => b.text)
@@ -974,6 +1013,7 @@ function volatAnthropicSTool_(apiKey, model, system, userMsg, maxWebSearches) {
     Logger.log('Formátovací dovolání: HTTP ' + fixResp.getResponseCode());
     if (fixResp.getResponseCode() === 200) {
       const fixData = JSON.parse(fixResp.getContentText());
+      zapocitatSpotrebu_(fixData);   // v3.47
       const fixText = (fixData.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
       events = parseEvents_(fixText);
     }
@@ -2998,12 +3038,16 @@ function updateMista() {
     ].join('\n');
     sendNotification_('Stálá místa aktualizována', body);
     try {
-      ss.getSheetByName(SHEET.KONTROLY).appendRow([
+      const ksh = ss.getSheetByName(SHEET.KONTROLY);
+      zajistitHlavickuSpotreby_(ksh);
+      const spotreba = odebratSpotrebu_();
+      ksh.appendRow([
         formatDate_(new Date()), 'aktualizace stálých míst',
         cfg.profil + '; do ' + cfg.dojezd, places.length, stats.nove,
         stats.aktualizovane, 0, 0, 0, places.length,
         'Automatický běh přes Anthropic API (' + ANTHROPIC_MODEL + ').',
-        'Apps Script automatizace']);
+        'Apps Script automatizace',
+        spotreba.vstup, spotreba.vystup, spotreba.hledani]);   // v3.47: M–O
     } catch (e) { Logger.log('Log do KONTROL selhal: ' + e); }
   } catch (err) {
     notifyFail_('Aktualizace stálých míst selhala', err);
@@ -3066,6 +3110,7 @@ function callAnthropicPlaces_(cfg) {
       throw new Error('Anthropic API vrátilo ' + code + ': ' + resp.getContentText().slice(0, 500));
     }
     data = JSON.parse(resp.getContentText());
+    zapocitatSpotrebu_(data);   // v3.47
 
     const toolBlock = (data.content || []).find(b => b.type === 'tool_use' && b.name === 'report_places');
     if (toolBlock && toolBlock.input && Array.isArray(toolBlock.input.places)) {
@@ -3297,6 +3342,18 @@ function runSelfTest() {
     }
   } catch (e) { problemy.push('kontrola OZNAČENÍ selhala: ' + e); }
 
+  // v3.47: týdenní report kvality hledání + poplachy (propad = problém)
+  let reportKvality = '';
+  try {
+    const ksh = ss.getSheetByName(SHEET.KONTROLY);
+    if (ksh && ksh.getLastRow() > 1) {
+      const radky = ksh.getRange(2, 1, ksh.getLastRow() - 1, 15).getValues();
+      const hodnoceni = hodnotitKvalituHledani_(radky, new Date());
+      hodnoceni.poplachy.forEach(p => problemy.push('kvalita hledání – ' + p));
+      reportKvality = sestavReportKvality_(hodnoceni);
+    }
+  } catch (e) { varovani.push('report kvality hledání selhal: ' + e); }
+
   const title = problemy.length
     ? 'Samotest: ' + problemy.length + ' ' + sklonuj_(problemy.length, 'problém', 'problémy', 'problémů')
     : (varovani.length ? 'Samotest: OK (' + varovani.length + ' varování)' : 'Samotest: OK');
@@ -3306,7 +3363,89 @@ function runSelfTest() {
   if (varovani.length) {
     body += '\n\nVarování (externí, neblokující):\n' + varovani.map(p => '• ' + p).join('\n');
   }
+  if (reportKvality) body += '\n\n' + reportKvality;
   sendNotification_(title, body);
+}
+
+// ---------------------------------------------------------------------------
+// TÝDENNÍ REPORT KVALITY HLEDÁNÍ (v3.47) – součást nedělního samotestu, bez
+// dalšího volání API: jen výpočet z listu KONTROLY. Hlavní metrika je počet
+// NOVÝCH akcí na běh – v srpnu 2026 se Haiku vyhodnotil jen podle „nalezeno
+// celkem“ a propad nových akcí (0,3 vs. 1,2 na běh) zůstal přehlédnutý.
+// ---------------------------------------------------------------------------
+
+const KVALITA_TYPY = ['denní kontrola', 'sledované město'];
+const KVALITA_POPLACH_NULOVYCH_BEHU = 3;     // denní kontrola: tolik nul za týden = poplach
+const KVALITA_POPLACH_NOVYCH_NA_BEH = 0.5;   // denní kontrola: průměr nových pod tímto = poplach
+
+/** PURE: odhad ceny v USD z tokenů podle CENY_MODELU_USD_MTOK; null u neznámého modelu. */
+function odhadCenyUsd_(model, vstup, vystup) {
+  const c = CENY_MODELU_USD_MTOK[model];
+  if (!c) return null;
+  return (vstup * c[0] + vystup * c[1]) / 1e6;
+}
+
+/** PURE: z řádků KONTROLY spočítá souhrn pro posledních 7 KALENDÁŘNÍCH dní
+ *  (včetně dneška) a 7 dní před tím, per typ (KVALITA_TYPY), + seznam
+ *  poplachů. Okno je po dnech, ne po hodinách: datum v KONTROLY se často čte
+ *  bez času (parseCzDate_ → půlnoc), takže hodinové okno by běh z minulé
+ *  neděle ráno při nedělním samotestu večer vyřadilo. `ted` = Date reportu. */
+function hodnotitKvalituHledani_(radky, ted) {
+  const den = 86400000;
+  const dnes = new Date(ted.getFullYear(), ted.getMonth(), ted.getDate());
+  const prazdne = () => ({ behu: 0, nove: 0, nul: 0, vstup: 0, vystup: 0, hledani: 0, cena: 0, behuSTokeny: 0 });
+  const vysledek = {};
+  KVALITA_TYPY.forEach(t => { vysledek[t] = { aktualni: prazdne(), predchozi: prazdne() }; });
+  radky.forEach(r => {
+    const typ = norm_(r[1]);
+    if (!vysledek[typ]) return;
+    const d = r[0] instanceof Date ? r[0] : parseCzDate_(r[0]);
+    if (!d) return;
+    const denRadku = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const stariDni = Math.round((dnes - denRadku) / den);   // round: posun letního/zimního času
+    const okno = stariDni >= 0 && stariDni < 7 ? 'aktualni' : (stariDni >= 7 && stariDni < 14 ? 'predchozi' : null);
+    if (!okno) return;
+    const s = vysledek[typ][okno];
+    const nalezeno = Number(r[3]) || 0;
+    s.behu++;
+    s.nove += Number(r[4]) || 0;
+    if (nalezeno === 0) s.nul++;
+    const vstup = Number(r[12]) || 0, vystup = Number(r[13]) || 0;
+    if (vstup || vystup) {
+      s.behuSTokeny++;
+      s.vstup += vstup; s.vystup += vystup; s.hledani += Number(r[14]) || 0;
+      const model = (String(r[10] || '').match(/claude-[a-z0-9-]+/) || [''])[0];
+      s.cena += odhadCenyUsd_(model, vstup, vystup) || 0;
+    }
+  });
+  const poplachy = [];
+  const denni = vysledek['denní kontrola'].aktualni;
+  if (denni.behu >= 3) {
+    if (denni.nul >= KVALITA_POPLACH_NULOVYCH_BEHU) {
+      poplachy.push('denní kontrola: ' + denni.nul + ' z ' + denni.behu + ' běhů za týden nenašlo žádnou akci');
+    }
+    if (denni.nove / denni.behu < KVALITA_POPLACH_NOVYCH_NA_BEH) {
+      poplachy.push('denní kontrola: průměr nových akcí ' + (denni.nove / denni.behu).toFixed(1) +
+        ' na běh (práh ' + KVALITA_POPLACH_NOVYCH_NA_BEH + ')');
+    }
+  }
+  return { typy: vysledek, poplachy };
+}
+
+/** PURE: textová sekce reportu do samotestu. */
+function sestavReportKvality_(hodnoceni) {
+  const radek = (s) => s.behu
+    ? s.behu + ' běhů, nové ø ' + (s.nove / s.behu).toFixed(1) + ', nulových ' + s.nul +
+      (s.behuSTokeny ? ', ~$' + s.cena.toFixed(2) + ' (' + Math.round(s.vstup / 1000) + 'k/' +
+        Math.round(s.vystup / 1000) + 'k tokenů, ' + s.hledani + ' vyhledávání)' : '')
+    : 'žádný běh';
+  const casti = ['Kvalita hledání (7 dní / předchozích 7):'];
+  KVALITA_TYPY.forEach(t => {
+    const v = hodnoceni.typy[t];
+    casti.push('• ' + t + ': ' + radek(v.aktualni) + ' | dříve: ' + radek(v.predchozi));
+  });
+  casti.push('(cena bez poplatků za webové vyhledávání)');
+  return casti.join('\n');
 }
 
 /** Denní hlídač (~20:00): ohlásí, pokud dnes neproběhla denní kontrola. */
@@ -3765,6 +3904,16 @@ function updateLokalita_(ss, profil, when) {
   } catch (e) { Logger.log('Aktualizace LOKALIT selhala: ' + e); }
 }
 
+/** v3.47: hlavička sloupců M–O listu KONTROLY (spotřeba API běhu). */
+const KONTROLY_SPOTREBA_HLAVICKA = ['Tokeny vstup', 'Tokeny výstup', 'Web vyhledávání'];
+
+/** v3.47: doplní hlavičku M–O, pokud chybí (starší listy ji nemají). */
+function zajistitHlavickuSpotreby_(sh) {
+  if (norm_(sh.getRange(1, 13).getValue()) !== norm_(KONTROLY_SPOTREBA_HLAVICKA[0])) {
+    sh.getRange(1, 13, 1, 3).setValues([KONTROLY_SPOTREBA_HLAVICKA]);
+  }
+}
+
 function logKontrola_(ss, typ, cfg, stats, pocetZdroju, model) {
   const sh = ss.getSheetByName(SHEET.KONTROLY);
 
@@ -3772,6 +3921,8 @@ function logKontrola_(ss, typ, cfg, stats, pocetZdroju, model) {
   if (norm_(sh.getRange(1, 12).getValue()) !== 'vykonavatel') {
     sh.getRange(1, 12).setValue('Vykonavatel');
   }
+  zajistitHlavickuSpotreby_(sh);
+  const spotreba = odebratSpotrebu_();
 
   sh.appendRow([
     formatDate_(new Date()),
@@ -3786,6 +3937,7 @@ function logKontrola_(ss, typ, cfg, stats, pocetZdroju, model) {
     pocetZdroju,
     'Automatický běh přes Anthropic API (' + (model || ANTHROPIC_MODEL) + ').',
     'Apps Script automatizace',
+    spotreba.vstup, spotreba.vystup, spotreba.hledani,   // v3.47: M–O
   ]);
 }
 
