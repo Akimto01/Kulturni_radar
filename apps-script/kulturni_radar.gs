@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.47 (26. 10. 2026) – všechny běhy na Sonnet 5.5 (konec Haiku pro denní kontrolu), spotřeba tokenů v KONTROLY, týdenní report kvality hledání v samotestu
- * (předchozí: 3.46 – stálá místa: párování podle klíče názvu (bez „a“/„&“, obce, pořadí slov) + skrytí stávajících duplicit při čtení)
+ * Verze: 3.48 (26. 10. 2026) – akce bez rozpoznatelného data („neuvedeno“): nezapisují se, na webu se skryjí, samotest je hlásí
+ * (předchozí: 3.47 – všechny běhy na Sonnet 5.5 (konec Haiku pro denní kontrolu), spotřeba tokenů v KONTROLY, týdenní report kvality hledání v samotestu)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.47';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.48';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -421,6 +421,7 @@ function readEventsApi_(ss, profilParam, zahrnoutOznacene, uzivatelId) {
     const jeOznaceno = oznaceni.oblibene || !!oznaceni.navstivenoDne;
     const stav = norm_(row[13]);
     const datumOd = parseCzDate_(row[1]);
+    if (!datumOd) return;   // v3.48: bez rozpoznatelného data (např. „neuvedeno“) na web nepatří
     if (!zahrnoutAkciDoVysledku_(stav, datumOd, dnes, zahrnoutOznacene, jeOznaceno)) return;
     const klicMista = klicSouradnic_(row[5], row[6]);
     const souradnice = souradniceMapa.get(klicMista) || null;
@@ -1061,6 +1062,7 @@ function callAnthropic_(cfg, zdroje, typKontroly) {
     'Výsledky NIKDY nevypisuj jako text – po dokončení hledání je odevzdej',
     'PRÁVĚ JEDNÍM zavoláním nástroje report_events (parametr events = seznam akcí).',
     'Formáty hodnot: id = RRRR-MM-DD-slug-nazvu; datum_od/datum_do = "D. M. RRRR" (datum_do může být "");',
+    'Akci bez konkrétního data začátku (např. jen „říjen“ nebo „neuvedeno“) NEODEVZDÁVEJ – appka ji stejně nezapíše.',
     'dojezd = text VŽDY s časem i vzdáleností (např. "cca 30–40 min, ~35 km"); kategorie = středníkem oddělené;',
   ].concat(podkategorieInstrukce_()).concat([
     'skore = číslo 1–10, rodinná atraktivita podle této rubriky:',
@@ -1131,6 +1133,7 @@ function callAnthropicEmailTip_(text) {
     'NE chyba. Nikdy si nic nevymýšlej ani nedoplňuj z domněnky.',
     'Pokud se ověřit podaří, odevzdej PRÁVĚ JEDNU akci zavoláním nástroje report_events.',
     'Formáty hodnot: id = RRRR-MM-DD-slug-nazvu; datum_od/datum_do = "D. M. RRRR" (datum_do může být "");',
+    'Akci bez konkrétního data začátku (např. jen „říjen“ nebo „neuvedeno“) NEODEVZDÁVEJ – appka ji stejně nezapíše.',
     'obec = přesný název obce/města, kde se akce koná (appka podle něj dohledává, kam akci zařadit);',
     'dojezd = stručný text o dostupnosti místa konání vzhledem k centru obce (u akce přímo ve městě stačí "v centru obce" nebo podobně);',
     'kategorie = středníkem oddělené, VÝHRADNĚ z tohoto seznamu: ' + kategorieSeznam + ';',
@@ -1215,9 +1218,14 @@ function upsertEvents_(ss, cfg, events) {
   });
 
   const today = formatDateOnly_(new Date());
+  // v3.48: akce bez rozpoznatelného data začátku (AI občas pošle „neuvedeno“)
+  // se nezapisují – nikdy by neproběhly, neměly počasí ani digest a dedup by
+  // je nepároval. Počítají se jen jako vyřazené (logKontrola_ → poznámka).
+  const sDatem = events.filter(ev => parseCzDate_(ev.datum_od));
   const stats = {
     total: events.length, nove: 0, zmenene: 0, zrusene: 0, bezZmeny: 0,
     noveNazvy: [], zmeneneNazvy: [], zruseneNazvy: [], bezZmenyNazvy: [],
+    bezData: events.length - sDatem.length,
   };
   const polozka = ev => ({
     d: dateKey_(ev.datum_od),
@@ -1225,7 +1233,7 @@ function upsertEvents_(ss, cfg, events) {
     t: String(ev.nazev || '') + ' (' + String(ev.datum_od || '') + ')',
   });
 
-  events.forEach(ev => {
+  sDatem.forEach(ev => {
     const rowVals = eventToRow_(ev, today);
     const key = dedupKey_(cfg.profil, ev.datum_od, ev.nazev, ev.misto);
     const pd = norm_(cfg.profil) + '|' + dateKey_(ev.datum_od);
@@ -3243,7 +3251,7 @@ function jeVycpavka_(nazev) {
  * problém – jednou ručně posouzeno, navždy ticho, viz nactiPosouzenePary_.
  */
 function auditDat_(ss) {
-  const out = { duplicity: [], vycpavky: [], bezUrl: 0 };
+  const out = { duplicity: [], vycpavky: [], bezUrl: 0, bezData: [] };
   const sh = ss.getSheetByName(SHEET.AKCE);
   if (!sh || sh.getLastRow() < 2) return out;
   const data = sh.getRange(2, 1, sh.getLastRow() - 1, AKCE_COLS).getValues();
@@ -3262,6 +3270,7 @@ function auditDat_(ss) {
     if (stav === 'proběhlo' || stav === 'zrušeno') return;
     if (jeVycpavka_(row[4])) out.vycpavky.push(String(row[4]));
     const od = parseCzDate_(row[1]);
+    if (!od && String(row[0] || '').trim()) out.bezData.push(String(row[4] || row[0]));   // v3.48
     if (od && od >= dnes && !String(row[19] || '').trim()) out.bezUrl++;
   });
   return out;
@@ -3318,6 +3327,7 @@ function runSelfTest() {
   if (audit.vycpavky.length) problemy.push('vycpávkové názvy (' + audit.vycpavky.length + '): ' + vypis(audit.vycpavky));
   else ok();
   if (audit.bezUrl) problemy.push('budoucí akce bez URL: ' + audit.bezUrl);
+  if (audit.bezData.length) problemy.push('akce bez rozpoznatelného data (' + audit.bezData.length + '): ' + vypis(audit.bezData));   // v3.48
 
   try {
     const oznaceni = readOznaceni_(ss);
@@ -3935,7 +3945,8 @@ function logKontrola_(ss, typ, cfg, stats, pocetZdroju, model) {
     0,
     stats.bezZmeny,
     pocetZdroju,
-    'Automatický běh přes Anthropic API (' + (model || ANTHROPIC_MODEL) + ').',
+    'Automatický běh přes Anthropic API (' + (model || ANTHROPIC_MODEL) + ').' +
+      (stats.bezData ? ' Vyřazeno bez data: ' + stats.bezData + '.' : ''),   // v3.48
     'Apps Script automatizace',
     spotreba.vstup, spotreba.vystup, spotreba.hledani,   // v3.47: M–O
   ]);

@@ -3891,3 +3891,78 @@ test('v3.47: sestavReportKvality_ – oba typy, průměr nových, cena a „žá
   assert.match(text, /sledované město: žádný běh/);
   assert.match(text, /bez poplatků za webové vyhledávání/);
 });
+
+// ---------------------------------------------------------------------------
+// v3.48: akce bez rozpoznatelného data (AI místo data poslalo „neuvedeno“ –
+// 5 takových akcí bylo 26. 10. 2026 na webu, srpnový Youngfest dodnes)
+// ---------------------------------------------------------------------------
+
+const AKCE_S_DATEM_ = { id: 'ok-1', datum_od: '14. 11. 2026', nazev: 'Svatomartinský košt', misto: 'Sál', obec: 'Brno', kategorie: 'vinařské/gastro kulturní akce', stav: 'potvrzeno' };
+const AKCE_BEZ_DATA_ = { id: '2026-10-mineral-expo-zlin', datum_od: 'neuvedeno', nazev: 'Mineral-Expo Zlín 2026', misto: 'Výstaviště', obec: 'Zlín', kategorie: 'výstavy', stav: 'potvrzeno' };
+
+test('v3.48: upsertEvents_ – akce s datem „neuvedeno“ se nezapíše, započítá se jako vyřazená', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]]) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [AKCE_S_DATEM_, AKCE_BEZ_DATA_]);
+  assert.equal(stats.total, 2, 'nalezeno celkem = vše, co AI vrátilo');
+  assert.equal(stats.bezData, 1);
+  assert.equal(stats.nove, 1);
+  const sh = ss.getSheetByName('AKCE');
+  assert.equal(sh.getLastRow(), 2, 'jen hlavička + akce s datem');
+  assert.equal(sh.rows[1][0], 'ok-1');
+});
+
+test('v3.48: upsertEvents_ – prázdné datum i text bez čísel se vyřadí, sériové číslo projde (v3.43)', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]]) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [
+    Object.assign({}, AKCE_S_DATEM_, { id: 'a', datum_od: '' }),
+    Object.assign({}, AKCE_S_DATEM_, { id: 'b', datum_od: 'říjen 2026' }),
+    Object.assign({}, AKCE_S_DATEM_, { id: 'c', nazev: 'Jiná akce', datum_od: 46340 }),
+  ]);
+  assert.equal(stats.bezData, 2);
+  assert.equal(stats.nove, 1);
+});
+
+test('v3.48: logKontrola_ – poznámka nese počet vyřazených bez data; bez vyřazených beze změny', () => {
+  const ss = fakeSpreadsheet({ KONTROLY: [[]] });
+  const ctx = nactiRadar();
+  const zaklad = { total: 3, nove: 1, zmenene: 0, zrusene: 0, bezZmeny: 1 };
+  ctx.logKontrola_(ss, 'sledované město', CFG_TEST, Object.assign({ bezData: 1 }, zaklad), 5, 'claude-sonnet-5-5');
+  ctx.logKontrola_(ss, 'sledované město', CFG_TEST, zaklad, 5, 'claude-sonnet-5-5');
+  const sh = ss.getSheetByName('KONTROLY');
+  assert.match(sh.rows[1][10], /\(claude-sonnet-5-5\)\. Vyřazeno bez data: 1\./);
+  assert.doesNotMatch(sh.rows[2][10], /Vyřazeno/);
+});
+
+test('v3.48: readEventsApi_ – stávající řádek s datem „neuvedeno“ se na web nedostane', () => {
+  const zitra = pridatDny_(new Date(), 1);
+  const prazdne = Array(10).fill('');
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([
+    [],
+    ['ok', czDatum_(zitra), '', '', 'Akce s datem', 'Sál', 'Zlín', '', '', '', '', '', '', 'potvrzeno', ...prazdne, 'Zlín'],
+    ['bez', 'neuvedeno', '', '', 'Mineral-Expo', 'Výstaviště', 'Zlín', '', '', '', '', '', '', 'potvrzeno', ...prazdne, 'Zlín'],
+  ]) });
+  const vysledek = nactiRadar().readEventsApi_(ss, 'Zlín', false, '');
+  assert.equal(JSON.stringify(vysledek.akce.map(a => a.id)), JSON.stringify(['ok']));
+});
+
+test('v3.48: auditDat_ – samotest hlásí aktivní řádky bez rozpoznatelného data, proběhlé ne', () => {
+  const zitra = pridatDny_(new Date(), 1);
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([
+    [],
+    ['ok', czDatum_(zitra), '', '', 'Akce s datem', 'Sál', 'Zlín', '', '', '', '', '', '', 'potvrzeno', '', '', '', '', '', 'https://x'],
+    ['bez', 'neuvedeno', '', '', 'Mineral-Expo', 'Výstaviště', 'Zlín', '', '', '', '', '', '', 'potvrzeno'],
+    ['stara', 'neuvedeno', '', '', 'Stará bez data', 'Sál', 'Zlín', '', '', '', '', '', '', 'proběhlo'],
+  ]) });
+  const audit = nactiRadar().auditDat_(ss);
+  assert.equal(JSON.stringify(audit.bezData), JSON.stringify(['Mineral-Expo']));
+});
+
+test('v3.48: prompt denní/mimořádné kontroly zakazuje odevzdat akci bez konkrétního data', () => {
+  const resp = anthropicResp({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'report_events', input: { events: [] } }] });
+  const fetchStub = frontaFetchuSPayloadem_([resp]);
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: fetchStub });
+  ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');
+  assert.match(fetchStub.zachycene[0].payload, /bez konkrétního data začátku/);
+});
