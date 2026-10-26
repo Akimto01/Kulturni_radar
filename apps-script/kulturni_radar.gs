@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.42 (9. 9. 2026) – upsertEvents_: fuzzy shoda už nezahazuje tiše odlišná data (širší changed)
- * (předchozí: 3.41 – upsertEvents_: audit log fuzzy sloučení do sloupce Z (AKCE), beze změny chování)
+ * Verze: 3.43 (26. 10. 2026) – parseCzDate_: rozpozná i sériové číslo data (proběhlé akce se zase skrývají)
+ * (předchozí: 3.42 – upsertEvents_: fuzzy shoda už nezahazuje tiše odlišná data (širší changed))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.42';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.43';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -253,14 +253,22 @@ function doPost(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+/** PURE: sériové číslo data ze Sheets (dny od 30. 12. 1899 – buňka bez
+ *  datumového formátu) → Date o půlnoci místního času; jinak null.
+ *  v3.43: vytaženo z cellText_, ať ho sdílí i parseCzDate_ (dřív ho uměla jen
+ *  cellText_, takže web ukazoval hezké „8. 8. 2026“, ale filtr proběhlých akcí,
+ *  markPastEvents, počasí, digesty i deduplikace takovou buňku neviděly jako datum). */
+function serioveCisloNaDatum_(v) {
+  if (typeof v !== 'number' || !(v > 30000 && v < 80000)) return null;
+  const d = new Date(1899, 11, 30);
+  d.setDate(d.getDate() + Math.floor(v));
+  return d;
+}
+
 /** Převod hodnoty buňky na text: Date → 'd. M. yyyy'; čas (rok 1899) → 'H:mm'. */
 function cellText_(v) {
-  if (typeof v === 'number' && v > 30000 && v < 80000) {
-    // Sériové číslo data (dny od 30. 12. 1899) – buňka bez datumového formátu
-    const d = new Date(1899, 11, 30);
-    d.setDate(d.getDate() + Math.floor(v));
-    return formatDateOnly_(d);
-  }
+  const zeSeriovehoCisla = serioveCisloNaDatum_(v);
+  if (zeSeriovehoCisla) return formatDateOnly_(zeSeriovehoCisla);
   if (v instanceof Date) {
     if (v.getFullYear() < 1930) {  // Sheets ukládá samotný čas jako datum r. 1899
       return Utilities.formatDate(v, Session.getScriptTimeZone(), 'H:mm');
@@ -3741,6 +3749,8 @@ function ruznyDenSerie_(nazevA, nazevB) {
 
 function parseCzDate_(v) {
   if (v instanceof Date) return v;
+  const zeSeriovehoCisla = serioveCisloNaDatum_(v);   // v3.43
+  if (zeSeriovehoCisla) return zeSeriovehoCisla;
   const m = String(v || '').match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/);
   if (!m) return null;
   return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));

@@ -3334,3 +3334,77 @@ test('upsertEvents_: FUZZY shoda, ÚPLNĚ stejný obsah (i misto/kategorie/cena/
   const log = ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0];
   assert.equal(log, '', 'beze změny obsahu se neloguje, i když šlo o fuzzy shodu (jiné ID/mírně jiný název)');
 });
+
+// ---------------------------------------------------------------------------
+// v3.43: parseCzDate_ a sériové číslo data (živá kontrola 26. 10. 2026:
+// API vracelo akce dávno po skončení – Vavřinecké hody do 9. 8., Znojmo 5/6
+// akcí z července/srpna. Buňka s datem jako sériové číslo prošla cellText_
+// (web ukázal „8. 8. 2026“), ale parseCzDate_ vrátila null → filtr
+// proběhlých, markPastEvents, počasí, digesty i dedup ji neviděly jako datum.)
+// ---------------------------------------------------------------------------
+
+/** Sériové číslo Sheets pro dané místní datum (dny od 30. 12. 1899). */
+function serioveCislo_(d) {
+  return Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899, 11, 30)) / 86400000);
+}
+
+test('v3.43: serioveCisloNaDatum_ – 46242 → 8. 8. 2026; mimo rozsah a nečísla → null', () => {
+  const d = r.serioveCisloNaDatum_(46242);
+  assert.equal(d.getFullYear(), 2026);
+  assert.equal(d.getMonth(), 7);
+  assert.equal(d.getDate(), 8);
+  assert.equal(d.getHours(), 0, 'půlnoc místního času – porovnání s `dnes` musí sedět');
+  assert.equal(r.serioveCisloNaDatum_(12), null, 'malé číslo (např. počet) není datum');
+  assert.equal(r.serioveCisloNaDatum_(99999), null);
+  assert.equal(r.serioveCisloNaDatum_('46242'), null, 'text čísla se nepřevádí – to je věc regexu');
+  assert.equal(r.serioveCisloNaDatum_(null), null);
+});
+
+test('v3.43: parseCzDate_ – sériové číslo dá stejné datum jako český text', () => {
+  const zCisla = r.parseCzDate_(46242);
+  const zTextu = r.parseCzDate_('8. 8. 2026');
+  assert.equal(zCisla.getTime(), zTextu.getTime());
+});
+
+test('v3.43: cellText_ a parseCzDate_ se na sériovém čísle shodnou (regresní pojistka)', () => {
+  assert.equal(r.cellText_(46242), '8. 8. 2026');
+  assert.equal(r.parseCzDate_(r.cellText_(46242)).getTime(), r.parseCzDate_(46242).getTime());
+});
+
+test('v3.43: dateKey_ – sériové číslo dá ISO klíč (dřív "46242" → nesedělo s textovým zápisem v dedup)', () => {
+  assert.equal(r.dateKey_(46242), '2026-08-08');
+  assert.equal(r.dateKey_(46242), r.dateKey_('8. 8. 2026'));
+});
+
+test('v3.43: readEventsApi_ – proběhlá akce se sériovým datem se do API nevrátí, budoucí ano', () => {
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const pred80 = pridatDny_(dnes, -80), pred79 = pridatDny_(dnes, -79), zitra = pridatDny_(dnes, 1);
+  const prazdne = Array(17).fill('');
+  const akceSheet = new MemSheet([
+    [],
+    ['ev-stara', serioveCislo_(pred80), serioveCislo_(pred79), '', 'Hody', 'Areál', 'Brno', '', '', '', '', '', '', 'potvrzeno', ...prazdne.slice(0, 10), 'Brno'],
+    ['ev-nova', serioveCislo_(zitra), '', '', 'Koncert', 'Sál', 'Brno', '', '', '', '', '', '', 'potvrzeno', ...prazdne.slice(0, 10), 'Brno'],
+  ]);
+  const ctx = nactiRadar();
+  const vysledek = ctx.readEventsApi_(fakeSpreadsheet({ AKCE: akceSheet }), 'Brno', false, '');
+  assert.equal(vysledek.akce.length, 1, 'proběhlá akce (sériové datum) musí být odfiltrovaná');
+  assert.equal(vysledek.akce[0].id, 'ev-nova');
+  assert.equal(vysledek.akce[0].datumOd, czDatum_(zitra), 'budoucí sériové datum se na webu ukáže česky');
+});
+
+test('v3.43: markPastEvents – sériové „Datum do“ v minulosti → stav „proběhlo“; budoucí zůstane', () => {
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const akceSheet = new MemSheet([
+    [],
+    ['ev-stara', serioveCislo_(pridatDny_(dnes, -80)), serioveCislo_(pridatDny_(dnes, -79)), '', 'Hody', '', '', '', '', '', '', '', '', 'potvrzeno'],
+    ['ev-jen-od', serioveCislo_(pridatDny_(dnes, -5)), '', '', 'Jednodenní', '', '', '', '', '', '', '', '', 'potvrzeno'],
+    ['ev-nova', serioveCislo_(pridatDny_(dnes, 3)), '', '', 'Budoucí', '', '', '', '', '', '', '', '', 'potvrzeno'],
+  ]);
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ AKCE: akceSheet });
+  ctx.SpreadsheetApp = { getActiveSpreadsheet: () => ss };   // markPastEvents si ss bere sama
+  ctx.markPastEvents();
+  assert.equal(akceSheet.rows[1][13], 'proběhlo', 'sériové „Datum do“ v minulosti');
+  assert.equal(akceSheet.rows[2][13], 'proběhlo', 'bez „Datum do“ rozhoduje sériové „Datum od“');
+  assert.equal(akceSheet.rows[3][13], 'potvrzeno', 'budoucí akce se nesmí označit');
+});
