@@ -20,6 +20,7 @@ const f = nactiFrontendFunkce([
   'isoDatum_', 'dnySAkcemi_', 'sestavKalendarMrizku_',
   'jeViditelnaVSeznamu_', 'filtrovatKategorii_', 'filtrovatOblibenaMista_', 'akceProMapu_',
   'dostupnePodkategorie_', 'filtrovatPodkategorii_',
+  'viditelneProfily_', 'testovaciProfilyPovoleny_',
   'akceDnePodleData_', 'seskupitPodleSouradnic_', 'sestavPopupDataMapy_',
   'vypocitejPoziciTooltipuKalendare_',
   'klicSouradnic_', 'sestavSeznamMist_', 'prepnoutVyberPinu_',
@@ -1433,4 +1434,31 @@ test('sestavHlaskuPrazdnehoStavu_: s posledniKontrola → hláška s datem, beze
     f.sestavHlaskuPrazdnehoStavu_('9. 9. 2026 8:12'),
     'Žádné akce pro vybraný filtr (naposledy zkontrolováno: 9. 9. 2026 8:12).'
   );
+});
+
+// ---------------------------------------------------------------------------
+// v3.60: testovací profily (rf-…) skryté na veřejné přihlašovací obrazovce
+// ---------------------------------------------------------------------------
+
+const SEZNAM_PROFILU_ = [
+  { id: 'vojta', jmeno: 'Vojta', testovaci: false },
+  { id: 'rf-test', jmeno: 'RF Test', testovaci: true },
+  { id: 'monika', jmeno: 'Monika', testovaci: false },
+];
+
+test('v3.60: viditelneProfily_ – bez příznaku testovací profil vypustí, pořadí ostatních zachová', () => {
+  shodneNapricRealmy(f.viditelneProfily_(SEZNAM_PROFILU_, false).map(u => u.id), ['vojta', 'monika']);
+});
+
+test('v3.60: viditelneProfily_ – s příznakem ukáže všechny (RF Suite Setup)', () => {
+  shodneNapricRealmy(f.viditelneProfily_(SEZNAM_PROFILU_, true).map(u => u.id), ['vojta', 'rf-test', 'monika']);
+});
+
+test('v3.60: viditelneProfily_ – starší backend bez pole testovaci → nic se neskryje; null → prázdné pole', () => {
+  shodneNapricRealmy(f.viditelneProfily_([{ id: 'rf-test', jmeno: 'RF Test' }], false).map(u => u.id), ['rf-test']);
+  assert.equal(f.viditelneProfily_(null, false).length, 0);
+});
+
+test('v3.60: testovaciProfilyPovoleny_ – bez localStorage (vyjímka) bezpečně false', () => {
+  assert.equal(f.testovaciProfilyPovoleny_(), false);
 });

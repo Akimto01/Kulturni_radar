@@ -3966,3 +3966,31 @@ test('v3.48: prompt denní/mimořádné kontroly zakazuje odevzdat akci bez konk
   ctx.callAnthropic_(CFG_TEST, ZDROJE_TEST, 'denní kontrola');
   assert.match(fetchStub.zachycene[0].payload, /bez konkrétního data začátku/);
 });
+
+// ---------------------------------------------------------------------------
+// v3.49: označení testovacích profilů v seznamu pro přihlašovací obrazovku
+// ---------------------------------------------------------------------------
+
+test('v3.49: jeTestovaciProfil_ – jen ID začínající „rf-“ (bez ohledu na velikost písmen)', () => {
+  assert.equal(r.jeTestovaciProfil_('rf-test'), true);
+  assert.equal(r.jeTestovaciProfil_('RF-druhy'), true);
+  assert.equal(r.jeTestovaciProfil_('vojta'), false);
+  assert.equal(r.jeTestovaciProfil_('surf-klub'), false, 'rf uprostřed ID se nepočítá');
+  assert.equal(r.jeTestovaciProfil_(''), false);
+  assert.equal(r.jeTestovaciProfil_(null), false);
+});
+
+test('v3.49: apiSeznamUzivatelu_ – testovací profil dostane testovaci:true, ostatní false; PIN dál nikde', () => {
+  const ctx = nactiRadar();
+  const ss = { getSheetByName: (n) => n === 'UŽIVATELÉ' ? {
+    getLastRow: () => 3,
+    getRange: () => ({ getValues: () => [
+      ['vojta', 'Vojta', 'sul$hash1', '{}', ''],
+      ['rf-test', 'RF Test', 'sul$hash2', '{}', ''],
+    ] }),
+  } : null };
+  const seznam = ctx.apiSeznamUzivatelu_(ss);
+  assert.equal(seznam[0].testovaci, false);
+  assert.equal(seznam[1].testovaci, true);
+  assert.equal('pinHash' in seznam[1], false);
+});

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.59 – dropdown + prázdný stav rozlišují "nikdy neprohledáno" od "prohledáno, nic nenalezeno" -->
+<!-- Kulturní radar Index.html v3.60 – testovací profily (rf-…) se na přihlašovací obrazovce zobrazí jen s příznakem v localStorage -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1213,10 +1213,23 @@
     document.getElementById('login-pin').value = '';
   }
 
+  /** PURE (v3.60): dlaždice k zobrazení – testovací profily (backend je označí
+   *  `testovaci: true`, ID „rf-…“) jen když je povolí příznak v prohlížeči.
+   *  Kosmetika pro veřejný web, ne zabezpečení (profil chrání PIN). */
+  function viditelneProfily_(seznam, povolitTestovaci) {
+    return (seznam || []).filter(u => povolitTestovaci || !u.testovaci);
+  }
+
+  /** v3.60: příznak „kr_testovaci_profily“ = '1' nastavuje RF Suite Setup
+   *  (keyword „Povolit testovací profily“). Běžný návštěvník ho nemá. */
+  function testovaciProfilyPovoleny_() {
+    try { return localStorage.getItem('kr_testovaci_profily') === '1'; } catch (_) { return false; }
+  }
+
   async function zobrazitLogin() {
     const kontejner = document.getElementById('login-dlazdice');
     try {
-      const seznam = await gsr('apiSeznamUzivatelu');
+      const seznam = viditelneProfily_(await gsr('apiSeznamUzivatelu'), testovaciProfilyPovoleny_());
       kontejner.innerHTML = '';
       if (!seznam || !seznam.length) {
         kontejner.innerHTML = '<span class="login-pokyn">Žádné profily – správce je musí založit v tabulce (menu Kulturní radar → Nastavit uživatelské profily).</span>';

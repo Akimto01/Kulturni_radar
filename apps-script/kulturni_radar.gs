@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.48 (26. 10. 2026) – akce bez rozpoznatelného data („neuvedeno“): nezapisují se, na webu se skryjí, samotest je hlásí
- * (předchozí: 3.47 – všechny běhy na Sonnet 5.5 (konec Haiku pro denní kontrolu), spotřeba tokenů v KONTROLY, týdenní report kvality hledání v samotestu)
+ * Verze: 3.49 (26. 10. 2026) – seznam profilů označí testovací profily (ID „rf-…“), frontend je veřejně skryje
+ * (předchozí: 3.48 – akce bez rozpoznatelného data („neuvedeno“): nezapisují se, na webu se skryjí, samotest je hlásí)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.48';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.49';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -1922,7 +1922,14 @@ function apiPrihlaseniUzivatele_(ss, uzivatelId, pin, ted) {
 
 /** API: seznam profilů k výběru na přihlašovací obrazovce (jen ID + jméno, žádné PINy). */
 function apiSeznamUzivatelu_(ss) {
-  return readUzivatele_(ss).map(u => ({ id: u.id, jmeno: u.jmeno }));
+  return readUzivatele_(ss).map(u => ({ id: u.id, jmeno: u.jmeno, testovaci: jeTestovaciProfil_(u.id) }));
+}
+
+/** PURE (v3.49): testovací profil = ID začínající „rf-“ (dnes „rf-test“ pro RF,
+ *  SoapUI a Bruno). Frontend takové dlaždice na veřejné přihlašovací obrazovce
+ *  nezobrazí (kosmetika, ne zabezpečení – profil dál chrání PIN a limit pokusů). */
+function jeTestovaciProfil_(id) {
+  return /^rf-/i.test(String(id || ''));
 }
 
 /** API: uloží osobní filtry (kategorie, dojezd, ...) uživatelského profilu jako JSON. */

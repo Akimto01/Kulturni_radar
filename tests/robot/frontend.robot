@@ -37,8 +37,24 @@ Přihlašovací obrazovka nabízí dlaždice profilů k výběru
     Should Be True    ${pocet} >= 1    Má se nabídnout aspoň jeden uživatelský profil
     ${existuje}=    Get Element Count    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id="${RF_TEST_USER_ID}"]
     Should Be Equal As Integers    ${existuje}    1
-    ...    msg=Testovací profil RF_TEST_USER_ID se mezi dlaždicemi nenašel – je založený v UŽIVATELÍCH?
+    ...    msg=Testovací profil RF_TEST_USER_ID se mezi dlaždicemi nenašel – je založený v UŽIVATELÍCH (a nastavil Suite Setup příznak testovacích profilů)?
     Close Page
+
+Testovací profil je bez příznaku na přihlašovací obrazovce skrytý (vlastní kontext)
+    [Tags]    ui    regrese
+    [Documentation]    v3.60 (Index.html) + backend v3.49: profil „rf-…“ se běžnému
+    ...    návštěvníkovi mezi dlaždicemi nezobrazí. Vlastní New Context = čistý
+    ...    localStorage bez příznaku ze Suite Setup; Close Context CURRENT
+    ...    vrátí Suite Setup kontext pro další testy.
+    [Teardown]    Close Context    CURRENT
+    New Context    viewport={'width': 1280, 'height': 900}
+    New Page    ${SITE_URL}
+    Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Click    ${FRAME} \#uzivatel-badge
+    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
+    ${testovaci}=    Get Element Count    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id^="rf-"]
+    Should Be Equal As Integers    ${testovaci}    0
+    ...    msg=Testovací profil je vidět i bez příznaku kr_testovaci_profily – veřejná přihlašovací obrazovka ho nemá ukazovat
 
 Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastní stránka)
     [Tags]    ui
@@ -1166,12 +1182,24 @@ Otevřít radar
     New Context    viewport={'width': 1280, 'height': 900}
     New Page       ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Povolit testovací profily
     Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
     # Data přicházejí asynchronně přes google.script.run → počkat na
     # první chip (meta hotová) a první kartu (events hotové), jinak
     # county v testech běží proti prázdnému UI (race condition).
     Wait For Elements State    ${FRAME} .chip >> nth=0     visible    timeout=20s
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
+
+Povolit testovací profily
+    [Documentation]    v3.60 (Index.html): testovací profily (ID „rf-…“) se na
+    ...    veřejné přihlašovací obrazovce nezobrazují, pokud v prohlížeči
+    ...    není příznak kr_testovaci_profily=1. Nastavuje se jednou v Suite
+    ...    Setup – localStorage sdílí všechny stránky stejného kontextu
+    ...    (New Page), takže platí i pro testy s vlastní stránkou. Testy
+    ...    s vlastním New Context (mobil, široké pásmo) se nepřihlašují.
+    ...    Musí proběhnout před prvním otevřením přihlášení (dlaždice se
+    ...    načítají při prvním otevření overlaye).
+    Evaluate JavaScript    ${FRAME} body    (el) => window.localStorage.setItem('kr_testovaci_profily', '1')
 
 Přihlásit se do radaru
     [Arguments]    ${uzivatel_id}    ${pin}
