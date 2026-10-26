@@ -339,13 +339,14 @@ Před commitem mi ukaž diff, ať vidím přesně, co jde do gitu.
 Od 8. 8. 2026 nasazuje Apps Script Claude Code přes clasp (sekce 6); ruční
 „Nová verze“ v editoru je jen záloha, kdyby clasp nefungoval.
 
-Claude Code **nemá přístup** do Apps Script editoru — to je vždy ruční
-krok Vojty. Prompt na to musí vždy explicitně upozornit (krok 5 výše),
-jinak hrozí přesně to, co se stalo 8. 8.: commit proběhne, ale appka na
-`kulturniradar.cz` (statický Cloudflare Pages) se aktualizuje automaticky
-přes `git push`, zatímco Apps Script `/exec` zůstane na staré verzi, dokud
-ho někdo ručně nenasadí — **tohle jsou dva nezávislé nasazovací kanály**,
-je snadné zapomenout na ten druhý.
+**Apps Script** (`/exec`, nasazuje clasp) a **Cloudflare Pages**
+(`kulturniradar.cz`, nasazuje `git push`) jsou **dva nezávislé nasazovací
+kanály**. Při změně Index.html je potřeba nasadit oba; změna jen
+backendu (`kulturni_radar.gs`) jde jen přes Apps Script. Prompt na to
+musí vždy upozornit (krok 5 výše), jinak hrozí přesně to, co se stalo
+8. 8. 2026: commit a push proběhly, appka na `kulturniradar.cz` se
+aktualizovala automaticky, zatímco Apps Script `/exec` zůstal na staré
+verzi, protože se na druhý kanál zapomnělo.
 
 ### Změny Index.html: dva kanály a pořadí ověření
 Index.html běží na Cloudflare Pages (nasazuje `git push`) i v Apps Scriptu
