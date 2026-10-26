@@ -17,3 +17,31 @@ jobs:
 
       - name: Spustit testy
         run: node --test tests/unit.test.js tests/frontend.test.js
+
+  # Dry run RF sady (nález z přípravy quality checku 7.-8. 10. 2026): ověří
+  # syntaxi .robot souborů a názvy/argumenty keywordů bez přístupu k produkci,
+  # takže je levný a nezávislý na stavu Apps Scriptu. Prohlížeče se
+  # nestahují (--skip-browsers), stačí Node závislosti Browser knihovny.
+  # Omezení: dry run nevyhodnocuje proměnné, překlep v ${PROMENNE} nechytí.
+  rf-dryrun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: tests/robot/requirements.txt
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Instalace RF závislostí (bez prohlížečů)
+        run: |
+          pip install -r tests/robot/requirements.txt
+          rfbrowser init --skip-browsers
+
+      - name: RF dry run (syntaxe a argumenty keywordů, bez sítě)
+        run: robot --dryrun --output NONE --report NONE --log NONE tests/robot/
