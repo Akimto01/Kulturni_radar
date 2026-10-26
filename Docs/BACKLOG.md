@@ -1,65 +1,50 @@
 # Backlog — Kulturní radar
 
-Poslední aktualizace: 8. 10. 2026. Neplánované nápady a rozpracované položky —
+Poslední aktualizace: 26. 10. 2026. Neplánované nápady a rozpracované položky –
 na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 
 ## Doporučené pořadí
-Zohledňuje závislosti mezi položkami a paralelizaci čekacích dob
-(Google Play schvalování běží mimo aktivní práci), stanoveno 8. 8. 2026:
+Aktualizováno 26. 10. 2026 po dlouhé session (backend v3.43–v3.49,
+Index.html v3.60, RF dry run v CI). Pořadí ze 8. 8. 2026 je splněné
+(filtr žánrů, roční přehled, notifikace A–F, kalendář, e-mailové tipy,
+API kredity) nebo přesunuté níže (design, Android); původní znění je
+v historii gitu.
 
-1. **Design večer s dcerou** (rozvržení, ikony/branding appky; CSS
-   tokeny v `:root`) — odemyká Android submission a snižuje riziko
-   předělávek u kalendářního pohledu. Rodina appku už aktivně
-   používá (4 profily vyzkoušené 7.–8. 8.), takže na designu záleží
-   i mimo původní účel
-   - Aktualizace 18.–19. 8. 2026: dcera má několik dní prázdniny,
-     není jasné, jestli bude včas k dispozici. Záložní varianta:
-     Vojta + Claude společně, s omezením — Claude umí navrhnout
-     koncept (barevné varianty, styl ikony, návrhy layoutu, mockupy
-     v chatu), ale finální produkčně použitelnou grafiku pro Google
-     Play (adaptive icon ve více vrstvách/rozlišeních přesných
-     rozměrů, feature graphic, screenshoty) je lepší dělat ve
-     specializovaném nástroji (Figma/Illustrator) člověkem se
-     zkušeností — dcera, nebo Vojta sám s podobným nástrojem. Claude
-     může připravit koncept a přesné specifikace (rozměry, formáty)
-     k exportu v libovolném nástroji.
-   - Aktualizace 27. 8. 2026: koncept ikony (varianta C: terénní
-     pozadí hnědá/zelená/modrá řeka, černý radar, zlatý pin s tmavým
-     obrysem a krémovou tečkou, terakotové tečky pro okolní akce)
-     předschválen Vojtou, viz `Docs/design-koncept-ikona-varianta-C.svg`
-     — slouží jako odrazový bod pro finální grafické zpracování
-     (Figma/Illustrator), ne jako hotová produkční grafika.
-2. **Android appka — start submission** (~3–4 h aktivní práce) —
-   spustit hned po designu, schvalovací proces v Google Play trvá
-   dny a běží na pozadí, ať se nečeká zbytečně
-3. ~~**API credit optimalizace**~~ — **HOTOVO, OVĚŘENO 21. 8. 2026**
-   (viz Větší témata níže)
-4. ~~**Filtr žánrů/podkategorie**~~ — **HOTOVO A NASAZENO 20. 8. 2026**
-   (backend v3.28 + Index.html v3.50, viz CHANGELOG.md)
-5. ~~**Roční přehled** + **Doporučení podle historie**~~ — **KOMPLETNĚ
-   HOTOVO 21. 8. 2026** (Index.html v3.52 + v3.53, viz CHANGELOG.md)
-6. ~~**Notifikace o akcích**~~ — **KROKY A–F HOTOVO 21. 8. 2026** (backend
-   v3.30–v3.33 + Index.html v3.54, viz CHANGELOG.md); zbývá jen živě
-   spustit RF sadu po nasazení. G (obsah „doporučení") vědomě odloženo,
-   viz Větší témata
-7. **Mapa akcí** — vědomě odložená budoucí varianta (viz Větší
-   témata), ne aktivně plánovaná v tomhle pořadí; jednotlivá akce
-   je už pokrytá hotovým odkazem „📍 Mapa" na kartě
-8. ~~**Kalendářní pohled**~~ — **HOTOVO** (redesign fáze 2, Index.html
-   v3.31–v3.42): měsíční mřížka, navigace mezi měsíci, klik na den →
-   scroll na akci, hover tooltip. RF otestováno 21. 8. 2026 (viz
-   Testovací dluh, krok 3 auditu). Tenhle bod byl zastaralý odkaz na
-   dobu před redesignem — funkce vznikla nezávisle na designovém
-   večeru zmíněném v bodě 1.
-9. ~~**Email zpracování návrhů**~~ — **KOMPLETNĚ HOTOVO 20. 8. 2026**
-   (backend v3.29 + Cloudflare Worker nasazen a ověřen testovacím
-   mailem — dorazil na Gmail i propsal se do EMAIL_TIPY), viz
-   CHANGELOG.md
-10. **Cesta B zrychlení přihlášení** (~1–2 h) — volitelné, nejvyšší
-    riziko regrese, nejnižší priorita
+**Časově vázané ověřovačky (nejdřív, krátké, Claude přes claude-in-chrome):**
+1. **Ověřit v3.44 v datech** (~15 min, po čtvrtečním běhu sledovaných
+   měst 29. 10. 10:00 a denních kontrolách) – podíl akcí se souřadnicemi
+   a počasím OK, první HTTP kódy selhání Open-Meteo v KONTROLY. Podle
+   kódů rozhodnout o pauzách mezi voláními (viz „Sledovat: HTTP kódy“).
+   Pak přeškrtnout body o souřadnicích a počasí v „Nálezy ze živé kontroly“.
+2. **První týdenní report kvality** (~10 min, po samotestu v neděli
+   1. 11. 18:00) – ověřit, že sekce „Kvalita hledání“ v mailu samotestu
+   dorazila (zapojení do `runSelfTest` není pokryté testem, v3.47).
+3. **Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – viz položka
+   „Vyhodnotit Sonnet 5.5 po 2 týdnech“; podle výsledku rozhodnout
+   i o stropu 15 akcí na běh.
+
+**Ruční úklid (Vojta, ~10 min, kdykoli):**
+4. Smazat 5 řádků s datem „neuvedeno“ v AKCE (Youngfest, KarmaFest,
+   Rajnochovická železnice, Slavnost pod jabloní, Mineral-Expo) – jinak
+   je samotest hlásí každou neděli (v3.48). Volitelně 2 staré skryté
+   duplicity v MÍSTA (v3.46).
+
+**Vývoj (podle chuti a času):**
+5. **Jeden automatický retry při HTTP 404 z echo URL** (~1 h, viz
+   Testovací dluh) – pozor na idempotenci zápisových volání.
+6. **Audit selektorů D–H** (~1 h, viz Testovací dluh).
+7. **„Kategorie D“ v `upsertEvents_`** (~1,5–2 h, hlavně průzkum, viz
+   „K PROŠETŘENÍ (otevřeno 31. 8. 2026)“).
+
+**Blokované / odložené:**
+8. **Design s dcerou → Android submission** (~3–4 h aktivní práce po
+   designu) – čeká na dceru; koncept ikony (varianta C) předschválen
+   27. 8. 2026, viz `Docs/design-koncept-ikona-varianta-C.svg`.
+9. **Cesta B zrychlení přihlášení** – jen sledovat (průzkum 19. 8. 2026
+   ukázal malý přínos a vysoké riziko).
 
 Poznámka: pořadí není striktní závazek, jen doporučení podle
-závislostí a efektivity — aktualizuj tuto sekci při každé větší
+závislostí a efektivity – aktualizuj tuto sekci při každé větší
 změně BACKLOGu.
 
 ## K ověření
@@ -127,7 +112,7 @@ změně BACKLOGu.
 - **Audit/úklid selektorů v `Index.html`** (nápad 22. 8. 2026, návrh `Docs/AUDIT-SELEKTORU.md` 23. 8. 2026) — **ČÁSTEČNĚ VYŘEŠENO 23. 8. 2026** (Index.html v3.57, nasazeno): body A+B+C z návrhu implementovány — `data-iso` na `.kalendar-den` (`vykreslitKalendar()`), `data-id` na `.mapa-popup-btn` (`sestavPopupMapy_()`), `data-klic` na `.mapa-misto` (`vykreslitSeznamMist_()`). A a B měly přímý dopad na existující RF testy (self-dokumentovaná křehkost v komentářích `frontend.robot` před opravou) — teď kalendářní test čte `data-iso` místo `Evaluate JavaScript` na interní proměnné appky (`kalendarRok`/`kalendarMesic`/`isoDatum_`), test tlačítka „Zobrazit v seznamu" i test kliku na řádek v seznamu míst ověřují KONKRÉTNÍ shodu ID/klíče místo jen „nějaký" element. Zbývá D–H z návrhu (`.misto-karta` bez identifikátoru, `.btn-url` rozlišitelné jen textem, chipy stálých míst, `.mapa-stat`, `.den-hlavicka` „Probíhá") — nižší priorita, bez přímého dopadu na existující testy, otevřeno k případnému budoucímu doplnění.
 - Sledovat, bez akce: **Mini předpověď počasí (P, v3.45) — Cesta B** — dnešní Cesta A (přímé volání Open-Meteo z frontendu) ověřena živě 20. 8. 2026 jako plně funkční (41 ms, HTTP 200, žádná chyba) — migrace na Cestu B (vlastní backend endpoint s cachováním) by teď řešila neexistující problém. Zvážit znovu jen pokud se v budoucnu objeví skutečný problém (rate limit chyby, nespolehlivost, potřeba delší předpovědi/přesnějších souřadnic).
 - Sledovat, bez akce: **`parseCzDate_` u textu s rozsahem typu „8.–9. 8. 2026“** vezme první úplné datum (9. 8.), ne začátek rozsahu. V datech zatím nepozorováno, AI posílá `datum_od` a `datum_do` zvlášť ve formátu D. M. RRRR.
-- Sledovat: test **Kalendář: hover na den** – pád v plném běhu 26. 10. 2026 (`TimeoutError` na `#kalendar-tooltip.zobrazeno`), izolovaně 2× PASS. Pokud se zopakuje, přidat tag `krehky` nebo scroll k buňce před hoverem.
+- ~~Sledovat: test **Kalendář: hover na den** – pád v plném běhu 26. 10. 2026 (`TimeoutError` na `#kalendar-tooltip.zobrazeno`), izolovaně 2× PASS. Pokud se zopakuje, přidat tag `krehky` nebo scroll k buňce před hoverem.~~ — **VYŘEŠENO 26. 10. 2026** (viz CHANGELOG.md, „RF testy (bez bump verze) – kalendář hover“): deterministická souhra s předchozím testem (myš zůstala nad buňkou 29. 10.), opraveno `Hover` na `header h1` před hoverem na buňku.
 - ~~**Tagování testů v RF sadě přes `[Tags]`**~~ — **VYŘEŠENO 29. 8. 2026**: všech 59 testů (50 `frontend.robot` + 9 `api.robot`) dostalo `[Tags]` podle skutečného chování ověřeného v kódu (docstringy, historické záznamy v CHANGELOG/BACKLOG) – `smoke`, `zapis`, `krehky`, `mapa`, `kalendar`, `filtr`, `notifikace`, `kontakt`, `regrese`, `ui`, `api`. Syntaxe ověřena `robot --dryrun` (59/59 OK) i živě přes `--include`/`--exclude` (smoke → 11, zapis → 6, mapaORkalendar → 11). Návod na použití doplněn do SKILL.md (obě kopie).
 - ~~Zjistit, proč Claude Code nenachází skill kulturni-radar-workflow automaticky~~ — VYŘEŠENO 19. 8. 2026: příčina potvrzena — Claude Code hledá skilly v `.claude/skills/<jméno>/SKILL.md`, ne v `Docs/`. Skill fyzicky existoval jen na `Docs/kulturni-radar-workflow/SKILL.md` (odkud ho čte Claude v hlavním chatu), proto ho Claude Code nenašel automaticky. Řešení: `SKILL.md` zkopírován (ne přesunut) do `.claude/skills/kulturni-radar-workflow/SKILL.md`. Zvažován symlink místo kopie (aby se do budoucna nerozjely dvě nezávislé verze), ale ověřeno, že `ln -s` v tomhle Windows prostředí bez zvýšených oprávnění tiše spadne zpět na plnou kopii adresáře (jiné inode, žádný `ReparsePoint` atribut) — spolehlivý symlink tu tedy není k dispozici, zůstává prostá kopie. **Důsledek: `Docs/…/SKILL.md` je zdroj pravdy, `.claude/skills/…/SKILL.md` je jeho ruční kopie — při každé budoucí úpravě SKILL.md aktualizovat OBĚ kopie, jinak se rozjedou.**
 - ~~**Diagnóza a oprava mezery v detekci duplicit (`najdiDuplicity_`)**~~ — **VYŘEŠENO 31. 8. 2026** (backend v3.34, viz CHANGELOG.md): nalezena reálná duplicita v AKCE — „Light Up Tugendhat" (zahrada vily Tugendhat, Brno, 7.–9. 8. 2026) měla dva řádky, protože dva zdroje se rozešly o 1 den v `datum_od` (6. 8. vs. 7. 8. 2026). Diagnóza potvrdila přesným výpočtem `isSameName_`, že fuzzy shoda názvů by duplicitu odhalila, ale nikdy se k porovnání nedostala — `najdiDuplicity_` (sdílená logika úklidu i samotestu) bucketovala kandidáty podle PŘESNÉ shody profil+datum_od, takže záznamy s odlišným datem o 1 den skončily v různých bucketech. Oprava: skupina se teď tvoří jen podle profilu, shoda data se ověřuje tolerančním oknem ±2 dny (`DUPLICITY_OKNO_DNI`/`jsouDataBlizkoProDuplicitu_`) až při porovnání kandidátů. `upsertEvents_` (zápisová cesta) vědomě beze změny — vyšší cena chybného sloučení při zápisu než u periodického úklidu. 5 nových Node testů (441→446). Po nasazení ručně spuštěno „Odstranit duplicity" — výsledek: **NÁSLEDNĚ ZJIŠTĚN INCIDENT** (viz CHANGELOG.md, „Backend v3.35") — z 12 nahlášených „duplicit" byla skutečná jen 1 (Light Up Tugendhat), zbylé byly chybná sloučení opravdu odlišných akcí (slabé pravidlo „3+ společných slov" v `isSameName_` bez ohledu na specifičnost/poměr sdílených slov). Data ručně obnovena přes Historii verzí Google Sheets. Opraveno v **backend v3.35** (`NAZEV_STOPWORDS_` + poměrový práh `NAZEV_SHODA_POMER_PRAH`, viz CHANGELOG.md) — 3 další Node testy (446→449), po nasazení znovu spuštěn úklid — **Balkan pár opraven správně, Ostravský seriál se ALE sloučil znovu** (skutečný produkční formát názvu „…– N. srpna" ztrácí číslo dne při `normNazev_`, na obou stranách zbyde identická sada `{ostrava, srpna}`, podmnožinová větev `isSameName_` obchází poměrový práh úplně). Data znovu ručně obnovena. Opraveno v **backend v3.36** (`RE_DEN_SERIE_`/`denZeSerie_`/`ruznyDenSerie_` — raná kontrola na NEnormalizovaném textu, rozpozná „N. měsíc" a při rozdílném čísle dne blokuje sloučení bez ohledu na `isSameName_`, viz CHANGELOG.md) — 3 další Node testy (449→452), regresně ověřeny všechny předchozí případy (Tugendhat, Balkan, Shakespearovské slavnosti). Po nasazení potřetí spuštěn úklid — **smazáno 9 místo očekávané 1**. Ruční audit všech zbylých párů (Google Sheets Historie verzí) potvrdil: Ostravský seriál i Balkan Soirée/Dunja Knebl už NEbyly v seznamu (obě předchozí opravy fungují), 5 párů bylo skutečných duplicit (Rivec Fest, Den Brna, Velhartice, Na prknech, Balkan Night/Fanfare), ale **našel se ČTVRTÝ mechanismus chybné shody**: „Festival planet Brno 2026" a „Kulturní léto na Poděbradech" — konkrétní akce/koncert v rámci sezónní/deštníkové série má název série jako součást svého vlastního názvu („Konkrétní akce – Název série"), takže fuzzy shoda (podmnožinová i poměrová větev `isSameName_`) prochází STRUKTURÁLNĚ, ne náhodou — žádný syntaktický signál neodliší legitimně zkrácený název (Balkan Night) od série sdílené desítkami různých akcí (viz konkrétní výpočet tokenů v CHANGELOG.md, „Backend v3.37"). Data znovu ručně obnovena. **Rozhodnutí: NEPOKRAČOVAT v záplatování jednotlivých vzorců** — čtyři různé mechanismy v jedné session jsou silný signál, že fuzzy shoda názvů je strukturálně nespolehlivá pro automatické NEVRATNÉ mazání. Opraveno v **backend v3.37**: „Odstranit duplicity" nahrazeno režimem návrhu k ručnímu schválení — nový list `NÁVRH DUPLICIT` (`navrhniDuplicity_`, jen čte/navrhuje, na AKCE nesahá) + `smazatPotvrzeneDuplicity_` (maže jen ručně potvrzené páry, identifikace přes ID ne číslo řádku). 6 nových Node testů (452→458). Po nasazení spuštěn návrh (ne mazání) — čeká na ruční schválení jednotlivých párů. Tři páry (dvakrát Festival planet Brno, jednou Kulturní léto na Poděbradech) ručně posouzeny jako kategorie D a označeny „Zamítnuto". **NÁSLEDNÝ INCIDENT (1.–7. 9. 2026):** samotest (`auditDat_`) hlásil den co den přesně tyhle tři už zamítnuté páry znovu jako problém v denním e-mailu — volala `najdiDuplicity_` přímo bez křížové kontroly proti `NÁVRH DUPLICIT`, na rozdíl od `navrhniDuplicity_`. Opraveno v **backend v3.40** (`nactiPosouzenePary_` — sdílená kontrolní funkce extrahovaná z `navrhniDuplicity_`, pravidlo „jednou posouzeno = navždy ticho", viz CHANGELOG.md) — 2 nové Node testy (464→466).
@@ -141,6 +126,7 @@ změně BACKLOGu.
 - ~~**Duplicita ve stálých místech: „Punkevní jeskyně a propast Macocha“ vs. „… & propast Macocha“** (nalezeno při přípravě quality checku, 7.–8. 10. 2026) — deduplikace míst nenormalizuje „a“ vs. „&“, takže stejné místo existuje dvakrát. Prověřit normalizaci názvu míst (obdoba `nazevTokens_`/`isSameName_` u akcí) a přidat Node test na tenhle pár.~~ — **HOTOVO 26. 10. 2026** (backend v3.46, viz CHANGELOG.md): `upsertMista_` páruje přes tolerantní `klicMista_`, stávající duplicity se skrývají při čtení. Živě ověřeno (Macocha 2× → 1×).
 - ~~**`robot --dryrun` celé RF sady v `node-tests.yml` při každém push** (nápad z přípravy quality checku, 7.–8. 10. 2026) — dry run zachytí chyby syntaxe a argumentů klíčových slov bez přístupu k Apps Scriptu, takže je levný a nezávislý na stavu produkce.~~ — **HOTOVO 26. 10. 2026** (viz CHANGELOG.md, „CI: RF dry run při každém pushi“): samostatný job `rf-dryrun` v `node-tests.yml`.
 - ~~**Unit testy `apiPrihlaseniUzivatele_`: větev „chybí profil nebo PIN“ nemá test, neexistující profil se testuje slabě** (nalezeno při přípravě quality checku, 7.–8. 10. 2026) – větev „chybí profil nebo PIN“ nemá žádný Node test. Neexistující profil se testuje jen přes `ok:false` bez ověření textu chyby (slabá aserce), takže test by prošel i při jiné chybě.~~ — **HOTOVO 26. 10. 2026** (backend v3.45, viz CHANGELOG.md): přibyly testy větve „chybí profil nebo PIN“ i „profil nenalezen“ s ověřením přesné hlášky.
+- **Nahradit pevný `Sleep 300ms` po kliknutí na chip v testech filtrů** (Chip typu stálého místa, Chip Oblíbená místa, případně další se stejným vzorem) za `Wait Until Keyword Succeeds` s ověřením očekávaného počtu (vzor jako u testu klik na den). Odhad ~30 min. Dva z těchto testů spadly v plném běhu 26. 10. 2026 (napočítaly 0 karet během překreslení), izolovaně 2× PASS.
 
 ## Probíhající měření
 - ~~**Haiku vs. Sonnet na denní kontrole**~~ — **VYŘEŠENO/UZAVŘENO 31. 8. 2026**: SPUŠTĚNO 20. 8. 2026 (backend v3.27, viz CHANGELOG.md), denní automatická kontrola (`dailyCheck` → typ `'denní kontrola'`) běží na `claude-haiku-4-5`, ostatní běhy zůstávají na Sonnetu (`vyberModelProKontrolu_`). Vyhodnocení provedeno ručně přímo z listu KONTROLY (Claude v hlavním chatu, claude-in-chrome, 31. 8. 2026), sloupec „Nalezeno celkem / Nové":

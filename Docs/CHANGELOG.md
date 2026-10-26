@@ -1,5 +1,20 @@
 # Changelog
 
+## RF testy (bez bump verze) – kalendář hover: deterministická souhra s předchozím testem – 26. 10. 2026
+### Kontext
+- Pád testu „Kalendář: hover na den s akcí zobrazí tooltip…“ v plném běhu (26. 10. 2026), izolovaně PASS.
+### Příčina
+- Předchozí test „Kalendář: klik na den s akcí odscrolluje…“ klikne na buňku 29. 10. (v říjnu 2026 jediný den s akcí s vlastní sekcí). Klik tooltip schová a myš zůstane nad buňkou. Hover test najede na tutéž buňku (první `.ma-akce`), myš se nepohne, `mouseenter` nevznikne a tooltip se neukáže (`TimeoutError` na `#kalendar-tooltip.zobrazeno`).
+### Reprodukce a oprava
+- Na původním kódu spuštění obou testů za sebou: klik PASS, hover FAIL, 2× z 2×.
+- Oprava v `tests/robot/frontend.robot`: před hoverem na buňku nejdřív `Hover` na `header h1`, čímž se zaručí skutečný `mouseenter`.
+### Ověření
+- Stejný pár testů po opravě: 2× oba PASS.
+- Plná frontend sada po opravě: 43/45; dva pády (Chip typu stálého místa, Chip Oblíbená místa) izolovaně 2× PASS. Oba po přepnutí chipu zpět čekají pevně Sleep 300ms a hned počítají karty; na konci dlouhé session s mnoha běhy proti produkci (pomalejší Apps Script, viz SKILL.md sekce 8) napočítaly 0 během překreslení.
+### Poznámka
+- Jen testy a dokumentace, žádná změna kódu appky, bez bumpu verze (backend i frontend beze změny).
+- `Docs/BACKLOG.md`: přepsaná sekce „Doporučené pořadí“ (aktualizace 26. 10. 2026).
+
 ## Backend v3.49 + Index.html v3.60 – testovací profily skryté na veřejné přihlašovací obrazovce – 26. 10. 2026
 ### Kontext
 - Nález ze živé kontroly 26. 10. 2026: profil „RF Test“ byl vidět na veřejné přihlašovací obrazovce.
