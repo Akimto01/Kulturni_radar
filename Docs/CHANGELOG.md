@@ -1,5 +1,41 @@
 # Changelog
 
+## Backend v3.47 – Sonnet 5.5 pro všechny běhy, spotřeba tokenů, týdenní report kvality – 26. 10. 2026
+### Kontext a diagnóza
+- Diagnostika nízkého počtu akcí (živá kontrola 26. 10. 2026, list KONTROLY): denní kontrola Brna na Haiku v září vrátila 25 z 30 běhů s 0 akcemi, v říjnu 10 z 26.
+- Měsíční průměry denní kontroly Brna z KONTROLY:
+
+| Období a model | Nalezeno ø | Nové ø | Nulových běhů |
+|---|---|---|---|
+| srpen, Sonnet 4.6 | 4,2 | 1,2 | 1/19 |
+| srpen, Haiku | 5,0 | 0,3 | 1/12 |
+| září, Haiku | 0,7 | 0,3 | 25/30 |
+| říjen, Haiku | 2,2 | 1,0 | 10/26 |
+
+- Sledovaná města na Sonnetu 4.6 (srpen–říjen): ~10 nalezených, 6–9 nových na běh.
+### Poučení
+- Srpnové vyhodnocení Haiku (31. 8. 2026) sledovalo jen „nalezeno celkem“. Průměr NOVÝCH akcí (0,3 vs. 1,2) ukazoval propad už tehdy. Týdenní report proto měří primárně nové akce.
+### Změněno (4 body)
+- Všechny běhy na `claude-sonnet-5-5`. Sonnet 4.6 je legacy a dražší, Haiku pro denní kontrolu (v3.27) je ukončen. Ceny z ceníku Anthropic (USD za milion tokenů, vstup/výstup): Sonnet 4.6 $3/$15 (legacy), Sonnet 5.5 $2/$10. `vyberModelProKontrolu_` zůstává jako jediné místo rozhodnutí.
+- Spotřeba tokenů z každého běhu do nových sloupců M–O listu KONTROLY (`zapocitatSpotrebu_`, `odebratSpotrebu_`, hlavičku doplní `zajistitHlavickuSpotreby_`): tokeny vstup, výstup, počet webových vyhledávání. Pokrývá i formátovací dovolání a stálá místa.
+- Týdenní report kvality hledání v nedělním samotestu (`hodnotitKvalituHledani_`, `sestavReportKvality_`): posledních 7 kalendářních dní proti předchozím 7, zvlášť pro „denní kontrola“ a „sledované město“, počet běhů, ø nových, nulové běhy, odhad ceny. Bez dalšího volání API.
+- Poplach v samotestu: 3+ nulové běhy denní kontroly za týden nebo průměr nových akcí pod 0,5.
+- Odhad ceny je bez poplatků za webové vyhledávání (ty se účtují zvlášť).
+### Testy
+- 10 nových Node testů, celkem 514 → 524, mutačně ověřené (9 mutací). 4 staré testy přepsány, protože zakládaly zrušené rozhodnutí Haiku pro denní kontrolu.
+- Netestované: zapojení reportu do `runSelfTest`, ověří se první nedělí.
+### Živé ověření 26. 10. 2026 (spuštěno z menu „Spustit kontrolu teď“ přes claude-in-chrome, 22:38)
+| | Denní kontrola na Haiku (dnes 8:12) | Mimořádná kontrola na Sonnetu 5.5 (22:38) |
+|---|---|---|
+| Nalezeno / nové | 0 / 0 | 9 / 8 |
+| Model | Haiku | claude-sonnet-5-5 |
+| Tokeny vstup / výstup | nezaznamenáno | 40466 / 4321 |
+| Webová vyhledávání | nezaznamenáno | 3 |
+- `?api=events&profil=Brno`: 6 → 14 akcí. Odhad ceny ~$0,12 za běh bez poplatků za vyhledávání.
+### Nasazení
+- Verze projektu 104 (číslo za @ v `clasp deployments` je číslo verze projektu, ne implementace), ověřeno `?api=meta` → `"verze":"3.47"`, smoke RF 11/11. Commit `387449e`.
+- Verze patří jen backendu (`kulturni_radar.gs` 3.47), `Index.html` beze změny.
+
 ## Backend v3.46 – stálá místa: párování podle klíče názvu, skrytí duplicit – 26. 10. 2026
 ### Kontext
 - Příčina ověřená v listu MÍSTA: AI při měsíční aktualizaci (`updateMista`) vymýšlí pokaždé jiné ID a mírně jiný název („Punkevní jeskyně a propast Macocha“ vs. „… & propast Macocha“, „VIDA! science centrum“ vs. „VIDA! Science Centrum Brno“). `upsertMista_` párovala přes přesné ID nebo přesný název+obec, takže vznikl nový řádek a starý zůstal.
@@ -25,7 +61,7 @@
 - Smoke RF 11/11.
 ### Poznámka
 - Verze patří jen backendu (`kulturni_radar.gs` 3.46), `Index.html` beze změny.
-- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.46"`, implementace @103), ověřeno `?api=meta` → `"verze":"3.46"`. Commit `f6e784e`.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.46"`, verze projektu 103), ověřeno `?api=meta` → `"verze":"3.46"`. Commit `f6e784e`.
 
 ## CI: RF dry run při každém pushi – 26. 10. 2026
 ### Přidáno
@@ -70,7 +106,7 @@
 - Nouzové odemčení: první pokus o odemčení se neprojevil a není jisté, zda menu tehdy skutečně proběhlo. Po spuštění menu přes claude-in-chrome (Google ohlásil „Skript byl dokončen“ bez výzvy k autorizaci) login prošel. Pravděpodobné vysvětlení je známé chování Apps Scriptu: první spuštění nové funkce z menu spotřebuje jen autorizaci a funkce neproběhne. Tady to nebylo přímo potvrzeno.
 ### Poznámka
 - Verze patří jen backendu (`kulturni_radar.gs` 3.45), `Index.html` beze změny.
-- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.45"`, implementace @102), ověřeno `?api=meta` → `"verze":"3.45"`. Commit `0b32326`.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.45"`, verze projektu 102), ověřeno `?api=meta` → `"verze":"3.45"`. Commit `0b32326`.
 
 ## Backend v3.44 – počasí a souřadnice: N/A mimo dosah, HTTP kódy, záložní geokódování – 26. 10. 2026
 ### Kontext
@@ -90,7 +126,7 @@
 - Neúspěšné lokality se teď zkouší znovu každý den: nejhůř 10 lokalit × 2 dotazy × 1,1 s pauza ≈ 22 s navíc v denní kontrole. Cena za to, že lokalita, které se jednou nepodaří, už neskončí bez pinu a počasí navždy.
 ### Poznámka
 - Verze patří jen backendu (`kulturni_radar.gs` 3.44), `Index.html` beze změny.
-- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.44"`, implementace @101), ověřeno `?api=meta` → `"verze":"3.44"`, RF `--include smoke` 11/11. Commit `8e85860`.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.44"`, verze projektu 101), ověřeno `?api=meta` → `"verze":"3.44"`, RF `--include smoke` 11/11. Commit `8e85860`.
 - Čeká na živé ověření po nejbližším běhu sledovaných měst (čtvrtek 10:00) a denní kontrole.
 
 ## Backend v3.43 – parseCzDate_ rozpozná sériové číslo data – 26. 10. 2026
@@ -108,7 +144,7 @@
 ### Poznámka
 - 6 nových Node testů (477 → 483): převod `serioveCisloNaDatum_`, `parseCzDate_`, shoda s `cellText_` (regresní pojistka), `dateKey_`, `readEventsApi_`, `markPastEvents`.
 - Verze patří jen backendu (`kulturni_radar.gs` 3.43), `Index.html` beze změny.
-- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.43"`, implementace @100), ověřeno `?api=meta` → `"verze":"3.43"`. Commit `f99aed6`.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.43"`, verze projektu 100), ověřeno `?api=meta` → `"verze":"3.43"`. Commit `f99aed6`.
 - Živě ověřeno po nasazení 26. 10. 2026 (claude-in-chrome, ?api=events): Brno 8 → 6 akcí, Praha 21 → 17, Znojmo 6 → 1, ve všech 6 kontrolovaných městech 0 proběhlých akcí v odpovědi.
 - Příčina, proč se v některých buňkách sloupců B/C listu AKCE vůbec objevuje číslo místo data, zůstává neprošetřená (viz BACKLOG.md). Oprava řeší důsledek, ne zdroj.
 

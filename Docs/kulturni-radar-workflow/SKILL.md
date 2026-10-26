@@ -462,6 +462,11 @@ ručně přímo na disk do repa (mimo chat, mimo přílohy) a požádat Claude
 Code, ať ho přečte přímo ze souborového systému (svým file/read
 nástrojem), ne z přílohy zprávy.
 
+### Rollback produkční implementace
+- `clasp deploy -i <ID> -V <číslo verze>` nasadí existující verzi projektu a vrátí jen webovou aplikaci (např. `clasp deploy -i <ID> -V 103 -d "rollback na v3.46"`).
+- Triggery (denní kontrola, samotest, sledovaná města) a menu Sheetu běží na aktuálním kódu projektu, takže úplný návrat vyžaduje `git revert` + `clasp push -f` + deploy.
+- Číslo za @ v `clasp deployments` je číslo verze projektu, ne implementace. ID implementace je řetězec začínající `AKfycb`.
+
 ## 7. Diagnostika přes claude-in-chrome (živé ověření na produkci)
 
 Vytěženo ze session 18. 8. 2026 (redesign v3.39–v3.45), kde Claude
