@@ -58,10 +58,18 @@ function nactiRadar(volby = {}) {
       getUuid: () => require('node:crypto').randomUUID(),
     },
     PropertiesService: {
-      getScriptProperties: () => ({
-        getProperty: (k) => (k in props ? props[k] : null),
-        setProperty: (k, v) => { props[k] = v; },
-      }),
+      // v3.45: deleteProperty/getKeys (limit pokusů na PIN) + volby.propertiesThrows
+      // simuluje výpadek úložiště (fail-open testy). Hodnoty se ukládají jako
+      // řetězce, stejně jako ve skutečném Apps Scriptu.
+      getScriptProperties: () => {
+        if (volby.propertiesThrows) throw new Error('PropertiesService nedostupný (test)');
+        return {
+          getProperty: (k) => (k in props ? props[k] : null),
+          setProperty: (k, v) => { props[k] = String(v); },
+          deleteProperty: (k) => { delete props[k]; },
+          getKeys: () => Object.keys(props),
+        };
+      },
     },
     MailApp: {
       sendEmail: (komu, predmet, telo, options) => { odeslane.push({ komu, predmet, telo, options }); },
@@ -105,6 +113,7 @@ function nactiRadar(volby = {}) {
   ctx.__odeslaneEmaily = odeslane;
   ctx.__sleepMs = ctxSleepMs;
   ctx.__cacheStore = cacheStore;
+  ctx.__props = props;   // v3.45: přímý pohled do Script Properties (stav zámku PINu)
   // Konstruktor Date ze sandboxu – `instanceof Date` napříč realmy nefunguje,
   // takže testy musí Date vytvářet uvnitř stejného realmu jako skript.
   ctx.__Date = vm.runInContext('Date', ctx);

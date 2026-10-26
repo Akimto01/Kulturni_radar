@@ -3573,3 +3573,116 @@ test('v3.44: doplnitChybejiciSouradnice_ – chyba uvnitř neshodí denní kontr
   const rozbite = { getSheetByName: () => { throw new Error('Sheets nedostupné'); } };
   assert.equal(ctx.doplnitChybejiciSouradnice_(rozbite, 10), 0);
 });
+
+// ---------------------------------------------------------------------------
+// v3.45: limit pokusů na PIN (nález z přípravy quality checku 7.–8. 10. 2026:
+// 4místný PIN šlo hádat bez omezení) + doplnění testů větví přihlášení
+// ---------------------------------------------------------------------------
+
+/** Sheet UŽIVATELÉ s jedním profilem „vojta“ (PIN 1234). */
+function ssSProfilem_(ctx) {
+  const hash = ctx.hashPin_('1234', 'sul-x');
+  return { getSheetByName: (n) => n === 'UŽIVATELÉ' ? {
+    getLastRow: () => 2,
+    getRange: () => ({ getValues: () => [['vojta', 'Vojta', hash, '{}', '7. 8. 2026', '{}']] }),
+  } : null };
+}
+const T0 = Date.UTC(2026, 9, 26, 20, 0, 0);
+const MIN = 60 * 1000;
+
+test('v3.45: přihlášení – chybí profil nebo PIN → přesná chybová hláška (dřív bez testu)', () => {
+  const ctx = nactiRadar();
+  const ss = ssSProfilem_(ctx);
+  assert.equal(ctx.apiPrihlaseniUzivatele_(ss, '', '1234').error, 'chybí profil nebo PIN');
+  assert.equal(ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '').error, 'chybí profil nebo PIN');
+  assert.equal(ctx.apiPrihlaseniUzivatele_(ss, undefined, undefined).error, 'chybí profil nebo PIN');
+});
+
+test('v3.45: přihlášení – neexistující profil → „profil nenalezen“ a žádný stav v úložišti', () => {
+  const ctx = nactiRadar();
+  const v = ctx.apiPrihlaseniUzivatele_(ssSProfilem_(ctx), 'nikdo', '1234', T0);
+  assert.equal(v.ok, false);
+  assert.equal(v.error, 'profil nenalezen', 'zpřísněná aserce – dřív se ověřovalo jen ok:false');
+  assert.equal(Object.keys(ctx.__props).length, 0, 'vymyšlená ID nesmí plnit Script Properties');
+});
+
+test('v3.45: delkaZamkuPinu_ – 0 pod limitem a mezi násobky, 15/30/60 min, strop 24 h', () => {
+  assert.equal(r.delkaZamkuPinu_(4), 0);
+  assert.equal(r.delkaZamkuPinu_(5), 15 * MIN);
+  assert.equal(r.delkaZamkuPinu_(6), 0, 'mezi násobky limitu se nezamyká');
+  assert.equal(r.delkaZamkuPinu_(10), 30 * MIN);
+  assert.equal(r.delkaZamkuPinu_(15), 60 * MIN);
+  assert.equal(r.delkaZamkuPinu_(5 * 20), 24 * 60 * MIN, 'strop 24 h');
+});
+
+test('v3.45: 4 chybné pokusy → bez zámku; 5. chybný → zámek 15 min s hláškou', () => {
+  const ctx = nactiRadar();
+  const ss = ssSProfilem_(ctx);
+  for (let i = 0; i < 4; i++) {
+    const v = ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '0000', T0 + i * 1000);
+    assert.equal(v.error, 'nesprávný PIN');
+    assert.equal(v.zamceno, undefined);
+  }
+  const paty = ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '0000', T0 + 5000);
+  assert.equal(paty.ok, false);
+  assert.equal(paty.zamceno, true);
+  assert.match(paty.error, /zkus to znovu za 15 min/);
+});
+
+test('v3.45: během zámku se odmítne i SPRÁVNÝ PIN a pokus se nepočítá', () => {
+  const ctx = nactiRadar();
+  const ss = ssSProfilem_(ctx);
+  for (let i = 0; i < 5; i++) ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '0000', T0);
+  const stavPred = ctx.__props['pin_pokusy_vojta'];
+  const v = ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '1234', T0 + 10 * MIN);
+  assert.equal(v.ok, false, 'odpověď nesmí prozradit, že PIN byl správný');
+  assert.equal(v.zamceno, true);
+  assert.match(v.error, /za 5 min/);
+  assert.equal(ctx.__props['pin_pokusy_vojta'], stavPred, 'pokus během zámku se nezapočítá');
+});
+
+test('v3.45: po vypršení zámku správný PIN projde a počítadlo se vynuluje', () => {
+  const ctx = nactiRadar();
+  const ss = ssSProfilem_(ctx);
+  for (let i = 0; i < 5; i++) ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '0000', T0);
+  const v = ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '1234', T0 + 15 * MIN + 1000);
+  assert.equal(v.ok, true);
+  assert.equal('pin_pokusy_vojta' in ctx.__props, false, 'úspěch smaže stav pokusů');
+});
+
+test('v3.45: po vypršení zámku dalších 5 chyb bez úspěchu → zámek 30 min (zdvojení)', () => {
+  const ctx = nactiRadar();
+  const ss = ssSProfilem_(ctx);
+  for (let i = 0; i < 5; i++) ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '0000', T0);
+  const poZamku = T0 + 16 * MIN;
+  let v;
+  for (let i = 0; i < 5; i++) v = ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '0000', poZamku);
+  assert.equal(v.zamceno, true);
+  assert.match(v.error, /za 30 min/);
+});
+
+test('v3.45: úspěch před dosažením limitu vynuluje počítadlo (chyby se nesčítají přes úspěch)', () => {
+  const ctx = nactiRadar();
+  const ss = ssSProfilem_(ctx);
+  for (let i = 0; i < 4; i++) ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '0000', T0);
+  assert.equal(ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '1234', T0).ok, true);
+  for (let i = 0; i < 4; i++) {
+    assert.equal(ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '0000', T0).zamceno, undefined);
+  }
+});
+
+test('v3.45: výpadek PropertiesService → fail-open (správný PIN projde, špatný jen „nesprávný PIN“)', () => {
+  const ctx = nactiRadar({ propertiesThrows: true });
+  const ss = ssSProfilem_(ctx);
+  assert.equal(ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '1234', T0).ok, true);
+  assert.equal(ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '0000', T0).error, 'nesprávný PIN');
+});
+
+test('v3.45: odemknoutVsechnyProfily – smaže jen stav pokusů, ostatní Script Properties nechá', () => {
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' } });
+  const ss = ssSProfilem_(ctx);
+  for (let i = 0; i < 5; i++) ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '0000', T0);
+  assert.equal(ctx.odemknoutVsechnyProfily(), 1);
+  assert.equal(ctx.__props.ANTHROPIC_API_KEY, 'k');
+  assert.equal(ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '1234', T0 + MIN).ok, true, 'po odemčení hned projde');
+});

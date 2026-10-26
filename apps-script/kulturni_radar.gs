@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.44 (26. 10. 2026) – počasí: N/A místo CHYBA mimo dosah met.no, HTTP kódy v logu, záložně souřadnice obce; souřadnice: zjednodušený dotaz + denní dohledání chybějících
- * (předchozí: 3.43 – parseCzDate_: rozpozná i sériové číslo data (proběhlé akce se zase skrývají))
+ * Verze: 3.45 (26. 10. 2026) – přihlášení: limit pokusů na PIN (5 chyb → zámek 15 min, zdvojování, strop 24 h)
+ * (předchozí: 3.44 – počasí: N/A místo CHYBA mimo dosah met.no, HTTP kódy v logu, záložně souřadnice obce; souřadnice: zjednodušený dotaz + denní dohledání chybějících)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.44';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.45';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -568,6 +568,7 @@ function onOpen() {
     .addItem('Samotest', 'runSelfTest')
     .addSeparator()
     .addItem('Nastavit uživatelské profily (jednorázově)', 'migraceUzivatelskeProfily')
+    .addItem('Odemknout všechny profily (limit PINu)', 'odemknoutVsechnyProfily')
     .addItem('Přidat sloupec Notifikace do UŽIVATELÉ (jednorázově)', 'migraceNotifikaceSloupec_')
     .addToUi();
 }
@@ -1749,12 +1750,89 @@ function overitPin_(pin, ulozenyHash) {
   return hashPin_(pin, sul) === ulozenyHash;
 }
 
-/** API: přihlášení uživatelského profilu jménem/ID + PIN. Nikdy nevrací hash. */
-function apiPrihlaseniUzivatele_(ss, uzivatelId, pin) {
+// ---------------------------------------------------------------------------
+// LIMIT POKUSŮ NA PIN (v3.45) – nejkratší PIN má 4 znaky a dřív nic neomezovalo
+// počet pokusů (nález z přípravy quality checku, 7.–8. 10. 2026). Stav per
+// profil v Script Properties (ne CacheService – ta má strop 6 h a Google ji
+// může kdykoli vyhodit, což by zámek tiše zrušilo).
+// ---------------------------------------------------------------------------
+
+const PIN_LIMIT_POKUSU = 5;                       // chybných pokusů v řadě → zámek
+const PIN_ZAMEK_ZAKLAD_MS = 15 * 60 * 1000;       // první zámek 15 min
+const PIN_ZAMEK_STROP_MS = 24 * 60 * 60 * 1000;   // zdvojování nejvýš do 24 h
+const PIN_POKUSY_PREFIX = 'pin_pokusy_';
+
+/** PURE: délka zámku po `chybnych` chybných pokusech v řadě – 0 pod limitem,
+ *  jinak 15 min a každých dalších PIN_LIMIT_POKUSU chyb dvojnásobek (strop 24 h). */
+function delkaZamkuPinu_(chybnych) {
+  if (chybnych < PIN_LIMIT_POKUSU || chybnych % PIN_LIMIT_POKUSU !== 0) return 0;
+  const kolikaty = chybnych / PIN_LIMIT_POKUSU;   // 1., 2., 3. … zámek
+  return Math.min(PIN_ZAMEK_ZAKLAD_MS * Math.pow(2, kolikaty - 1), PIN_ZAMEK_STROP_MS);
+}
+
+/** PURE: nový stav po chybném pokusu ({chybnych, zamcenoDo} v ms epoch). */
+function zaznamenatChybnyPin_(stav, ted) {
+  const chybnych = ((stav && stav.chybnych) || 0) + 1;
+  const zamek = delkaZamkuPinu_(chybnych);
+  return { chybnych, zamcenoDo: zamek ? ted + zamek : 0 };
+}
+
+/** PURE: kolik celých minut zbývá do konce zámku (0 = nezamčeno). */
+function zbyvaMinutZamkuPinu_(stav, ted) {
+  if (!stav || !stav.zamcenoDo || stav.zamcenoDo <= ted) return 0;
+  return Math.ceil((stav.zamcenoDo - ted) / 60000);
+}
+
+/** Načte stav pokusů profilu. Chyba úložiště nebo rozbitý JSON → null
+ *  (fail-open: výpadek Googlu nesmí rodinu zamknout). */
+function nactiStavPinu_(uzivatelId) {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty(PIN_POKUSY_PREFIX + uzivatelId);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    Logger.log('Limit PINu: stav nejde načíst (' + e + ') – pokračuji bez limitu.');
+    return null;
+  }
+}
+
+function ulozitStavPinu_(uzivatelId, stav) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    if (stav) props.setProperty(PIN_POKUSY_PREFIX + uzivatelId, JSON.stringify(stav));
+    else props.deleteProperty(PIN_POKUSY_PREFIX + uzivatelId);
+  } catch (e) { Logger.log('Limit PINu: stav nejde uložit (' + e + ').'); }
+}
+
+/** Ruční nouzové odemčení VŠECH profilů (menu / editor) – smaže stav pokusů. */
+function odemknoutVsechnyProfily() {
+  const props = PropertiesService.getScriptProperties();
+  const klice = props.getKeys().filter(k => k.indexOf(PIN_POKUSY_PREFIX) === 0);
+  klice.forEach(k => props.deleteProperty(k));
+  Logger.log('Odemčeno profilů: ' + klice.length);
+  return klice.length;
+}
+
+/** API: přihlášení uživatelského profilu jménem/ID + PIN. Nikdy nevrací hash.
+ *  v3.45: limit pokusů – během zámku se PIN vůbec neověřuje (ani správný),
+ *  jinak by odpověď prozradila trefu. `ted` jen pro testy. */
+function apiPrihlaseniUzivatele_(ss, uzivatelId, pin, ted) {
   if (!uzivatelId || !pin) return { ok: false, error: 'chybí profil nebo PIN' };
   const uzivatel = readUzivatele_(ss).find(u => u.id === uzivatelId);
-  if (!uzivatel) return { ok: false, error: 'profil nenalezen' };
-  if (!overitPin_(pin, uzivatel.pinHash)) return { ok: false, error: 'nesprávný PIN' };
+  if (!uzivatel) return { ok: false, error: 'profil nenalezen' };   // bez stavu – ať nejde plnit úložiště vymyšlenými ID
+  const nyni = ted || Date.now();
+  const stav = nactiStavPinu_(uzivatelId);
+  const zbyva = zbyvaMinutZamkuPinu_(stav, nyni);
+  if (zbyva) return { ok: false, zamceno: true, error: 'Příliš mnoho pokusů, zkus to znovu za ' + zbyva + ' min.' };
+  if (!overitPin_(pin, uzivatel.pinHash)) {
+    const novy = zaznamenatChybnyPin_(stav, nyni);
+    ulozitStavPinu_(uzivatelId, novy);
+    if (novy.zamcenoDo) {
+      return { ok: false, zamceno: true, error: 'nesprávný PIN – příliš mnoho pokusů, zkus to znovu za ' +
+        zbyvaMinutZamkuPinu_(novy, nyni) + ' min.' };
+    }
+    return { ok: false, error: 'nesprávný PIN' };
+  }
+  if (stav) ulozitStavPinu_(uzivatelId, null);   // úspěch vynuluje počítadlo
   let filtry = {};
   try { filtry = uzivatel.filtry ? JSON.parse(uzivatel.filtry) : {}; } catch (e) { filtry = {}; }
   let notifikace = {};
