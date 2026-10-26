@@ -1,5 +1,28 @@
 # Changelog
 
+## Index.html v3.61 – zahodit pozdní odpověď při přepínání profilu – 26. 10. 2026
+### Kontext
+- V plném běhu frontend sady (26. 10. 2026) spadly dva chip testy (Chip typu stálého místa: 0 != 18, Chip Oblíbená místa: 0 != 15), izolovaně 2× PASS. Vysvětlení s pevným `Sleep 300ms` se ukázalo jako chybné (chipy překreslují synchronně bez síťového požadavku, ověřeno čtením `Index.html`).
+### Důkaz chyby (fault injection)
+- V prohlížeči (claude-in-chrome) s odpovědí pro Českou Lípu uměle zpožděnou o 4 s (obal `window.fetch`, jen v záložce) a přepnutím Česká Lípa → Brno stránka po pozdní odpovědi pod volbou Brno ukázala 0 akcí a 0 míst. `nactiAkce` a `nactiMista` neměly ochranu proti pozdní odpovědi.
+- Bez zpoždění se chyba ani před opravou 4× nezreprodukovala.
+### Změněno
+- `nactiAkce` a `nactiMista`: pořadová čísla požadavků (`poradiNacteniAkci_`, `poradiNacteniMist_`). Zpracuje se jen odpověď na poslední požadavek, zastaralá odpověď i chyba zastaralého požadavku se zahodí.
+- `tests/frontend-harness.js`: podpora `async function` (vezme i předchozí klíčové slovo `async`).
+### Testy
+- Node 536 → 540 (+4), mutačně ověřené 4/4, včetně mutace „stráž nezpracuje nic“.
+### Živé ověření 26. 10. 2026 (fault injection, Česká Lípa → Brno, odpověď zpožděná o 4 s)
+| | v3.60 (před opravou) | v3.61 (po opravě, 2 pokusy) |
+|---|---|---|
+| Akcí pod volbou Brno | 0 | 14 |
+| Míst pod volbou Brno | 0 | 18 |
+- RF po nasazení: smoke 11/11, frontend sada bez zápisových testů 45/45.
+### Závěr a omezení
+- Že šlo o příčinu dnešních pádů chip testů, je pravděpodobné, ne dokázané: bez zpoždění se chyba nereprodukovala a pády se v plném běhu objevily jen jednou.
+### Poznámka
+- Backend beze změny (3.49), `Index.html` v3.61. Apps Script verze projektu 107, commit `d86001c`.
+- Frontend se nasazuje `git push` (Cloudflare Pages), na Apps Script jde přes clasp.
+
 ## RF testy (bez bump verze) – kalendář hover: deterministická souhra s předchozím testem – 26. 10. 2026
 ### Kontext
 - Pád testu „Kalendář: hover na den s akcí zobrazí tooltip…“ v plném běhu (26. 10. 2026), izolovaně PASS.
