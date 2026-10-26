@@ -1,5 +1,32 @@
 # Changelog
 
+## Backend v3.46 – stálá místa: párování podle klíče názvu, skrytí duplicit – 26. 10. 2026
+### Kontext
+- Příčina ověřená v listu MÍSTA: AI při měsíční aktualizaci (`updateMista`) vymýšlí pokaždé jiné ID a mírně jiný název („Punkevní jeskyně a propast Macocha“ vs. „… & propast Macocha“, „VIDA! science centrum“ vs. „VIDA! Science Centrum Brno“). `upsertMista_` párovala přes přesné ID nebo přesný název+obec, takže vznikl nový řádek a starý zůstal.
+### Změněno
+- Nová čistá `klicMista_(nazev, obec)`: slova názvu (bez diakritiky, interpunkce, číslic) bez spojky „a“ a bez slov obce, seřazená, + normalizovaná obec. Když by po odebrání slov obce nic nezbylo, použije se celý název.
+- `upsertMista_` páruje přes `klicMista_` (dřív přes přesný název+obec). Zápis se mění jen v párování: příští měsíční aktualizace přepíše existující řádek místo přidání nového.
+- Nová čistá `deduplikovatMista_`: z řádků listu MÍSTA nechá pro každý klíč jeden, s nejnovější „Poslední aktualizací“ (sloupec N), při shodě pozdější řádek.
+- `readMista_` nejdřív vyfiltruje aktivní řádky profilu a pak skryje duplicity.
+- Nic se nemaže. Staré duplicitní řádky v listu MÍSTA zůstávají, jen se nezobrazují. Dva staré řádky (Macocha s „a“, „VIDA! science centrum“) jdou případně ručně smazat.
+### Ověřené riziko
+- Oblíbená místa (🏛) se vážou na AKCE, ne na list MÍSTA, takže skrytí řádku nemůže zrušit uživatelovo označení (ověřeno čtením kódu: apiToggleMisto_ ukládá do listu OZNAČENÍ typ oblibene_misto pod klíčem klicSouradnic_(misto, obec) z akce; výstup readMista_ žádnou informaci o oblíbenosti nenese).
+### Kompromis
+- Tolerantní klíč by sloučil i dvě různá místa v téže obci, která se liší jen pořadím slov, spojkou „a“ nebo slovem z názvu obce.
+- U stálých míst jednoho profilu je to nepravděpodobné. Dopad by byl jen na zobrazení (skrytý řádek) a na párování při aktualizaci, žádná data se nemažou.
+### Testy
+- 8 nových Node testů (506 → 514, sekce „v3.46“ v `tests/unit.test.js`), mutačně ověřené.
+### Živé ověření 26. 10. 2026 (`?api=places&profil=Brno`)
+| | Před (v3.45) | Po (v3.46) |
+|---|---|---|
+| Počet míst | 20 | 18 |
+| VIDA | 2× („VIDA! science centrum“, „VIDA! Science Centrum Brno“) | 1× „VIDA! Science Centrum Brno“ |
+| Macocha | 2× (s „a“ a s „&“) | 1× s „&“ |
+- Smoke RF 11/11.
+### Poznámka
+- Verze patří jen backendu (`kulturni_radar.gs` 3.46), `Index.html` beze změny.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.46"`, implementace @103), ověřeno `?api=meta` → `"verze":"3.46"`. Commit `f6e784e`.
+
 ## CI: RF dry run při každém pushi – 26. 10. 2026
 ### Přidáno
 - `.github/workflows/node-tests.yml`: samostatný job `rf-dryrun` vedle `node-testy`. Kroky: `actions/setup-python` (Python 3.12, pip cache podle `tests/robot/requirements.txt`), `actions/setup-node` (Node 22), `pip install -r tests/robot/requirements.txt`, `rfbrowser init --skip-browsers`, `robot --dryrun --output NONE --report NONE --log NONE tests/robot/`.
