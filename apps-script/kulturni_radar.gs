@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.45 (26. 10. 2026) – přihlášení: limit pokusů na PIN (5 chyb → zámek 15 min, zdvojování, strop 24 h)
- * (předchozí: 3.44 – počasí: N/A místo CHYBA mimo dosah met.no, HTTP kódy v logu, záložně souřadnice obce; souřadnice: zjednodušený dotaz + denní dohledání chybějících)
+ * Verze: 3.46 (26. 10. 2026) – stálá místa: párování podle klíče názvu (bez „a“/„&“, obce, pořadí slov) + skrytí stávajících duplicit při čtení
+ * (předchozí: 3.45 – přihlášení: limit pokusů na PIN (5 chyb → zámek 15 min, zdvojování, strop 24 h))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.45';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.46';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -1553,6 +1553,38 @@ function markPastEvents() {
 const MISTA_HLAVICKA = ['ID', 'Název', 'Typ', 'Obec', 'Dojezd', 'Otevírací doba',
   'Sezónní poznámka', 'Vstupné', 'Vhodné pro děti', 'Skóre', 'Stav', 'URL',
   'Poznámka', 'Poslední aktualizace', 'Profil lokality'];
+
+/** PURE (v3.46): porovnávací klíč stálého místa. AI při měsíční aktualizaci
+ *  vymýšlí pokaždé jiné ID a mírně jiný název („Punkevní jeskyně a propast
+ *  Macocha“ vs. „… & propast Macocha“, „VIDA! science centrum“ vs. „VIDA!
+ *  Science Centrum Brno“), takže párování přes přesné ID/název vytvářelo
+ *  duplicity. Klíč = slova názvu (normNazev_: bez diakritiky, interpunkce,
+ *  číslic) bez spojky „a“ a bez slov obce, seřazená, + normalizovaná obec.
+ *  Když by po odebrání slov obce nic nezbylo („Brno“ v Brně), použije se
+ *  celý název. */
+function klicMista_(nazev, obec) {
+  const obecNorm = normNazev_(obec);
+  const slovaObce = new Set(obecNorm.split(' ').filter(Boolean));
+  const vsechna = normNazev_(nazev).split(' ').filter(t => t && t !== 'a');
+  const bezObce = vsechna.filter(t => !slovaObce.has(t));
+  return (bezObce.length ? bezObce : vsechna).sort().join(' ') + '|' + obecNorm;
+}
+
+/** PURE (v3.46): z řádků listu MÍSTA nechá pro každý klíč (klicMista_) jen
+ *  jeden – s nejnovější „Poslední aktualizací“ (sloupec N), při shodě
+ *  pozdější řádek. Stávající duplicity se tím na webu i v digestech skryjí,
+ *  aniž by se cokoli mazalo z listu. Pořadí výstupu = pořadí v listu. */
+function deduplikovatMista_(radky) {
+  const nejlepsi = new Map();   // klíč → index
+  const cas = r => { const d = parseCzDate_(r[13]); return d ? d.getTime() : 0; };
+  radky.forEach((r, i) => {
+    const klic = klicMista_(r[1], r[3]);
+    const j = nejlepsi.get(klic);
+    if (j === undefined || cas(r) >= cas(radky[j])) nejlepsi.set(klic, i);
+  });
+  const ponechat = new Set(nejlepsi.values());
+  return radky.filter((r, i) => ponechat.has(i));
+}
 
 /** Založí list MÍSTA s hlavičkou, pokud neexistuje. Vrací list. */
 function ensureMistaSheet_(ss) {
@@ -3066,7 +3098,7 @@ function upsertMista_(ss, cfg, places) {
   existing.forEach((row, i) => {
     if (norm_(row[14]) !== norm_(cfg.profil)) return;
     if (row[0]) byId[norm_(row[0])] = i;
-    byKey[norm_(row[1]) + '|' + norm_(row[3])] = i;
+    byKey[klicMista_(row[1], row[3])] = i;   // v3.46: tolerantní klíč místo přesného názvu
   });
 
   const today = formatDate_(new Date());
@@ -3078,14 +3110,14 @@ function upsertMista_(ss, cfg, places) {
       String(p.stav || 'aktivní'), String(p.url || ''), String(p.poznamka || ''), today, cfg.profil,
     ];
     let idx = byId[norm_(p.id)];
-    if (idx === undefined) idx = byKey[norm_(p.nazev) + '|' + norm_(p.obec)];
+    if (idx === undefined) idx = byKey[klicMista_(p.nazev, p.obec)];
     if (idx === undefined) {
       const r = sh.getLastRow() + 1;
       sh.getRange(r, 1, 1, 15).setValues([rowVals]);
       const ni = existing.length;
       existing.push(rowVals);
       if (p.id) byId[norm_(p.id)] = ni;
-      byKey[norm_(p.nazev) + '|' + norm_(p.obec)] = ni;
+      byKey[klicMista_(p.nazev, p.obec)] = ni;
       stats.nove++;
     } else {
       sh.getRange(idx + 2, 1, 1, 15).setValues([rowVals]);
@@ -3512,9 +3544,9 @@ function readMista_(ss, profil) {
   if (!sh || sh.getLastRow() < 2) return [];
   const data = sh.getRange(2, 1, sh.getLastRow() - 1, 15).getValues();
   const out = [];
-  data.forEach(row => {
-    if (norm_(row[14]) !== norm_(profil)) return;
-    if (norm_(row[10]).indexOf('aktiv') !== 0) return;
+  // v3.46: jen aktivní řádky profilu, pak skrýt duplicity (viz deduplikovatMista_)
+  const relevantni = data.filter(row => norm_(row[14]) === norm_(profil) && norm_(row[10]).indexOf('aktiv') === 0);
+  deduplikovatMista_(relevantni).forEach(row => {
     out.push({
       nazev: String(row[1] || '').trim(),
       typ: String(row[2] || '').split(';')[0].trim(),

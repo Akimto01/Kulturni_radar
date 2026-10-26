@@ -3686,3 +3686,85 @@ test('v3.45: odemknoutVsechnyProfily – smaže jen stav pokusů, ostatní Scrip
   assert.equal(ctx.__props.ANTHROPIC_API_KEY, 'k');
   assert.equal(ctx.apiPrihlaseniUzivatele_(ss, 'vojta', '1234', T0 + MIN).ok, true, 'po odemčení hned projde');
 });
+
+// ---------------------------------------------------------------------------
+// v3.46: duplicity stálých míst (AI při měsíční aktualizaci vymýšlí jiné ID
+// a mírně jiný název; párování přes přesné ID/název vytvářelo nové řádky)
+// ---------------------------------------------------------------------------
+
+test('v3.46: klicMista_ – „a“ vs. „&“ dá stejný klíč (Macocha)', () => {
+  assert.equal(
+    r.klicMista_('Punkevní jeskyně a propast Macocha', 'Blansko (Moravský kras)'),
+    r.klicMista_('Punkevní jeskyně & propast Macocha', 'Blansko (Moravský kras)'));
+});
+
+test('v3.46: klicMista_ – název obce v názvu, velikost písmen, interpunkce a pořadí slov nevadí (VIDA!)', () => {
+  const k = r.klicMista_('VIDA! science centrum', 'Brno');
+  assert.equal(r.klicMista_('VIDA! Science Centrum Brno', 'Brno'), k);
+  assert.equal(r.klicMista_('Science centrum VIDA', 'Brno'), k, 'jiné pořadí slov');
+});
+
+test('v3.46: klicMista_ – různá místa zůstanou různá', () => {
+  const k = (n, o) => r.klicMista_(n, o);
+  assert.notEqual(k('Zoo Brno', 'Brno'), k('Zoo Hodonín', 'Hodonín'), 'jiná obec');
+  assert.notEqual(k('Technické muzeum Brno', 'Brno'), k('Moravské zemské muzeum', 'Brno'));
+  assert.notEqual(k('Státní zámek Lednice', 'Lednice'), k('Státní zámek Valtice', 'Valtice'));
+  assert.notEqual(k('Kateřinská jeskyně', 'Blansko (Moravský kras)'), k('Jeskyně Balcarka', 'Blansko (Moravský kras)'));
+});
+
+test('v3.46: klicMista_ – název tvořený jen obcí se nevyprázdní', () => {
+  assert.equal(r.klicMista_('Brno', 'Brno'), 'brno|brno');
+});
+
+/** Řádek listu MÍSTA (15 sloupců A–O). */
+const radekMista_ = (id, nazev, obec, aktualizace, skore = 5) =>
+  [id, nazev, 'jeskyně', obec, '', '', '', '', '', skore, 'aktivní', '', '', aktualizace, 'Brno'];
+
+test('v3.46: deduplikovatMista_ – z duplicit nechá řádek s nejnovější aktualizací, jiná místa nedotkne', () => {
+  const radky = [
+    radekMista_('punkevni-jeskyne-macocha', 'Punkevní jeskyně a propast Macocha', 'Blansko (Moravský kras)', '1. 9. 2026 6:01'),
+    radekMista_('zoo-brno', 'Zoo Brno', 'Brno', '1. 10. 2026 6:01'),
+    radekMista_('punkevni-jeskyne-moravsky-kras', 'Punkevní jeskyně & propast Macocha', 'Blansko (Moravský kras)', '1. 10. 2026 6:01'),
+  ];
+  const vysledek = r.deduplikovatMista_(radky).map(x => x[0]);
+  assert.equal(JSON.stringify(vysledek), JSON.stringify(['zoo-brno', 'punkevni-jeskyne-moravsky-kras']));
+});
+
+test('v3.46: deduplikovatMista_ – starší řádek níž v listu se neprosadí přes novější výš', () => {
+  const radky = [
+    radekMista_('nova', 'VIDA! Science Centrum Brno', 'Brno', '1. 10. 2026 6:01'),
+    radekMista_('stara', 'VIDA! science centrum', 'Brno', '1. 8. 2026 22:00'),
+  ];
+  assert.equal(JSON.stringify(r.deduplikovatMista_(radky).map(x => x[0])), JSON.stringify(['nova']));
+});
+
+test('v3.46: readMista_ – na webu i v digestech se duplicita zobrazí jen jednou', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ MÍSTA: [
+    [],
+    radekMista_('vida-science-centrum-brno', 'VIDA! science centrum', 'Brno', '1. 8. 2026 22:00', 9),
+    radekMista_('science-centrum-vida-brno', 'VIDA! Science Centrum Brno', 'Brno', '1. 10. 2026 6:01', 9),
+    radekMista_('zoo-brno', 'Zoo Brno', 'Brno', '1. 10. 2026 6:01', 8),
+  ] });
+  const mista = ctx.readMista_(ss, 'Brno');
+  assert.equal(mista.length, 2);
+  assert.equal(mista.filter(m => /VIDA/.test(m.nazev)).length, 1);
+  assert.equal(mista.find(m => /VIDA/.test(m.nazev)).nazev, 'VIDA! Science Centrum Brno', 'zobrazí se novější verze');
+});
+
+test('v3.46: upsertMista_ – stejné místo s jiným ID a „&“ místo „a“ aktualizuje řádek, nepřidá nový', () => {
+  const ctx = nactiRadar();
+  const ss = fakeSpreadsheet({ MÍSTA: [
+    [],
+    radekMista_('punkevni-jeskyne-macocha', 'Punkevní jeskyně a propast Macocha', 'Blansko (Moravský kras)', '1. 9. 2026 6:01'),
+  ] });
+  const stats = ctx.upsertMista_(ss, { profil: 'Brno' }, [{
+    id: 'punkevni-jeskyne-moravsky-kras', nazev: 'Punkevní jeskyně & propast Macocha',
+    typ: 'jeskyně', obec: 'Blansko (Moravský kras)', skore: 9, stav: 'aktivní',
+  }]);
+  assert.equal(stats.nove, 0);
+  assert.equal(stats.aktualizovane, 1);
+  const sh = ss.getSheetByName('MÍSTA');
+  assert.equal(sh.getLastRow(), 2, 'pořád jen hlavička + jeden řádek');
+  assert.equal(sh.rows[1][1], 'Punkevní jeskyně & propast Macocha', 'řádek převzal novou verzi');
+});
