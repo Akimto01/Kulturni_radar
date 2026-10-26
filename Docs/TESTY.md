@@ -287,7 +287,7 @@ sjednotit na `Skip`.
 
 | Workflow | Trigger | Obsah |
 |---|---|---|
-| `node-tests.yml` | každý push, PR, ručně | unit + frontend unit |
+| `node-tests.yml` | každý push, PR, ručně | unit + frontend unit, RF dry run (syntaxe + keywordy) |
 | `cloudflare-worker-tests.yml` | push/PR se změnou `cloudflare-worker/**`, ručně | worker |
 | `rf-tests.yml` | neděle 19:00 UTC (po nedělním samotestu), ručně | API, pak frontend (`if: always()`), reporty jako artefakt na 14 dní |
 

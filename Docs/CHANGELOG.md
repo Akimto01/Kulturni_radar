@@ -1,5 +1,20 @@
 # Changelog
 
+## CI: RF dry run při každém pushi – 26. 10. 2026
+### Přidáno
+- `.github/workflows/node-tests.yml`: samostatný job `rf-dryrun` vedle `node-testy`. Kroky: `actions/setup-python` (Python 3.12, pip cache podle `tests/robot/requirements.txt`), `actions/setup-node` (Node 22), `pip install -r tests/robot/requirements.txt`, `rfbrowser init --skip-browsers`, `robot --dryrun --output NONE --report NONE --log NONE tests/robot/`.
+- Co dry run ověří: syntaxi všech 59 testů, existenci klíčových slov a platnost názvů argumentů, a to bez sítě a bez přístupu k Apps Scriptu, takže nezávisí na stavu produkce.
+- Proč `--skip-browsers`: Browser knihovna potřebuje při načtení své Node závislosti (listener), ale prohlížeče se v dry runu nespouštějí, takže se nestahují (rychlejší a levnější běh).
+### Mutační ověření
+- Provedeno dvakrát nezávisle se shodným výsledkem: na Windows (Claude Code, mutace níže) a na Linuxu (Claude v chatu, jiné mutace stejných tří typů: překlep `Clsoe Page`, `msg=` u jiného volání `Wait For Elements State`, proměnná `${NEEXISTUJE}`).
+- Překlep v názvu keywordu (`Wait For Elementz State`): dry run ho chytí („No keyword with name … found“), 49/50, exit 1.
+- Nepodporovaný argument `msg=` u `Wait For Elements State`: chytí („got unexpected named argument 'msg'“), 49/50, exit 1.
+- Neexistující proměnná (`${FRAME_NEEXISTUJE}`): NEchytí, 59/59, exit 0. Dry run proměnné nevyhodnocuje. Omezení je zapsané i v komentáři v `node-tests.yml`.
+### Výsledek v CI
+- Commit `f3a2e9b`: `rf-dryrun` zelený, 59/59, běh 21 s (první běh se studenou pip cache; zrychlení s teplou cache zatím neověřeno). `node-testy` zelený, 7 s.
+### Poznámka
+- Jen CI, žádná změna kódu appky ani testů, bez bumpu verze (backend i frontend beze změny).
+
 ## Backend v3.45 – limit pokusů na PIN – 26. 10. 2026
 ### Kontext
 - Nález z přípravy quality checku (7.–8. 10. 2026): nejkratší PIN má 4 znaky a nic neomezovalo počet pokusů, PIN šlo hádat.
