@@ -3408,3 +3408,168 @@ test('v3.43: markPastEvents – sériové „Datum do“ v minulosti → stav �
   assert.equal(akceSheet.rows[2][13], 'proběhlo', 'bez „Datum do“ rozhoduje sériové „Datum od“');
   assert.equal(akceSheet.rows[3][13], 'potvrzeno', 'budoucí akce se nesmí označit');
 });
+
+// ---------------------------------------------------------------------------
+// v3.44: počasí a souřadnice (živá kontrola 26. 10. 2026: ~polovina akcí bez
+// souřadnic, CHYBA u akcí mimo dosah met.no, KONTROLY bez HTTP kódů)
+// ---------------------------------------------------------------------------
+
+const NOMINATIM_NIC = { code: 200, body: [] };
+const NOMINATIM_BOD = (lat, lon) => ({ code: 200, body: [{ lat: String(lat), lon: String(lon) }] });
+
+test('v3.44: sestavZjednodusenyDotazGeokodovani_ – první část místa před čárkou/pomlčkou/závorkou + obec', () => {
+  assert.equal(r.sestavZjednodusenyDotazGeokodovani_('Fléda, Štefánikova 266/24, Brno', 'Brno'), 'Fléda, Brno, Česko');
+  assert.equal(r.sestavZjednodusenyDotazGeokodovani_('Zelný trh \u2013 horní část', 'Brno'), 'Zelný trh, Brno, Česko');
+  assert.equal(r.sestavZjednodusenyDotazGeokodovani_('Muzeum (MZM)', 'Brno'), 'Muzeum, Brno, Česko');
+  assert.equal(r.sestavZjednodusenyDotazGeokodovani_('BVV, pavilon E', 'Brno'), 'BVV, Brno, Česko');
+});
+
+test('v3.44: sestavZjednodusenyDotazGeokodovani_ – nejde zjednodušit → prázdný řetězec', () => {
+  assert.equal(r.sestavZjednodusenyDotazGeokodovani_('Jurkovičova vila', 'Brno'), '', 'bez oddělovače');
+  assert.equal(r.sestavZjednodusenyDotazGeokodovani_('Brno-Komín', 'Brno'), '', 'spojovník bez mezer není oddělovač');
+  assert.equal(r.sestavZjednodusenyDotazGeokodovani_('ZŠ, Pastviny', 'Brno'), '', 'první část kratší než 3 znaky');
+  assert.equal(r.sestavZjednodusenyDotazGeokodovani_('', 'Brno'), '');
+});
+
+test('v3.44: zajistitSouradnice_ – plný text neprojde, zjednodušený ano → uloží se pod PŮVODNÍ klíč', () => {
+  const volane = [];
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([NOMINATIM_NIC, NOMINATIM_BOD(49.2, 16.6)], volane) });
+  const ss = fakeSpreadsheet({ SOUŘADNICE: [[]] });
+  const cache = new Map();
+  const vysledek = ctx.zajistitSouradnice_(ss, 'Fléda, Štefánikova 266/24, Brno', 'Brno', cache);
+  assert.equal(vysledek.lat, 49.2);
+  assert.equal(volane.length, 2, 'plný dotaz + zjednodušený');
+  assert.match(decodeURIComponent(volane[1]), /q=Fléda, Brno, Česko/);
+  const ulozene = ctx.readSouradnice_(ss);
+  assert.equal(ulozene.length, 1);
+  assert.equal(ulozene[0].klic, r.klicSouradnic_('Fléda, Štefánikova 266/24, Brno', 'Brno'));
+  assert.equal(ss.getSheetByName('SOUŘADNICE').rows[1][3], 'Fléda, Brno, Česko', 'zdrojový text = skutečně použitý dotaz');
+});
+
+test('v3.44: zajistitSouradnice_ – místo nejde zjednodušit → jen jeden dotaz, null, nic se neuloží', () => {
+  const volane = [];
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([NOMINATIM_NIC], volane) });
+  const ss = fakeSpreadsheet({ SOUŘADNICE: [[]] });
+  assert.equal(ctx.zajistitSouradnice_(ss, 'Jurkovičova vila', 'Brno', new Map()), null);
+  assert.equal(volane.length, 1);
+  assert.equal(ctx.readSouradnice_(ss).length, 0);
+});
+
+test('v3.44: vyhodnotPocasiUdalosti_ – Open-Meteo selhal, met.no odpověděl bez data akce → NA (ne CHYBA)', () => {
+  const souradnice = { lat: 49.1, lng: 16.6 };
+  const stary = { stav: 'OK', kod: 3, teplota: 12 };
+  const v = r.vyhodnotPocasiUdalosti_('2026-11-05', souradnice, null, null, stary, true);
+  assert.equal(v.stav, 'NA');
+  assert.equal(v.kod, '');
+});
+
+test('v3.44: vyhodnotPocasiUdalosti_ – bez 6. argumentu se chová jako dřív (oba zdroje dole → CHYBA)', () => {
+  const v = r.vyhodnotPocasiUdalosti_('2026-11-05', { lat: 49.1, lng: 16.6 }, null, null, null);
+  assert.equal(v.stav, 'CHYBA');
+});
+
+test('v3.44: shrnoutKodySelhani_ – seskupí, seřadí podle četnosti, čísla jako „HTTP N“', () => {
+  assert.equal(r.shrnoutKodySelhani_([429, 'síť', 429, 503, 429]), 'HTTP 429 ×3, HTTP 503 ×1, síť ×1');
+  assert.equal(r.shrnoutKodySelhani_([]), '');
+  assert.equal(r.shrnoutKodySelhani_(undefined), '');
+});
+
+test('v3.44: fetchJsonSKodem_ – vrací skutečný důvod selhání (HTTP kód / síť), úspěch po retry', () => {
+  let ctx = nactiRadar({ urlFetch: frontaFetchu([{ code: 429, body: {} }, { code: 429, body: {} }]) });
+  let odp = ctx.fetchJsonSKodem_('https://x');
+  assert.equal(odp.data, null);
+  assert.equal(odp.kod, 429);
+
+  ctx = nactiRadar({ urlFetch: frontaFetchu(['throw', 'throw']) });
+  assert.equal(ctx.fetchJsonSKodem_('https://x').kod, 'síť');
+
+  ctx = nactiRadar({ urlFetch: frontaFetchu([{ code: 500, body: {} }, { code: 200, body: { a: 1 } }]) });
+  odp = ctx.fetchJsonSKodem_('https://x');
+  assert.equal(odp.kod, 200);
+  assert.equal(odp.data.a, 1);
+  assert.equal(ctx.fetchJson_ === undefined, false, 'fetchJson_ dál existuje (obal)');
+});
+
+test('v3.44: aktualizujPocasi_ – Open-Meteo 429, met.no odpoví bez data akce → NA, log nese „HTTP 429“', () => {
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const za12 = pridatDny_(dnes, 12);
+  const klic = r.klicSouradnic_('Výstaviště', 'Brno');
+  const METNO_BEZ_DATA = { code: 200, body: { properties: { timeseries: [
+    { time: isoDatum_(dnes) + 'T12:00:00Z', data: { instant: { details: { air_temperature: 10 } } } },
+  ] } } };
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([{ code: 429, body: {} }, { code: 429, body: {} }, METNO_BEZ_DATA]) });
+  const ss = fakeSpreadsheet({
+    AKCE: [[], ['ev-g', czDatum_(za12), '', '', 'Caravaning', 'Výstaviště', 'Brno', '', '', '', '', '', '', '']],
+    SOUŘADNICE: [[], [klic, 49.18, 16.58, '', '']],
+    KONTROLY: [[]],
+  });
+  ctx.aktualizujPocasi_(ss);
+  assert.equal(ctx.readPocasi_(ss).find(p => p.id === 'ev-g').stav, 'NA');
+  const kontroly = ss.getSheetByName('KONTROLY');
+  assert.equal(kontroly.getLastRow(), 2, 'selhání Open-Meteo se loguje, i když z něj nevznikla CHYBA');
+  assert.match(kontroly.rows[1][2], /CHYBA u 0/);
+  assert.match(kontroly.rows[1][2], /HTTP 429 ×1/);
+});
+
+test('v3.44: aktualizujPocasi_ – místo bez souřadnic → počasí podle obce, pin (klíč místa) nevznikne', () => {
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const zitra = pridatDny_(dnes, 1);
+  const FORECAST_OK = { code: 200, body: { daily: { time: [isoDatum_(zitra)], weather_code: [2], temperature_2m_max: [9.6] } } };
+  const volane = [];
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([
+    NOMINATIM_BOD(49.19, 16.61),   // geokódování obce „Brno“
+    FORECAST_OK,
+  ], volane) });
+  const ss = fakeSpreadsheet({
+    AKCE: [[], ['ev-h', czDatum_(zitra), '', '', 'Akce', 'areál ZŠ Pastviny a Komín', 'Brno', '', '', '', '', '', '', '']],
+    SOUŘADNICE: [[]],
+    KONTROLY: [[]],
+  });
+  ctx.aktualizujPocasi_(ss);
+  const zaznam = ctx.readPocasi_(ss).find(p => p.id === 'ev-h');
+  assert.equal(zaznam.stav, 'OK');
+  assert.equal(zaznam.teplota, 10);
+  assert.match(decodeURIComponent(volane[0]), /q=Brno, Česko/, 'geokóduje se jen obec');
+  const klice = ctx.readSouradnice_(ss).map(x => x.klic);
+  assert.equal(klice.length, 1);
+  assert.equal(klice[0], r.klicSouradnic_('', 'Brno'));
+  assert.equal(klice.includes(r.klicSouradnic_('areál ZŠ Pastviny a Komín', 'Brno')), false,
+    'souřadnice obce se neukládají pod klíč místa – na mapě nevznikne zavádějící pin');
+});
+
+test('v3.44: vyberLokalityBezSouradnic_ – jen budoucí/probíhající bez cache, bez duplicit, od nejbližší', () => {
+  const dnes = new r.__Date(2026, 9, 26);
+  const d = (den, mesic) => (den + '. ' + mesic + '. 2026');
+  const data = [
+    ['a', d(10, 11), '', '', '', 'Místo Pozdě', 'Brno', '', '', '', '', '', '', ''],
+    ['b', d(28, 10), '', '', '', 'Místo Brzy', 'Brno', '', '', '', '', '', '', ''],
+    ['c', d(29, 10), '', '', '', 'Místo Brzy', 'Brno', '', '', '', '', '', '', ''],          // duplicitní lokalita
+    ['d', d(1, 10), d(30, 11), '', '', 'Místo Probíhá', 'Brno', '', '', '', '', '', '', ''],
+    ['e', d(1, 8), d(9, 8), '', '', 'Místo Minulé', 'Brno', '', '', '', '', '', '', ''],
+    ['f', d(30, 10), '', '', '', 'Místo Zrušené', 'Brno', '', '', '', '', '', '', 'zrušeno'],
+    ['g', d(30, 10), '', '', '', 'Místo Známé', 'Brno', '', '', '', '', '', '', ''],
+  ];
+  const cache = new Map([[r.klicSouradnic_('Místo Známé', 'Brno'), { lat: 1, lng: 1 }]]);
+  const vysledek = r.vyberLokalityBezSouradnic_(data, cache, dnes).map(k => k.misto);
+  assert.equal(JSON.stringify(vysledek), JSON.stringify(['Místo Probíhá', 'Místo Brzy', 'Místo Pozdě']));
+});
+
+test('v3.44: doplnitChybejiciSouradnice_ – respektuje limit, vrátí počet doplněných', () => {
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const radek = (id, misto, posun) => [id, czDatum_(pridatDny_(dnes, posun)), '', '', '', misto, 'Brno', '', '', '', '', '', '', ''];
+  const volane = [];
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([NOMINATIM_BOD(49.1, 16.1), NOMINATIM_BOD(49.2, 16.2)], volane) });
+  const ss = fakeSpreadsheet({
+    AKCE: [[], radek('x', 'Sál X', 3), radek('y', 'Sál Y', 1), radek('z', 'Sál Z', 5)],
+    SOUŘADNICE: [[]],
+  });
+  assert.equal(ctx.doplnitChybejiciSouradnice_(ss, 2), 2);
+  assert.equal(volane.length, 2, 'třetí lokalita se v tomhle běhu už nezkouší');
+  assert.match(decodeURIComponent(volane[0]), /Sál Y/, 'nejbližší akce první');
+});
+
+test('v3.44: doplnitChybejiciSouradnice_ – chyba uvnitř neshodí denní kontrolu (vrátí 0)', () => {
+  const ctx = nactiRadar();
+  const rozbite = { getSheetByName: () => { throw new Error('Sheets nedostupné'); } };
+  assert.equal(ctx.doplnitChybejiciSouradnice_(rozbite, 10), 0);
+});

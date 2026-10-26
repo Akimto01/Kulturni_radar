@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.43 (26. 10. 2026) – parseCzDate_: rozpozná i sériové číslo data (proběhlé akce se zase skrývají)
- * (předchozí: 3.42 – upsertEvents_: fuzzy shoda už nezahazuje tiše odlišná data (širší changed))
+ * Verze: 3.44 (26. 10. 2026) – počasí: N/A místo CHYBA mimo dosah met.no, HTTP kódy v logu, záložně souřadnice obce; souřadnice: zjednodušený dotaz + denní dohledání chybějících
+ * (předchozí: 3.43 – parseCzDate_: rozpozná i sériové číslo data (proběhlé akce se zase skrývají))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.43';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.44';       // jediný zdroj pravdy – hlásí se v ?api=meta
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const ANTHROPIC_MODEL_HAIKU = 'claude-haiku-4-5';  // v3.27: experiment – jen 'denní kontrola', viz callAnthropic_
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -736,6 +736,8 @@ function dailyCheck() {
     // reportu (viz runCheck_/notifyOk_) – ne ve dvou samostatných e-mailech.
     const emailTipyStats = zpracovatEmailTipy_(SpreadsheetApp.getActiveSpreadsheet());
     runCheck_('denní kontrola', emailTipyStats);
+    // v3.44: dohledat souřadnice u akcí, kterým chybí (vlastní try/catch uvnitř).
+    doplnitChybejiciSouradnice_(SpreadsheetApp.getActiveSpreadsheet(), SOURADNICE_DENNI_LIMIT);
   } catch (err) {
     notifyFail_('Denní kontrola selhala', err);
     throw err;
@@ -2287,6 +2289,18 @@ function sestavDotazGeokodovani_(misto, obec) {
   return cast.join(', ') + ', Česko';
 }
 
+/** PURE (v3.44): záložní, zjednodušený dotaz pro Nominatim – jen první část
+ *  místa před čárkou, pomlčkou nebo závorkou + obec. „Fléda, Štefánikova 266/24,
+ *  Brno“ → „Fléda, Brno, Česko“; „Zelný trh – horní část“ → „Zelný trh, Brno,
+ *  Česko“. Plný text s číslem popisným/upřesněním Nominatim často nenajde.
+ *  '' když zjednodušit nejde (místo bez oddělovače, příliš krátká první část). */
+function sestavZjednodusenyDotazGeokodovani_(misto, obec) {
+  const m = String(misto || '').trim();
+  const prvni = m.split(/\s*(?:,|\(|\s[-\u2013\u2014]\s)\s*/)[0].trim();
+  if (!prvni || prvni.length < 3 || prvni === m) return '';
+  return sestavDotazGeokodovani_(prvni, obec);
+}
+
 /** Čte list SOUŘADNICE do prostých objektů. I/O – bez logiky. */
 function readSouradnice_(ss) {
   const sh = ss.getSheetByName(SHEET.SOURADNICE);
@@ -2337,11 +2351,23 @@ function zajistitSouradnice_(ss, misto, obec, cache) {
   if (cache.has(klic)) return cache.get(klic);
   const dotaz = sestavDotazGeokodovani_(misto, obec);
   let vysledek = null;
+  let pouzityDotaz = dotaz;
   try {
     vysledek = geocodovatNominatim_(dotaz);
   } catch (e) { Logger.log('geokódování selhalo pro "' + dotaz + '": ' + e); }
+  // v3.44: plný text neprošel → zkusit zjednodušený (první část místa + obec),
+  // výsledek se uloží pod PŮVODNÍ klíč, ať ho readEventsApi_ najde.
+  if (!vysledek) {
+    const zjednoduseny = sestavZjednodusenyDotazGeokodovani_(misto, obec);
+    if (zjednoduseny && zjednoduseny !== dotaz) {
+      try {
+        vysledek = geocodovatNominatim_(zjednoduseny);
+        if (vysledek) pouzityDotaz = zjednoduseny;
+      } catch (e) { Logger.log('geokódování selhalo pro "' + zjednoduseny + '": ' + e); }
+    }
+  }
   if (vysledek) {
-    pridatSouradnici_(ss, klic, vysledek.lat, vysledek.lng, dotaz);
+    pridatSouradnici_(ss, klic, vysledek.lat, vysledek.lng, pouzityDotaz);
   }
   cache.set(klic, vysledek);   // i null se cachuje – ať se nejednoznačný text nezkouší pořád dokola
   return vysledek;
@@ -2362,6 +2388,54 @@ function zajistitSouradniceProAkce_(ss, events) {
       zajistitSouradnice_(ss, ev.misto, ev.obec, cache);
     });
   } catch (e) { Logger.log('zajistitSouradniceProAkce_ selhalo: ' + e); }
+}
+
+/** v3.44: kolik lokalit bez souřadnic se smí zkusit dohledat v jednom denním
+ *  běhu – každá stojí 1–2 dotazy na Nominatim (1,1 s pauza, pravidlo 1 dotaz/s). */
+const SOURADNICE_DENNI_LIMIT = 10;
+
+/** PURE (v3.44): lokality budoucích (i právě probíhajících) akcí, které ještě
+ *  nemají souřadnice v cache – bez duplicit, seřazené od nejbližšího termínu
+ *  (nejbližší akce mají z pinu/počasí největší užitek). */
+function vyberLokalityBezSouradnic_(data, cache, dnes) {
+  const kandidati = [];
+  const videno = new Set();
+  data.forEach(row => {
+    const stav = norm_(row[13]);
+    if (stav === 'zrušeno' || stav === 'proběhlo') return;
+    const od = parseCzDate_(row[1]);
+    if (!od) return;
+    const konec = parseCzDate_(row[2]) || od;
+    if (konec < dnes) return;
+    const klic = klicSouradnic_(row[5], row[6]);
+    if (!klic || cache.has(klic) || videno.has(klic)) return;
+    videno.add(klic);
+    kandidati.push({ misto: row[5], obec: row[6], od });
+  });
+  kandidati.sort((a, b) => a.od - b.od);
+  return kandidati.map(k => ({ misto: k.misto, obec: k.obec }));
+}
+
+/** v3.44: denní pokus dohledat souřadnice u budoucích akcí, kterým chybí –
+ *  dřív se geokódovalo jen pro akce z právě proběhlého běhu, takže lokalita,
+ *  která jednou neprošla, zůstala bez pinu i počasí navždy. Max `limit`
+ *  lokalit na běh. Chyba tady nesmí shodit denní kontrolu. Vrací počet doplněných. */
+function doplnitChybejiciSouradnice_(ss, limit) {
+  try {
+    const sh = ss.getSheetByName(SHEET.AKCE);
+    if (!sh || sh.getLastRow() < 2) return 0;
+    const data = sh.getRange(2, 1, sh.getLastRow() - 1, AKCE_COLS).getValues();
+    const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+    const cache = souradniceMapy_(readSouradnice_(ss));
+    let doplneno = 0;
+    vyberLokalityBezSouradnic_(data, cache, dnes).slice(0, limit).forEach(k => {
+      if (zajistitSouradnice_(ss, k.misto, k.obec, cache)) doplneno++;
+    });
+    return doplneno;
+  } catch (e) {
+    Logger.log('doplnitChybejiciSouradnice_ selhalo: ' + e);
+    return 0;
+  }
 }
 
 /** Jednorázové (ruční, z menu) doplnění souřadnic pro VŠECHNY existující akce
@@ -2404,6 +2478,7 @@ function doplnitSouradniceZpetne() {
 
 const POCASI_HLAVICKA = ['ID akce', 'Aktualizováno', 'Stav', 'Kód počasí', 'Teplota (°C)'];
 const POCASI_FORECAST_DAYS = 16;   // dosah denní předpovědi Open-Meteo
+const POCASI_LIMIT_NOVYCH_OBCI = 10;   // v3.44: max nově geokódovaných obcí za běh (Nominatim 1 dotaz/s)
 
 function ensurePocasiSheet_(ss) {
   let sh = ss.getSheetByName(SHEET.POCASI);
@@ -2466,11 +2541,13 @@ function metNoTextNaKod_(text) {
  *  - forecast (Open-Meteo, {time,code,teplota}) obsahuje datum akce → OK.
  *  - forecast je non-null, ale datum akce v něm není → mimo 16denní dosah → NA
  *    (Open-Meteo fungovalo, prostě tak daleko nevidí – to NENÍ chyba).
+ *  - v3.44: met.no odpověděl (metNoOdpovedel), ale pro datum akce nemá data
+ *    (vidí ~9 dní) → NA, ne CHYBA – dosah předpovědi, ne výpadek.
  *  - forecast je null (Open-Meteo request selhal) → zkusit metNoDenni
  *    (agregovatMetNoDen_ výsledek); když i ten chybí → CHYBA, se zachováním
  *    poslední OK hodnoty ze `stary`, pokud existuje (jinak NA-like prázdno,
  *    ale stav zůstává CHYBA, ať frontend/KONTROLY vidí skutečný výpadek). */
-function vyhodnotPocasiUdalosti_(iso, souradnice, forecast, metNoDenni, stary) {
+function vyhodnotPocasiUdalosti_(iso, souradnice, forecast, metNoDenni, stary, metNoOdpovedel) {
   if (!souradnice) return { stav: 'NA', kod: '', teplota: '' };
   if (forecast) {
     const i = forecast.time.indexOf(iso);
@@ -2484,6 +2561,9 @@ function vyhodnotPocasiUdalosti_(iso, souradnice, forecast, metNoDenni, stary) {
       teplota: Math.round(metNoDenni.maxTeplota),
     };
   }
+  // v3.44: met.no odpověděl, jen pro tohle datum nemá data (vidí ~9 dní, akce
+  // je dál) → to není výpadek, ale dosah předpovědi: NA, ne CHYBA.
+  if (metNoOdpovedel) return { stav: 'NA', kod: '', teplota: '' };
   if (stary && stary.kod !== '' && stary.kod != null) {
     return { stav: 'CHYBA', kod: stary.kod, teplota: stary.teplota };
   }
@@ -2493,26 +2573,61 @@ function vyhodnotPocasiUdalosti_(iso, souradnice, forecast, metNoDenni, stary) {
 /** Zavolá Open-Meteo pro dané souřadnice; vrací {time, code, teplota} (paralelní
  *  pole stejná jako v odpovědi API), nebo null při selhání requestu. */
 function ziskatOpenMeteoPredpoved_(lat, lng) {
-  const d = fetchJson_(
+  return ziskatOpenMeteoPredpovedSKodem_(lat, lng).forecast;
+}
+
+/** v3.44: jako ziskatOpenMeteoPredpoved_, ale vrací i důvod selhání
+ *  ({forecast, kod}) – kod je HTTP kód, 'síť' nebo 'neúplná odpověď'. */
+function ziskatOpenMeteoPredpovedSKodem_(lat, lng) {
+  const odp = fetchJsonSKodem_(
     'https://api.open-meteo.com/v1/forecast?daily=weather_code,temperature_2m_max' +
     '&timezone=Europe%2FPrague&forecast_days=' + POCASI_FORECAST_DAYS +
     '&latitude=' + lat + '&longitude=' + lng);
-  if (!d || !d.daily || !d.daily.time) return null;
-  return { time: d.daily.time, code: d.daily.weather_code, teplota: d.daily.temperature_2m_max };
+  const d = odp.data;
+  if (!d || !d.daily || !d.daily.time) {
+    return { forecast: null, kod: odp.kod === 200 ? 'neúplná odpověď' : odp.kod };
+  }
+  return { forecast: { time: d.daily.time, code: d.daily.weather_code, teplota: d.daily.temperature_2m_max }, kod: 200 };
+}
+
+/** PURE (v3.44): pole důvodů selhání → „HTTP 429 ×3, síť ×1“ (nejčastější
+ *  první). Prázdné pole → ''. */
+function shrnoutKodySelhani_(kody) {
+  const pocty = {};
+  (kody || []).forEach(k => {
+    const popis = typeof k === 'number' ? 'HTTP ' + k : String(k == null ? 'neznámo' : k);
+    pocty[popis] = (pocty[popis] || 0) + 1;
+  });
+  return Object.keys(pocty)
+    .sort((a, b) => pocty[b] - pocty[a] || a.localeCompare(b))
+    .map(p => p + ' ×' + pocty[p])
+    .join(', ');
 }
 
 /** Zaloguje do KONTROL, že se pro část akcí nepodařilo počasí získat ani ze
  *  záložního met.no – stejný vzor jako ostatní API chyby v projektu (viz
  *  runSelfTest / weatherApiDostupne_), ať je to vidět i mimo Apps Script log. */
-function logKontrolaPocasi_(ss, pocetChyb) {
+function logKontrolaPocasi_(ss, pocetChyb, diag) {
   try {
     const sh = ss.getSheetByName(SHEET.KONTROLY);
     if (!sh) return;
+    // v3.44: kromě počtu akcí ve stavu CHYBA i skutečné důvody selhání
+    // (HTTP kódy) – dřív fetchJson_ kód zahazoval a příčina nebyla vidět.
+    const d = diag || {};
+    let rozsah = 'CHYBA u ' + pocetChyb + ' akc(í/e)';
+    if (d.openMeteoKody && d.openMeteoKody.length) {
+      rozsah += '; Open-Meteo selhalo pro ' + d.openMeteoKody.length + ' lokalit(u/y) (' +
+        shrnoutKodySelhani_(d.openMeteoKody) + ')';
+    }
+    if (d.metNoKody && d.metNoKody.length) {
+      rozsah += '; met.no selhalo ' + d.metNoKody.length + '× (' + shrnoutKodySelhani_(d.metNoKody) + ')';
+    }
     sh.appendRow([
       formatDate_(new Date()), 'aktualizace počasí',
-      'Open-Meteo (+ met.no záložně) nedostupné pro ' + pocetChyb + ' akc(i/e)',
+      rozsah,
       0, 0, 0, 0, 0, 0, 0,
-      'Poslední známá hodnota zachována v listu POČASÍ (stav CHYBA).',
+      pocetChyb ? 'Poslední známá hodnota zachována v listu POČASÍ (stav CHYBA).'
+        : 'Žádná akce ve stavu CHYBA – záloha met.no nebo N/A mimo dosah předpovědi.',
       'Apps Script automatizace']);
   } catch (e) { Logger.log('Log do KONTROL (počasí) selhal: ' + e); }
 }
@@ -2543,6 +2658,7 @@ function aktualizujPocasi_(ss) {
         id,
         iso: Utilities.formatDate(od, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
         klic: klicSouradnic_(row[5], row[6]),
+        obec: String(row[6] || '').trim(),
       });
     });
     if (!udalosti.length) return;
@@ -2550,36 +2666,59 @@ function aktualizujPocasi_(ss) {
     const forecastCache = {};   // klic souřadnic → {time,code,teplota} | null
     const metNoCache = {};      // klic souřadnic → parsovaný met.no JSON | false
     let chyby = 0;
+    const openMeteoKody = [];   // v3.44: důvody selhání, jeden záznam na lokalitu
+    const metNoKody = [];
+    let novychObci = 0;         // v3.44: limit nových geokódování obce v jednom běhu
+
+    // v3.44: když místo akce nemá souřadnice, pro POČASÍ stačí souřadnice obce
+    // (pin na mapu z nich nevzniká – readEventsApi_ hledá klíč místo+obec).
+    const souradniceObce = (obec) => {
+      if (!obec) return null;
+      const klicObce = klicSouradnic_('', obec);
+      if (!souradniceMapa.has(klicObce)) {
+        if (novychObci >= POCASI_LIMIT_NOVYCH_OBCI) return null;
+        novychObci++;
+      }
+      return zajistitSouradnice_(ss, '', obec, souradniceMapa);
+    };
 
     const nove = udalosti.map(u => {
-      const souradnice = souradniceMapa.get(u.klic) || null;
-      let forecast = null, metNoDenni = null;
+      const souradnice = souradniceMapa.get(u.klic) || souradniceObce(u.obec) || null;
+      const klicPredpovedi = souradnice ? souradnice.lat + ',' + souradnice.lng : '';
+      let forecast = null, metNoDenni = null, metNoOdpovedel = false;
 
       if (souradnice) {
-        if (!(u.klic in forecastCache)) forecastCache[u.klic] = ziskatOpenMeteoPredpoved_(souradnice.lat, souradnice.lng);
-        forecast = forecastCache[u.klic];
+        if (!(klicPredpovedi in forecastCache)) {
+          const odp = ziskatOpenMeteoPredpovedSKodem_(souradnice.lat, souradnice.lng);
+          forecastCache[klicPredpovedi] = odp.forecast;
+          if (!odp.forecast) openMeteoKody.push(odp.kod);
+        }
+        forecast = forecastCache[klicPredpovedi];
 
         if (!forecast) {
-          if (!(u.klic in metNoCache)) {
-            metNoCache[u.klic] = fetchJson_(
+          if (!(klicPredpovedi in metNoCache)) {
+            const odpMetNo = fetchJsonSKodem_(
               'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + souradnice.lat + '&lon=' + souradnice.lng,
-              { 'User-Agent': METNO_USER_AGENT }) || false;
+              { 'User-Agent': METNO_USER_AGENT });
+            metNoCache[klicPredpovedi] = odpMetNo.data || false;
+            if (!odpMetNo.data) metNoKody.push(odpMetNo.kod);
           }
-          const metNo = metNoCache[u.klic];
+          const metNo = metNoCache[klicPredpovedi];
           if (metNo && metNo.properties && metNo.properties.timeseries) {
+            metNoOdpovedel = true;
             metNoDenni = agregovatMetNoDen_(metNo.properties.timeseries, u.iso);
           }
         }
       }
 
       const stary = staryMapa.get(u.id) || null;
-      const vysledek = vyhodnotPocasiUdalosti_(u.iso, souradnice, forecast, metNoDenni, stary);
+      const vysledek = vyhodnotPocasiUdalosti_(u.iso, souradnice, forecast, metNoDenni, stary, metNoOdpovedel);
       if (vysledek.stav === 'CHYBA') chyby++;
       return { id: u.id, aktualizovano: dnesText, stav: vysledek.stav, kod: vysledek.kod, teplota: vysledek.teplota };
     });
 
     zapsatPocasi_(ss, nove);
-    if (chyby) logKontrolaPocasi_(ss, chyby);
+    if (chyby || openMeteoKody.length) logKontrolaPocasi_(ss, chyby, { openMeteoKody, metNoKody });
   } catch (e) {
     Logger.log('aktualizujPocasi_ selhalo: ' + e);
   }
@@ -3341,16 +3480,31 @@ function readEventsInRange_(ss, profil, from, to) {
 
 /** GET s jedním opakováním po pauze (přechodné výpadky); parsovaný JSON, nebo null. */
 function fetchJson_(url, headers) {
+  return fetchJsonSKodem_(url, headers).data;
+}
+
+/** v3.44: jako fetchJson_, ale vrací i důvod posledního neúspěchu:
+ *  {data, kod} – kod je HTTP kód (číslo), 'síť' (výjimka UrlFetchApp) nebo
+ *  'neplatný JSON'. Dřív se kód zahazoval a příčina selhání nebyla vidět. */
+function fetchJsonSKodem_(url, headers) {
   const volby = { muteHttpExceptions: true };
   if (headers) volby.headers = headers;
+  let kod = null;
   for (let pokus = 0; pokus < 2; pokus++) {
+    let r = null;
     try {
-      const r = UrlFetchApp.fetch(url, volby);
-      if (r.getResponseCode() === 200) return JSON.parse(r.getContentText());
-    } catch (e) { /* síťová chyba – zkusit ještě jednou */ }
+      r = UrlFetchApp.fetch(url, volby);
+    } catch (e) { kod = 'síť'; }
+    if (r) {
+      kod = r.getResponseCode();
+      if (kod === 200) {
+        try { return { data: JSON.parse(r.getContentText()), kod: 200 }; }
+        catch (e) { kod = 'neplatný JSON'; }
+      }
+    }
     if (pokus === 0) Utilities.sleep(1500);
   }
-  return null;
+  return { data: null, kod };
 }
 
 /** Sonda dostupnosti Open-Meteo (fixní souřadnice Brna) – rozliší v samotestu
