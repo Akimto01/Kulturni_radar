@@ -1,5 +1,27 @@
 # Changelog
 
+## Backend v3.48 – akce bez rozpoznatelného data: nezapisovat, skrýt, hlásit – 26. 10. 2026
+### Diagnóza (čteno přes claude-in-chrome, 26. 10. 2026)
+- Bod 1, zdroj sériových čísel v listu AKCE: všech 19 řádků se sériovým číslem nebo textem s apostrofem leží v souvislém bloku řádků 36–59 z 1.–9. 8. 2026. Žádný z nich nemá vyplněný „První nález“, který `upsertEvents_` vždy zapisuje, a od srpna žádný další nevznikl. Nejpravděpodobněji šlo o jednorázovou ruční operaci. Současný kód tuto formu nevytváří a v3.43 ji už zvládá, kódová oprava proto není potřeba.
+- Bod 2, nový problém: 5 řádků z běhů sledovaných měst má jako „Datum od“ text „neuvedeno“ (Olomouc: Youngfest Šumperk, KarmaFest; Zlín: Rajnochovická lesní železnice, Slavnost pod jabloní, Mineral-Expo) a všech 5 bylo na webu. Nikdy neproběhnou, nemají počasí ani digest a dedup je nepáruje.
+### Změněno
+- `upsertEvents_`: akce bez rozpoznatelného data začátku (`parseCzDate_` vrátí `null`) nezapíše. Počet vyřazených jde do poznámky v KONTROLY („Vyřazeno bez data: N.“).
+- `readEventsApi_`: skryjí se jen řádky, ze kterých `parseCzDate_` datum nevyčte (např. „neuvedeno“, „říjen 2026“, prázdné). Sériová čísla od v3.43 projdou jako platné datum.
+- `auditDat_` a `runSelfTest`: řádky bez rozpoznatelného data (neprázdné, ne proběhlé, ne zrušené) se hlásí jako problém samotestu.
+- Prompt (`callAnthropic_`, `callAnthropicEmailTip_`): zákaz odevzdávat akci bez konkrétního data začátku.
+### Testy
+- 6 nových Node testů (524 → 530), mutačně ověřené (6 mutací).
+### Živé ověření 26. 10. 2026 (`?api=events`, akce bez číslice v `datumOd`)
+| Profil | Před (v3.47): akcí / bez data | Po (v3.48): akcí / bez data |
+|---|---|---|
+| Olomouc | 10 / 2 | 8 / 0 |
+| Zlín | 12 / 3 | 9 / 0 |
+- Smoke RF 11/11.
+### Poznámka
+- Samotest bude těch 5 řádků hlásit, dokud je někdo ručně nesmaže nebo jim nedoplní datum. Řádky v listu AKCE zůstávají, jen se nezobrazují.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.48"`), verze projektu 105, ověřeno `?api=meta` → `"verze":"3.48"`. Commit `c6be82a`.
+- Verze patří jen backendu (`kulturni_radar.gs` 3.48), `Index.html` beze změny.
+
 ## Backend v3.47 – Sonnet 5.5 pro všechny běhy, spotřeba tokenů, týdenní report kvality – 26. 10. 2026
 ### Kontext a diagnóza
 - Diagnostika nízkého počtu akcí (živá kontrola 26. 10. 2026, list KONTROLY): denní kontrola Brna na Haiku v září vrátila 25 z 30 běhů s 0 akcemi, v říjnu 10 z 26.
