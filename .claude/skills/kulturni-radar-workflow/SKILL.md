@@ -176,6 +176,7 @@ Víc tagů v jednom `--include` jde spojit i inline: `--include mapaORkalendar`.
   ve VS Code.
 
 - Od v3.45 se profil zamkne po 5 chybných PINech v řadě (15 min). Opakované spouštění samotného testu špatného PINu bez úspěšného přihlášení mezi tím zamkne rf-test - odemknout menu Sheetu 'Odemknout všechny profily (limit PINu)' nebo počkat. Zamčený rf-test navíc vyřadí celou frontend sadu, protože Suite Setup (keyword "Otevřít radar") se přihlašuje rf-test (běh 26. 10. 2026: 3/11). Pokud se odemčení neprojeví, spusť menu znovu: u nové funkce první spuštění z menu pravděpodobně spotřebuje jen autorizaci (známé chování Apps Scriptu, 26. 10. 2026 nepotvrzeno přímo).
+- Od Index.html v3.60 se testovací profily (rf-…) na přihlašovací obrazovce zobrazí jen s localStorage příznakem kr_testovaci_profily=1, který nastavuje Suite Setup (keyword Povolit testovací profily). Nový test s vlastním New Context, který se má přihlašovat, musí ten keyword zavolat také.
 
 ## 3. Sync CHANGELOG.md ↔ BACKLOG.md
 

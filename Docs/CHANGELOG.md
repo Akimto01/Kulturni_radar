@@ -1,5 +1,25 @@
 # Changelog
 
+## Backend v3.49 + Index.html v3.60 – testovací profily skryté na veřejné přihlašovací obrazovce – 26. 10. 2026
+### Kontext
+- Nález ze živé kontroly 26. 10. 2026: profil „RF Test“ byl vidět na veřejné přihlašovací obrazovce.
+- Je to kosmetika pro veřejný web, ne zabezpečení: profil dál chrání PIN a limit pokusů z v3.45.
+### Změněno
+- Backend v3.49: `apiSeznamUzivatelu_` přidává ke každému profilu `testovaci: true/false` (`jeTestovaciProfil_`: ID začíná „rf-“). Odpověď dál nenese PINy ani nic dalšího.
+- Index.html v3.60: `viditelneProfily_` skryje testovací dlaždice, pokud v `localStorage` není `kr_testovaci_profily=1` (`testovaciProfilyPovoleny_`, čtení v try/catch). Běžný návštěvník příznak nemá.
+- RF (`frontend.robot`): nový keyword „Povolit testovací profily“ v „Otevřít radar“ (Suite Setup) před přihlášením nastaví příznak v `localStorage`. Nový test „Testovací profil je bez příznaku na přihlašovací obrazovce skrytý (vlastní kontext)“ ověří, že čistý kontext žádnou dlaždici `rf-…` nevidí. Test dlaždic má doplněnou chybovou hlášku o příznaku.
+- API testy (SoapUI, Bruno, `api.robot`) se nemění, přihlašují se přímo POSTem.
+### Testy
+- Node 530 → 536 (+6), mutačně ověřené 4/4. RF 59 → 60 (dry run 60/60).
+### Živé ověření 26. 10. 2026
+- Backend: verze projektu 106, `?api=meta` → `"verze":"3.49"`, `?api=uzivatele` vrací u `rf-test` `"testovaci": true`.
+- Frontend: po `git push` Cloudflare Pages servíruje komentář „Index.html v3.60“.
+- Pohled běžného návštěvníka (claude-in-chrome, bez příznaku v localStorage): přihlašovací obrazovka nabízí jen Vojta, Monika, Míša, Jarda, dlaždice rf-test chybí.
+- RF: smoke 11/11. Frontend sada bez zápisových testů: 44/45, oba nové či dotčené testy (nový test skrytí, test dlaždic) PASS, testy po novém testu běžely dál v kontextu ze Suite Setup.
+- 1 pád v plném běhu, izolovaně 2× PASS, nesouvisí se změnou (kalendář v3.49/v3.60 neměnily): „Kalendář: hover na den s akcí zobrazí tooltip…“, `TimeoutError` při čekání na `#kalendar-tooltip.zobrazeno` (3 s). Screenshot z pádu: stránka odscrollovaná k kartám 5. a 6. 11., sticky hlavička a lišta chipů nahoře, kalendář „Říjen 2026“ viditelný a nepřekrytý, den 29 zvýrazněný, tooltip není vidět. Příčina nepotvrzena, odhad: hover během dojezdu scrollu po předchozím testu (klik na den). Viz BACKLOG.
+### Poznámka
+- Commit `9bad768`. Frontend se nasazuje `git push` (Cloudflare Pages), backend přes clasp (verze projektu 106). Backend i `Index.html` mají vlastní číslo verze (3.49 a 3.60).
+
 ## Backend v3.48 – akce bez rozpoznatelného data: nezapisovat, skrýt, hlásit – 26. 10. 2026
 ### Diagnóza (čteno přes claude-in-chrome, 26. 10. 2026)
 - Bod 1, zdroj sériových čísel v listu AKCE: všech 19 řádků se sériovým číslem nebo textem s apostrofem leží v souvislém bloku řádků 36–59 z 1.–9. 8. 2026. Žádný z nich nemá vyplněný „První nález“, který `upsertEvents_` vždy zapisuje, a od srpna žádný další nevznikl. Nejpravděpodobněji šlo o jednorázovou ruční operaci. Současný kód tuto formu nevytváří a v3.43 ji už zvládá, kódová oprava proto není potřeba.
