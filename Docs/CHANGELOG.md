@@ -1,5 +1,24 @@
 # Changelog
 
+## Backend v3.43 – parseCzDate_ rozpozná sériové číslo data – 26. 10. 2026
+### Kontext
+- Živá kontrola 26. 10. 2026 ukázala, že API vrací dávno proběhlé akce (Brno 2, Praha 4, Znojmo 5 z 6). Příčina: `parseCzDate_` neuměla sériové číslo data ze Sheets (dny od 30. 12. 1899, buňka bez datumového formátu), uměla ho jen `cellText_`. Web proto ukazoval hezké datum, ale všechno, co záviselo na `parseCzDate_`, takovou buňku nevidělo jako datum.
+### Změněno
+- Nová čistá funkce `serioveCisloNaDatum_(v)`: převede číslo v rozsahu 30000–80000 na `Date` o půlnoci místního času, jinak vrací `null`. Převod byl vytažen z `cellText_`, která ho teď volá a sdílí s `parseCzDate_`.
+- `parseCzDate_` nejdřív zkusí sériové číslo, pak teprve textový zápis `d. M. rrrr`.
+### Dopad opravy
+- Filtr proběhlých akcí v API (`readEventsApi_`): proběhlé akce se sériovým datem se zase nevrací (pokryto testem).
+- `markPastEvents`: akce se sériovým „Datum do“ v minulosti dostanou stav „proběhlo“ (pokryto testem).
+- Aktualizace počasí: buňky se sériovým datem se už berou jako datum (ověřeno čtením kódu: aktualizujPocasi_ a readEventsInRange_ přeskočí řádek, když parseCzDate_ vrátí null; bez vlastního testu).
+- Digesty: akce se sériovým datem se zase započítají podle termínu (ověřeno čtením kódu: aktualizujPocasi_ a readEventsInRange_ přeskočí řádek, když parseCzDate_ vrátí null; bez vlastního testu).
+- Deduplikace: `dateKey_` dá pro sériové číslo ISO klíč (dřív třeba „46242“), takže klíč sedí s textovým zápisem téhož data (pokryto testem).
+### Poznámka
+- 6 nových Node testů (477 → 483): převod `serioveCisloNaDatum_`, `parseCzDate_`, shoda s `cellText_` (regresní pojistka), `dateKey_`, `readEventsApi_`, `markPastEvents`.
+- Verze patří jen backendu (`kulturni_radar.gs` 3.43), `Index.html` beze změny.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.43"`, implementace @100), ověřeno `?api=meta` → `"verze":"3.43"`. Commit `f99aed6`.
+- Živě ověřeno po nasazení 26. 10. 2026 (claude-in-chrome, ?api=events): Brno 8 → 6 akcí, Praha 21 → 17, Znojmo 6 → 1, ve všech 6 kontrolovaných městech 0 proběhlých akcí v odpovědi.
+- Příčina, proč se v některých buňkách sloupců B/C listu AKCE vůbec objevuje číslo místo data, zůstává neprošetřená (viz BACKLOG.md). Oprava řeší důsledek, ne zdroj.
+
 ## Docs: ukázky testů - odkazy na kód – 8. 10. 2026
 ### Změněno
 - `Docs/Quality Check/UKAZKY-TESTU.md`: u všech tří rozebraných testů přidány trvalé odkazy na kód testu na GitHubu (odkazy na konkrétní commit `2ac6d1e`, řádky se proto neposunou), u prvního testu i odkaz na změnu před/po (commit `8ca3c96`). Doplněna věta o tom, že odkazy míří na stav repa z 8. 10. 2026.
