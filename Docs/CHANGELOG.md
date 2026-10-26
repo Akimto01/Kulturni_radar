@@ -1,5 +1,26 @@
 # Changelog
 
+## Backend v3.44 – počasí a souřadnice: N/A mimo dosah, HTTP kódy, záložní geokódování – 26. 10. 2026
+### Kontext
+- Diagnostika ze živé kontroly 26. 10. 2026 (listy KONTROLY a SOUŘADNICE) odhalila dvě příčiny.
+- Počasí CHYBA: vzniká jen v nedělních a čtvrtečních bězích sledovaných měst, kdy část volání Open-Meteo selže (důvod neznámý, `fetchJson_` zahazoval HTTP kód). Záložní met.no vidí jen ~9 dní, takže pro akce za 10+ dní nemá data, a to se chybně hodnotilo jako CHYBA.
+- Souřadnice chybí, protože klíč je přesný text místa (např. „Fléda, Štefánikova 266/24, Brno“) a Nominatim ho nenajde. Neúspěšná lokalita se navíc už nikdy nezkusila znovu (geokódovalo se jen pro akce z právě proběhlého běhu).
+### Změněno (5 bodů)
+- N/A místo CHYBA: `vyhodnotPocasiUdalosti_` dostala parametr `metNoOdpovedel`. Když met.no odpoví, ale pro datum akce nemá data, je to dosah předpovědi, stav je NA.
+- HTTP kódy v logu KONTROLY: nová `fetchJsonSKodem_` (vrací `{data, kod}`, kod = HTTP kód, „síť“ nebo „neplatný JSON“), `fetchJson_` je tenký obal. Nové `ziskatOpenMeteoPredpovedSKodem_` a `shrnoutKodySelhani_` (například „HTTP 429 ×3, síť ×1“). `logKontrolaPocasi_` zapisuje kódy selhání Open-Meteo i met.no.
+- Záložní zjednodušený dotaz pro Nominatim: `sestavZjednodusenyDotazGeokodovani_` (první část místa před čárkou, pomlčkou nebo závorkou + obec). Výsledek se ukládá pod PŮVODNÍ klíč, ať ho `readEventsApi_` najde.
+- Počasí podle souřadnic obce: když místo akce nemá souřadnice, použijí se souřadnice obce (max 10 nově geokódovaných obcí za běh, `POCASI_LIMIT_NOVYCH_OBCI`). Pin na mapě z toho nevzniká. Cache předpovědí je teď klíčovaná souřadnicemi, ne klíčem místa.
+- Denní dohledání chybějících souřadnic: `vyberLokalityBezSouradnic_` (čistá) a `doplnitChybejiciSouradnice_` volaná z `dailyCheck`, max 10 lokalit na běh (`SOURADNICE_DENNI_LIMIT`), nejbližší termíny první, chyba nesmí shodit denní kontrolu.
+### Testy
+- 13 nových Node testů (483 → 496, sekce „v3.44“ v `tests/unit.test.js`), mutačně ověřené.
+- Netestované je jen samotné zapojení `doplnitChybejiciSouradnice_` do `dailyCheck`.
+### Kompromis
+- Neúspěšné lokality se teď zkouší znovu každý den: nejhůř 10 lokalit × 2 dotazy × 1,1 s pauza ≈ 22 s navíc v denní kontrole. Cena za to, že lokalita, které se jednou nepodaří, už neskončí bez pinu a počasí navždy.
+### Poznámka
+- Verze patří jen backendu (`kulturni_radar.gs` 3.44), `Index.html` beze změny.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.44"`, implementace @101), ověřeno `?api=meta` → `"verze":"3.44"`, RF `--include smoke` 11/11. Commit `8e85860`.
+- Čeká na živé ověření po nejbližším běhu sledovaných měst (čtvrtek 10:00) a denní kontrole.
+
 ## Backend v3.43 – parseCzDate_ rozpozná sériové číslo data – 26. 10. 2026
 ### Kontext
 - Živá kontrola 26. 10. 2026 ukázala, že API vrací dávno proběhlé akce (Brno 2, Praha 4, Znojmo 5 z 6). Příčina: `parseCzDate_` neuměla sériové číslo data ze Sheets (dny od 30. 12. 1899, buňka bez datumového formátu), uměla ho jen `cellText_`. Web proto ukazoval hezké datum, ale všechno, co záviselo na `parseCzDate_`, takovou buňku nevidělo jako datum.
