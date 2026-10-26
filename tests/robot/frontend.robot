@@ -846,6 +846,12 @@ Kalendář: hover na den s akcí zobrazí tooltip s názvy akcí, mouseout ho sc
     IF    ${pocet} == 0
         Log    Aktuální měsíc nemá žádný den s akcí (.ma-akce) – test nemá co ověřit v tomto běhu.    level=WARN
     ELSE
+        # 26. 10. 2026: nejdřív odjet myší z kalendáře. Předchozí test (klik na
+        # den) nechá myš nad buňkou dne a klikem tooltip schová; když je to
+        # tatáž buňka (v říjnu 2026 jediný den s akcí, 29. 10.), Hover myší
+        # nepohne, mouseenter nevznikne a tooltip se neukáže (pád v plném
+        # běhu, izolovaně PASS). Odjetí zaručí skutečný mouseenter.
+        Hover    ${FRAME} header h1
         Hover    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce >> nth=0
         Wait For Elements State    ${FRAME} \#kalendar-tooltip.zobrazeno    visible    timeout=3s
         ${pocet_radku}=    Get Element Count    ${FRAME} \#kalendar-tooltip > div
