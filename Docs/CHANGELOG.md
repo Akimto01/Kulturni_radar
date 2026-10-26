@@ -10,7 +10,7 @@
 - Oprava v `tests/robot/frontend.robot`: před hoverem na buňku nejdřív `Hover` na `header h1`, čímž se zaručí skutečný `mouseenter`.
 ### Ověření
 - Stejný pár testů po opravě: 2× oba PASS.
-- Plná frontend sada po opravě: 43/45; dva pády (Chip typu stálého místa, Chip Oblíbená místa) izolovaně 2× PASS. Oba po přepnutí chipu zpět čekají pevně Sleep 300ms a hned počítají karty; na konci dlouhé session s mnoha běhy proti produkci (pomalejší Apps Script, viz SKILL.md sekce 8) napočítaly 0 během překreslení.
+- Plná frontend sada po opravě: 43/45; dva pády (Chip typu stálého místa: 0 != 18, Chip Oblíbená místa: 0 != 15) izolovaně 2× PASS. Příčina neznámá. Původní vysvětlení (pevný Sleep 300ms) je chybné: oba chipy překreslují synchronně bez síťového požadavku (ověřeno čtením Index.html), takže na délce čekání nezáleží. Hypotéza k ověření viz BACKLOG.
 ### Poznámka
 - Jen testy a dokumentace, žádná změna kódu appky, bez bumpu verze (backend i frontend beze změny).
 - `Docs/BACKLOG.md`: přepsaná sekce „Doporučené pořadí“ (aktualizace 26. 10. 2026).
