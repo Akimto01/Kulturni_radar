@@ -103,6 +103,11 @@ robot --variable BASE_URL:$URL --variable NTFY_TOPIC:<topic> --outputdir vysledk
 ```
 Rychlá pojistka před spuštěním: `echo $URL` musí vypsat celou adresu.
 
+`--variable BASE_URL` je potřeba jen při testování jiné než produkční
+implementace. Výchozí hodnota v resources.robot (`%{RADAR_URL=…}`) už na
+produkci ukazuje; prázdné `$URL` ji naopak přepíše na prázdný řetězec
+(26. 10. 2026: 3 API testy FAIL). Bezpečnější je parametr vynechat.
+
 ### Vzorec B — `HTTPError: 404` na `script.googleusercontent.com/macros/echo?...`
 Google Apps Script interně přesměrovává `/exec` na dočasnou "echo" URL
 s `user_content_key`. Při souběhu víc požadavků (celá RF sada běží rychle
@@ -311,14 +316,17 @@ Kontext: [1-3 věty CO a PROČ se změnilo]. Přiložený zip obsahuje
 
 Udělej prosím:
 
-1. Rozbal zip do repa (přepíše [N] soubor/y).
+1. Rozbal zip ~/Downloads/<název>.zip do repa (přepíše [N] soubor/y).
 2. `git status` — potvrď, že se změnily jen tyhle [N].
 3. `node --test tests/unit.test.js tests/frontend.test.js` — očekávám
    [staré]/[staré] → [nové]/[nové] ([+X] nových testů pro [co]).
 4. Ukaž mi diff [souborů] před commitem.
 5. Po mém potvrzení: [je-li apps-script/*.gs či Index.html mezi soubory:]
-   nasaď do Apps Script editoru (Nová verze, Popis "[vXX]"), commitni
-   s hláškou: "[commit hláška v ~7 slovech, česky bez diakritiky]"
+   nasaď přes clasp (`clasp push -f` a `clasp deploy -i <ID produkční
+   implementace> --description "[vXX]"`, viz sekce 6), ověř `?api=meta`,
+   pak `robot --include smoke --outputdir vysledky tests/robot/` (bez
+   --variable BASE_URL, výchozí hodnota v resources.robot je produkce),
+   commitni s hláškou: "[commit hláška v ~7 slovech, česky bez diakritiky]"
 6. Aktualizuj Docs/CHANGELOG.md [a Docs/BACKLOG.md, pokud se tím něco
    z BACKLOGu dokončuje — viz sekce 3].
 7. `git add`, `git commit`, `git push`.
@@ -327,7 +335,10 @@ Udělej prosím:
 Před commitem mi ukaž diff, ať vidím přesně, co jde do gitu.
 ```
 
-### Pravidlo pro krok 5 (ruční nasazení)
+### Pravidlo pro krok 5 (dva nasazovací kanály)
+Od 8. 8. 2026 nasazuje Apps Script Claude Code přes clasp (sekce 6); ruční
+„Nová verze“ v editoru je jen záloha, kdyby clasp nefungoval.
+
 Claude Code **nemá přístup** do Apps Script editoru — to je vždy ruční
 krok Vojty. Prompt na to musí vždy explicitně upozornit (krok 5 výše),
 jinak hrozí přesně to, co se stalo 8. 8.: commit proběhne, ale appka na
@@ -335,6 +346,14 @@ jinak hrozí přesně to, co se stalo 8. 8.: commit proběhne, ale appka na
 přes `git push`, zatímco Apps Script `/exec` zůstane na staré verzi, dokud
 ho někdo ručně nenasadí — **tohle jsou dva nezávislé nasazovací kanály**,
 je snadné zapomenout na ten druhý.
+
+### Změny Index.html: dva kanály a pořadí ověření
+Index.html běží na Cloudflare Pages (nasazuje `git push`) i v Apps Scriptu
+(nasazuje clasp). RF frontend testy jdou proti kulturniradar.cz, takže u
+změny frontendu musí commit + push proběhnout PŘED živými RF testy. Po
+pushi počkat, až https://kulturniradar.cz obsahuje komentář s novou verzí
+(`curl -sL https://kulturniradar.cz | grep -q "Index.html vX.YY"`,
+typicky do 1 min), teprve pak RF.
 
 ### Časté doladění po living testu
 Session 8. 8. ukázala vzorec: první verze funkce → živý test → menší
@@ -514,6 +533,15 @@ function stackingInfo(el) {
 // Přesné pixelové zarovnání dvou prvků (right/left okraje)
 document.getElementById('A').getBoundingClientRect().right ===
 document.getElementById('B').getBoundingClientRect().right;
+
+// Fault injection: zpozdit odpověď pro vybraný profil (jen v této záložce)
+const puvodniFetch = window.fetch;
+window.fetch = async (url, ...rest) => {
+  if (/profil=%C4%8Cesk%C3%A1/.test(String(url))) await new Promise(r => setTimeout(r, 4000));
+  return puvodniFetch(url, ...rest);
+};
+// ... přepnout profil, počkat, změřit ...
+window.fetch = puvodniFetch;   // vždy vrátit
 ```
 
 ### Gotcha: resize_window nespolehlivě simuluje mobilní viewport
@@ -528,6 +556,19 @@ DevTools (Ctrl+Shift+M) — ne přes claude-in-chrome `resize_window`.
 RF testy tohle omezení nemají (vlastní `New Context` s `viewport`
 parametrem, viz sekce M/N testů v `tests/robot/frontend.robot`) a
 fungují spolehlivě.
+
+### Čtení Google Sheetu (jen čtení)
+- Celý list jako tabulka: navigovat na
+  `https://docs.google.com/spreadsheets/d/<ID>/gviz/tq?tqx=out:html&sheet=<LIST>&tq=<dotaz>`
+  a číst DOM (`tqx=out:csv` a `out:json` se stáhnou jako soubor a JS na
+  nich nejde spustit). Pozor: typ sloupce určuje většina hodnot v celém
+  listu, buňky s menšinovým typem (číslo mezi daty, text mezi čísly) se
+  v exportu zobrazí PRÁZDNĚ, i s filtrem `where`.
+- Skutečná hodnota jedné buňky: navigovat na
+  `…/edit?gid=<gid>#gid=<gid>&range=B36` a přečíst řádek vzorců (zoom).
+  gid listu se zjistí kliknutím na záložku (URL se změní). NIKDY nepsat
+  do Sheetu přes pole názvu buňky ani klávesnicí – snadno se přepíše
+  buňka v aktuálním listu (typicky KRITÉRIA, kde B2 řídí automatiku).
 
 ## 8. Flaky testy — obecný princip a náš případ (21. 8. 2026)
 
@@ -569,6 +610,18 @@ kód, je dělá těžko prokazatelnými.
 - **Hledat vzorec napříč víc pokusy** — mění se pokaždé JINÁ sada
   selhávajících testů (ukazuje na vnější zátěž/timing), nebo padá
   VŽDY ten samý test na tom samém místě (ukazuje spíš na reálný bug)?
+- **Než se pád připíše časování (pevný Sleep, pomalý backend), ověřit
+  v kódu, jestli je akce synchronní.** 26. 10. 2026 se pád chip testů
+  nejdřív chybně vysvětlil krátkým Sleep 300ms, přitom chipy překreslují
+  synchronně bez síťového požadavku.
+- **Izolovaný PASS nestačí: spustit i pár s PŘEDCHOZÍM testem v souboru**
+  (`robot --test "Předchozí*" --test "Padající*"`). Izolovaný běh skrývá
+  souhru testů (26. 10. 2026: klik na den nechal myš nad buňkou, hover
+  test pak nevyvolal mouseenter, deterministický pád jen v plném běhu).
+- **Podezření na závod o pořadí odpovědí ověřit fault injection přes
+  claude-in-chrome:** obalit window.fetch a vybraný požadavek uměle
+  zpozdit (snippet v sekci 7). 26. 10. 2026 tak potvrzena chyba appky
+  opravená v Index.html v3.61.
 
 ### Náš konkrétní případ (21. 8. 2026)
 - **Kontext**: desítky živých RF běhů proti produkci během jedné dlouhé
