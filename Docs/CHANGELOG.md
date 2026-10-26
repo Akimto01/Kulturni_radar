@@ -1,5 +1,35 @@
 # Changelog
 
+## Backend v3.45 – limit pokusů na PIN – 26. 10. 2026
+### Kontext
+- Nález z přípravy quality checku (7.–8. 10. 2026): nejkratší PIN má 4 znaky a nic neomezovalo počet pokusů, PIN šlo hádat.
+### Pravidlo
+- 5 chybných PINů v řadě → zámek 15 min. Každých dalších 5 chyb bez úspěchu zdvojnásobí zámek (15 → 30 → 60 min …, strop 24 h). Úspěch počítadlo vynuluje.
+- Během zámku se PIN vůbec neověřuje, ani správný, jinak by odpověď prozradila trefu. Odpověď nese `zamceno:true` a hlášku s počtem minut.
+- Neexistující profil vrací „profil nenalezen“ a nezapisuje žádný stav, ať nejde plnit úložiště vymyšlenými ID.
+### Rozhodnutí a kompromisy
+- Stav je v Script Properties (`pin_pokusy_<id>`), ne v CacheService: cache má strop 6 h a Google ji může kdykoli vyhodit, což by zámek tiše zrušilo.
+- Fail-open: když úložiště selže nebo je JSON rozbitý, přihlášení pokračuje bez limitu. Výpadek Googlu nesmí rodinu zamknout.
+- Vědomě vynechaný `LockService`: souběžné pokusy mohou čtení a zápis počítadla přeskočit a nějaký pokus se nezapočítá. U rodinné appky je to přijatelné, hádání PINu to prakticky neusnadní.
+- Nouzové odemčení: nové menu Sheetu „Odemknout všechny profily (limit PINu)“ (`odemknoutVsechnyProfily`) smaže jen klíče `pin_pokusy_*`.
+### Testy
+- 10 nových Node testů (496 → 506, sekce „v3.45“ v `tests/unit.test.js`), mutačně ověřené. Pokrývají i dřív netestovanou větev „chybí profil nebo PIN“ a „profil nenalezen“ (BACKLOG, položka k `apiPrihlaseniUzivatele_`).
+- `tests/harness.js`: `getScriptProperties` dostal `deleteProperty`, `getKeys`, volbu `propertiesThrows` (simulace výpadku) a ukládá hodnoty jako řetězce jako skutečný Apps Script.
+### Živé ověření 26. 10. 2026 (záměrný zápis do produkce, jen profil `rf-test`)
+| Pokus | PIN | ok | zamceno | error |
+|---|---|---|---|---|
+| 1–4 | špatný | false | – | nesprávný PIN |
+| 5 | špatný | false | true | nesprávný PIN – příliš mnoho pokusů, zkus to znovu za 15 min. |
+| 6 | správný | false | true | Příliš mnoho pokusů, zkus to znovu za 15 min. |
+- Pokus 6 potvrdil, že se PIN během zámku neověřuje.
+- Po odemčení z menu Sheetu login `rf-test` se správným PINem vrátil `ok:true`, smoke RF 11/11, test „Špatný PIN zobrazí chybu a nepřihlásí (vlastní stránka)“ PASS.
+### Poznatky z živého ověření
+- Zamčený `rf-test` vyřadí celou frontend sadu: Suite Setup (keyword „Otevřít radar“) se přihlašuje `rf-test`. Běh 26. 10. 2026 za zámku skončil 3/11 (všech 8 frontendových smoke testů padlo).
+- Nouzové odemčení: první pokus o odemčení se neprojevil a není jisté, zda menu tehdy skutečně proběhlo. Po spuštění menu přes claude-in-chrome (Google ohlásil „Skript byl dokončen“ bez výzvy k autorizaci) login prošel. Pravděpodobné vysvětlení je známé chování Apps Scriptu: první spuštění nové funkce z menu spotřebuje jen autorizaci a funkce neproběhne. Tady to nebylo přímo potvrzeno.
+### Poznámka
+- Verze patří jen backendu (`kulturni_radar.gs` 3.45), `Index.html` beze změny.
+- Nasazeno přes clasp (`clasp push -f` + `clasp deploy -i … --description "v3.45"`, implementace @102), ověřeno `?api=meta` → `"verze":"3.45"`. Commit `0b32326`.
+
 ## Backend v3.44 – počasí a souřadnice: N/A mimo dosah, HTTP kódy, záložní geokódování – 26. 10. 2026
 ### Kontext
 - Diagnostika ze živé kontroly 26. 10. 2026 (listy KONTROLY a SOUŘADNICE) odhalila dvě příčiny.
