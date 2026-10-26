@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.60 – testovací profily (rf-…) se na přihlašovací obrazovce zobrazí jen s příznakem v localStorage -->
+<!-- Kulturní radar Index.html v3.61 – nactiAkce/nactiMista zahodí pozdní odpověď pro dříve vybraný profil (rychlé přepínání měst) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1709,23 +1709,35 @@
     el.textContent = text;
   }
 
+  // v3.61: pořadová čísla požadavků. Při rychlém přepínání měst běží víc
+  // načtení najednou a odpověď pro DŘÍVE vybraný profil mohla dorazit později
+  // a přepsat aktuální (ověřeno 26. 10. 2026: pod volbou Brno 0 akcí a 0 míst
+  // z České Lípy). Zpracuje se jen odpověď na poslední požadavek.
+  let poradiNacteniAkci_ = 0;
+  let poradiNacteniMist_ = 0;
+
   async function nactiAkce(profil) {
+    const moje = ++poradiNacteniAkci_;
     zobrazitStatus_('Načítám…');
     try {
       const data = await api('events', profil ? 'profil=' + encodeURIComponent(profil) : '');
+      if (moje !== poradiNacteniAkci_) return;   // v3.61: zastaralá odpověď
       vsechnaAkce = data.akce || [];
       prekreslit();
       if (data.generovano) {
         document.getElementById('meta-info').textContent = 'načteno: ' + data.generovano;
       }
     } catch (e) {
+      if (moje !== poradiNacteniAkci_) return;   // v3.61: chyba zastaralého požadavku nepřepíše aktuální stav
       zobrazitStatus_('Chyba: ' + e.message);
     }
   }
 
   async function nactiMista(profil) {
+    const moje = ++poradiNacteniMist_;
     try {
       const data = await api('places', profil ? 'profil=' + encodeURIComponent(profil) : '');
+      if (moje !== poradiNacteniMist_) return;   // v3.61: zastaralá odpověď
       renderMista(data.mista || []);
     } catch (_) { /* místa jsou bonus, selhání nekritické */ }
   }

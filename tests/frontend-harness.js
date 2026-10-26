@@ -21,8 +21,11 @@ function nactiFrontendFunkce(nazvyFunkci) {
   vm.createContext(ctx);
 
   nazvyFunkci.forEach(nazev => {
-    const zacatekDeklarace = js.search(new RegExp('function\\s+' + nazev + '\\s*\\('));
+    let zacatekDeklarace = js.search(new RegExp('function\\s+' + nazev + '\\s*\\('));
     if (zacatekDeklarace < 0) throw new Error('Funkce "' + nazev + '" nebyla v Index.html nalezena.');
+    // v3.61: u `async function` vzít i klíčové slovo async, jinak by tělo
+    // s `await` nešlo spustit (SyntaxError).
+    if (js.slice(Math.max(0, zacatekDeklarace - 6), zacatekDeklarace) === 'async ') zacatekDeklarace -= 6;
     const prvniSlozena = js.indexOf('{', zacatekDeklarace);
     if (prvniSlozena < 0) throw new Error('Funkce "' + nazev + '": nenalezena otevírací závorka.');
 

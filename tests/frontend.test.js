@@ -1462,3 +1462,71 @@ test('v3.60: viditelneProfily_ – starší backend bez pole testovaci → nic s
 test('v3.60: testovaciProfilyPovoleny_ – bez localStorage (vyjímka) bezpečně false', () => {
   assert.equal(f.testovaciProfilyPovoleny_(), false);
 });
+
+// ---------------------------------------------------------------------------
+// v3.61: pozdní odpověď pro dříve vybraný profil nesmí přepsat aktuální
+// (ověřeno v prohlížeči 26. 10. 2026 zpožděním odpovědi pro Českou Lípu:
+// pod volbou Brno se zobrazilo 0 akcí a 0 míst)
+// ---------------------------------------------------------------------------
+
+/** Kontext s nactiAkce/nactiMista a stuby; api vrací odložené sliby, které
+ *  test vyřeší v libovolném pořadí. */
+function kontextNacitani_() {
+  const g = nactiFrontendFunkce(['nactiAkce', 'nactiMista']);
+  const cekajici = {};
+  g.api = (endpoint, dotaz) => new Promise((resolve, reject) => {
+    cekajici[endpoint + ':' + decodeURIComponent(dotaz.replace('profil=', ''))] = { resolve, reject };
+  });
+  g.vsechnaAkce = [];
+  g.poradiNacteniAkci_ = 0;
+  g.poradiNacteniMist_ = 0;
+  g.stavy = [];
+  g.zobrazitStatus_ = (t) => { g.stavy.push(t); };
+  g.prekreslit = () => {};
+  g.document = { getElementById: () => ({}) };
+  g.mista = null;
+  g.renderMista = (m) => { g.mista = m; };
+  return { g, cekajici };
+}
+
+test('v3.61: nactiAkce – pozdní odpověď pro dříve vybraný profil se zahodí', async () => {
+  const { g, cekajici } = kontextNacitani_();
+  const p1 = g.nactiAkce('Česká Lípa');
+  const p2 = g.nactiAkce('Brno');
+  cekajici['events:Brno'].resolve({ akce: [{ id: 'brno-1' }] });
+  await p2;
+  cekajici['events:Česká Lípa'].resolve({ akce: [] });   // dorazí až po Brnu
+  await p1;
+  assert.equal(g.vsechnaAkce.length, 1, 'zůstávají akce Brna, ne prázdná Česká Lípa');
+  assert.equal(g.vsechnaAkce[0].id, 'brno-1');
+});
+
+test('v3.61: nactiAkce – chyba zastaralého požadavku nepřepíše stav aktuálního', async () => {
+  const { g, cekajici } = kontextNacitani_();
+  const p1 = g.nactiAkce('Česká Lípa');
+  const p2 = g.nactiAkce('Brno');
+  cekajici['events:Brno'].resolve({ akce: [{ id: 'brno-1' }] });
+  await p2;
+  cekajici['events:Česká Lípa'].reject(new Error('HTTP 404'));
+  await p1;
+  assert.equal(g.stavy.some(t => /Chyba/.test(t)), false, 'žádná chybová hláška ze zastaralého požadavku');
+});
+
+test('v3.61: nactiAkce – jediný požadavek se zpracuje normálně (regrese)', async () => {
+  const { g, cekajici } = kontextNacitani_();
+  const p = g.nactiAkce('Brno');
+  cekajici['events:Brno'].resolve({ akce: [{ id: 'a' }, { id: 'b' }] });
+  await p;
+  assert.equal(g.vsechnaAkce.length, 2);
+});
+
+test('v3.61: nactiMista – pozdní odpověď pro dříve vybraný profil se zahodí', async () => {
+  const { g, cekajici } = kontextNacitani_();
+  const p1 = g.nactiMista('Česká Lípa');
+  const p2 = g.nactiMista('Brno');
+  cekajici['places:Brno'].resolve({ mista: [{ nazev: 'Zoo Brno' }] });
+  await p2;
+  cekajici['places:Česká Lípa'].resolve({ mista: [] });
+  await p1;
+  assert.equal(g.mista.length, 1, 'zůstávají místa Brna');
+});
