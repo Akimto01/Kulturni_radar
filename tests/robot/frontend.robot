@@ -56,6 +56,33 @@ Testovací profil je bez příznaku na přihlašovací obrazovce skrytý (vlastn
     Should Be Equal As Integers    ${testovaci}    0
     ...    msg=Testovací profil je vidět i bez příznaku kr_testovaci_profily – veřejná přihlašovací obrazovka ho nemá ukazovat
 
+Přepnutí na město s diakritikou načte jeho akce (regrese v3.65)
+    [Tags]    regrese
+    [Documentation]    v3.65 (Index.html): api() předávalo profil zakódovaný
+    ...    dvakrát, takže každé město s diakritikou (Plzeň, Zlín, Třinec…)
+    ...    ukazovalo na kulturniradar.cz 0 akcí i míst – od statického webu
+    ...    (v3.15) až do 27. 10. 2026. Testy jely jen s Brnem. Test vybere
+    ...    dynamicky prohledané město s diakritikou a přes město „nikdy
+    ...    neprohledáno“ (0 karet) ověří, že se jeho akce skutečně načtou.
+    ${puvodni}=    Get Property    ${FRAME} \#profil-select    value
+    ${diakritika}=    Evaluate JavaScript    ${FRAME} \#profil-select
+    ...    (el) => { const o = [...el.options].find(o => /[^\x00-\x7F]/.test(o.value) && !o.text.includes('nikdy neprohledáno') && o.value !== el.value); return o ? o.value : ''; }
+    ${prazdny}=    Evaluate JavaScript    ${FRAME} \#profil-select
+    ...    (el) => { const o = [...el.options].find(o => o.text.includes('nikdy neprohledáno') && o.value !== el.value); return o ? o.value : ''; }
+    Skip If    '${diakritika}' == '' or '${prazdny}' == ''
+    ...    Chybí prohledané město s diakritikou nebo město „nikdy neprohledáno“ – test nemá co ověřit.
+    Select Options By    ${FRAME} \#profil-select    value    ${prazdny}
+    Wait For Elements State    ${FRAME} text=Tohle město appka ještě nikdy neprohledala.    visible    timeout=15s
+    Select Options By    ${FRAME} \#profil-select    value    ${diakritika}
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=15s
+    ...    message=Město ${diakritika} (s diakritikou) neukázalo žádnou akci – vrátilo se dvojité kódování profilu?
+    # Návrat na původní profil (navazující testy s ním počítají), opět přes
+    # prázdné město, ať je návrat pozorovatelný.
+    Select Options By    ${FRAME} \#profil-select    value    ${prazdny}
+    Wait For Elements State    ${FRAME} text=Tohle město appka ještě nikdy neprohledala.    visible    timeout=15s
+    Select Options By    ${FRAME} \#profil-select    value    ${puvodni}
+    Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=15s
+
 Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastní stránka)
     [Tags]    ui
     [Documentation]    v3.14: klíčový test nového chování (rozhodnutí 8. 8. 2026).

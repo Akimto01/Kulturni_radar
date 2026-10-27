@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.64 – audit selektorů D–H: data-misto, data-akce, data-typ, data-stat, id den-probiha -->
+<!-- Kulturní radar Index.html v3.65 – oprava dvojitého URL kódování profilu (města s diakritikou ukazovala 0 akcí i míst) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1211,7 +1211,11 @@
   }
 
   async function api(endpoint, param = '') {
-    const profil = param.replace('profil=', '');
+    // v3.65: param nese profil už zakódovaný (nactiAkce/nactiMista volají
+    // encodeURIComponent) a sestavFetchPozadavek_ ho kóduje znovu – server pak
+    // dostal „Zl%C3%ADn“ místo „Zlín“ a vrátil 0 akcí i míst pro každé město
+    // s diakritikou (Plzeň, Zlín, Třinec…). Proto zpět na čistý název.
+    const profil = decodeURIComponent(param.replace('profil=', ''));
     if (endpoint === 'meta')   return gsr('apiMeta');
     if (endpoint === 'events') return gsr('apiEvents', profil, true,
       prihlasenyUzivatel ? prihlasenyUzivatel.id : '');   // vždy i s označenými, filtrujeme v UI; ★/✓ per profil

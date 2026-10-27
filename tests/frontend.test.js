@@ -1648,3 +1648,46 @@ test('v3.63: POST idempotentní zápis (filtry, notifikace) se při 404 jednou z
     assert.equal(g.volani.length, 2, fn);
   }
 });
+
+// ---------------------------------------------------------------------------
+// v3.65: dvojité URL kódování profilu – města s diakritikou ukazovala 0 akcí
+// (nalezeno 27. 10. 2026 při ověřování v3.64: Plzeň a Zlín prázdné, přestože
+// API pro ně vrací akce; server dostal „Zl%C3%ADn“ místo „Zlín“)
+// ---------------------------------------------------------------------------
+
+function kontextApi_() {
+  const g = nactiFrontendFunkce(['api', 'sestavFetchPozadavek_']);
+  g.prihlasenyUzivatel = null;
+  g.volani = [];
+  g.gsr = (fn, ...args) => { g.volani.push({ fn, args }); return Promise.resolve({}); };
+  return g;
+}
+
+test('v3.65: api – events pro město s diakritikou předá serveru čistý název (ne zakódovaný)', async () => {
+  const g = kontextApi_();
+  await g.api('events', 'profil=' + encodeURIComponent('Zlín'));
+  assert.equal(g.volani[0].fn, 'apiEvents');
+  assert.equal(g.volani[0].args[0], 'Zlín');
+});
+
+test('v3.65: api – places pro město s diakritikou předá čistý název', async () => {
+  const g = kontextApi_();
+  await g.api('places', 'profil=' + encodeURIComponent('České Budějovice'));
+  assert.equal(g.volani[0].args[0], 'České Budějovice');
+});
+
+test('v3.65: api → sestavFetchPozadavek_ – v URL je profil zakódovaný právě jednou', async () => {
+  const g = kontextApi_();
+  await g.api('events', 'profil=' + encodeURIComponent('Plzeň'));
+  const poz = g.sestavFetchPozadavek_('apiEvents', g.volani[0].args, 'https://x/exec');
+  assert.match(poz.url, /profil=Plze%C5%88(&|$)/);
+  assert.doesNotMatch(poz.url, /%25/, 'žádné dvojité kódování (%25)');
+});
+
+test('v3.65: api – město bez diakritiky a prázdný profil beze změny (regrese)', async () => {
+  const g = kontextApi_();
+  await g.api('events', 'profil=Brno');
+  await g.api('places', '');
+  assert.equal(g.volani[0].args[0], 'Brno');
+  assert.equal(g.volani[1].args[0], '');
+});
