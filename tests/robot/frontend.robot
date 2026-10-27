@@ -271,24 +271,32 @@ Opakované přepnutí profilu v dropdownu nerozbije appku (regrese v3.12)
     ...    async reject, žádná viditelná chyba) – appka na druhé a další
     ...    přepnutí přestala reagovat. Oprava (5. 8. 2026): zobrazitStatus_
     ...    element znovu vytvoří, pokud chybí. Test přepne postupně přes
-    ...    3 různé profily (bug se projevil až na DRUHÉM a dalším volání)
-    ...    – Wait For Elements State po KAŽDÉM přepnutí je přímý regresní
-    ...    signál: pokud by se bug vrátil, druhé/třetí přepnutí by
-    ...    timeoutovalo (karty by se nikdy nepřekreslily).
-    ${pocet_profilu}=    Get Element Count    ${FRAME} \#profil-select option
-    IF    ${pocet_profilu} < 3
-        Log    Méně než 3 profily k dispozici – test nemá co ověřit v tomto běhu.    level=WARN
+    ...    víc profilů (bug se projevil až na DRUHÉM a dalším volání).
+    ...    27. 10. 2026: test dřív po přepnutí čekal jen na viditelnou
+    ...    kartu, což splnily ještě STARÉ karty – bug z v3.12 by tedy
+    ...    nezachytil (staré karty zůstaly) a navíc nechával běžet
+    ...    překrývající se požadavky, které mohly rozbít další testy (viz
+    ...    Index.html v3.61). Teď střídá původní profil s městem bez akcí
+    ...    („nikdy neprohledáno“), takže každý přechod je pozorovatelný
+    ...    (0 karet ↔ karty) a čeká na dokončení načtení: kdyby se bug
+    ...    vrátil, druhé a další přepnutí by timeoutovalo.
+    ${puvodni}=    Get Property    ${FRAME} \#profil-select    value
+    ${prazdny}=    Evaluate JavaScript    ${FRAME} \#profil-select
+    ...    (el) => { const o = [...el.options].find(o => o.text.includes('nikdy neprohledáno') && o.value !== el.value); return o ? o.value : ''; }
+    IF    '${prazdny}' == ''
+        Log    Žádné město „nikdy neprohledáno“ k dispozici – test nemá co ověřit v tomto běhu.    level=WARN
     ELSE
-        ${puvodni}=    Get Property    ${FRAME} \#profil-select    value
-        FOR    ${i}    IN RANGE    3
-            ${hodnota}=    Get Attribute    ${FRAME} \#profil-select option >> nth=${i}    value
-            Select Options By    ${FRAME} \#profil-select    value    ${hodnota}
-            Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=10s
+        FOR    ${i}    IN RANGE    2
+            Select Options By    ${FRAME} \#profil-select    value    ${prazdny}
+            Wait For Elements State    ${FRAME} text=Tohle město appka ještě nikdy neprohledala.    visible    timeout=15s
+            ${karet}=    Get Element Count    ${FRAME} .karta
+            Should Be Equal As Integers    ${karet}    0
+            ...    msg=Po přepnutí na město bez akcí zůstaly na stránce karty (${karet}) – nepřekreslilo se?
+            # Návrat na původní profil (navazující testy s ním počítají) –
+            # z 0 karet zpět na karty = skutečné nové načtení.
+            Select Options By    ${FRAME} \#profil-select    value    ${puvodni}
+            Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=15s
         END
-        # Vrátit sdílenou stránku na původní profil, ať navazující testy
-        # v sadě nezůstanou na jiném profilu, než čekají.
-        Select Options By    ${FRAME} \#profil-select    value    ${puvodni}
-        Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=10s
     END
 
 Chipy kategorií se vykreslily

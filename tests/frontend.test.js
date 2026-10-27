@@ -21,6 +21,7 @@ const f = nactiFrontendFunkce([
   'jeViditelnaVSeznamu_', 'filtrovatKategorii_', 'filtrovatOblibenaMista_', 'akceProMapu_',
   'dostupnePodkategorie_', 'filtrovatPodkategorii_',
   'viditelneProfily_', 'testovaciProfilyPovoleny_',
+  'hlaskaPrazdnehoStavuProProfil_',
   'akceDnePodleData_', 'seskupitPodleSouradnic_', 'sestavPopupDataMapy_',
   'vypocitejPoziciTooltipuKalendare_',
   'klicSouradnic_', 'sestavSeznamMist_', 'prepnoutVyberPinu_',
@@ -1478,6 +1479,7 @@ function kontextNacitani_() {
     cekajici[endpoint + ':' + decodeURIComponent(dotaz.replace('profil=', ''))] = { resolve, reject };
   });
   g.vsechnaAkce = [];
+  g.zobrazenyProfil_ = '';
   g.poradiNacteniAkci_ = 0;
   g.poradiNacteniMist_ = 0;
   g.stavy = [];
@@ -1529,4 +1531,38 @@ test('v3.61: nactiMista – pozdní odpověď pro dříve vybraný profil se zah
   cekajici['places:Česká Lípa'].resolve({ mista: [] });
   await p1;
   assert.equal(g.mista.length, 1, 'zůstávají místa Brna');
+});
+
+// ---------------------------------------------------------------------------
+// v3.62: hláška prázdného stavu podle ZOBRAZENÉHO profilu (nalezeno 27. 10.
+// 2026 novým RF testem přepnutí profilu: Česká Lípa „nikdy neprohledáno“
+// hlásila „naposledy zkontrolováno: 27. 10. 2026 8:13“ – čas Brna)
+// ---------------------------------------------------------------------------
+
+const KONTROLY_PROFILU_ = { 'Brno': '27. 10. 2026 8:13', 'Česká Lípa': '' };
+
+test('v3.62: hlaskaPrazdnehoStavuProProfil_ – po přepnutí na nikdy neprohledané město hlásí „nikdy neprohledala“, ne čas startovního profilu', () => {
+  assert.equal(f.hlaskaPrazdnehoStavuProProfil_(KONTROLY_PROFILU_, 'Česká Lípa', 'Brno'),
+    'Tohle město appka ještě nikdy neprohledala.');
+});
+
+test('v3.62: hlaskaPrazdnehoStavuProProfil_ – zobrazený prohledaný profil hlásí svůj čas', () => {
+  assert.match(f.hlaskaPrazdnehoStavuProProfil_(KONTROLY_PROFILU_, 'Brno', 'Praha'), /naposledy zkontrolováno: 27\. 10\. 2026 8:13/);
+});
+
+test('v3.62: hlaskaPrazdnehoStavuProProfil_ – před prvním načtením (zobrazený prázdný) použije startovní profil', () => {
+  assert.match(f.hlaskaPrazdnehoStavuProProfil_(KONTROLY_PROFILU_, '', 'Brno'), /naposledy zkontrolováno/);
+  assert.equal(f.hlaskaPrazdnehoStavuProProfil_(null, 'Brno', 'Brno'), 'Tohle město appka ještě nikdy neprohledala.');
+});
+
+test('v3.62: nactiAkce – zobrazený profil se nastaví jen z aktuální odpovědi, zastaralá ho nepřepíše', async () => {
+  const { g, cekajici } = kontextNacitani_();
+  const p1 = g.nactiAkce('Brno');
+  const p2 = g.nactiAkce('Česká Lípa');
+  cekajici['events:Česká Lípa'].resolve({ akce: [] });
+  await p2;
+  assert.equal(g.zobrazenyProfil_, 'Česká Lípa');
+  cekajici['events:Brno'].resolve({ akce: [{ id: 'brno-1' }] });   // pozdní, zastaralá
+  await p1;
+  assert.equal(g.zobrazenyProfil_, 'Česká Lípa', 'zastaralá odpověď Brna nesmí přepnout hlášku zpět na Brno');
 });

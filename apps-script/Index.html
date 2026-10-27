@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.61 – nactiAkce/nactiMista zahodí pozdní odpověď pro dříve vybraný profil (rychlé přepínání měst) -->
+<!-- Kulturní radar Index.html v3.62 – hláška prázdného stavu podle profilu, jehož data jsou zobrazená (dřív vždy podle profilu ze startu stránky) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1039,6 +1039,14 @@
     return profil + (kraj ? ' · ' + kraj : '') + (posledniKontrola ? '' : ' (nikdy neprohledáno)');
   }
 
+  /** PURE (v3.62): hláška prázdného stavu pro profil, jehož data jsou právě
+   *  zobrazená. Dřív renderAkce bral aktivniProfil, který se nastaví jen při
+   *  startu stránky – po přepnutí v dropdownu (Brno → Česká Lípa) pak město
+   *  „nikdy neprohledáno“ hlásilo „naposledy zkontrolováno“ s časem Brna. */
+  function hlaskaPrazdnehoStavuProProfil_(mapaKontrol, zobrazenyProfil, aktivni) {
+    return sestavHlaskuPrazdnehoStavu_((mapaKontrol || {})[zobrazenyProfil || aktivni]);
+  }
+
   /** Hláška prázdného stavu (renderAkce(), filtrovane.length === 0) –
    *  rozlišuje "appka tohle město ještě nikdy neprohledala" od "prohledala,
    *  ale pro tenhle filtr nic nenašla". */
@@ -1715,6 +1723,9 @@
   // z České Lípy). Zpracuje se jen odpověď na poslední požadavek.
   let poradiNacteniAkci_ = 0;
   let poradiNacteniMist_ = 0;
+  // v3.62: profil, jehož akce jsou právě zobrazené (nastaví nactiAkce až po
+  // ochraně proti zastaralé odpovědi) – řídí se jím hláška prázdného stavu.
+  let zobrazenyProfil_ = '';
 
   async function nactiAkce(profil) {
     const moje = ++poradiNacteniAkci_;
@@ -1722,6 +1733,7 @@
     try {
       const data = await api('events', profil ? 'profil=' + encodeURIComponent(profil) : '');
       if (moje !== poradiNacteniAkci_) return;   // v3.61: zastaralá odpověď
+      zobrazenyProfil_ = profil || '';           // v3.62
       vsechnaAkce = data.akce || [];
       prekreslit();
       if (data.generovano) {
@@ -1767,7 +1779,7 @@
     if (filtrovane.length === 0) {
       const el = document.createElement('div');
       el.id = 'status';
-      el.textContent = sestavHlaskuPrazdnehoStavu_(posledniKontrolaProfilu_[aktivniProfil]);
+      el.textContent = hlaskaPrazdnehoStavuProProfil_(posledniKontrolaProfilu_, zobrazenyProfil_, aktivniProfil);   // v3.62
       main.prepend(el);
       return;
     }
