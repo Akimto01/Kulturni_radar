@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.63 – jeden automatický retry při HTTP 404 z echo URL (jen čtení a idempotentní zápisy) -->
+<!-- Kulturní radar Index.html v3.64 – audit selektorů D–H: data-misto, data-akce, data-typ, data-stat, id den-probiha -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1822,6 +1822,7 @@
     if (probiha.length) {
       const h = document.createElement('div');
       h.className = 'den-hlavicka';
+      h.id = 'den-probiha';   // v3.64 (audit selektorů H): symetrie s den-YYYY-MM-DD
       h.textContent = 'Probíhá / dlouhodobé';
       fragment.appendChild(h);
       probiha.forEach(a => fragment.appendChild(vytvorKartu(a, true)));
@@ -1997,6 +1998,7 @@
       link.target = '_blank';
       link.rel = 'noopener';
       link.className = 'btn-url';
+      link.dataset.akce = 'vice-info';   // v3.64 (audit selektorů E)
       link.textContent = 'Více info →';
       link.addEventListener('click', (e) => otevritVNoveOknem_(e, a.url));
       akceDiv.appendChild(link);
@@ -2007,6 +2009,7 @@
       link.target = '_blank';
       link.rel = 'noopener';
       link.className = 'btn-url';
+      link.dataset.akce = 'kalendar';   // v3.64
       link.textContent = '📅 Do kalendáře';
       link.addEventListener('click', (e) => otevritVNoveOknem_(e, gcal));
       akceDiv.appendChild(link);
@@ -2014,6 +2017,7 @@
     const btnSdilet = document.createElement('button');
     btnSdilet.type = 'button';
     btnSdilet.className = 'btn-url';
+    btnSdilet.dataset.akce = 'sdilet';   // v3.64
     btnSdilet.textContent = '📤 Sdílet';
     const mapa = mapsUrl_(a);
     if (mapa) {
@@ -2022,6 +2026,7 @@
       link.target = '_blank';
       link.rel = 'noopener';
       link.className = 'btn-url';
+      link.dataset.akce = 'mapa';   // v3.64
       link.textContent = '📍 Mapa';
       link.addEventListener('click', (e) => otevritVNoveOknem_(e, mapa));
       akceDiv.appendChild(link);
@@ -2463,12 +2468,13 @@
     el.innerHTML = '';
     const s = spocitejStatistikuVyberu_(akceMapa);
     [
-      { hodnota: s.pocetAkci, popisek: 'akcí' },
-      { hodnota: s.pocetMist, popisek: 'míst' },
-      { hodnota: s.pocetKategorii, popisek: 'kategorií' },
+      { hodnota: s.pocetAkci, popisek: 'akcí', klic: 'akci' },
+      { hodnota: s.pocetMist, popisek: 'míst', klic: 'mist' },
+      { hodnota: s.pocetKategorii, popisek: 'kategorií', klic: 'kategorii' },
     ].forEach(polozka => {
       const bunka = document.createElement('div');
       bunka.className = 'mapa-stat';
+      bunka.dataset.stat = polozka.klic;   // v3.64 (audit selektorů G)
       const cislo = document.createElement('div');
       cislo.className = 'mapa-stat-cislo';
       cislo.textContent = polozka.hodnota;
@@ -2885,12 +2891,14 @@
       chipsWrap.style.marginBottom = '10px';
       const vseChip = document.createElement('button');
       vseChip.className = 'chip' + (aktMistoTyp === null ? ' active' : '');
+      vseChip.dataset.typ = '';   // v3.64 (audit selektorů F): „Vše“ = prázdný typ
       vseChip.textContent = 'Vše';
       vseChip.addEventListener('click', () => { aktMistoTyp = null; prekreslitMista(); });
       chipsWrap.appendChild(vseChip);
       typy.forEach(t => {
         const ch = document.createElement('button');
         ch.className = 'chip' + (aktMistoTyp === t ? ' active' : '');
+        ch.dataset.typ = t;   // v3.64
         ch.textContent = t.charAt(0).toUpperCase() + t.slice(1);
         ch.addEventListener('click', () => { aktMistoTyp = t; prekreslitMista(); });
         chipsWrap.appendChild(ch);
@@ -2912,6 +2920,7 @@
       skupiny[typ].forEach(m => {
         const el = document.createElement('div');
         el.className = 'misto-karta';
+        el.dataset.misto = m.nazev + '|' + m.obec;   // v3.64 (audit selektorů D)
         const info = document.createElement('div');
         const n = document.createElement('div');
         n.className = 'misto-nazev';

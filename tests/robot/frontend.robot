@@ -425,17 +425,28 @@ Klik na podkategorii-chip skutečně zúží seznam karet
 
 Sekce stálých míst existuje
     [Tags]    ui
+    [Documentation]    v3.64: každá karta stálého místa nese data-misto
+    ...    („název|obec“, audit selektorů D), ať jde konkrétní místo vybrat
+    ...    strukturálně, ne podle textu nebo pořadí.
     Wait For Elements State    ${FRAME} \#mista-sekce .misto-karta >> nth=0    visible    timeout=15s
     ${mist}=    Get Element Count    ${FRAME} .misto-karta
     Should Be True    ${mist} >= 1
+    ${bez_klice}=    Get Element Count    ${FRAME} .misto-karta:not([data-misto])
+    Should Be Equal As Integers    ${bez_klice}    0
+    ...    msg=Některé karty stálých míst nemají data-misto
 
 Karta má odkaz Do kalendáře
     [Tags]    ui
     [Documentation]    v3.10: 📅 Do kalendáře je čistě klientský odkaz (Google
     ...    Calendar šablonová URL) – žádné volání serveru, bezpečné otevřít i
     ...    kliknout by bylo bezpečné, ale stačí ověřit existenci a text odkazu.
-    ${text}=    Get Text    ${FRAME} .karta >> nth=0 >> .karta-akce
-    Should Contain    ${text}    Do kalendáře
+    ...    v3.64: strukturálně přes data-akce (audit selektorů E) a cíl odkazu,
+    ...    ne jen podle českého textu.
+    ${odkaz}=    Set Variable    ${FRAME} .karta >> nth=0 >> .btn-url[data-akce="kalendar"]
+    Get Element Count    ${odkaz}    ==    1
+    ${href}=    Get Attribute    ${odkaz}    href
+    Should Start With    ${href}    https://calendar.google.com/calendar/render?
+    Get Text    ${odkaz}    contains    Do kalendáře
 
 Karta má tlačítko Sdílet
     [Tags]    ui
@@ -443,9 +454,8 @@ Karta má tlačítko Sdílet
     ...    navigator.share/clipboard uvnitř sandboxovaného iframe se v headless
     ...    testovacím prohlížeči chová nedeterministicky (může otevřít systémový
     ...    dialog nebo tiše selhat na oprávněních); existence prvku je vše, co
-    ...    tady chceme spolehlivě ověřit.
-    ${text}=    Get Text    ${FRAME} .karta >> nth=0 >> .karta-akce
-    Should Contain    ${text}    Sdílet
+    ...    tady chceme spolehlivě ověřit. v3.64: přes data-akce="sdilet".
+    Get Element Count    ${FRAME} .karta >> nth=0 >> button.btn-url[data-akce="sdilet"]    ==    1
 
 Tlačítko Sdílet výběr existuje
     [Tags]    ui
@@ -460,9 +470,11 @@ Karta má odkaz Mapa
     [Tags]    ui
     [Documentation]    v3.13: 📍 Mapa je čistě klientský odkaz (Google Maps
     ...    URL schéma, žádný API klíč) – existence a text stačí ověřit stejně
-    ...    jako u Do kalendáře.
-    ${text}=    Get Text    ${FRAME} .karta >> nth=0 >> .karta-akce
-    Should Contain    ${text}    Mapa
+    ...    jako u Do kalendáře. v3.64: přes data-akce="mapa" a cíl odkazu.
+    ${odkaz}=    Set Variable    ${FRAME} .karta >> nth=0 >> .btn-url[data-akce="mapa"]
+    Get Element Count    ${odkaz}    ==    1
+    ${href}=    Get Attribute    ${odkaz}    href
+    Should Start With    ${href}    https://www.google.com/maps/search/?api=1&query=
 
 Políčko počasí se zobrazuje správně
     [Tags]    ui
@@ -513,7 +525,8 @@ Chip typu stálého místa zúží seznam (pokud profil má 2+ typů)
         ...    Profil má aktuálně jen ${pocet_chipu} chip(y) typů míst (0 nebo 1 typ celkem) – chipy filtru se korektně nevykreslují, test nemá co ověřit v tomto běhu.
     
     ${vsech}=    Get Element Count    ${FRAME} .misto-karta
-    Click    ${FRAME} \#mista-sekce .chip >> nth=1
+    # v3.64 (audit selektorů F): první konkrétní typ přes data-typ, ne „druhý chip“
+    Click    ${FRAME} \#mista-sekce .chip[data-typ]:not([data-typ=""]) >> nth=0
     Sleep    300ms
         
     ${filtrovanych}=    Get Element Count    ${FRAME} .misto-karta
@@ -521,7 +534,7 @@ Chip typu stálého místa zúží seznam (pokud profil má 2+ typů)
     Should Be True    ${filtrovanych} >= 1
         ...    msg=Vybraný typ místa by měl mít aspoň jedno místo (jinak by se chip nevykreslil)
         
-    Click    ${FRAME} \#mista-sekce .chip >> text=Vše
+    Click    ${FRAME} \#mista-sekce .chip[data-typ=""]
     Sleep    300ms
         
     ${zpet}=    Get Element Count    ${FRAME} .misto-karta
