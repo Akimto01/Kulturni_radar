@@ -1566,3 +1566,85 @@ test('v3.62: nactiAkce – zobrazený profil se nastaví jen z aktuální odpov�
   await p1;
   assert.equal(g.zobrazenyProfil_, 'Česká Lípa', 'zastaralá odpověď Brna nesmí přepnout hlášku zpět na Brno');
 });
+
+// ---------------------------------------------------------------------------
+// v3.63: jeden retry při HTTP 404 z echo URL – jen čtení a idempotentní zápisy
+// (při 404 na echo už skript na serveru proběhl, ztratila se jen odpověď)
+// ---------------------------------------------------------------------------
+
+const EXEC_TEST_ = 'https://script.google.com/macros/s/X/exec';
+
+/** Kontext s gsrPresFetch_ a frontou HTTP odpovědí; zaznamenává volání. */
+function kontextFetch_(kody) {
+  const g = nactiFrontendFunkce(['gsrPresFetch_', 'lzeOpakovatPozadavek_', 'sestavFetchPozadavek_']);
+  g.EXEC_URL = EXEC_TEST_;
+  g.IDEMPOTENTNI_POST_AKCE_ = ['filtry', 'set-notifikace'];
+  g.OPAKOVANI_PAUZA_MS_ = 0;
+  g.setTimeout = (fn) => fn();
+  g.volani = [];
+  const fronta = kody.slice();
+  g.fetch = async (url, opts) => {
+    g.volani.push({ url, metoda: opts ? opts.method : 'GET' });
+    const kod = fronta.shift();
+    return { ok: kod === 200, status: kod, json: async () => ({ ok: true }) };
+  };
+  return g;
+}
+
+test('v3.63: lzeOpakovatPozadavek_ – jen 404, GET ano, chybějící požadavek ne (POST viz testy níže)', () => {
+  const g = kontextFetch_([]);
+  const get = g.sestavFetchPozadavek_('apiEvents', ['Brno'], EXEC_TEST_);
+  assert.equal(g.lzeOpakovatPozadavek_(get, 404), true);
+  assert.equal(g.lzeOpakovatPozadavek_(get, 500), false, 'jen 404 (známý vzorec echo URL)');
+  assert.equal(g.lzeOpakovatPozadavek_(null, 404), false);
+});
+
+test('v3.63: GET – 404 a pak 200 → data se vrátí po jednom opakování', async () => {
+  const g = kontextFetch_([404, 200]);
+  const data = await g.gsrPresFetch_('apiEvents', ['Brno', true, '']);
+  assert.equal(data.ok, true);
+  assert.equal(g.volani.length, 2);
+});
+
+test('v3.63: GET – 404 dvakrát → chyba po jediném opakování (žádná smyčka)', async () => {
+  const g = kontextFetch_([404, 404, 200]);
+  await assert.rejects(() => g.gsrPresFetch_('apiMeta', []), /HTTP 404/);
+  assert.equal(g.volani.length, 2);
+});
+
+test('v3.63: GET – jiný kód než 404 se neopakuje', async () => {
+  const g = kontextFetch_([500, 200]);
+  await assert.rejects(() => g.gsrPresFetch_('apiPlaces', ['Brno']), /HTTP 500/);
+  assert.equal(g.volani.length, 1);
+});
+
+test('v3.63: POST přepínač ★/✓ (toggle) se při 404 neopakuje – druhý pokus by označení vrátil', async () => {
+  const g = kontextFetch_([404, 200]);
+  await assert.rejects(() => g.gsrPresFetch_('apiToggle', ['akce-1', 'oblibene', 'vojta']), /HTTP 404/);
+  assert.equal(g.volani.length, 1);
+});
+
+test('v3.63: POST neidempotentní akce se při 404 neopakují (login, kontakt, kontrola, ntfy, 🏛)', async () => {
+  const pripady = [
+    ['apiPrihlaseniUzivatele', ['vojta', '0000']],
+    ['apiKontakt', ['Jméno', 'Zpráva', '', '']],
+    ['apiSpustKontrolu', ['token']],
+    ['apiNajdiProUzivatele', ['vojta', 'token']],
+    ['apiVygenerovatNtfyTema', ['vojta']],
+    ['apiToggleMisto', ['Sál', 'Brno', 'vojta']],
+  ];
+  for (const [fn, args] of pripady) {
+    const g = kontextFetch_([404, 200]);
+    await assert.rejects(() => g.gsrPresFetch_(fn, args), /HTTP 404/, fn);
+    assert.equal(g.volani.length, 1, fn + ' se nesmí opakovat');
+  }
+});
+
+test('v3.63: POST idempotentní zápis (filtry, notifikace) se při 404 jednou zopakuje', async () => {
+  for (const [fn, args] of [['apiSetFiltry', ['vojta', {}]], ['apiSetNotifikace', ['vojta', {}]]]) {
+    const g = kontextFetch_([404, 200]);
+    const data = await g.gsrPresFetch_(fn, args);
+    assert.equal(data.ok, true, fn);
+    assert.equal(g.volani.length, 2, fn);
+  }
+});

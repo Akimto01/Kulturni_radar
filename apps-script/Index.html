@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.62 – hláška prázdného stavu podle profilu, jehož data jsou zobrazená (dřív vždy podle profilu ze startu stránky) -->
+<!-- Kulturní radar Index.html v3.63 – jeden automatický retry při HTTP 404 z echo URL (jen čtení a idempotentní zápisy) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -1163,6 +1163,24 @@
     }
   }
 
+  // v3.63: přerušované výpadky Apps Scriptu se projevují HTTP 404 na
+  // přesměrované „echo“ URL (script.googleusercontent.com/macros/echo).
+  // Pozor: v tu chvíli skript na serveru UŽ PROBĚHL, ztratila se jen
+  // odpověď. Opakovat se proto smí jen čtení (GET) a zápisy, které jen
+  // nastaví hodnotu (opakování dá stejný výsledek). Přepínače ★/✓/🏛 by se
+  // vrátily zpět, kontakt by poslal dva maily, kontrola by dvakrát
+  // zaplatila AI, špatný PIN by se započítal dvakrát (limit v3.45) a ntfy
+  // téma by se vygenerovalo jiné.
+  const IDEMPOTENTNI_POST_AKCE_ = ['filtry', 'set-notifikace'];
+  const OPAKOVANI_PAUZA_MS_ = 800;
+
+  /** PURE (v3.63): smí se požadavek po neúspěchu jednou zopakovat? */
+  function lzeOpakovatPozadavek_(poz, status) {
+    if (status !== 404 || !poz) return false;
+    if (poz.metoda === 'GET') return true;
+    return IDEMPOTENTNI_POST_AKCE_.indexOf(poz.telo && poz.telo.akce) >= 0;
+  }
+
   async function gsrPresFetch_(fn, args) {
     const poz = sestavFetchPozadavek_(fn, args, EXEC_URL);
     if (!poz) throw new Error('Neznámá serverová funkce: ' + fn);
@@ -1171,7 +1189,11 @@
     const opts = poz.metoda === 'POST'
       ? { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(poz.telo) }
       : undefined;
-    const resp = await fetch(poz.url, opts);
+    let resp = await fetch(poz.url, opts);
+    if (!resp.ok && lzeOpakovatPozadavek_(poz, resp.status)) {   // v3.63: jeden retry
+      await new Promise(r => setTimeout(r, OPAKOVANI_PAUZA_MS_));
+      resp = await fetch(poz.url, opts);
+    }
     if (!resp.ok) throw new Error('Server vrátil HTTP ' + resp.status);
     return resp.json();
   }
