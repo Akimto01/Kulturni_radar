@@ -683,3 +683,7 @@ aktuálně rozpracované/vybrané úkoly:**
   nastavování přes web UI (Project → Settings → Workflows) potřeba
   jen pokud by se v budoucnu chovaly jinak, než se očekává — zatím
   ověřeno funkční přímo přes `gh` CLI, žádný krok navíc.
+
+Od 27. 10. 2026: milníky = cíle z BACKLOG.md (Cíl 1–4), pole Odhad (h) a Termín. Zpětné uzavřené issues pro dokončenou práci jsou povolené jako dokumentace průběhu (schváleno 27. 10. 2026, poprvé pro v3.43–v3.65); pravidlo „issue až při výběru“ platí dál pro nové nápady.
+
+Na Vojtově stroji je aktivní účet gh pracovní cermakvoj-tesena (v repu jen READ, bez scope project). Pro práci s issues a boardem používat u každého příkazu GH_TOKEN=$(gh auth token --user Akimto01), globální účet nepřepínat.

@@ -25,22 +25,22 @@ Kulturní radar má být appka pro rodinu a přátele, která zároveň slouží
 Aktualizováno 27. 10. 2026 podle cílů výše. Hotové body z 26.–27. 10. 2026 (v3.43–v3.50, Index.html v3.60–v3.65) jsou v CHANGELOG.md.
 
 **Časově vázané ověřovačky (krátké, Claude přes claude-in-chrome; připomínky v kalendáři):**
-1. **Ověřit v3.44 v datech** (~15 min, po čtvrtečním běhu sledovaných měst 29. 10. 10:00) – podíl akcí se souřadnicemi a počasím OK, první HTTP kódy selhání Open-Meteo v KONTROLY; pak přeškrtnout body v „Nálezy ze živé kontroly“.
-2. **První týdenní report kvality** (~10 min, po samotestu 1. 11. 18:00) – sekce „Kvalita hledání“ včetně řádku fuzzy sloučení (v3.50); zapojení do runSelfTest není pokryté testem.
-3. **Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – podle cíle 3; rozhodnout o rozpočtu a stropu 15 akcí na běh.
+1. **Ověřit v3.44 v datech** (~15 min, po čtvrtečním běhu sledovaných měst 29. 10. 10:00) – podíl akcí se souřadnicemi a počasím OK, první HTTP kódy selhání Open-Meteo v KONTROLY; pak přeškrtnout body v „Nálezy ze živé kontroly“. → issue #6
+2. **První týdenní report kvality** (~10 min, po samotestu 1. 11. 18:00) – sekce „Kvalita hledání“ včetně řádku fuzzy sloučení (v3.50); zapojení do runSelfTest není pokryté testem. → issue #7
+3. **Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – podle cíle 3; rozhodnout o rozpočtu a stropu 15 akcí na běh. → issue #8
 
 **Cíl 1 – portfolio:**
-4. **README jako rozcestník** (~45 min) – CI odznaky, testovací pyramida v číslech, odkazy na dokumentaci a výstupy.
-5. **Příběhy chyb** (~1–2 h na kus) – kandidáti: dvojité kódování u měst s diakritikou (v3.65), závod pozdních odpovědí potvrzený fault injection (v3.61), Haiku a špatně zvolená metrika (v3.47), test čekající na staré karty (v3.62).
-6. **Veřejný RF report z CI** (~1 h) – log.html/report.html přes GitHub Pages.
-7. **Dokumentace výstavby architektury testů** (~2–3 h) – od strategie přes Node harness, RF/Browser, API nástroje po CI a dry run; podklady v CHANGELOG.md a Docs/TESTY.md.
-8. **Mutační testování (Stryker)** (~2 h) – mutation score místo ručních mutací.
-9. **Video nebo GIF z běhu testů** (~30 min).
+4. **README jako rozcestník** (~45 min) – CI odznaky, testovací pyramida v číslech, odkazy na dokumentaci a výstupy. → issue #9
+5. **Příběhy chyb** (~1–2 h na kus) – kandidáti: dvojité kódování u měst s diakritikou (v3.65), závod pozdních odpovědí potvrzený fault injection (v3.61), Haiku a špatně zvolená metrika (v3.47), test čekající na staré karty (v3.62). → issue #10
+6. **Veřejný RF report z CI** (~1 h) – log.html/report.html přes GitHub Pages. → issue #11
+7. **Dokumentace výstavby architektury testů** (~2–3 h) – od strategie přes Node harness, RF/Browser, API nástroje po CI a dry run; podklady v CHANGELOG.md a Docs/TESTY.md. → issue #12
+8. **Mutační testování (Stryker)** (~2 h) – mutation score místo ručních mutací. → issue #13
+9. **Video nebo GIF z běhu testů** (~30 min). → issue #14
 
 **Cíl 2 – otevření přátelům (souběžně s cílem 3):**
 10. **Design s dcerou → Android** (~3–4 h aktivní práce po designu) – čeká na dceru; koncept ikony varianta C předschválen 27. 8. 2026.
-11. **Zakládání nového profilu bez ruční práce v Sheetu** (odhad po návrhu).
-12. **Přihlašovací obrazovka pro víc uživatelů** (odhad po návrhu) – dnes ukazuje jména všech profilů každému návštěvníkovi.
+11. **Zakládání nového profilu bez ruční práce v Sheetu** (odhad po návrhu). → issue #15
+12. **Přihlašovací obrazovka pro víc uživatelů** (odhad po návrhu) – dnes ukazuje jména všech profilů každému návštěvníkovi. → issue #16
 
 **Cíl 3 – kvalita akcí:** viz ověřovačka 3; další kroky podle vyhodnocení.
 
