@@ -1,5 +1,32 @@
 # Changelog
 
+## Backend v3.50 – počet fuzzy sloučení v týdenním reportu; uzavření „kategorie D“ – 27. 10. 2026
+### Analýza
+- Zdroj: log fuzzy sloučení ve sloupci Z listu AKCE, čteno přes claude-in-chrome 27. 10. 2026. 25 řádků se záznamem (9. 9.–27. 10. 2026).
+- Zhruba 20 sloučení je správných (táž akce pod jiným názvem), např. „Festival Serial Killer 2026“ → „Serial Killer festival“, „Maker Faire Brno“ → „Maker Faire Brno 2026“.
+- 4–5 sloučení je podezřelých na spojení dvou různých akcí:
+
+| Sloučení | Podezření |
+|---|---|
+| NPÚ bezplatné prohlídky | série, změna obce |
+| Slavnostní / Zahajovací koncert v Obecním domě | dva různé koncerty |
+| Výstava v Galerii města Třince → „To to letí… 95 let města Třince“ | různé výstavy |
+| Západočeské baroko 2026 → „– Manětín“ | přepsáno i datum do |
+| Výstava Olomouc buďme kámoši → Olomouc buďme 2026 | různé akce |
+
+### Rozhodnutí: chování ponechat, jen sledovat počet
+- Bezpečnější varianta (nesluč při pochybnosti) by u zhruba 20 správných případů vytvořila duplicity na webu, tedy víc škody než užitku.
+- Spolehlivé pravidlo pro rozlišení série od přejmenování nejde z 25 případů navrhnout bez hádání.
+### Změna v3.50
+- `spocitatFuzzySlouceni_(bunky, ted)` (čistá funkce) spočítá záznamy „[fuzzy merge D. M. RRRR …]“ za posledních 7 dní a 7 dní před tím, stejné okno jako `hodnotitKvalituHledani_`.
+- `runSelfTest` předá sloupec Z do `hodnoceni.fuzzy`, `sestavReportKvality_` přidá řádek „fuzzy sloučení v AKCE: N | dříve: M“. Jen viditelnost, nic se nezapisuje.
+### Testy
+- Node 551 → 554 (+3), mutačně ověřené 2/3. Třetí mutant je ekvivalentní (data v logu jsou bez času).
+- Zapojení do `runSelfTest` není pokryté testem, ověří se s reportem 1. 11. 2026.
+- RF po nasazení: smoke 11/11.
+### Poznámka
+- Backend v3.50, `Index.html` beze změny (v3.63). Apps Script verze projektu 110, commit `bf02050`.
+
 ## Index.html v3.63 – jeden retry při HTTP 404 z echo URL – 27. 10. 2026
 ### Kontext
 - Přerušované výpadky Apps Scriptu 7.–8. 10. 2026 se projevovaly HTTP 404 na přesměrované „echo“ URL (`script.googleusercontent.com/macros/echo`), viz skill, vzorec B. Frontend je ukázal uživateli jako chybu.
