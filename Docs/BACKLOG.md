@@ -36,6 +36,7 @@ Aktualizováno 27. 10. 2026 podle cílů výše. Hotové body z 26.–27. 10. 20
 7. **Dokumentace výstavby architektury testů** (~2–3 h) – od strategie přes Node harness, RF/Browser, API nástroje po CI a dry run; podklady v CHANGELOG.md a Docs/TESTY.md. → issue #12
 8. **Mutační testování (Stryker)** (~2 h) – mutation score místo ručních mutací. → issue #13
 9. **Video nebo GIF z běhu testů** (~30 min). → issue #14
+9a. **Správa defektů: formulář, životní cyklus a analýza úniků** (~1,5–2 h) – včetně zpětného přepisu defektů z 26.–27. 10. 2026 se závažností a prioritou. → issue #32
 
 **Cíl 2 – otevření přátelům (souběžně s cílem 3):**
 10. **Design s dcerou → Android** (~3–4 h aktivní práce po designu) – čeká na dceru; koncept ikony varianta C předschválen 27. 8. 2026.
