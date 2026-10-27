@@ -1,5 +1,25 @@
 # Changelog
 
+## Index.html v3.62 + RF test přepnutí profilu – 27. 10. 2026
+### Chyba
+- Po přepnutí v dropdownu na město „nikdy neprohledáno“ (Česká Lípa) se v prázdném stavu zobrazila hláška „Žádné akce pro vybraný filtr (naposledy zkontrolováno: 27. 10. 2026 8:13)“ – čas Brna. Ověřeno živě přes claude-in-chrome.
+- Příčina: `renderAkce` bral `posledniKontrolaProfilu_[aktivniProfil]`, ale `aktivniProfil` se nastaví jen při startu stránky. Změna v3.59 se ověřovala přes URL `?profil=`, kde to funguje, takže přepnutí v dropdownu nezachytila.
+- Chybu odhalil až přepracovaný RF test (původní verze dvakrát po sobě spadla na čekání na hlášku, viz níže).
+### Oprava
+- `nactiAkce` si po stráži z v3.61 zapamatuje `zobrazenyProfil_` (profil, jehož akce jsou právě zobrazené).
+- Nová čistá funkce `hlaskaPrazdnehoStavuProProfil_(mapaKontrol, zobrazenyProfil, aktivni)` podle něj vybere hlášku; `renderAkce` ji používá místo `aktivniProfil`.
+### Testy
+- Node 540 → 544 (+4), mutačně ověřené 3/4. Čtvrtou mutaci (zapojení v `renderAkce`) hlídá RF test, který před opravou 2× spadl a po ní prošel.
+### Změna RF testu „Opakované přepnutí profilu v dropdownu nerozbije appku (regrese v3.12)“
+- Stará verze po každém přepnutí čekala jen na viditelnou kartu, což splnily ještě staré karty. Bug z v3.12 by nezachytila a nechávala běžet překrývající se požadavky (souvislost s pády chip testů, viz v3.61).
+- Nová verze střídá původní profil s městem „nikdy neprohledáno“ (vybraným dynamicky), čeká na hlášku prázdného stavu a 0 karet, pak na návrat karet; 2 cykly. Pozorovatelné přechody 0 ↔ karty.
+- Omezení: schopnost zachytit bug z v3.12 nejde ověřit mutačně bez nasazení rozbité appky.
+### Výsledky po nasazení (27. 10. 2026)
+- Nový test 2× PASS (před opravou 2× FAIL), smoke 11/11, frontend sada bez zápisových testů 45/45.
+### Poznámka
+- Backend beze změny (3.49), `Index.html` v3.62. Apps Script verze projektu 108, commit `56a2cd1`.
+- Frontend se nasazuje `git push` (Cloudflare Pages), na Apps Script jde přes clasp.
+
 ## Index.html v3.61 – zahodit pozdní odpověď při přepínání profilu – 26. 10. 2026
 ### Kontext
 - V plném běhu frontend sady (26. 10. 2026) spadly dva chip testy (Chip typu stálého místa: 0 != 18, Chip Oblíbená místa: 0 != 15), izolovaně 2× PASS. Vysvětlení s pevným `Sleep 300ms` se ukázalo jako chybné (chipy překreslují synchronně bez síťového požadavku, ověřeno čtením `Index.html`).
