@@ -1,51 +1,54 @@
 # Backlog — Kulturní radar
 
-Poslední aktualizace: 26. 10. 2026. Neplánované nápady a rozpracované položky –
+Poslední aktualizace: 27. 10. 2026. Neplánované nápady a rozpracované položky –
 na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 
+## Cíle do dubna 2027
+Kulturní radar má být appka pro rodinu a přátele, která zároveň slouží jako ukázka mé práce (portfolio pro výběrová řízení). Pořadí priorit schváleno 27. 10. 2026; cíle 2 a 3 poběží souběžně.
+
+**1. Testy a kvalita kódu jako ukázka**
+- Repo musí jít ukázat bez dalšího vysvětlování: CI zelené, CHANGELOG a BACKLOG aktuální, každá oprava s testem a živým ověřením.
+- Víc forem výstupů: README jako rozcestník; „příběhy chyb“ (problém → diagnóza → test → oprava); veřejný RF report z CI; dokumentace postupné výstavby architektury testů (od strategie přes framework po CI); systematické mutační testování (Stryker); krátké video nebo GIF z běhu testů.
+
+**2. Otevření přátelům: design a Android**
+- Design s dcerou, pak Android (PWA → Trusted Web Activity → Google Play).
+- Před otevřením přátelům vyřešit zakládání nového profilu bez ruční práce v Sheetu a přihlašovací obrazovku, která dnes každému návštěvníkovi ukazuje jména všech profilů.
+
+**3. Kvalita a počet nalezených akcí**
+- Měřítko z týdenního reportu: denní kontrola Brna průměrně ≥ 1,2 nové akce na běh a nejvýš 1 nulový běh za týden; sledovaná města bez dlouhodobě prázdných výsledků.
+- Rozpočet na Claude API se stanoví podle přínosu po vyhodnocení Sonnetu 5.5 (kolem 9. 11. 2026).
+
+**4. Víc měst a profilů**
+- Až po splnění cíle 3 a vyjasnění nákladů; další sledované město jen se smysluplnými zdroji.
+
 ## Doporučené pořadí
-Aktualizováno 26. 10. 2026 po dlouhé session (backend v3.43–v3.49,
-Index.html v3.60, RF dry run v CI). Pořadí ze 8. 8. 2026 je splněné
-(filtr žánrů, roční přehled, notifikace A–F, kalendář, e-mailové tipy,
-API kredity) nebo přesunuté níže (design, Android); původní znění je
-v historii gitu.
+Aktualizováno 27. 10. 2026 podle cílů výše. Hotové body z 26.–27. 10. 2026 (v3.43–v3.50, Index.html v3.60–v3.65) jsou v CHANGELOG.md.
 
-**Časově vázané ověřovačky (nejdřív, krátké, Claude přes claude-in-chrome):**
-1. **Ověřit v3.44 v datech** (~15 min, po čtvrtečním běhu sledovaných
-   měst 29. 10. 10:00 a denních kontrolách) – podíl akcí se souřadnicemi
-   a počasím OK, první HTTP kódy selhání Open-Meteo v KONTROLY. Podle
-   kódů rozhodnout o pauzách mezi voláními (viz „Sledovat: HTTP kódy“).
-   Pak přeškrtnout body o souřadnicích a počasí v „Nálezy ze živé kontroly“.
-2. **První týdenní report kvality** (~10 min, po samotestu v neděli
-   1. 11. 18:00) – ověřit, že sekce „Kvalita hledání“ v mailu samotestu
-   dorazila (zapojení do `runSelfTest` není pokryté testem, v3.47).
-3. **Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – viz položka
-   „Vyhodnotit Sonnet 5.5 po 2 týdnech“; podle výsledku rozhodnout
-   i o stropu 15 akcí na běh.
+**Časově vázané ověřovačky (krátké, Claude přes claude-in-chrome; připomínky v kalendáři):**
+1. **Ověřit v3.44 v datech** (~15 min, po čtvrtečním běhu sledovaných měst 29. 10. 10:00) – podíl akcí se souřadnicemi a počasím OK, první HTTP kódy selhání Open-Meteo v KONTROLY; pak přeškrtnout body v „Nálezy ze živé kontroly“.
+2. **První týdenní report kvality** (~10 min, po samotestu 1. 11. 18:00) – sekce „Kvalita hledání“ včetně řádku fuzzy sloučení (v3.50); zapojení do runSelfTest není pokryté testem.
+3. **Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – podle cíle 3; rozhodnout o rozpočtu a stropu 15 akcí na běh.
 
-**Ruční úklid (Vojta, ~10 min, kdykoli):**
-4. Smazat 5 řádků s datem „neuvedeno“ v AKCE (Youngfest, KarmaFest,
-   Rajnochovická železnice, Slavnost pod jabloní, Mineral-Expo) – jinak
-   je samotest hlásí každou neděli (v3.48). Volitelně 2 staré skryté
-   duplicity v MÍSTA (v3.46).
+**Cíl 1 – portfolio:**
+4. **README jako rozcestník** (~45 min) – CI odznaky, testovací pyramida v číslech, odkazy na dokumentaci a výstupy.
+5. **Příběhy chyb** (~1–2 h na kus) – kandidáti: dvojité kódování u měst s diakritikou (v3.65), závod pozdních odpovědí potvrzený fault injection (v3.61), Haiku a špatně zvolená metrika (v3.47), test čekající na staré karty (v3.62).
+6. **Veřejný RF report z CI** (~1 h) – log.html/report.html přes GitHub Pages.
+7. **Dokumentace výstavby architektury testů** (~2–3 h) – od strategie přes Node harness, RF/Browser, API nástroje po CI a dry run; podklady v CHANGELOG.md a Docs/TESTY.md.
+8. **Mutační testování (Stryker)** (~2 h) – mutation score místo ručních mutací.
+9. **Video nebo GIF z běhu testů** (~30 min).
 
-**Vývoj (podle chuti a času):**
-5. ~~**Jeden automatický retry při HTTP 404 z echo URL** (~1 h, viz
-   Testovací dluh) – pozor na idempotenci zápisových volání.~~ HOTOVO 27. 10. 2026.
-6. ~~**Audit selektorů D–H** (~1 h, viz Testovací dluh).~~ HOTOVO 27. 10. 2026.
-7. ~~**„Kategorie D“ v `upsertEvents_`** (~1,5–2 h, hlavně průzkum, viz
-   „K PROŠETŘENÍ (otevřeno 31. 8. 2026)“).~~ UZAVŘENO 27. 10. 2026.
+**Cíl 2 – otevření přátelům (souběžně s cílem 3):**
+10. **Design s dcerou → Android** (~3–4 h aktivní práce po designu) – čeká na dceru; koncept ikony varianta C předschválen 27. 8. 2026.
+11. **Zakládání nového profilu bez ruční práce v Sheetu** (odhad po návrhu).
+12. **Přihlašovací obrazovka pro víc uživatelů** (odhad po návrhu) – dnes ukazuje jména všech profilů každému návštěvníkovi.
 
-**Blokované / odložené:**
-8. **Design s dcerou → Android submission** (~3–4 h aktivní práce po
-   designu) – čeká na dceru; koncept ikony (varianta C) předschválen
-   27. 8. 2026, viz `Docs/design-koncept-ikona-varianta-C.svg`.
-9. **Cesta B zrychlení přihlášení** – jen sledovat (průzkum 19. 8. 2026
-   ukázal malý přínos a vysoké riziko).
+**Cíl 3 – kvalita akcí:** viz ověřovačka 3; další kroky podle vyhodnocení.
 
-Poznámka: pořadí není striktní závazek, jen doporučení podle
-závislostí a efektivity – aktualizuj tuto sekci při každé větší
-změně BACKLOGu.
+**Ruční úklid (Vojta, kdykoli):** smazat 5 řádků „neuvedeno“ v AKCE (v3.48); projít 5 podezřelých fuzzy sloučení (CHANGELOG v3.50); volitelně 2 staré skryté duplicity v MÍSTA (v3.46).
+
+**Odloženo:** Cesta B zrychlení přihlášení (jen sledovat).
+
+Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, závislostí a efektivity – aktualizuj tuto sekci při každé větší změně BACKLOGu.
 
 ## K ověření
 - iPad: ověřit, jestli window.open() (v3.7 Index.html) vyřešil otevírání „Více info"/„Do kalendáře" v nové záložce — dcera se ještě nevrátila s iPadem. (Dojezd v km u nově nalezených akcí ověřen 7. 8. jako OK, položka odstraněna.)
