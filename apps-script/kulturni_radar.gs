@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.49 (26. 10. 2026) – seznam profilů označí testovací profily (ID „rf-…“), frontend je veřejně skryje
- * (předchozí: 3.48 – akce bez rozpoznatelného data („neuvedeno“): nezapisují se, na webu se skryjí, samotest je hlásí)
+ * Verze: 3.50 (27. 10. 2026) – týdenní report kvality uvádí i počet fuzzy sloučení v AKCE (sloupec Z)
+ * (předchozí: 3.49 – seznam profilů označí testovací profily (ID „rf-…“), frontend je veřejně skryje)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.49';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.50';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -3367,6 +3367,12 @@ function runSelfTest() {
       const radky = ksh.getRange(2, 1, ksh.getLastRow() - 1, 15).getValues();
       const hodnoceni = hodnotitKvalituHledani_(radky, new Date());
       hodnoceni.poplachy.forEach(p => problemy.push('kvalita hledání – ' + p));
+      // v3.50: počet fuzzy sloučení ze sloupce Z listu AKCE (jen viditelnost)
+      const ash = ss.getSheetByName(SHEET.AKCE);
+      if (ash && ash.getLastRow() > 1 && ash.getLastColumn() >= COL_Z) {
+        const bunky = ash.getRange(2, COL_Z, ash.getLastRow() - 1, 1).getValues().map(r => r[0]);
+        hodnoceni.fuzzy = spocitatFuzzySlouceni_(bunky, new Date());
+      }
       reportKvality = sestavReportKvality_(hodnoceni);
     }
   } catch (e) { varovani.push('report kvality hledání selhal: ' + e); }
@@ -3449,6 +3455,29 @@ function hodnotitKvalituHledani_(radky, ted) {
   return { typy: vysledek, poplachy };
 }
 
+/** PURE (v3.50): počet fuzzy sloučení (záznamů „[fuzzy merge D. M. RRRR …]“
+ *  ve sloupci Z listu AKCE) za posledních 7 kalendářních dní a 7 dní před
+ *  tím – stejné okno jako hodnotitKvalituHledani_. Jen viditelnost: analýza
+ *  27. 10. 2026 ukázala, že ~4 z 5 sloučení jsou správná (přejmenování téže
+ *  akce), chybná (série/„kategorie D“) jsou vzácná. Kdyby jich výrazně
+ *  přibylo, má to být v reportu vidět. `bunky` = hodnoty sloupce Z. */
+function spocitatFuzzySlouceni_(bunky, ted) {
+  const den = 86400000;
+  const dnes = new Date(ted.getFullYear(), ted.getMonth(), ted.getDate());
+  const vysledek = { aktualni: 0, predchozi: 0 };
+  (bunky || []).forEach(b => {
+    const re = /\[fuzzy merge (\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/g;
+    let m;
+    while ((m = re.exec(String(b || '')))) {
+      const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+      const stariDni = Math.round((dnes - d) / den);
+      if (stariDni >= 0 && stariDni < 7) vysledek.aktualni++;
+      else if (stariDni >= 7 && stariDni < 14) vysledek.predchozi++;
+    }
+  });
+  return vysledek;
+}
+
 /** PURE: textová sekce reportu do samotestu. */
 function sestavReportKvality_(hodnoceni) {
   const radek = (s) => s.behu
@@ -3461,6 +3490,9 @@ function sestavReportKvality_(hodnoceni) {
     const v = hodnoceni.typy[t];
     casti.push('• ' + t + ': ' + radek(v.aktualni) + ' | dříve: ' + radek(v.predchozi));
   });
+  if (hodnoceni.fuzzy) {   // v3.50
+    casti.push('• fuzzy sloučení v AKCE: ' + hodnoceni.fuzzy.aktualni + ' | dříve: ' + hodnoceni.fuzzy.predchozi);
+  }
   casti.push('(cena bez poplatků za webové vyhledávání)');
   return casti.join('\n');
 }

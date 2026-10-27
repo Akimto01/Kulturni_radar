@@ -3994,3 +3994,35 @@ test('v3.49: apiSeznamUzivatelu_ – testovací profil dostane testovaci:true, o
   assert.equal(seznam[1].testovaci, true);
   assert.equal('pinHash' in seznam[1], false);
 });
+
+// ---------------------------------------------------------------------------
+// v3.50: počet fuzzy sloučení (sloupec Z AKCE) v týdenním reportu kvality
+// (uzavření „kategorie D“ 27. 10. 2026: ponechat chování, sledovat počet)
+// ---------------------------------------------------------------------------
+
+test('v3.50: spocitatFuzzySlouceni_ – počítá záznamy v okně 7 + 7 dní, i víc záznamů v jedné buňce', () => {
+  const bunky = [
+    '[fuzzy merge 5. 11. 2026 8:13] "A" → "A 2026"; přepsáno: čas',
+    '[fuzzy merge 3. 11. 2026 8:13] "B" → "B2"; přepsáno: místo\n[fuzzy merge 7. 11. 2026 8:13] "B2" → "B3"; přepsáno: popis',
+    '[fuzzy merge 30. 10. 2026 20:22] "C" → "C2"; přepsáno: cena',   // předchozí týden
+    '[fuzzy merge 10. 10. 2026 8:12] "D" → "D2"; přepsáno: url',     // starší než 14 dní
+    '',
+    null,
+  ];
+  const v = r.spocitatFuzzySlouceni_(bunky, TED_KVALITA());
+  assert.equal(v.aktualni, 3);
+  assert.equal(v.predchozi, 1);
+});
+
+test('v3.50: spocitatFuzzySlouceni_ – hranice okna po kalendářních dnech (2. 11. aktuální, 1. 11. předchozí)', () => {
+  const v = r.spocitatFuzzySlouceni_(['[fuzzy merge 2. 11. 2026 0:01] x', '[fuzzy merge 1. 11. 2026 23:59] y'], TED_KVALITA());
+  assert.equal(v.aktualni, 1);
+  assert.equal(v.predchozi, 1);
+});
+
+test('v3.50: sestavReportKvality_ – řádek s počtem fuzzy sloučení, jen když je k dispozici', () => {
+  const h = r.hodnotitKvalituHledani_([], TED_KVALITA());
+  assert.doesNotMatch(r.sestavReportKvality_(h), /fuzzy/);
+  h.fuzzy = { aktualni: 4, predchozi: 2 };
+  assert.match(r.sestavReportKvality_(h), /fuzzy sloučení v AKCE: 4 \| dříve: 2/);
+});
