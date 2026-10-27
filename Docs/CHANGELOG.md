@@ -1,5 +1,36 @@
 # Changelog
 
+## Index.html v3.63 – jeden retry při HTTP 404 z echo URL – 27. 10. 2026
+### Kontext
+- Přerušované výpadky Apps Scriptu 7.–8. 10. 2026 se projevovaly HTTP 404 na přesměrované „echo“ URL (`script.googleusercontent.com/macros/echo`), viz skill, vzorec B. Frontend je ukázal uživateli jako chybu.
+### Klíčové zjištění
+- Při 404 na echo URL už skript na serveru proběhl, ztratila se jen odpověď. Opakovat tedy nelze naslepo: u zápisů by se akce provedla dvakrát.
+### Pravidlo
+- `gsrPresFetch_` při HTTP 404 jednou zopakuje požadavek po 800 ms (`OPAKOVANI_PAUZA_MS_`). Rozhoduje nová čistá funkce `lzeOpakovatPozadavek_(poz, status)`.
+- Opakuje se: čtení (GET) a idempotentní zápisy `filtry` a `set-notifikace` (jen nastaví hodnotu, opakování dá stejný výsledek).
+- Neopakuje se:
+  - přepínače ★/✓/🏛 – druhé volání by stav vrátilo zpět,
+  - login – špatný PIN by se započítal dvakrát (limit v3.45),
+  - kontakt – odešly by dva maily,
+  - run a najdi – kontrola by dvakrát zaplatila AI,
+  - ntfy téma – vygenerovalo by se jiné.
+- Režim `google.script.run` beze změny.
+### Testy
+- Node 544 → 551 (+7), mutačně ověřené 5/5, včetně mutací „retry pro přepínače“ a „retry ve smyčce“.
+### Živé ověření 27. 10. 2026 (claude-in-chrome, fault injection obalem `window.fetch`, jen v záložce)
+| Scénář | Podvržená 404 | Volání | Výsledek |
+|---|---|---|---|
+| Načtení akcí Brna | jen 1. pokus | 2, rozestup 811 ms | 17 akcí, bez chyby |
+| `apiToggle` | stále | 1 | chyba „Server vrátil HTTP 404“, bez opakování |
+| `apiSetFiltry` | stále | 2 | po druhém pokusu chyba |
+- U scénářů 2 a 3 stub požadavky zachytil, na server nic neodešlo.
+### Testy po nasazení
+- RF: smoke 11/11, frontend sada bez zápisových testů 45/45.
+- RF frontend testy jdou přes appku, takže je retry chrání i před vzorcem B. API testy volají server přímo a nemění se.
+### Poznámka
+- Backend beze změny (3.49), `Index.html` v3.63. Apps Script verze projektu 109, commit `5f61ed7`.
+- Frontend se nasazuje `git push` (Cloudflare Pages), na Apps Script jde přes clasp.
+
 ## Index.html v3.62 + RF test přepnutí profilu – 27. 10. 2026
 ### Chyba
 - Po přepnutí v dropdownu na město „nikdy neprohledáno“ (Česká Lípa) se v prázdném stavu zobrazila hláška „Žádné akce pro vybraný filtr (naposledy zkontrolováno: 27. 10. 2026 8:13)“ – čas Brna. Ověřeno živě přes claude-in-chrome.
