@@ -30,6 +30,7 @@ souboru.
 
 ### Kontrolní seznam před balením
 1. Provést změnu(y) v pracovní kopii.
+   - Novou funkci vkládat PŘED dokumentační komentář sousední funkce, ne mezi komentář a funkci, ke které patří (jinak komentář visí nad cizí funkcí; stalo se 26. 10. u cellText_ a 27. 10. u sestavHlaskuPrazdnehoStavu_).
 2. Bump verze (viz výše) — vždy, i u jednořádkové opravy.
 3. Syntaktická kontrola (bez Apps Scriptu, jen Node):
    ```bash
@@ -182,6 +183,7 @@ Víc tagů v jednom `--include` jde spojit i inline: `--include mapaORkalendar`.
 
 - Od v3.45 se profil zamkne po 5 chybných PINech v řadě (15 min). Opakované spouštění samotného testu špatného PINu bez úspěšného přihlášení mezi tím zamkne rf-test - odemknout menu Sheetu 'Odemknout všechny profily (limit PINu)' nebo počkat. Zamčený rf-test navíc vyřadí celou frontend sadu, protože Suite Setup (keyword "Otevřít radar") se přihlašuje rf-test (běh 26. 10. 2026: 3/11). Pokud se odemčení neprojeví, spusť menu znovu: u nové funkce první spuštění z menu pravděpodobně spotřebuje jen autorizaci (známé chování Apps Scriptu, 26. 10. 2026 nepotvrzeno přímo).
 - Od Index.html v3.60 se testovací profily (rf-…) na přihlašovací obrazovce zobrazí jen s localStorage příznakem kr_testovaci_profily=1, který nastavuje Suite Setup (keyword Povolit testovací profily). Nový test s vlastním New Context, který se má přihlašovat, musí ten keyword zavolat také.
+- RF testy jedou s profilem Brno (bez diakritiky), proto chyba s dvojitým kódováním profilu (v3.65) unikala testům od 2. 8. 2026. U změn kolem profilů a URL ověřovat i město s diakritikou (RF test „Přepnutí na město s diakritikou“). Živé kontroly ostatních měst dělat přes appku, ne přímým voláním API – přímé API chybu ve frontendu nevidí.
 
 ## 3. Sync CHANGELOG.md ↔ BACKLOG.md
 
@@ -571,6 +573,9 @@ fungují spolehlivě.
   do Sheetu přes pole názvu buňky ani klávesnicí – snadno se přepíše
   buňka v aktuálním listu (typicky KRITÉRIA, kde B2 řídí automatiku).
 
+### Sondy po přepnutí profilu
+Po přepnutí profilu v dropdownu nikdy nečekat na „nějakou“ kartu – podmínku splní ještě karty předchozího profilu a sonda změří starý stav (27. 10. 2026: všechna města hlásila 17 karet Brna). Buď přejít přes město „nikdy neprohledáno“ (0 karet, pak čekat na nové karty), nebo počkat pevnou dobu (~8 s) a ověřit obsah (např. název první karty). Stejná past jako u RF testu „Opakované přepnutí profilu“ (opraveno v Index.html v3.62).
+
 ## 8. Flaky testy — obecný princip a náš případ (21. 8. 2026)
 
 ### Co je flaky test
@@ -687,3 +692,5 @@ aktuálně rozpracované/vybrané úkoly:**
 Od 27. 10. 2026: milníky = cíle z BACKLOG.md (Cíl 1–4), pole Odhad (h) a Termín. Zpětné uzavřené issues pro dokončenou práci jsou povolené jako dokumentace průběhu (schváleno 27. 10. 2026, poprvé pro v3.43–v3.65); pravidlo „issue až při výběru“ platí dál pro nové nápady.
 
 Na Vojtově stroji je aktivní účet gh pracovní cermakvoj-tesena (v repu jen READ, bez scope project). Pro práci s issues a boardem používat u každého příkazu GH_TOKEN=$(gh auth token --user Akimto01), globální účet nepřepínat.
+
+Nastavení pohledů boardu (claude-in-chrome): po kliknutí na „Save view“ GitHub otevře potvrzovací dialog „Save display options … make it the default for everyone“, který se musí potvrdit tlačítkem „Save“ – Escape ho zruší a změna se tiše neuloží (27. 10. 2026 dvakrát). Změny pohledu (visibleFields, groupedBy, sumFields) jdou předvyplnit parametry v URL pohledu, pak stačí uložit. Uložení vždy ověřit znovunačtením čisté URL bez parametrů. V GitHub UI hledat prvky přes find, ne souřadnicemi – okno mění velikost a klik mine.
