@@ -1,5 +1,54 @@
 # Changelog
 
+## Index.html v3.65 – oprava dvojitého kódování profilu (města s diakritikou) – 27. 10. 2026
+### Chyba
+- Při ověřování v3.64 ukazovaly Plzeň a Zlín na kulturniradar.cz 0 akcí i 0 míst, přestože API pro ně akce vrací (Plzeň 18).
+- Příčina (ověřeno v prohlížeči): `nactiAkce`/`nactiMista` předají profil přes `encodeURIComponent`, `api()` ho nechalo zakódovaný a `sestavFetchPozadavek_` ho zakódoval znovu. Server dostal „Zl%C3%ADn“ místo „Zlín“.
+- Rozsah: všechna města s diakritikou (Plzeň, Zlín, Třinec…). Brno a další ASCII názvy fungovaly.
+### Od kdy chyba existovala (git log/blame)
+- Řádek `const profil = param.replace('profil=', '');` v `api()` vznikl v `c0a1549` (2. 8. 2026, v3.3) spolu s `encodeURIComponent` v `nactiAkce`/`nactiMista`. Už tehdy šel zakódovaný profil přímo do `google.script.run`, a backend nikde nedekóduje (v `kulturni_radar.gs` není `decodeURIComponent`). Podle kódu tedy chyba v režimu `google.script.run` pravděpodobně existovala od 2. 8. 2026; živě jsem ten režim neověřoval.
+- Fetch režim (`sestavFetchPozadavek_`, statický web) vznikl v `7326b54` (8. 8. 2026, v3.15/v3.21) a profil kóduje podruhé.
+### Proč to testy nezachytily
+- RF testy jedou s Brnem (bez diakritiky).
+- Včerejší kontrola ostatních měst šla přímo přes API, ne přes appku.
+### Oprava
+- `api()` profil před předáním dekóduje: `decodeURIComponent(param.replace('profil=', ''))`.
+### Testy
+- Node 554 → 558 (+4), mutačně ověřené: bez opravy spadnou 3 ze 4. Čtvrtý je regrese pro Brno a prázdný profil.
+- Nový RF test „Přepnutí na město s diakritikou načte jeho akce (regrese v3.65)“: dynamicky vybere prohledané město s diakritikou a město „nikdy neprohledáno“, přes ně ověří, že se akce vybraného města načtou, a vrátí původní profil.
+- Riziko testu: vybere první prohledané město s diakritikou v abecedě (dnes Plzeň). Kdyby to bylo město bez budoucích akcí, falešně spadne (viz BACKLOG).
+### Živé ověření 27. 10. 2026 (claude-in-chrome)
+| Město | Před opravou | Po opravě |
+|---|---|---|
+| Plzeň | 0 akcí | 18 akcí |
+| Zlín | 0 akcí | 9 akcí |
+| Třinec | 0 akcí | 0 akcí (správně, API vrací 0) |
+- Žádný ze 6 požadavků nemá dvojité kódování (`%25`).
+### RF po nasazení
+- Nový test 2× PASS (vybral Plzeň, prázdné město Česká Lípa), smoke 11/11, frontend sada bez zápisových testů 46/46.
+### Poznámka
+- Backend beze změny (3.50), `Index.html` v3.65. Apps Script verze projektu 112, commit `7e21952`.
+
+## Index.html v3.64 – audit selektorů D–H – 27. 10. 2026
+### Změněno (jen atributy, chování beze změny)
+- D: `.misto-karta[data-misto="název|obec"]`.
+- E: `.btn-url[data-akce="vice-info|kalendar|mapa|sdilet"]`.
+- F: chipy typů míst `[data-typ]` („Vše“ = prázdný řetězec). Refaktor na `vytvorChip()` vědomě vynechán, návrh ho doporučuje posoudit zvlášť.
+- G: `.mapa-stat[data-stat="akci|mist|kategorii"]`.
+- H: `#den-probiha` na hlavičce skupiny „Probíhá / dlouhodobé“.
+### Zpevněné RF testy
+- Odkazy Do kalendáře, Mapa a Sdílet přes `data-akce`, u prvních dvou i ověření cíle odkazu.
+- Test sekce stálých míst ověří `data-misto` u všech karet.
+- Test chipů typů míst přes `data-typ` místo pozice a textu „Vše“.
+### Ověření v Chrome (claude-in-chrome)
+- D: 18/18 karet míst má `data-misto`. E: všechny čtyři `data-akce`. F: chipy mají `data-typ`. G: tři buňky statistiky mají `data-stat`.
+- Zjištění: stejnou třídu `.mapa-stat` používají i dlaždice mini předpovědi počasí, ty `data-stat` nemají. Nový atribut je spolehlivě odliší.
+- H živě neověřeno: žádný kontrolovaný profil teď nemá probíhající akci, skupina „Probíhá“ se nevykresluje.
+### RF po nasazení
+- Smoke 11/11, frontend sada bez zápisových testů 45/45, bez SKIP.
+### Poznámka
+- Backend beze změny (3.50), `Index.html` v3.64. Apps Script verze projektu 111, commit `8a5b663`.
+
 ## Backend v3.50 – počet fuzzy sloučení v týdenním reportu; uzavření „kategorie D“ – 27. 10. 2026
 ### Analýza
 - Zdroj: log fuzzy sloučení ve sloupci Z listu AKCE, čteno přes claude-in-chrome 27. 10. 2026. 25 řádků se záznamem (9. 9.–27. 10. 2026).
