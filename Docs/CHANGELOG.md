@@ -22,7 +22,7 @@
 | Příčina | Pády | Stav |
 |---|---|---|
 | Opraveno 26.–27. 10. | kalendář hover, část chip testů (`0 != N`), skip 🏛 | v3.61 až v3.65 a opravy testů |
-| Příčina nejasná | trojice ★/✓ (#6 až #14), pak jiný pád ★ v #15 | 9 běhů za sebou stejný pád, timeout na ikoně u první karty |
+| Pravděpodobně závod odpovědí + slabý test (nepřímá shoda, viz sekce níže) | trojice ★/✓ (#6 až #14), pak jiný pád ★ v #15 | 9 běhů za sebou stejný pád, 0 karet na stránce |
 | Prostředí CI / backend | #9 (23 pádů), timeout `page.goto` v #17 | přechodné výpadky odezvy Apps Scriptu nebo webu |
 | Nestabilní test | chip typu stálého místa, chip Neověřeno | výsledek závisí na datech profilu, viz BACKLOG |
 ### Ověření hypotézy: zápis ★ na řádek „Léto na Zelňáku“
@@ -30,7 +30,14 @@
 - Test: POST na `/exec` akce `toggle` (typ `oblibene`, profil rf-test) dvakrát za sebou na Zelňák a dvakrát na běžnou budoucí akci Brna (`2026-10-29-hollywood-halloween`).
 - Výsledek: všechna čtyři volání vrátila `ok:true` za 2 až 3 s, odpovědi mají stejný tvar (Zelňák false, pak true; Halloween true, pak false). **Hypotéza o selhání zápisu na serveru se nepotvrdila.** Řádek Zelňáku zápis přijímá stejně jako běžná akce.
 - Zelňák navíc měl ★ nastavenou už před testem (první volání ji vypnulo, druhé vrátilo), takže po dřívějších pádech zůstala u rf-test ★ na tomhle řádku. Původní stav jsem obnovil.
-- Co zůstává nejasné: v logu #6 až #14 test čekal na ikonu `.ikona-oznaceni.hvezda` u první karty a ta se neobjevila vůbec (nešlo o stav „ukládání“). Proč se ikona na kartě nevykreslila, jsem neověřil.
+- V logu #6 až #14 test čekal na ikonu `.ikona-oznaceni.hvezda` u první karty a ta se neobjevila vůbec (nešlo o stav „ukládání“). Vysvětlení viz další sekce.
+### Pravděpodobná příčina ★/✓ trojice a chip testů
+**Jde o silnou nepřímou shodu, ne o přímý důkaz.** Příčinu jsem nereprodukoval ani neviděl v datech běhu.
+- (a) Ikony ★/✓ se na kartě vykreslují bez podmínky i ve starém kódu (ověřeno v `8311581` i `3f04d62`). Chyba „Karty mají ikony pro Oblíbené a Navštívené: `0 != 1`“ proto neznamená chybějící ikony, ale **0 karet na stránce**. Totéž platí pro timeout na `.karta .first .ikona-oznaceni`: žádná karta, žádná ikona.
+- (b) Test „Opakované přepnutí profilu“ přibyl 21. 8. 2026 (viz BACKLOG), první červený běh #6 byl 23. 8. Časově to sedí.
+- (c) Test přepínal profily rychle za sebou bez čekání na dokončení načtení. Závod pozdních odpovědí (opraven v Index.html v3.61, test přepsán ve v3.62) mohl nechat seznam prázdný a následující testy v souboru pak narazily na 0 karet. V CI s pomalejší odezvou Apps Scriptu je to pravděpodobnější než lokálně.
+- (d) Stejný příznak (0 karet) mají nestabilní chip testy (`0 != N`).
+- (e) Po opravách prošel #16. Běh #17 sice selhal, ale jinak: pomalý zápis ★ a timeout `page.goto`, ne 0 karet.
 ### Ověření opakovaným během
 - Ruční běh #16 (HEAD `7109792`): API 9/9, frontend 52/52, nic přeskočeného.
 - Ruční běh #17 (stejný commit): frontend 50/52. ★ lze označit (ikona zůstala v „ukládání“ přes 10 s) a „Mapa lze otevřít a zavřít“ (timeout `page.goto` na kulturniradar.cz po 10 s). #16 tedy nebyl důkaz stability, týdenní běh je pořád křehký.
@@ -40,7 +47,8 @@
 - `tests/robot/requirements.txt`: přesné verze z instalace v #16: robotframework 7.5, robotframework-requests 0.9.7, robotframework-browser 20.6.0. Tranzitivní závislosti zamčené nejsou. Lokálně mám starší verze (7.4.2 a 20.0.0), takže se lokální a CI prostředí liší.
 ### Další kroky
 - Ošetřit chip testy (BACKLOG, Testovací dluh).
-- Prošetřit trojici ★/✓ a křehkost ★ testu při pomalém zápisu (timeout 10 s, zápis trvá 2 až 3 s, v zátěži i víc).
+- Timeouty v CI (zápis ★/✓, `page.goto`), viz BACKLOG, Testovací dluh.
+- Po #17 jsem hvězdu u rf-test na Halloweenu vrátil a ověřil přes `?api=events` (0 označených akcí v seznamu Brna). Zelňák (minulá akce, v seznamu se nezobrazuje) má ★ nastavenou dál, testy ho nevidí.
 
 ## Docs: README jako rozcestník – 28. 10. 2026
 - Nové `README.md` pro hodnotitele: odznaky CI, odkaz na kulturniradar.cz, krátké EN shrnutí, tabulka „Pro hodnotitele: kde co najít“ (board a testovací dokumentace), „Testy v číslech“, „Jak pracuji“ s vybranými chybami (#31, #26, #27, #22), aktualizované „Co appka umí“, architektura, struktura repa a provoz s aktuálními náklady.
