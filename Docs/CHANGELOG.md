@@ -1,5 +1,12 @@
 # Changelog
 
+## Docs: architektura automatizace testů (#12) – 28. 10. 2026
+Issue #12, commit `1283c99`. Nový dokument `Docs/ARCHITEKTURA-TESTU.md`, odkaz v tabulce „Pro hodnotitele“ v README.
+- **Obsah:** návrh architektury automatizace testů podle osnovy kurzu *Architektura automatizovaných testů v praxi*: A strategie (zdroje, pět rozhodnutí, rizikové oblasti), B framework (struktura, prvky, data a secrets, pravidla týmu a test designu), C CI/CD (sady, umístění, flaky testy, výkon, artefakty), D reporting a hodnota automatizace, E jak architektura vznikala (časová osa od 1. 8. do 28. 10. se spouštěči a API nástroje SoapUI, Bruno a JMeter včetně diagnózy HTTP 405). U každého rozhodnutí je uvedeno, jestli je zavedené, nebo navržené.
+- **Ověření:** čísla (558 Node, 61 RF = 9 API + 52 frontend, 11 smoke, 7 worker), tagy RF, soubory a klíčová slova ve stromu, hodnoty `CEKANI_*`, retence 30 dní, `Fill Secret` a kontrola úniku proti repu, délky běhů proti historii Actions (3 min 38 s až 4 min 6 s u úplných běhů), datum každého řádku časové osy proti git historii, scénáře api-tests proti README a obsah v3.63 proti CHANGELOGu. První verze měla osm nepřesností (data v časové ose, vracení stavu v api-tests, rozsah opakování ve v3.63 a další), všechny byly před commitem opraveny.
+- **Zjištění, která dokument zapsal:** tag `krehky` nese 12 testů, i když pravidlo zní „jen po prokázání vnější příčiny“ (revize je v BACKLOGu); karanténa flaky testů je jen navržená; chybí linter testů (Robocop) a paralelizace je záměrně vypnutá.
+- **Doručení notifikací** na telefon při selhání potvrdil majitel screenshoty z 28. 10. Platnost podmínky pro plánovaný běh (a automatické spuštění publikace reportu) ověří až plánovaný běh 1. 11. 2026.
+
 ## Docs: správa defektů (#32) – 28. 10. 2026
 Issue #32, commit `fd18940` (dokumentace a formulář), úprava boardu a issues přes `gh`.
 ### Co
