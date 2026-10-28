@@ -667,15 +667,16 @@ kód, je dělá těžko prokazatelnými.
 Zavedeno 31. 8. 2026 jako portfolio-ready ukázka Kanban workflow
 (pohovory) + osobní přehlednost pro aktuálně řešené úkoly. Board:
 `gh project view 1 --owner Akimto01 --web` (title „Kulturní radar -
-práce", 3 sloupce Todo/In Progress/Done). Labely: `feature`, `bug`,
+práce", 4 sloupce Backlog/Todo/In Progress/Done). Labely: `feature`, `bug`,
 `docs`, `testing`, `research` (+ výchozí GitHub labely, nepoužívané
 pro tenhle projekt).
 
 **BACKLOG.md zůstává hlavní znalostní bází, Kanban je jen doplněk pro
 aktuálně rozpracované/vybrané úkoly:**
-- Položka jde do Kanbanu (nová GitHub issue + přidání na board) ve
-  chvíli, kdy Vojta vybere „tohle teď/příště řešíme" — ne dřív, ne
-  automaticky pro každý nápad v BACKLOGu.
+- Položky z Doporučeného pořadí mají issue ve stavu Backlog; Todo jen
+  pro vybrané na nejbližší práci; nápady mimo Doporučené pořadí
+  zůstávají jen v BACKLOGu (od 28. 10. 2026, nahrazuje dřívější
+  „issue až při výběru“).
 - Zůstává JEN v BACKLOG.md, nikdy nezakládat issue: výzkumné poznámky,
   odložené/watch-only položky (sekce „Sledovat, bez akce"),
   dlouhodobé nápady (sekce „Větší témata" / „Dlouhodobá vize"),
@@ -696,7 +697,7 @@ aktuálně rozpracované/vybrané úkoly:**
   výchozím stavu zapnutý workflow „Item closed" (ověřeno přes
   `gh api graphql`, `enabled: true` hned po `gh project create`), který
   při zavření issue sám nastaví Status na Done. Podobně „Item added to
-  project" sám nastaví nově přidané položky na Todo. Ruční
+  project" sám nastaví nově přidané položky na Todo. Pro položku z Doporučeného pořadí proto po `gh project item-add` nastavit Status Backlog: `gh project item-edit --project-id <ID> --id <item> --field-id <Status> --single-select-option-id c22bd2c7` (sloupec Backlog přibyl 28. 10. 2026). Ruční
   nastavování přes web UI (Project → Settings → Workflows) potřeba
   jen pokud by se v budoucnu chovaly jinak, než se očekává — zatím
   ověřeno funkční přímo přes `gh` CLI, žádný krok navíc.
@@ -705,7 +706,7 @@ aktuálně rozpracované/vybrané úkoly:**
   nastavit ručně pole Stav defektu na Uzavřený: vestavěná automatika
   mění jen Status. Defekt se uzavírá až po ověření v produkci.
 
-Od 27. 10. 2026: milníky = cíle z BACKLOG.md (Cíl 1–4), pole Odhad (h) a Termín. Zpětné uzavřené issues pro dokončenou práci jsou povolené jako dokumentace průběhu (schváleno 27. 10. 2026, poprvé pro v3.43–v3.65); pravidlo „issue až při výběru“ platí dál pro nové nápady.
+Od 27. 10. 2026: milníky = cíle z BACKLOG.md (Cíl 1–4), pole Odhad (h) a Termín. Zpětné uzavřené issues pro dokončenou práci jsou povolené jako dokumentace průběhu (schváleno 27. 10. 2026, poprvé pro v3.43–v3.65); nové nápady mimo Doporučené pořadí zůstávají jen v BACKLOGu (viz pravidlo výše).
 
 Na Vojtově stroji je aktivní účet gh pracovní cermakvoj-tesena (v repu jen READ, bez scope project). Pro práci s issues a boardem používat u každého příkazu GH_TOKEN=$(gh auth token --user Akimto01), globální účet nepřepínat.
 

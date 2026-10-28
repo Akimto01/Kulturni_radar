@@ -1,5 +1,11 @@
 # Changelog
 
+## Docs: board se sloupcem Backlog, issues pro fázi 5, pravidlo v SKILL – 28. 10. 2026
+- **Board:** Status má novou volbu Backlog (pořadí Backlog, Todo, In Progress, Done; ostatní volby si ponechaly id, statusy existujících položek se nezměnily). Backlog dostaly #4, #5, #8, #13, #14, #15, #16, #35, #38 a #39 (#4 a #5 podle nového pravidla, nejsou vybrané na nejbližší práci). Pohled Kanban ověřen v prohlížeči: Backlog se zobrazuje jako první sloupec. Fáze 1 (#6, #7, #36, #37) a #34 zůstávají Todo.
+- **Nové issues ve stavu Backlog** (Cíl 1, Odhad): #40 Lokalizační testy (A4, 5 h), #41 Kontrola verze frontendu ve smoke testu (R2, 1 h), #42 Smoke přes Apps Script iframe v CI (R5, 1 h), #43 Přímý API test přihlášení (0,5 h), #44 Katalog testů na GitHub Pages (0,5 h), #45 Hlídat počty testů v README skriptem (0,5 h), #46 Sdílený skript kontroly úniku (0,5 h, až po #36), #47 PROVOZ.md: doplnit triggery (0,5 h, štítek docs). BACKLOG má u příslušných položek → issue #N.
+- **Soulad BACKLOGu a boardu:** všechny odkazy → issue #N mají existující issue na boardu s milníkem. Odhad chybí u #4, #5, #15 a #16 (odhad po návrhu), Termín u #37.
+- **SKILL.md (obě kopie), sekce 9:** nové pravidlo „položky z Doporučeného pořadí mají issue ve stavu Backlog; Todo jen pro vybrané na nejbližší práci; nápady mimo Doporučené pořadí zůstávají jen v BACKLOGu“ a poznámka, že nové issue na boardu dostane automaticky Todo.
+
 ## Docs: BACKLOG plán po 28. 10. (fáze 1 až 5), nové issues, čas nedělního běhu – 28. 10. 2026
 - **Čas týdenního běhu:** cron `rf-tests.yml` z `0 19 * * 0` na `20 20 * * 0` (neděle 20:20 UTC, 21:20 SEČ, 22:20 SELČ): po nedělním triggeru `zpracovatSledovanaMesta` ve 20:00 místního času a mimo celou hodinu, kdy je fronta plánovaných běhů GitHubu nejvytíženější. Časy opraveny v `ARCHITEKTURA-TESTU.md` (C1) a `TESTY.md` (4.2).
 - **BACKLOG, Doporučené pořadí:** přepsáno na pět fází (ověření do 2. 11., zpevnění základu, pokrytí kritických funkcí, měření, šířka); hotové body zůstaly v bloku Hotovo.
