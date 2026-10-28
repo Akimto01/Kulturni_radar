@@ -160,6 +160,15 @@ robot --variable BASE_URL:$URL --include mapa --include kalendar tests/robot/
 ```
 Víc tagů v jednom `--include` jde spojit i inline: `--include mapaORkalendar`.
 
+### Plánovaný běh CI: čas a notifikace
+
+Cron v GitHub Actions je v UTC a nepřechází na letní čas: po změně času
+(březen, říjen) zkontrolovat souběh s triggery Apps Scriptu (neděle 20:00
+místního času `zpracovatSledovanaMesta`). Plánovat mimo celou hodinu: fronta
+GitHubu je na začátku hodiny nejvytíženější a běhy se zdržují o hodiny
+(dnes `20 20 * * 0`, tedy 21:20 SEČ / 22:20 SELČ). GitHub neposílá e-maily
+o selhání plánovaných běhů (ověřeno v Gmailu), proto notifikace přes ntfy.
+
 ### Drobnosti, na které jsme narazili jen jednou, ale stojí za zapsání
 - `Wait For Elements State` (knihovna Browser) **nepodporuje** pojmenovaný
   argument `msg=` (na rozdíl od `Should Be Equal` a podobných) —
@@ -184,6 +193,10 @@ Víc tagů v jednom `--include` jde spojit i inline: `--include mapaORkalendar`.
 - Od v3.45 se profil zamkne po 5 chybných PINech v řadě (15 min). Opakované spouštění samotného testu špatného PINu bez úspěšného přihlášení mezi tím zamkne rf-test - odemknout menu Sheetu 'Odemknout všechny profily (limit PINu)' nebo počkat. Zamčený rf-test navíc vyřadí celou frontend sadu, protože Suite Setup (keyword "Otevřít radar") se přihlašuje rf-test (běh 26. 10. 2026: 3/11). Pokud se odemčení neprojeví, spusť menu znovu: u nové funkce první spuštění z menu pravděpodobně spotřebuje jen autorizaci (známé chování Apps Scriptu, 26. 10. 2026 nepotvrzeno přímo).
 - Od Index.html v3.60 se testovací profily (rf-…) na přihlašovací obrazovce zobrazí jen s localStorage příznakem kr_testovaci_profily=1, který nastavuje Suite Setup (keyword Povolit testovací profily). Nový test s vlastním New Context, který se má přihlašovat, musí ten keyword zavolat také.
 - RF testy jedou s profilem Brno (bez diakritiky), proto chyba s dvojitým kódováním profilu (v3.65) unikala testům od 2. 8. 2026. U změn kolem profilů a URL ověřovat i město s diakritikou (RF test „Přepnutí na město s diakritikou“). Živé kontroly ostatních měst dělat přes appku, ne přímým voláním API – přímé API chybu ve frontendu nevidí.
+
+- Úklid výsledků: `rm -rf` s proměnnou vždy jako `"${S:?}/${a:?}"`, jinak
+  bezpečnostní kontrola Claude Code příkaz zablokuje (a prázdná proměnná by
+  smazala víc, než má).
 
 ## 3. Sync CHANGELOG.md ↔ BACKLOG.md
 
@@ -211,6 +224,20 @@ odhadu) zkontrolovat, jestli sekce „Doporučené pořadí" na začátku
 souboru pořád odpovídá realitě — závislosti mezi položkami se mohou
 změnit (např. dokončení jedné položky odemkne jinou). Aktualizovat
 pořadí při změně, ne nechávat zastaralé.
+
+### Dokumenty psané v hlavním chatu: ověření před commitem
+
+Dokumenty psané v hlavním chatu (příběhy chyb, architektura, defekty) nechat
+před commitem ověřit Claude Code proti gitu, CHANGELOGu a souborům: 28. 10.
+2026 to třikrát po sobě našlo nepřesnosti (data, nedoložená tvrzení). Výstup
+ověření: nesrovnalosti vypsat, neopravovat sám.
+
+### Role dokumentů (od 28. 10. 2026)
+
+`Docs/testovani/TESTY.md` = co a proč se testuje, `Docs/testovani/ARCHITEKTURA-TESTU.md`
+= jak jsou testy postavené, README = jediný zdroj počtů testů. Každý fakt má
+jedno místo, ostatní dokumenty na něj odkazují. Mapa dokumentace je v
+`Docs/README.md`.
 
 ## 4. Konec pracovní session
 
@@ -298,6 +325,30 @@ Frontend (`tests/frontend-harness.js`, `nactiFrontendFunkce(['fn1','fn2'])`):
 - Pojistka v CI (`python .github/scripts/kontrola-architektury-testu.py`, job
   `rf-dryrun`) nesmí hlásit růst porušení. Při opravě porušení spustit skript
   s `--zapsat-baseline` a commitnout sníženou baseline.
+
+### Tajné hodnoty v RF reportech (incident #33, 28. 10. 2026)
+
+GitHub maskuje secrets jen v konzoli, ne v souborech z testů (`output.xml`,
+`log.html`). Pravidla:
+- PIN a hesla přes `Fill Secret` (`$promenna`), ne jako text.
+- Volání s tajnou hodnotou (URL, odpověď) obalit `Set Log Level NONE`
+  s TRY/FINALLY, který úroveň vždy vrátí.
+- Uvnitř nepoužívat `FOR` (iterační proměnné se zapisují i při NONE).
+- Aserce až po obnovení logování a bez hodnot ve zprávě (chybové zprávy se
+  zapisují vždy).
+- V `[Documentation]` tajné proměnné escapovat (`\${VAR}`).
+- `playwright-log.txt` do reportů nepatří (zapisuje i hodnoty z DOM).
+- Hledání úniku vždy počítáním výskytů (`grep -c`, `-l`), nikdy vypsáním
+  hodnoty.
+
+### Měření pokrytí kódu (od 28. 10. 2026)
+
+`node --test --experimental-test-coverage tests/unit.test.js tests/frontend.test.js`
+(CI zatím jen vypisuje). Funguje jen proto, že `tests/harness.js` předává
+`vm.runInContext` jako `filename` URL souboru (`pathToFileURL`); holé jméno se
+v reportu neukáže. Backend 82,2 % řádků k 28. 10. Matice pokrytí podle názvů
+testů nadhodnocuje, tvrzení o pokrytí opírat o měření. Frontend se zatím měřit
+nedá, harness vykrajuje funkce bez čísel řádků (issue #39).
 
 ## 5. Release šablona — balíček + Claude Code prompt v jednom kroku
 
