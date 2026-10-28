@@ -1261,6 +1261,9 @@ Přihlásit se do radaru
     ...    otevře login overlay klikem na badge "Přihlásit se" (pokud už není
     ...    otevřený – např. po pokusu o ★ bez přihlášení), pak vybere profil,
     ...    vyplní PIN a počká na skrytí overlay.
+    ...    PIN se zadává přes Fill Secret (`$pin`, bez složených závorek), aby se
+    ...    hodnota nezapsala do log.html/output.xml – repo je veřejné a reporty
+    ...    z CI jsou artefakty ke stažení.
     ${overlay_otevreny}=    Get Element Count    ${FRAME} \#login-overlay:not(.skryto)
     IF    ${overlay_otevreny} == 0
         Click    ${FRAME} \#uzivatel-badge
@@ -1268,7 +1271,7 @@ Přihlásit se do radaru
     Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
     Click    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id="${uzivatel_id}"]
     Wait For Elements State    ${FRAME} \#login-pin-sekce.zobrazit    visible    timeout=5s
-    Fill Text    ${FRAME} \#login-pin    ${pin}
+    Fill Secret    ${FRAME} \#login-pin    $pin
     Click    ${FRAME} \#login-potvrdit
     Wait For Elements State    ${FRAME} \#login-overlay    hidden    timeout=15s
 

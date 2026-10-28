@@ -30,8 +30,37 @@ jobs:
           RF_TEST_PIN: ${{ secrets.RF_TEST_PIN }}
         run: robot --variable BASE_URL:${{ secrets.RADAR_URL }} --outputdir vysledky/frontend tests/robot/frontend.robot
 
-      - name: Uložit reporty
+      - name: Kontrola úniku tajných hodnot
+        id: kontrola_uniku
         if: always()
+        env:
+          RF_TEST_PIN: ${{ secrets.RF_TEST_PIN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          # Repo je veřejné, artefakty si může stáhnout kdokoli přihlášený. Při nálezu
+          # se vypíše jen název souboru a secretu, nikdy hodnota.
+          # Hledá se ve všech textových souborech. Část řetězců v log.html a report.html
+          # je komprimovaná, ale RF je generuje z output.xml, takže únik v nich by byl
+          # vždy i v output.xml, kde je text prostý.
+          # PIN je krátký a prosté hledání by hlásilo falešné shody (kód knihovny v HTML,
+          # zlomky časů, čísla), proto se hledá jen v uvozovkách nebo jako celý text prvku.
+          nalez=0
+          if [ -n "$NTFY_TOPIC" ]; then
+            while IFS= read -r soubor; do
+              echo "::error::Únik tajné hodnoty NTFY_TOPIC v souboru $soubor"
+              nalez=1
+            done < <(grep -rlF -- "$NTFY_TOPIC" vysledky/ || true)
+          fi
+          if [ -n "$RF_TEST_PIN" ]; then
+            while IFS= read -r soubor; do
+              echo "::error::Únik tajné hodnoty RF_TEST_PIN v souboru $soubor"
+              nalez=1
+            done < <(grep -rlF -e "'$RF_TEST_PIN'" -e "\"$RF_TEST_PIN\"" -e ">$RF_TEST_PIN<" -- vysledky/ || true)
+          fi
+          exit $nalez
+
+      - name: Uložit reporty
+        if: always() && steps.kontrola_uniku.outcome == 'success'
         uses: actions/upload-artifact@v6
         with:
           name: rf-reporty

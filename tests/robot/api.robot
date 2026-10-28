@@ -123,17 +123,31 @@ Notifikační kanál ntfy je živý
     ...                nejspíš mrtvý (špatný topic, tichá chyba sendNotification_,
     ...                změna ntfy API) – a nikdo si toho jinak nevšimne,
     ...                protože mrtvý kanál nemá jak křičet.
-    ...                Topic je soukromý → bez ${NTFY_TOPIC} se test přeskočí.
+    ...                Topic je soukromý → bez \${NTFY_TOPIC} se test přeskočí
+    ...                (zpětné lomítko je nutné: RF v dokumentaci rozvíjí proměnné
+    ...                a hodnota by skončila v log.html, output.xml i report.html).
+    ...                Topic je tajný a repo je veřejné, reporty z CI jsou ke stažení:
+    ...                URL i odpověď (události ntfy obsahují "topic") se proto
+    ...                zpracují při Log Level NONE a stav se kontroluje až po jeho
+    ...                obnovení (zpráva Status Should Be by URL vypsala).
     Skip If    '${NTFY_TOPIC}' == ''    NTFY_TOPIC nenastaven – test přeskočen
-    ${r}=    GET    https://ntfy.sh/${NTFY_TOPIC}/json    params=poll=1&since=48h
-    Status Should Be    200    ${r}
-    ${radky}=    Split To Lines    ${r.text}
-    ${zprav}=    Set Variable    ${0}
-    FOR    ${radek}    IN    @{radky}
-        ${j}=    Evaluate    json.loads($radek)    modules=json
-        IF    '${j}[event]' == 'message'
-            ${zprav}=    Evaluate    ${zprav} + 1
+    ${puvodni_uroven}=    Set Log Level    NONE
+    TRY
+        ${r}=    GET    https://ntfy.sh/${NTFY_TOPIC}/json    params=poll=1&since=48h    expected_status=any
+        ${stav}=    Set Variable    ${r.status_code}
+        ${zprav}=    Set Variable    ${0}
+        IF    ${stav} == 200
+            ${radky}=    Split To Lines    ${r.text}
+            FOR    ${radek}    IN    @{radky}
+                ${j}=    Evaluate    json.loads($radek)    modules=json
+                IF    '${j}[event]' == 'message'
+                    ${zprav}=    Evaluate    ${zprav} + 1
+                END
+            END
         END
+    FINALLY
+        Set Log Level    ${puvodni_uroven}
     END
+    Should Be Equal As Integers    ${stav}    200    ntfy vrátilo jiný stav než 200 (URL se kvůli tajnému tématu nezapisuje)
     Should Be True    ${zprav} >= 1
     ...    Za 48 h nepřišla na ntfy žádná zpráva – notifikační kanál je nejspíš mrtvý
