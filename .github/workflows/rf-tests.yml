@@ -45,7 +45,16 @@ jobs:
           # PIN má mít 8 znaků, takže stačí prosté hledání. Kratší PIN by dával falešné
           # shody (kód knihovny v HTML, zlomky časů, čísla): v tom případě se krok
           # ohlásí jako ::warning:: a hledá se jen v uvozovkách nebo jako celý text prvku.
+          # playwright-log.txt je ladicí log Browser Library: zapisuje i hodnoty vrácené
+          # z DOM a úroveň logování RF ho neovlivní. Do reportů nepatří, proto se maže.
+          find vysledky -name playwright-log.txt -delete 2>/dev/null || true
           nalez=0
+          # Ntfy témata uživatelských profilů (radar- + 32 hex, apiVygenerovatNtfyTema_)
+          # se nesmí objevit v žádném reportu, ať jde o kohokoli.
+          while IFS= read -r soubor; do
+            echo "::error::Únik ntfy tématu uživatelského profilu (radar-…) v souboru $soubor"
+            nalez=1
+          done < <(grep -rlE -- 'radar-[0-9a-f]{32}' vysledky/ || true)
           if [ -n "$NTFY_TOPIC" ]; then
             while IFS= read -r soubor; do
               echo "::error::Únik tajné hodnoty NTFY_TOPIC v souboru $soubor"

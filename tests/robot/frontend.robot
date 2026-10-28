@@ -232,15 +232,22 @@ Notifikace: vygenerování ntfy tématu, uložení a znovunačtení po přihlá�
     # (kanál vypnutí téma nemaže, viz apiVygenerovatNtfyTema_) – test
     # proto nesmí předpokládat konkrétní podstav, jen klikne na to
     # tlačítko, které je zrovna zobrazené (generovat, nebo rotovat).
-    ${ma_tema}=    Get Style    ${FRAME} \#notif-ntfy-s-tematem    display
-    IF    "${ma_tema}" != "none"
-        ${odkaz_pred}=    Get Attribute    ${FRAME} \#notif-ntfy-odkaz    href
-        Click    ${FRAME} \#notif-ntfy-rotovat
-    ELSE
-        ${odkaz_pred}=    Set Variable    ${EMPTY}
-        Wait For Elements State    ${FRAME} \#notif-ntfy-bez-tematu    visible    timeout=3s
-        Click    ${FRAME} \#notif-ntfy-generovat
-    END
+    # 28. 10. 2026 (issue #33): odkaz obsahuje ntfy téma profilu (kdo ho zná,
+    # může číst jeho notifikace). Get Attribute i přiřazení proměnné by hodnotu
+    # zapsaly do logu, proto Log Level NONE; aserce až po obnovení úrovně
+    # a bez hodnot ve zprávě (chybové zprávy se zapisují vždy). IF podmínky
+    # přes $proměnnou, ne ${proměnnou}, ať se hodnota nedostane do textu podmínky.
+    ${puvodni_uroven}=    Set Log Level    NONE
+    TRY
+        ${ma_tema}=    Get Style    ${FRAME} \#notif-ntfy-s-tematem    display
+        IF    $ma_tema != 'none'
+            ${odkaz_pred}=    Get Attribute    ${FRAME} \#notif-ntfy-odkaz    href
+            Click    ${FRAME} \#notif-ntfy-rotovat
+        ELSE
+            ${odkaz_pred}=    Set Variable    ${EMPTY}
+            Wait For Elements State    ${FRAME} \#notif-ntfy-bez-tematu    visible    timeout=3s
+            Click    ${FRAME} \#notif-ntfy-generovat
+        END
     # v3.33 RF fix (21. 8. 2026): oba tlačítka se disablují/re-enablují
     # SPOLEČNĚ v témže try/finally (viz vygenerovatNtfyTema_ v Index.html),
     # bez ohledu na to, které z nich spustilo volání – čekání na
@@ -251,14 +258,18 @@ Notifikace: vygenerování ntfy tématu, uložení a znovunačtení po přihlá�
     # test tak mohl projít i s ještě neproběhlým voláním na serveru
     # (přesně tohle způsobilo rozdílnou hodnotu tématu mezi RF logem
     # a ručním ověřením v Sheetu 21. 8. 2026).
-    Wait For Elements State    ${FRAME} \#notif-ntfy-rotovat:not([disabled])    visible    timeout=10s
-    Wait For Elements State    ${FRAME} \#notif-ntfy-s-tematem    visible    timeout=10s
-    ${odkaz}=    Get Attribute    ${FRAME} \#notif-ntfy-odkaz    href
-    Should Contain    ${odkaz}    https://ntfy.sh/radar-
-    IF    "${odkaz_pred}" != "${EMPTY}"
-        Should Not Be Equal    ${odkaz}    ${odkaz_pred}
-        ...    msg=Rotace měla vygenerovat NOVÉ téma, ne zachovat staré (${odkaz_pred})
+        Wait For Elements State    ${FRAME} \#notif-ntfy-rotovat:not([disabled])    visible    timeout=10s
+        Wait For Elements State    ${FRAME} \#notif-ntfy-s-tematem    visible    timeout=10s
+        ${odkaz}=    Get Attribute    ${FRAME} \#notif-ntfy-odkaz    href
+        ${tvar_ok}=    Evaluate    $odkaz.startswith('https://ntfy.sh/radar-')
+        ${rotovano}=    Evaluate    $odkaz_pred == '' or $odkaz != $odkaz_pred
+    FINALLY
+        Set Log Level    ${puvodni_uroven}
     END
+    Should Be True    ${tvar_ok}
+    ...    msg=Odkaz na ntfy téma nemá tvar https://ntfy.sh/radar-… (hodnota se kvůli tajnosti nevypisuje)
+    Should Be True    ${rotovano}
+    ...    msg=Rotace měla vygenerovat NOVÉ téma, ne zachovat staré (hodnoty se kvůli tajnosti nevypisují)
 
     Click    ${FRAME} \#filtry-ulozit
     Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=10s
