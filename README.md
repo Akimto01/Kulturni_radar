@@ -21,6 +21,7 @@ Documentation is in Czech.*
 | Plán, průběh a hotová práce (Kanban, přehled podle cílů, časový plán) | [GitHub Projects board](https://github.com/users/Akimto01/projects/1) |
 | Poslední výsledky E2E testů (report a log Robot Frameworku) | [GitHub Pages](https://akimto01.github.io/Kulturni_radar/) |
 | Testovací plán a strategie (rizika, úrovně, kritéria, mezery) | [Docs/TESTY.md](Docs/TESTY.md) |
+| Architektura automatizace testů (strategie, framework, CI/CD, reporting) | [Docs/ARCHITEKTURA-TESTU.md](Docs/ARCHITEKTURA-TESTU.md) |
 | Matice pokrytí (co je pokryté, na jaké úrovni a co ne) | [Docs/POKRYTI.md](Docs/POKRYTI.md) |
 | Testovací analýza: od testovací báze k testovacím případům | [Docs/TESTOVACI-ANALYZA.md](Docs/TESTOVACI-ANALYZA.md) |
 | Rozbor tří testů: jak navrhuji testy | [Docs/Quality Check/UKAZKY-TESTU.md](Docs/Quality%20Check/UKAZKY-TESTU.md) |
