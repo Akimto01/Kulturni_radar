@@ -30,7 +30,7 @@ Aktualizováno 27. 10. 2026 podle cílů výše. Hotové body z 26.–27. 10. 20
 3. **Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – podle cíle 3; rozhodnout o rozpočtu a stropu 15 akcí na běh. → issue #8
 
 **Cíl 1 – portfolio:**
-4. **README jako rozcestník** (~45 min) – CI odznaky, testovací pyramida v číslech, odkazy na dokumentaci a výstupy. → issue #9
+4. ~~**README jako rozcestník** (~45 min) – CI odznaky, testovací pyramida v číslech, odkazy na dokumentaci a výstupy.~~ **HOTOVO 28. 10. 2026** (commit 5b044a7, viz CHANGELOG.md). → issue #9
 5. **Příběhy chyb** (~1–2 h na kus) – kandidáti: dvojité kódování u měst s diakritikou (v3.65), závod pozdních odpovědí potvrzený fault injection (v3.61), Haiku a špatně zvolená metrika (v3.47), test čekající na staré karty (v3.62). → issue #10
 6. **Veřejný RF report z CI** (~1 h) – log.html/report.html přes GitHub Pages. → issue #11
 7. **Dokumentace výstavby architektury testů** (~2–3 h) – od strategie přes Node harness, RF/Browser, API nástroje po CI a dry run; podklady v CHANGELOG.md a Docs/TESTY.md. → issue #12

@@ -1,5 +1,10 @@
 # Changelog
 
+## Docs: README jako rozcestník – 28. 10. 2026
+- Nové `README.md` pro hodnotitele: odznaky CI, odkaz na kulturniradar.cz, krátké EN shrnutí, tabulka „Pro hodnotitele: kde co najít“ (board a testovací dokumentace), „Testy v číslech“, „Jak pracuji“ s vybranými chybami (#31, #26, #27, #22), aktualizované „Co appka umí“, architektura, struktura repa a provoz s aktuálními náklady.
+- Čísla ověřena proti repu: Node 349 (backend) a 209 (frontend), RF dry run 61 (frontend 52, API 9), Worker 7. Všechny relativní odkazy vedou na existující soubory, odznaky vrací HTTP 200.
+- Bez změny kódu (backend 3.50, `Index.html` v3.65). Commit `5b044a7`, issue #9 uzavřeno.
+
 ## Index.html v3.65 – oprava dvojitého kódování profilu (města s diakritikou) – 27. 10. 2026
 ### Chyba
 - Při ověřování v3.64 ukazovaly Plzeň a Zlín na kulturniradar.cz 0 akcí i 0 míst, přestože API pro ně akce vrací (Plzeň 18).
