@@ -130,6 +130,9 @@ Notifikační kanál ntfy je živý
     ...                URL i odpověď (události ntfy obsahují "topic") se proto
     ...                zpracují při Log Level NONE a stav se kontroluje až po jeho
     ...                obnovení (zpráva Status Should Be by URL vypsala).
+    ...                Řádky odpovědi se nesmí procházet cyklem FOR: RF zapisuje hodnoty
+    ...                iterační proměnné do output.xml i při Log Level NONE (ověřeno
+    ...                v CI 28. 10. 2026), proto se počítají jedním Evaluate.
     Skip If    '${NTFY_TOPIC}' == ''    NTFY_TOPIC nenastaven – test přeskočen
     ${puvodni_uroven}=    Set Log Level    NONE
     TRY
@@ -137,13 +140,7 @@ Notifikační kanál ntfy je živý
         ${stav}=    Set Variable    ${r.status_code}
         ${zprav}=    Set Variable    ${0}
         IF    ${stav} == 200
-            ${radky}=    Split To Lines    ${r.text}
-            FOR    ${radek}    IN    @{radky}
-                ${j}=    Evaluate    json.loads($radek)    modules=json
-                IF    '${j}[event]' == 'message'
-                    ${zprav}=    Evaluate    ${zprav} + 1
-                END
-            END
+            ${zprav}=    Evaluate    sum(1 for l in $r.text.splitlines() if l.strip() and json.loads(l).get('event') == 'message')    modules=json
         END
     FINALLY
         Set Log Level    ${puvodni_uroven}
