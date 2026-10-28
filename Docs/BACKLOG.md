@@ -31,7 +31,7 @@ Aktualizováno 27. 10. 2026 podle cílů výše. Hotové body z 26.–27. 10. 20
 
 **Cíl 1 – portfolio:**
 4. ~~**README jako rozcestník** (~45 min) – CI odznaky, testovací pyramida v číslech, odkazy na dokumentaci a výstupy.~~ **HOTOVO 28. 10. 2026** (commit 5b044a7, viz CHANGELOG.md). → issue #9
-5. **Příběhy chyb** (~1–2 h na kus) – kandidáti: dvojité kódování u měst s diakritikou (v3.65), závod pozdních odpovědí potvrzený fault injection (v3.61), Haiku a špatně zvolená metrika (v3.47), test čekající na staré karty (v3.62). → issue #10
+5. ~~**Příběhy chyb** (~1–2 h na kus) – kandidáti: dvojité kódování u měst s diakritikou (v3.65), závod pozdních odpovědí potvrzený fault injection (v3.61), Haiku a špatně zvolená metrika (v3.47), test čekající na staré karty (v3.62).~~ **HOTOVO 28. 10. 2026** (commit fd7c012, `Docs/PRIBEHY-CHYB.md`): napsané jsou tři příběhy (diakritika v3.65, CI deset týdnů červená včetně závodu odpovědí v3.61 a testu čekajícího na staré karty v3.62, únik tajných hodnot). Kandidát Haiku a špatně zvolená metrika (v3.47) zůstává nenapsaný, případně doplnit jako čtvrtý příběh. → issue #10
 6. ~~**Veřejný RF report z CI** (~1 h) – log.html/report.html přes GitHub Pages.~~ **HOTOVO 28. 10. 2026** (commit f2404f8, viz CHANGELOG). Stránka https://akimto01.github.io/Kulturni_radar/ se po každém týdenním běhu aktualizuje sama, první automatické ověření bude plánovaný běh 1. 11. 2026. → issue #11
 7. **Dokumentace výstavby architektury testů** (~2–3 h) – od strategie přes Node harness, RF/Browser, API nástroje po CI a dry run; podklady v CHANGELOG.md a Docs/TESTY.md. → issue #12
 8. **Mutační testování (Stryker)** (~2 h) – mutation score místo ručních mutací. → issue #13

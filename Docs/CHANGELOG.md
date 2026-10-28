@@ -1,5 +1,10 @@
 # Changelog
 
+## Docs: příběhy chyb – 28. 10. 2026
+Issue #10, commit `fd7c012`. Nový dokument `Docs/PRIBEHY-CHYB.md` se třemi případovými studiemi (od příznaku přes diagnózu a kořenovou příčinu po pojistku a poučení): města s diakritikou bez akcí (Index.html v3.65, #31), CI deset týdnů červená (v3.61 a v3.62, #26, #27) a únik tajných hodnot v reportech testů (#33). Odkaz přibyl do tabulky „Pro hodnotitele“ v README.
+- Fakta jsem před commitem ověřil proti CHANGELOGu, issues #26, #27, #31 a #33, git historii a živým odkazům (data, počty akcí, rozsah běhů #6 až #15, pořadí nálezu čtyř cest úniku). První verze obsahovala pět nepřesností (stáří chyby, popis starého testu přepínání, lokální běhy, pojistky v CI, téma testovacího profilu), všechny byly opraveny před commitem.
+- Zbývající nejistota je v textu uvedená: kořenová příčina deseti červených týdnů je silná nepřímá shoda, ne přímý důkaz, a celá sada úprav v CI se ověří až plánovaným během 1. 11. 2026.
+
 ## CI: veřejný RF report přes GitHub Pages – 28. 10. 2026
 Issue #11, commit `f2404f8`. Stránka: https://akimto01.github.io/Kulturni_radar/
 ### Co
