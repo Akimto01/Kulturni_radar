@@ -41,6 +41,8 @@ Documentation is in Czech.*
 | Testy e-mailového Workeru | `node:test` | 7 | push nebo PR se změnou `cloudflare-worker/**` (CI) |
 | Cvičné API testy produkčního API | SoapUI, Bruno, JMeter | 8 + 8 + zátěžový scénář | ručně, viz [api-tests/](api-tests/README.md) |
 
+Pokrytí řádků backendu jednotkovými testy: 82,2 % (k 28. 10. 2026, měří a vypisuje CI v jobu `node-testy`). Frontend se měřit nedá, harness vykrajuje funkce z `Index.html`.
+
 ## Jak pracuji
 
 - **Každá oprava má diagnózu, test a živé ověření.** Nejdřív příčina (ne příznak),

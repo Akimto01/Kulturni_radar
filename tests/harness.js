@@ -9,6 +9,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { pathToFileURL } = require('node:url');
 
 function formatujDatum(d, vzor) {
   const dd = d.getDate(), mm = d.getMonth() + 1, yyyy = d.getFullYear();
@@ -105,10 +106,12 @@ function nactiRadar(volby = {}) {
     LockService: zakazano('LockService'),
   };
 
-  const kod = fs.readFileSync(
-    path.join(__dirname, '..', 'apps-script', 'kulturni_radar.gs'), 'utf8');
+  const cestaKGs = path.join(__dirname, '..', 'apps-script', 'kulturni_radar.gs');
+  const kod = fs.readFileSync(cestaKGs, 'utf8');
   vm.createContext(ctx);
-  vm.runInContext(kod, ctx, { filename: 'kulturni_radar.gs' });
+  // filename jako file:// URL, ať node --experimental-test-coverage přiřadí
+  // pokrytí ke zdrojovému souboru (holé jméno se v reportu neukáže).
+  vm.runInContext(kod, ctx, { filename: pathToFileURL(cestaKGs).href });
 
   ctx.__odeslaneEmaily = odeslane;
   ctx.__sleepMs = ctxSleepMs;

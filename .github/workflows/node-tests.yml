@@ -15,8 +15,9 @@ jobs:
         with:
           node-version: '22'
 
+      # Pokrytí řádků backendu (kulturni_radar.gs) se zatím jen vypisuje, bez prahu.
       - name: Spustit testy
-        run: node --test tests/unit.test.js tests/frontend.test.js
+        run: node --test --experimental-test-coverage tests/unit.test.js tests/frontend.test.js
 
   # Dry run RF sady (nález z přípravy quality checku 7.-8. 10. 2026): ověří
   # syntaxi .robot souborů a názvy/argumenty keywordů bez přístupu k produkci,

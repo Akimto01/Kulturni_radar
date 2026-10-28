@@ -146,6 +146,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
 - **Hlídat počty testů v README skriptem proti repu** (~30 min): skript porovná tabulku „Testy v číslech“ s reálnými počty (`node --test`, `robot --dryrun`) a poběží v CI vedle pojistky souladu. README je jediný zdroj počtů (TESTY.md, POKRYTI.md na něj odkazují).
 - **Lokalizační testy podle `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola A4** (~4–6 h, odhad nejistý): `TZ=Europe/Prague` pro jednotkové testy v CI, test českého řazení, datum přes půlnoc a přechod letního času, E2E a API pro stálá místa s diakritikou.
 - **Revize tagu `krehky` u 12 testů:** viz dávka 10 issue #34 (`Docs/audity/AUDIT-SOULADU-TESTU.md`) a `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola C3. Bez vlastního odhadu. → issue #34
+- **Pokrytí kritických funkcí backendu** (~5 h): platba AI (`runCheck_`, `dailyCheck`, `callAnthropicPlaces_`, `updateMista`, `apiNajdiProUzivatele_`), `apiSetFiltry_`, `setupTriggers`, `watchdogDailyCheck`, `notifyFail_` a přehledy, větve `apiToggle_`, `nastavPin_`. Předpoklad: stub tabulky (`SpreadsheetApp`) a `ScriptApp` v harnessu. Měření z 28. 10. 2026 viz `Docs/testovani/POKRYTI.md`. → issue #35
 - **Katalog testů na GitHub Pages** (~30 min): `publikovat-report.yml` vygeneruje `python -m robot.testdoc tests/robot/` a zveřejní ho vedle reportu a logu (přidat na seznam povolených souborů webu, odkaz z index.html, projde stejnou kontrolou úniku). Tím se podloží tvrzení v TESTY.md §9, že testdoc nahrazuje Test Case Specification podle ISO 29119.
 
 ## Probíhající měření

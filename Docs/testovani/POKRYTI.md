@@ -13,7 +13,7 @@ ukazuje, **co** je pokryté, na které úrovni a co ne.
 | **W** | Node unit – worker | `cloudflare-worker/email-webhook.test.mjs` |
 | **API** | RF – API kontrakt | `tests/robot/api.robot` |
 | **E2E** | RF – UI v prohlížeči | `tests/robot/frontend.robot` |
-| **PROV** | Provozní kontroly v produkci | `runSelfTest`, `watchdogDailyCheck`, `auditDat_` |
+| **PROV** | Provozní kontroly v produkci | `runSelfTest` (unit test čte jen jeho zdrojový text, funkci nespouští), `watchdogDailyCheck`, `auditDat_` |
 | **RUČ** | Ruční ověření | reálný telefon, vizuální kontrola, spot-check LLM |
 
 Celkové počty testů na jednotlivých úrovních jsou jen v [README](../../README.md),
@@ -21,6 +21,9 @@ tabulka „Testy v číslech“, a tady se neopakují. U Node testů jsou uveden
 hlavní testované funkce, ne přesné počty. U RF testů je v oblastech uveden
 počet testů dané oblasti a tagy, přesný seznam dá
 `python -m robot.testdoc tests/robot/`.
+
+Matice vznikla podle názvů testů, od 28. 10. 2026 ji koriguje měření pokrytí řádků
+backendu (Node, `--experimental-test-coverage`; hodnoty u funkcí jsou z něj).
 
 Hodnocení pokrytí: **●** silné (více úrovní, včetně regresí) · **◐** částečné
 (jedna úroveň nebo jen část chování) · **○** žádné nebo jen ruční.
@@ -33,17 +36,17 @@ Rizika R1–R11 odpovídají sekci 3 v `Docs/testovani/TESTY.md` (R9 až R11 př
 |---|---|---|---|---|---|
 | **R1** Špatná data akcí | BE: `parseEvents_`, `cellText_`, sériová čísla dat (BUG v3.2), `eventToRow_`, `upsertEvents_`, `najdiDuplicity_`, `isSameName_`, `jeVycpavka_` | Events s validními českými datumy | Hlavičky dnů jsou česká data, dlouhodobé akce bez minulých hlaviček | `auditDat_`, samotest; ruční schválení duplicit (list NÁVRH DUPLICIT) | ● |
 | **R2** Produkce běží na jiné verzi než repo | BE: konstanta `VERZE` souhlasí s hlavičkou | Nasazená verze backendu odpovídá repu | – (verze frontendu na Cloudflare se netestuje) | Po nasazení ruční smoke; konkrétní verze frontendu se neověřuje | ◐ |
-| **R3** Ztráta nebo poškození označení | BE: `toggleOznaceni_` (izolace uživatelů), `apiToggle_`, `apiToggleMisto_`, sirotci v OZNAČENÍ | – | ★ / ✓ / 🏛 round-trip s reloadem, integrace ★ → filtr | Ruční kontrola dat po nestandardním běhu | ● |
-| **R4** Nedoručené notifikace | BE: `sendNotification_`, `spojitPrijemce_`, `planNotifikaceUzivatele_`, `jeDueNaNotifikaci_`, `sendUserNotifications_` (dry-run i reálné) | Kanál ntfy je živý | Nastavení notifikací, plný cyklus s návratem | `watchdogDailyCheck` | ● |
+| **R3** Ztráta nebo poškození označení | BE: `toggleOznaceni_` (izolace uživatelů), `apiToggle_` (jen 44 % řádků, chování jistí hlavně E2E round-trip), `apiToggleMisto_`, sirotci v OZNAČENÍ | – | ★ / ✓ / 🏛 round-trip s reloadem, integrace ★ → filtr | Ruční kontrola dat po nestandardním běhu | ● |
+| **R4** Nedoručené notifikace | BE: `sendNotification_`, `spojitPrijemce_`, `planNotifikaceUzivatele_`, `jeDueNaNotifikaci_`, `sendUserNotifications_` (dry-run i reálné); bez testu zůstávají `watchdogDailyCheck`, `notifyFail_` a týdenní i víkendový přehled (0 % řádků) | Kanál ntfy je živý | Nastavení notifikací, plný cyklus s návratem | `watchdogDailyCheck` | ◐ |
 | **R5** Rozbití jednoho ze dvou prostředí | FE: `sestavFetchPozadavek_` (GET/POST routy) | – | Celá sada spustitelná proti statickému webu i Apps Scriptu (`FRAME`), regrese odhlášení | – | ◐ |
-| **R6** Zbytečně utracený API kredit | BE: `routePost_` odmítne špatný token **před** dražší operací, `jeDnesJizZpracovano_`, `vyberModelProKontrolu_` | Spuštění kontroly s neplatným tokenem odmítnuto | Token dialog a „Najít akce pro mě“ bez spuštění | – | ● |
+| **R6** Zbytečně utracený API kredit | BE: `routePost_` odmítne špatný token **před** dražší operací, `jeDnesJizZpracovano_`, `vyberModelProKontrolu_`; chráněné je jen odmítnutí tokenu, vlastní AI volání jsou slabě pokrytá (`callAnthropicPlaces_` 3 %, `runCheck_` 11 %, `apiNajdiProUzivatele_` 23 % řádků) | Spuštění kontroly s neplatným tokenem odmítnuto | Token dialog a „Najít akce pro mě“ bez spuštění | – | ◐ |
 | **R7** Zneužití formuláře nebo webhooku | BE: `apiKontakt_` (limit, cooldown), `apiEmailTip_` (token, limit); W: webhook | Neplatný token, neznámý endpoint | Prázdná zpráva, odeslání a cooldown | – | ● |
 | **R8** Rozbité rozvržení | – | – | Sticky header, dvě responzivní pásma, mobilní toggle mapy a kalendáře | Vizuální kontrola, reálný telefon | ◐ |
 | **R9** Načtení akcí pro zvolené město | FE: `sestavFetchPozadavek_` (diakritika escapovaná), `api()` předá serveru čistý název města pro events i places (4 testy, v3.65), stráž pozdní odpovědi v `nactiAkce` a `nactiMista` (4 testy, v3.61), `hlaskaPrazdnehoStavuProProfil_` (3 testy) a zobrazený profil v `nactiAkce` (1 test), v3.62 | Events umí filtrovat podle profilu (jen Ostrava, slabé) | Přepnutí na město s diakritikou (jen karty akcí, ne místa), Opakované přepnutí profilu | Živá kontrola ostatních měst přes appku | ◐ |
 | **R10** Únik tajných hodnot z testovací infrastruktury | – | – | PIN přes `Fill Secret`, téma ntfy bez zápisu do logu | Kontrola úniku v `rf-tests.yml` a `publikovat-report.yml` (nehledá v PNG, ty se před zveřejněním mažou), Secret scanning; ruční výměna hodnot po #33 | ◐ |
 | **R11** Tiché selhání automatizace | – | – | – | Notifikace ntfy při selhání plánovaného běhu (zatím jen ruční běhy, plánovaný ověří 1. 11. 2026), veřejný report, pojistka souladu testů (`kontrola-architektury-testu.py`) | ◐ |
 
-Nejslabší jsou R2 a R5, obě mají hodnocení ◐. Nově přidaná R9, R10 a R11 mají také ◐.
+Hodnocení ◐ mají R2 a R5 (viz níže), R4 a R6 (podle měření pokrytí z 28. 10.: přehledy a hlídač bez testu, AI volání slabě pokrytá) a nová R9 až R11.
 
 U R2 API test porovnává `VERZE` z repa s verzí, kterou hlásí produkční
 `/exec`. Tím zachytí třeba situaci z 8. 8., kdy `clasp deploy` bez `-i` nechal
@@ -70,7 +73,7 @@ kontrolu verze frontendu a spouštět smoke v CI i s `FRAME`.
 | 3 | Detekce duplicit | BE: `najdiDuplicity_`, `isSameName_`, `normNazev_`, `nazevTokens_`, `denZeSerie_`, `ruznyDenSerie_`, `navrhniDuplicity_`, `smazatPotvrzeneDuplicity_` | – | – | ● (+ ruční schválení) |
 | 4 | Viditelnost akcí (proběhlé, zrušené, označené) | BE: 7 scénářů filtru viditelnosti | – | Dlouhodobé akce | ● |
 | 5 | Označení ★ / ✓ a oblíbená místa 🏛 | BE: `toggleOznaceni_`, `apiToggle_`, `apiToggleMisto_`, `oblibenaMistaSety_`, `readOznaceni_`; FE: `klicMistoUkladani_`, `filtrovatOblibenaMista_` | – | 4 zápisové (round-trip, integrace) + 3 chipy bez zápisu | ● |
-| 6 | Uživatelé, přihlášení, PIN | BE: `hashPin_`, `overitPin_`, `apiPrihlaseniUzivatele_` (nikdy nevrací hash), `apiSeznamUzivatelu_`; FE: `pinVypadaPlatne_`, `sestavPrihlasenehoUzivatele_` | – | 7 (dlaždice, testovací profil skrytý bez příznaku, anonymní režim, špatný PIN, odhlášení, přepínač, dialog profilu) | ● |
+| 6 | Uživatelé, přihlášení, PIN | BE: `hashPin_`, `overitPin_`, `apiPrihlaseniUzivatele_` (nikdy nevrací hash), `apiSeznamUzivatelu_`; FE: `pinVypadaPlatne_`, `sestavPrihlasenehoUzivatele_`; `apiSetFiltry_` bez jednotkového testu; E2E ji volá nepřímo při uložení dialogu profilu (test notifikací), ale uložené filtry neověřuje | – | 7 (dlaždice, testovací profil skrytý bez příznaku, anonymní režim, špatný PIN, odhlášení, přepínač, dialog profilu) | ● |
 | 7 | API routování a přenos údajů | BE: `routePost_` (neznámá akce, token, login, toggle); FE: `sestavFetchPozadavek_` (PIN a token v těle, nikdy v URL) | Meta, events, places, filtr profilu, neznámý endpoint, neplatný token | – | ● |
 | 8 | Cache odpovědí | BE: klíč cache, verze, invalidace, izolace uživatelů, fail-open při výpadku CacheService | – | – | ◐ (jen unit) |
 | 9 | Počasí | BE: `weatherFor_` (retry, fallback Open-Meteo → met.no, cache), `vyhodnotPocasiUdalosti_`, `aktualizujPocasi_`; FE: `weathercodeEmoji_`, `pocasiZobrazeni_` | – | Políčko počasí | ● |
@@ -127,3 +130,4 @@ plánu bych ho znovu prošel.
 | 30. 9. 2026 | První verze, zpětná rekonstrukce ze stavu repa |
 | 6. 10. 2026 | Doplněno hodnocení nejslabších rizik a priority mezer |
 | 28. 10. 2026 | Revize po vzniku ARCHITEKTURA-TESTU.md: role dokumentů, počty testů odkazem na README, opravené počty v oblastech 6 a 10, rizika R9 až R11, oblast 19 (diakritika a lokalizace) |
+| 28. 10. 2026 | Korekce podle měření pokrytí řádků backendu (82,2 %): R6 a R4 z ● na ◐, poznámka u R3 (`apiToggle_` 44 %), `apiSetFiltry_` v oblasti 6 bez jednotkového testu, upřesněný `runSelfTest` |

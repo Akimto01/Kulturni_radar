@@ -20,3 +20,6 @@ vysledky/
 # node_modules se necommitují, package-lock.json ano.
 cloudflare-worker/node_modules/
 cloudflare-worker/.wrangler/
+
+# lokální nastavení Claude Code (oprávnění nástrojů), patří jen k tomuto stroji
+/.claude/settings.json
