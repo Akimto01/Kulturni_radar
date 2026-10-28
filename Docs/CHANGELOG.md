@@ -1,5 +1,47 @@
 # Changelog
 
+## CI: týdenní RF běh byl 10 týdnů červený – 28. 10. 2026
+### Co se stalo
+- Workflow `rf-tests.yml` (neděle 19:00 UTC, proti produkci) selhal v běhách #6 až #15 (23. 8. až 25. 10. 2026), poslední zelený byl #5 (16. 8.). Nikdo si toho nevšiml, protože selhání nikam nehlásí. Odznak RF testů v novém README byl kvůli tomu červený.
+- Mezi #5 a #6 se nezměnilo `rf-tests.yml`, `requirements.txt` ani secrets (naposledy 7. 8.). Změnila se sada: `frontend.robot` z 25 na 50 testů (+656 řádků) a Index.html v3.43 až v3.57. API testy (9) procházely vždy.
+### Pády frontendu podle běhů
+| Běh | Datum | Commit | Pády | Padlé testy |
+|---|---|---|---|---|
+| #6 | 23. 8. | 8311581 | 4 | chip typu stálého místa, ★ promítne do filtru, ★ lze označit, ✓ lze označit |
+| #7 | 30. 8. | 44ddc5b | 4 | karty mají ikony ★/✓, ★ promítne do filtru, ★ lze označit, ✓ lze označit |
+| #8 | 6. 9. | 273d2a4 | 4 | chip Neověřeno, ★ promítne do filtru, ★ lze označit, ✓ lze označit |
+| #9 | 13. 9. | a237630 | 23 | téměř vše timeout (výpadek odezvy backendu) |
+| #10 | 20. 9. | a347382 | 5 | chip typu místa, chip Neověřeno, trojice ★/✓ |
+| #11 | 27. 9. | a347382 | 3 | trojice ★/✓ |
+| #12 | 4. 10. | e85f804 | 3 | trojice ★/✓ |
+| #13 | 11. 10. | 3f04d62 | 4 | chip Neověřeno, trojice ★/✓ |
+| #14 | 18. 10. | 3f04d62 | 4 | chip typu místa, trojice ★/✓ |
+| #15 | 25. 10. | 3f04d62 | 4 | chip Oblíbené, chip Neověřeno, ★ lze označit (po reloadu hvězda nedrží), kalendář hover |
+- V #6 až #14 se navíc přeskakoval test „🏛 Oblíbené místo“ (první karta neměla známé místo). Podrobnosti jsou z logů, artefakty mají retenci 14 dní.
+### Seskupení příčin
+| Příčina | Pády | Stav |
+|---|---|---|
+| Opraveno 26.–27. 10. | kalendář hover, část chip testů (`0 != N`), skip 🏛 | v3.61 až v3.65 a opravy testů |
+| Příčina nejasná | trojice ★/✓ (#6 až #14), pak jiný pád ★ v #15 | 9 běhů za sebou stejný pád, timeout na ikoně u první karty |
+| Prostředí CI / backend | #9 (23 pádů), timeout `page.goto` v #17 | přechodné výpadky odezvy Apps Scriptu nebo webu |
+| Nestabilní test | chip typu stálého místa, chip Neověřeno | výsledek závisí na datech profilu, viz BACKLOG |
+### Ověření hypotézy: zápis ★ na řádek „Léto na Zelňáku“
+- Hypotéza: zápis ★ na řádek se sériovým číslem místo data (ID `2026-05-14-leto-na-zelnaku`) selhával na serveru, hvězda zůstala v „ukládání“ a testy timeoutovaly.
+- Test: POST na `/exec` akce `toggle` (typ `oblibene`, profil rf-test) dvakrát za sebou na Zelňák a dvakrát na běžnou budoucí akci Brna (`2026-10-29-hollywood-halloween`).
+- Výsledek: všechna čtyři volání vrátila `ok:true` za 2 až 3 s, odpovědi mají stejný tvar (Zelňák false, pak true; Halloween true, pak false). **Hypotéza o selhání zápisu na serveru se nepotvrdila.** Řádek Zelňáku zápis přijímá stejně jako běžná akce.
+- Zelňák navíc měl ★ nastavenou už před testem (první volání ji vypnulo, druhé vrátilo), takže po dřívějších pádech zůstala u rf-test ★ na tomhle řádku. Původní stav jsem obnovil.
+- Co zůstává nejasné: v logu #6 až #14 test čekal na ikonu `.ikona-oznaceni.hvezda` u první karty a ta se neobjevila vůbec (nešlo o stav „ukládání“). Proč se ikona na kartě nevykreslila, jsem neověřil.
+### Ověření opakovaným během
+- Ruční běh #16 (HEAD `7109792`): API 9/9, frontend 52/52, nic přeskočeného.
+- Ruční běh #17 (stejný commit): frontend 50/52. ★ lze označit (ikona zůstala v „ukládání“ přes 10 s) a „Mapa lze otevřít a zavřít“ (timeout `page.goto` na kulturniradar.cz po 10 s). #16 tedy nebyl důkaz stability, týdenní běh je pořád křehký.
+- Po #17 zůstala u rf-test nastavená ★ na první kartě Brna (Hollywood Halloween): test při pádu uprostřed zápisu hvězdu nevrátil. Viz write-safety v sekci 8 skillu.
+### Změna CI (commit `74eb619`)
+- `rf-tests.yml`: krok `if: failure()` pošle notifikaci na ntfy (secret `NTFY_TOPIC`, titulek a odkaz na běh), `retention-days` 14 na 30. Notifikace jde přímo na ntfy.sh přes HTTP (appka používá e-mailovou bránu kvůli kvótě sdílených IP Googlu, runner GitHubu má jiné IP). Krok zatím nebyl vyzkoušený na skutečném selhání.
+- `tests/robot/requirements.txt`: přesné verze z instalace v #16: robotframework 7.5, robotframework-requests 0.9.7, robotframework-browser 20.6.0. Tranzitivní závislosti zamčené nejsou. Lokálně mám starší verze (7.4.2 a 20.0.0), takže se lokální a CI prostředí liší.
+### Další kroky
+- Ošetřit chip testy (BACKLOG, Testovací dluh).
+- Prošetřit trojici ★/✓ a křehkost ★ testu při pomalém zápisu (timeout 10 s, zápis trvá 2 až 3 s, v zátěži i víc).
+
 ## Docs: README jako rozcestník – 28. 10. 2026
 - Nové `README.md` pro hodnotitele: odznaky CI, odkaz na kulturniradar.cz, krátké EN shrnutí, tabulka „Pro hodnotitele: kde co najít“ (board a testovací dokumentace), „Testy v číslech“, „Jak pracuji“ s vybranými chybami (#31, #26, #27, #22), aktualizované „Co appka umí“, architektura, struktura repa a provoz s aktuálními náklady.
 - Čísla ověřena proti repu: Node 349 (backend) a 209 (frontend), RF dry run 61 (frontend 52, API 9), Worker 7. Všechny relativní odkazy vedou na existující soubory, odznaky vrací HTTP 200.
