@@ -1,5 +1,30 @@
 # Changelog
 
+## CI: delší čekání na server jen v CI – 28. 10. 2026
+Commit `04538e8`. Týdenní RF běh proti produkci (`rf-tests.yml`).
+### Proč
+Po běhu #19 (zelený, 52/52) selhaly tři ruční běhy za sebou (#20, #21, #22), pokaždé jiný test a vždy čekání na Apps Script: v #20 viselo přihlášení v Suite Setup přes 15 s (celá frontend sada 0/52, tlačítko zůstalo „Přihlašuji…“), v #21 zápis u „🏛 Oblíbené místo“ přes 10 s, v #22 uložení filtrů v testu notifikací přes 10 s. Stejný vzorec měl běh #17 (zápis ★ přes 10 s, `page.goto` po 10 s). Pravděpodobná příčina je kolísající odezva Apps Scriptu pod zátěží (pokaždé jiný test, vždy čekání na server, odezva backendu při ruční kontrole 2 až 4 s). Je to nepřímá shoda, přímý důkaz nemáme.
+### Co
+- Tři proměnné v `tests/robot/resources.robot`. **Výchozí hodnoty se rovnají dosavadním pevným timeoutům, takže lokální chování se nemění a přísnost se nesnižuje:**
+  - `${CEKANI_ZAPIS}` 10 s: dokončení zápisu,
+  - `${CEKANI_PRIHLASENI}` 15 s: přihlášení,
+  - `${CEKANI_NAVIGACE}` 10 s: `Set Browser Timeout` v Suite Setup (page.goto a akce bez vlastního timeoutu).
+- `rf-tests.yml` je u frontend běhu přepisuje na **30 s, 40 s a 30 s** (`--variable CEKANI_ZAPIS:30s --variable CEKANI_PRIHLASENI:40s --variable CEKANI_NAVIGACE:30s`). API běh beze změny.
+### Pokrytá čekání (`frontend.robot`)
+- `${CEKANI_PRIHLASENI}`: zmizení `#login-overlay` po přihlášení (keyword „Přihlásit se do radaru“), čekání na dlaždice profilů (keyword a tři testy s přihlašovací obrazovkou).
+- `${CEKANI_ZAPIS}`: `:not(.ukladani)` po zápisu ★, ✓ a 🏛 (test „Označení ★ se skutečně promítne do filtru“ dvakrát a sdílený keyword „Ověřit plný cyklus označení“ dvakrát), ntfy téma po vygenerování nebo rotaci (`rotovat:not([disabled])`, `s-tematem`) a zavření `#filtry-dialog` po uložení (dvakrát).
+- `${CEKANI_NAVIGACE}`: Browser timeout nastavený před prvním `New Page`, dědí ho i testy s vlastní stránkou.
+### Co záměrně ne a proč
+- **Čistě klientské věci** (3 až 5 s): otevření a zavření dialogů přes `#filtry-zavrit`, přepínání oblastí e-mail a ntfy, kalendář, mapa, tooltip, optimistická odezva ikon (`Wait Until Keyword Succeeds 10s`). Nečekají na server.
+- **Čtení dat** (`.karta`, `.chip` po načtení a reloadu, 15 až 20 s): není to zápis ani přihlášení a neselhávalo to.
+- **Odeslání kontaktního formuláře** (`#kontakt-odeslat:not([disabled])`, 15 s): je to serverový zápis, ale na timeout nikdy nespadl a dnešní výchozí hodnota je jiná než u `${CEKANI_ZAPIS}`, proto bez nové proměnné.
+### Notifikace
+Krok „Upozornění na selhání (ntfy)“ běží jen pro plánované běhy (`failure() && github.event_name == 'schedule'`). Ruční běh notifikaci neposílá, sleduje ho ten, kdo ho spustil.
+### Ověření a rizika
+- Lokálně: RF dry run 61/61, zkušební test přepsání proměnných přes `--variable`, smoke 11/11 s výchozími hodnotami (bez výskytu PINu v jeho výstupu).
+- **V CI zatím neověřeno.** Dnes se v CI nic nespouštělo (Apps Script měl za sebou hodně zátěže). První ověření bude plánovaný běh v neděli 1. 11. 2026.
+- Browser timeout je globální: v CI platí 30 s pro všechny akce bez vlastního timeoutu (klik, čtení), takže skutečná chyba se projeví později a při pomalém backendu může běh trvat výrazně déle. Přísnost testů se nesnižuje.
+
 ## Bezpečnost: únik tajných hodnot v artefaktech CI – 28. 10. 2026
 Issue #33 (závažnost: vysoká, veřejně dostupné tajemství; priorita: okamžitá). Hodnoty se tu z principu neuvádějí.
 ### Co unikalo a kde
