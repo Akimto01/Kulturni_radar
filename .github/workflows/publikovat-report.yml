@@ -1,0 +1,161 @@
+name: Publikovat RF report (GitHub Pages)
+
+# Po každém dokončeném běhu rf-tests.yml na main (a ručně pro zvolený běh) vezme
+# artefakt rf-reporty, znovu zkontroluje únik tajných hodnot a publikuje jen
+# report.html a log.html + souhrnnou stránku. Screenshoty a playwright-log.txt
+# se nikdy nezveřejňují. Viz Docs/CHANGELOG.md a issue #11.
+
+on:
+  workflow_run:
+    workflows: ["RF testy (API + frontend)"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "ID běhu rf-tests.yml (databaseId z gh run list), jehož report se má publikovat"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  sestavit:
+    runs-on: ubuntu-latest
+    outputs:
+      publikovat: ${{ steps.artefakt.outputs.existuje }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Určit a ověřit běh
+        id: beh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UDALOST_RUN_ID: ${{ github.event.workflow_run.id }}
+          VSTUP_RUN_ID: ${{ inputs.run_id }}
+        run: |
+          run_id="${UDALOST_RUN_ID:-$VSTUP_RUN_ID}"
+          case "$run_id" in
+            ''|*[!0-9]*) echo "::error::ID běhu musí být číslo, dostal jsem '$run_id'"; exit 1 ;;
+          esac
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" > beh.json
+          # Publikovat jde jen výstup workflowu rf-tests.yml z větve main, ne libovolného běhu.
+          cesta=$(jq -r '.path' beh.json)
+          vetev=$(jq -r '.head_branch' beh.json)
+          if [ "$cesta" != ".github/workflows/rf-tests.yml" ] || [ "$vetev" != "main" ]; then
+            echo "::error::Běh $run_id není běh rf-tests.yml z větve main (path=$cesta, větev=$vetev)"
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Zjistit, jestli má běh artefakt rf-reporty
+        id: artefakt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.beh.outputs.run_id }}
+        run: |
+          pocet=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" \
+            --jq '[.artifacts[] | select(.name == "rf-reporty" and (.expired | not))] | length')
+          if [ "$pocet" -ge 1 ]; then
+            echo "existuje=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "existuje=false" >> "$GITHUB_OUTPUT"
+            zprava="Publikace přeskočena: běh $RUN_ID nemá artefakt rf-reporty (kontrola úniku tajných hodnot ho nenahrála, nebo už expiroval)."
+            echo "::notice::$zprava"
+            echo "$zprava" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Stáhnout artefakt rf-reporty
+        if: steps.artefakt.outputs.existuje == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: rf-reporty
+          path: vysledky
+          run-id: ${{ steps.beh.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      # Stejná kontrola jako v rf-tests.yml (při změně udržovat obě místa shodná).
+      # Nález = nepublikovat a selhat, další kroky a nasazení se nespustí.
+      - name: Kontrola úniku tajných hodnot
+        if: steps.artefakt.outputs.existuje == 'true'
+        env:
+          RF_TEST_PIN: ${{ secrets.RF_TEST_PIN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          # Při nálezu se vypíše jen název souboru a secretu, nikdy hodnota.
+          # PIN má mít 8 znaků, takže stačí prosté hledání. Kratší PIN by dával falešné
+          # shody (kód knihovny v HTML, zlomky časů, čísla): v tom případě se krok
+          # ohlásí jako ::warning:: a hledá se jen v uvozovkách nebo jako celý text prvku.
+          find vysledky -name playwright-log.txt -delete 2>/dev/null || true
+          nalez=0
+          while IFS= read -r soubor; do
+            echo "::error::Únik ntfy tématu uživatelského profilu (radar-…) v souboru $soubor"
+            nalez=1
+          done < <(grep -rlE -- 'radar-[0-9a-f]{32}' vysledky/ || true)
+          if [ -n "$NTFY_TOPIC" ]; then
+            while IFS= read -r soubor; do
+              echo "::error::Únik tajné hodnoty NTFY_TOPIC v souboru $soubor"
+              nalez=1
+            done < <(grep -rlF -- "$NTFY_TOPIC" vysledky/ || true)
+          fi
+          if [ -n "$RF_TEST_PIN" ]; then
+            if [ "${#RF_TEST_PIN}" -ge 8 ]; then
+              hledani=(-e "$RF_TEST_PIN")
+            else
+              echo "::warning::RF_TEST_PIN má méně než 8 znaků, kontrola úniku PINu je jen přibližná (hledá se v uvozovkách a jako celý text prvku)"
+              hledani=(-e "'$RF_TEST_PIN'" -e "\"$RF_TEST_PIN\"" -e ">$RF_TEST_PIN<")
+            fi
+            while IFS= read -r soubor; do
+              echo "::error::Únik tajné hodnoty RF_TEST_PIN v souboru $soubor"
+              nalez=1
+            done < <(grep -rlF "${hledani[@]}" -- vysledky/ || true)
+          fi
+          exit $nalez
+
+      - name: Odstranit screenshoty a ladicí log
+        if: steps.artefakt.outputs.existuje == 'true'
+        run: |
+          # Screenshot může zachytit dialog s ntfy tématem a kontrola obrázky číst neumí.
+          # playwright-log.txt zapisuje hodnoty z DOM mimo dosah logování RF.
+          echo "Odstraněno PNG: $(find vysledky -name '*.png' | wc -l)"
+          find vysledky -name '*.png' -delete
+          find vysledky -name playwright-log.txt -delete
+          rm -rf vysledky/*/browser
+
+      - name: Vygenerovat web
+        if: steps.artefakt.outputs.existuje == 'true'
+        run: |
+          python3 .github/scripts/generovat-index-reportu.py \
+            --vysledky vysledky --meta beh.json --repo "$GITHUB_REPOSITORY" --vystup web
+          # Pojistka: na webu nesmí být nic jiného než index a report/log obou sad.
+          if find web -type f ! -name index.html ! -name report.html ! -name log.html | grep -q .; then
+            echo "::error::Na webu jsou nečekané soubory:"
+            find web -type f ! -name index.html ! -name report.html ! -name log.html
+            exit 1
+          fi
+
+      - name: Nahrát artefakt pro Pages
+        if: steps.artefakt.outputs.existuje == 'true'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: web
+
+  nasadit:
+    needs: sestavit
+    if: needs.sestavit.outputs.publikovat == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.nasazeni.outputs.page_url }}
+    steps:
+      - name: Nasadit na GitHub Pages
+        id: nasazeni
+        uses: actions/deploy-pages@v5
