@@ -1,5 +1,26 @@
 # Changelog
 
+## CI: veřejný RF report přes GitHub Pages – 28. 10. 2026
+Issue #11, commit `f2404f8`. Stránka: https://akimto01.github.io/Kulturni_radar/
+### Co
+- Nový workflow `.github/workflows/publikovat-report.yml` („Publikovat RF report (GitHub Pages)“). Spouští se po dokončení běhu `rf-tests.yml` na `main` (`workflow_run`) a ručně (`workflow_dispatch` s `run_id` běhu).
+- Postup: ověří, že zadaný běh patří `rf-tests.yml` z větve `main`, zjistí, jestli má artefakt `rf-reporty` (když ne, skončí bez publikace s vysvětlením v souhrnu běhu), stáhne ho, znovu spustí **stejnou kontrolu úniku tajných hodnot** jako `rf-tests.yml` (při nálezu nepublikuje a selže), smaže všechna PNG a `playwright-log.txt`, vygeneruje `index.html` a nasadí přes `actions/deploy-pages`. Pages mají zdroj GitHub Actions (`build_type=workflow`).
+- Generátor stránky: `.github/scripts/generovat-index-reportu.py` (jen standardní knihovna). Index ukazuje datum a čas běhu, spouštěč, commit (odkaz), počty prošlých a selhaných testů obou sad z `output.xml`, odkazy na `report.html` a `log.html` a na běh v Actions. Bez externích zdrojů, česky, světlý i tmavý režim.
+### Co se zveřejňuje a co ne
+- Zveřejní se jen `index.html` a `report.html` a `log.html` sad API a frontend (5 souborů). Pojistka ve workflow selže, pokud by na webu bylo cokoli dalšího.
+- Nezveřejňují se `output.xml`, screenshoty pádů a `playwright-log.txt`. Screenshot může zachytit dialog s ntfy tématem a kontrola obrázky číst neumí, ladicí log zapisuje hodnoty z DOM mimo dosah logování RF. Poznámka o tom je i na stránce.
+- Před návrhem jsem prošel obsah artefaktu z hlediska soukromí: jména rodinných profilů se v reportech nevyskytují, jediná e-mailová adresa je veřejný kontakt `info@kulturniradar.cz` z webu.
+### Ověření (28. 10. 2026, ruční spuštění pro běh #22)
+- Workflow prošel, `https://akimto01.github.io/Kulturni_radar/` vrací 200, stejně jako čtyři odkazy na report a log.
+- Index ukazuje API 9/9 a frontend 51/52, což odpovídá běhu #22 (selhal „Notifikace: vygenerování ntfy tématu“, viz záznam o timeoutech).
+- Soubory `output.xml`, PNG i `playwright-log.txt` na webu vrací 404, ve stromu je 5 souborů.
+- Stažená publikovaná HTML: 0 výskytů vzoru `radar-[0-9a-f]{32}` a 0 výskytů nového PINu. Lokální kopie jsem smazal.
+- Lokálně před nasazením: generátor na reálném artefaktu, simulace kroků workflow (čistý výstup projde, umělý únik tématu selže a web se negeneruje).
+### Poznámky a rizika
+- Stránka dnes ukazuje běh #22 s jedním selhaným testem. Po týdenním běhu 1. 11. 2026 ji přepíše výsledek plánovaného běhu. Automatický průchod `workflow_run` se do té doby neověřil, ověřeno bylo jen ruční spuštění.
+- Kontrola úniku je zkopírovaná ve dvou workflow (`rf-tests.yml` a `publikovat-report.yml`). Při změně udržovat obě shodná, případně ji později vyčlenit do sdíleného skriptu.
+- Publikuje se každý dokončený běh včetně selhaných. Kdo chce prezentovat jen zelené výsledky, musí to řešit podmínkou ve workflow, záměrně to tak není.
+
 ## CI: delší čekání na server jen v CI – 28. 10. 2026
 Commit `04538e8`. Týdenní RF běh proti produkci (`rf-tests.yml`).
 ### Proč
