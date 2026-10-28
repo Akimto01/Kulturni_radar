@@ -1,5 +1,26 @@
 # Changelog
 
+## Docs: správa defektů (#32) – 28. 10. 2026
+Issue #32, commit `fd18940` (dokumentace a formulář), úprava boardu a issues přes `gh`.
+### Co
+- **Formulář defektu** `.github/ISSUE_TEMPLATE/defekt.yml` (štítek `bug`, automaticky na board): shrnutí, oblast, verze a prostředí, kroky, očekávaný a skutečný výsledek, závažnost, priorita, jak nalezeno a důkazy. Upozorňuje, že se nikdy nevkládají tajné hodnoty.
+- **`Docs/DEFEKTY.md`:** stupnice závažnosti S1 až S5 a priority P1 až P5 s příklady z projektu, životní cyklus (Nový, Potvrzený, V opravě, Ověřuje se, Uzavřený, Zamítnutý, Nereprodukovatelný), zpětná klasifikace osmi defektů z 26.–28. 10. 2026 a analýza úniků (na které úrovni testů měl být každý defekt chycen, proč unikl a co se změnilo). Odkaz je v tabulce „Pro hodnotitele“ v README.
+- **Pole na boardu** (single-select): Závažnost, Priorita, Jak nalezeno, Stav defektu, s hodnotami shodnými s dokumentem a formulářem.
+- **Pohled „Defekty“** na boardu: filtr `label:bug`, seskupení podle Závažnosti, sloupce Title, Status, Priorita, Jak nalezeno, Stav defektu.
+- **Zpětná klasifikace:** hodnoty polí u #17, #18, #21, #23, #26, #27, #31 a #33 a do každé issue komentář „Zpětná klasifikace“ s analýzou úniku. Hodnoty i komentáře jsem načetl programově z tabulek v `Docs/DEFEKTY.md`, takže odpovídají dokumentu přesně.
+- **#18 znovu otevřena** (Stav defektu Ověřuje se, Status In Progress): podle životního cyklu se defekt uzavírá až po ověření v produkci, ověření v datech čeká na čtvrteční běh sledovaných měst, viz #6.
+- **#4 (Cloudflare, štítek `bug`)** má jen Stav defektu Nový (nahlášeno, zatím neposouzeno), závažnost a prioritu nemá záměrně vyplněnou.
+- **SKILL.md** (sekce 9, obě kopie): pravidlo, že se defekty zakládají formulářem a že se při zavření ručně nastavuje Stav defektu na Uzavřený.
+### Zjištění z klasifikace
+- Šest z osmi defektů neodhalily automatické testy, ale živá kontrola a analýza (každý nalezený ručně skončil novým testem nebo pojistkou).
+- Opakující se příčiny úniků: testovací data a cesta (jen Brno, jen textové datum, ověřování přímým API nebo URL parametrem) a chybějící monitoring dat (#18, #21, #23).
+### Ověření
+- Formulář se v GitHubu při zakládání issue zobrazuje správně (10 polí, povinná označená), ověřeno v prohlížeči.
+- Pohled „Defekty“ po uložení a znovunačtení čisté URL drží filtr, seskupení i sloupce, ověřeno v prohlížeči.
+- Pole a komentáře: `gh project item-list` ukázal u všech osmi defektů vyplněná čtyři pole, každá issue má právě jeden komentář „Zpětná klasifikace“.
+### Poznámka k provozu
+- Vestavěná automatika boardu při zavření issue mění jen Status (Done), ne pole Stav defektu. Při zavření defektu ho nastavit ručně na Uzavřený. Ani znovuotevření issue Status samo nepřepne zpět, viz #18.
+
 ## Docs: příběhy chyb – 28. 10. 2026
 Issue #10, commit `fd7c012`. Nový dokument `Docs/PRIBEHY-CHYB.md` se třemi případovými studiemi (od příznaku přes diagnózu a kořenovou příčinu po pojistku a poučení): města s diakritikou bez akcí (Index.html v3.65, #31), CI deset týdnů červená (v3.61 a v3.62, #26, #27) a únik tajných hodnot v reportech testů (#33). Odkaz přibyl do tabulky „Pro hodnotitele“ v README.
 - Fakta jsem před commitem ověřil proti CHANGELOGu, issues #26, #27, #31 a #33, git historii a živým odkazům (data, počty akcí, rozsah běhů #6 až #15, pořadí nálezu čtyř cest úniku). První verze obsahovala pět nepřesností (stáří chyby, popis starého testu přepínání, lokální běhy, pojistky v CI, téma testovacího profilu), všechny byly opraveny před commitem.

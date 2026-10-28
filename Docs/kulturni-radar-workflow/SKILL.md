@@ -688,6 +688,10 @@ aktuálně rozpracované/vybrané úkoly:**
   nastavování přes web UI (Project → Settings → Workflows) potřeba
   jen pokud by se v budoucnu chovaly jinak, než se očekává — zatím
   ověřeno funkční přímo přes `gh` CLI, žádný krok navíc.
+- Defekty se zakládají formulářem `.github/ISSUE_TEMPLATE/defekt.yml`
+  (stupnice a cyklus v `Docs/DEFEKTY.md`). Při zavření defektu
+  nastavit ručně pole Stav defektu na Uzavřený: vestavěná automatika
+  mění jen Status. Defekt se uzavírá až po ověření v produkci.
 
 Od 27. 10. 2026: milníky = cíle z BACKLOG.md (Cíl 1–4), pole Odhad (h) a Termín. Zpětné uzavřené issues pro dokončenou práci jsou povolené jako dokumentace průběhu (schváleno 27. 10. 2026, poprvé pro v3.43–v3.65); pravidlo „issue až při výběru“ platí dál pro nové nápady.
 
