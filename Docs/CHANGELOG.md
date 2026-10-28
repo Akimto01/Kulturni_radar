@@ -93,6 +93,7 @@ Starý PIN byl shodný s testovací hodnotou, kterou používají veřejné unit
 ### Co se stalo
 - Workflow `rf-tests.yml` (neděle 19:00 UTC, proti produkci) selhal v běhách #6 až #15 (23. 8. až 25. 10. 2026), poslední zelený byl #5 (16. 8.). Nikdo si toho nevšiml, protože selhání nikam nehlásí. Odznak RF testů v novém README byl kvůli tomu červený.
 - Mezi #5 a #6 se nezměnilo `rf-tests.yml`, `requirements.txt` ani secrets (naposledy 7. 8.). Změnila se sada: `frontend.robot` z 25 na 50 testů (+656 řádků) a Index.html v3.43 až v3.57. API testy (9) procházely vždy.
+- Ověřeno v Gmailu 28. 10. 2026: plánované běhy #6 až #15 nevyvolaly žádný e-mail o selhání. E-maily „Run failed: RF testy“ přišly jen u ručně spuštěných běhů (28. 10. 2026) a e-maily ze starého push workflow „Testy“ (19. 8. 2026) skončily přes filtr mimo doručenou poštu. Selhání tedy bylo skutečně tiché, ntfy notifikace z plánovaného běhu je správná oprava.
 ### Pády frontendu podle běhů
 | Běh | Datum | Commit | Pády | Padlé testy |
 |---|---|---|---|---|
