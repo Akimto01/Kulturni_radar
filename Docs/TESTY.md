@@ -1,9 +1,10 @@
 # Testovací plán a strategie – Kulturní radar
 
-> **Pracovní verze k 30. 9. 2026.** Dokument je zpětně sestavený podle
-> aktuálního stavu repozitáře a reálného způsobu, jakým projekt vyvíjím a
-> testuji. Cílem není formálně „odškrtnout normu“, ale mít na jednom místě
-> přehled o tom, co testuji, proč právě takhle a kde jsou vědomé mezery.
+> **Pracovní verze.** Dokument je zpětně sestavený podle aktuálního stavu
+> repozitáře a reálného způsobu, jakým projekt vyvíjím a testuji. Cílem není
+> formálně „odškrtnout normu“, ale mít na jednom místě přehled o tom, co
+> testuji, proč právě takhle a kde jsou vědomé mezery. Datum poslední revize
+> je v historii dokumentu na konci.
 
 ## 0. O dokumentu
 
@@ -14,12 +15,18 @@
   `Docs/BACKLOG.md` a git historie (186 commitů od 1. 8. 2026). Testy
   vznikaly průběžně s vývojem; původní strategie popisovala 18 unit,
   6 API a 7 E2E testů a samotest s watchdogem jako návrh.
+- **Role dokumentů:** tento plán říká, **co a proč** se testuje. **Jak** se
+  testy píšou a běží, popisuje [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md).
+  Počty testů jsou jen v [README](../README.md) (tabulka „Testy v číslech“)
+  a jinde se neopakují.
 - **Související dokumenty:** `Docs/POKRYTI.md` (matice pokrytí),
-  `Docs/ARCHITEKTURA.md`, `Docs/PROVOZ.md`, `Docs/AUDIT-SELEKTORU.md`.
+  `Docs/ARCHITEKTURA.md`, `Docs/PROVOZ.md`, `Docs/AUDIT-SELEKTORU.md`,
+  `Docs/ARCHITEKTURA-TESTU.md`, `Docs/AUDIT-SOULADU-TESTU.md`.
 
 Původní strategie z 2. 8. už přestala odpovídat tomu, kam se projekt za
-dva měsíce posunul. Testovací sada narostla z 31 na zhruba 540 testů, přibyl
-frontend na vlastní doméně, profily uživatelů i mapa. Dokument proto dávám
+dva měsíce posunul. Testovací sada narostla z 31 testů na stovky (aktuální
+počty jsou v README), přibyl frontend na vlastní doméně, profily uživatelů
+i mapa. Dokument proto dávám
 dohromady hlavně zpětně podle toho, co skutečně funguje. Chci, aby mi dával
 smysl i za půl roku a aby se v něm případně zorientoval někdo další, kdo by
 projekt převzal.
@@ -36,7 +43,7 @@ profily a 1 vyhrazený testovací profil `rf-test`. Veřejně dostupná na
 
 | Položka | Popis | Nasazení |
 |---|---|---|
-| `apps-script/kulturni_radar.gs` | Jediný backend (164 funkcí): data v Google Sheetu, triggery, AI volání, notifikace, JSON API | `clasp deploy` → Apps Script `/exec` |
+| `apps-script/kulturni_radar.gs` | Jediný backend (187 funkcí k 28. 10. 2026): data v Google Sheetu, triggery, AI volání, notifikace, JSON API | `clasp deploy` → Apps Script `/exec` |
 | `apps-script/Index.html` | Frontend v jednom souboru, dvě prostředí (Apps Script iframe a statický web) | `git push` → Cloudflare Pages `kulturniradar.cz` |
 | `cloudflare-worker/email-webhook.js` | Přeposílání mailů z `info@` a webhook do appky | `wrangler deploy` |
 
@@ -106,7 +113,8 @@ watchdog, datová hygiena).
 
 ## 3. Rizika
 
-Seřazeno podle dopadu na uživatele.
+Seřazeno podle dopadu na uživatele. R9 až R11 přibyly 28. 10. 2026 po analýze
+defektů ([DEFEKTY.md](DEFEKTY.md)), proto jsou na konci.
 
 | # | Riziko | Dopad | Doložený incident | Hlavní pokrytí |
 |---|---|---|---|---|
@@ -118,6 +126,9 @@ Seřazeno podle dopadu na uživatele.
 | R6 | Zbytečně utracený API kredit | Střední – přímé náklady | – | Testy záměrně nespouštějí placené akce; zamítnutí neplatného tokenu |
 | R7 | Zneužití kontaktního formuláře nebo webhooku | Nízký až střední | – | RF cooldown formuláře, API neplatný token, testy workeru |
 | R8 | Rozbité rozvržení na mobilu nebo desktopu | Nízký | Redesign v3.39–3.45 | RF responzivní pásma, mobilní viewport; zbytek ručně |
+| R9 | Načtení akcí pro zvolené město | Vysoký – hlavní funkce ukáže prázdný seznam nebo akce jiného města | Dvojité kódování města s diakritikou (#31, 80 dní), závod pozdních odpovědí při přepínání měst (#26) | Node testy `sestavFetchPozadavek_` a stráže pozdní odpovědi, RF „Přepnutí na město s diakritikou“ a „Opakované přepnutí profilu“ |
+| R10 | Únik tajných hodnot z testovací infrastruktury | Vysoký – PIN a ntfy téma veřejně dostupné v reportech | PIN a ntfy téma v artefaktech CI veřejného repa (#33) | `Fill Secret`, kontrola úniku v `rf-tests.yml` a `publikovat-report.yml`, Secret scanning |
+| R11 | Tiché selhání automatizace | Vysoký – testy běží, ale nikdo se o selhání nedozví | Týdenní běh deset týdnů červený bez upozornění (PRIBEHY-CHYB.md, příběh 2) | Notifikace ntfy při selhání plánovaného běhu, veřejný report, pojistka souladu testů |
 
 Největší důraz dávám na data a na správné nasazení. U obou už se v projektu
 reálně ukázalo, že chyba může znamenat špatný výsledek pro uživatele, i když
@@ -150,18 +161,19 @@ najednou.
 
 ### 4.2 Úrovně testů (pyramida)
 
-| Úroveň | Nástroj | Počet | Kde / kdy běží |
-|---|---|---|---|
-| Unit – backend | Node `node:test`, `tests/harness.js` (vm sandbox, stuby Google API) | 291 | CI při každém push/PR |
-| Unit – frontend | Node, `tests/frontend-harness.js` (čisté funkce z `Index.html`, bez DOM) | 186 | CI při každém push/PR |
-| Unit – worker | Node, `cloudflare-worker/email-webhook.test.mjs` | 7 | CI při změně `cloudflare-worker/**` |
-| API kontrakt | RF + RequestsLibrary, `api.robot` | 9 | CI neděle 19:00 UTC + ručně |
-| E2E UI | RF + Browser Library (Chromium), `frontend.robot` | 50 | CI neděle 19:00 UTC + ručně |
-| Provozní kontroly v produkci | Apps Script `runSelfTest`, `watchdogDailyCheck`, `auditDat_` | – | triggery v produkci |
-| Ruční | reálný telefon, spot-check obsahu LLM, vizuální kontrola | – | občas |
+| Úroveň | Nástroj | Kde / kdy běží |
+|---|---|---|
+| Unit – backend | Node `node:test`, `tests/harness.js` (vm sandbox, stuby Google API) | CI při každém push/PR |
+| Unit – frontend | Node, `tests/frontend-harness.js` (čisté funkce z `Index.html`, bez DOM) | CI při každém push/PR |
+| Unit – worker | Node, `cloudflare-worker/email-webhook.test.mjs` | CI při změně `cloudflare-worker/**` |
+| API kontrakt | RF + RequestsLibrary, `api.robot` | CI neděle 19:00 UTC + ručně |
+| E2E UI | RF + Browser Library (Chromium), `frontend.robot` | CI neděle 19:00 UTC + ručně |
+| Provozní kontroly v produkci | Apps Script `runSelfTest`, `watchdogDailyCheck`, `auditDat_` | triggery v produkci |
+| Ruční | reálný telefon, spot-check obsahu LLM, vizuální kontrola | občas |
 
-Stav k 30. 9. 2026: všech 477 Node testů backendu a frontendu prochází
-(obě sady dohromady za zhruba 1 s); 7 testů workeru běží v samostatné sadě.
+Počty testů na jednotlivých úrovních jsou v [README](../README.md), tabulka
+„Testy v číslech“ (jediný zdroj). Jednotkové testy backendu a frontendu
+prochází společně za zhruba 1 s, testy workeru běží v samostatné sadě.
 
 **Klíčové technické prvky:**
 
@@ -174,9 +186,9 @@ Stav k 30. 9. 2026: všech 477 Node testů backendu a frontendu prochází
 - Frontend RF umí dva cíle: statický web (výchozí) a Apps Script přes
   frame-piercing prefix `id=sandboxFrame >>> id=userHtmlFrame >>>`.
 
-Pyramida má pořád široký základ – 477 unit testů backendu a frontendu
-a 7 testů workeru proti 59 testům v Robot
-Frameworku. E2E testů je ale i tak relativně hodně, protože část chování
+Pyramida má pořád široký základ: jednotkových testů je řádově víc než testů
+v Robot Frameworku (přesné počty jsou v README). E2E testů je ale i tak
+relativně hodně, protože část chování
 frontendu se projeví až v DOMu, v práci s Leafletem, kalendářem, sticky
 layoutem nebo při komunikaci s reálným API.
 
@@ -214,8 +226,8 @@ samostatného monitoringu.
 ### 4.4 Testovací prostředí
 
 - **Jediné prostředí je produkce** (Apps Script `/exec`, `kulturniradar.cz`).
-- Závislosti: `tests/robot/requirements.txt` (RF ≥ 7.0, RequestsLibrary
-  ≥ 0.9, Browser ≥ 18.0), `rfbrowser init chromium`, Node 22.
+- Závislosti: `tests/robot/requirements.txt` (pinované verze: RF 7.5,
+  RequestsLibrary 0.9.7, Browser 20.6.0), `rfbrowser init chromium`, Node 22.
 - Konfigurace přes proměnné prostředí: `RADAR_URL`, `RADAR_SITE_URL`,
   `RF_FRAME`, `RF_TEST_USER_ID`, `RF_TEST_PIN`, `NTFY_TOPIC`.
 
@@ -225,7 +237,14 @@ Repo je od 8. 10. 2026 veřejné. Před zveřejněním jsem zapnul GitHub
 Secret scanning, který prošel celou historii bez nálezu, a push
 protection, která zablokuje push obsahující rozpoznaný tajný klíč.
 Zapnutí Dependabot alerts pro závislosti (`requirements.txt`,
-`package.json` workeru) je v sekci 10.
+`package.json` workeru) je v [BACKLOG.md](BACKLOG.md).
+
+Samotné repo ale tajné hodnoty nezaručí: 28. 10. 2026 se ukázalo, že PIN
+a ntfy téma unikly do reportů v artefaktech CI veřejného repa (#33). Od té doby
+se PIN zadává přes `Fill Secret`, CI před nahráním reportů hledá tajné hodnoty
+a při nálezu report nenahraje a uniklé hodnoty byly vyměněny; příběh je
+v [PRIBEHY-CHYB.md](PRIBEHY-CHYB.md) (příběh 3), mechanika v
+[ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md), kapitola B3.
 
 Samostatné testovací prostředí by tady znamenalo druhý Google Sheet, druhé
 nasazení Apps Scriptu, další Cloudflare Pages prostředí a zároveň řešit, jak
@@ -242,9 +261,13 @@ bych to takhle nedělal – tam bych chtěl samostatné testovací prostředí s
 
 - Vyhrazený testovací profil „RF Test“ (`RF_TEST_USER_ID`), nikdy reálný
   rodinný profil.
-- Zápisové testy (tag `zapis`) vracejí stav v `[Teardown]` (★/✓/🏛),
-  s bezpečnou výchozí hodnotou `${puvodni}` nastavenou ještě před
-  rizikovým krokem. Notifikační test vrací stav plným cyklem v těle testu.
+- Zápisové testy ★/✓/🏛 mají `[Teardown]` s bezpečnou výchozí hodnotou
+  `${puvodni}` nastavenou ještě před rizikovým krokem, ale teardown vlastní
+  selhání polyká. Notifikační test vrací stav plným cyklem jen v těle testu
+  a `[Teardown]` nemá. Stav se tedy vrací **jen na úspěšné cestě**, po pádu
+  může u `rf-test` zůstat změna (doloženo po bězích #6 až #14, #17 a #22).
+  Plán oprav: [AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md), řádky 6 a 7,
+  dávky 5 a 6.
 - Kontaktní formulář: jediný test, který posílá reálný e-mail, spojený
   s ověřením cooldownu.
 - Bez `RF_TEST_USER_ID`/`RF_TEST_PIN` se frontend suita hlasitě přeskočí
@@ -254,8 +277,8 @@ Round-trip testy označení ★ a ✓ mají teardown s bezpečnou výchozí hodn
 nastavenou ještě před rizikovým krokem od začátku (3. 8., v3.9); test 🏛
 převzal stejný vzor. Při sérii desítek RF běhů 21. 8. se ale ukázalo, že to samo
 nestačí. Zápisové testy začaly padat na timeout při ukládání a pod zátěží
-Apps Scriptu selhal i úklid v teardownu. Po běhu zůstala u `rf-test` dvakrát
-viset hvězda, kterou jsem musel ručně uklidit a ověřit přímo ze serveru.
+Apps Scriptu selhal i úklid v teardownu. Po běhu zůstala u `rf-test` 21. 8. dvakrát
+viset hvězda (a později znovu po bězích #6 až #14 a po #17), kterou jsem musel ručně uklidit a ověřit přímo ze serveru.
 
 Pro mě z toho plyne hlavně to, že timeout u zápisového testu není jen „spadl
 test“. Může po něm zůstat změněný stav v produkčních datech, i když je teardown
@@ -270,51 +293,43 @@ invarianty**, ne konkrétní hodnoty: schéma odpovědi (`lat`/`lng`), regex
 (kalendář), ověření zápisu reloadem, invarianty denní kontroly
 (0 ≤ nalezeno ≤ 15, přírůstek řádků = Nové).
 
-Testy závislé na datech se chovají dvojím způsobem:
-
-- `Skip If`, když data chybí (např. počasí, ikona první karty),
-- `Log … level=WARN` a projití, celkem v 9 testech ve `frontend.robot`
-  (11 výskytů; např. chip podkategorií, přepínání profilů, kalendář
-  a většina testů mapy). Stav k 28. 10. 2026, plán oprav je v
-  [AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md).
-
-Varianta s `WARN` je starší a dnes ji nepovažuju za ideální. Když potřebná
-data nejsou k dispozici, test sice projde, ale reálně nic neověří a v souhrnu
-to vypadá jako běžný PASS. `Skip If` je v tomhle čitelnější, protože je rovnou
-vidět, že test neměl podmínky ke spuštění. Proto chci tyhle případy postupně
-sjednotit na `Skip`.
+Test závislý na datech se má při chybějících datech hlasitě přeskočit
+(`Skip If`, např. počasí, ikona první karty), ne projít naprázdno. Starší testy
+místo toho jen zalogují `Log … level=WARN` a projdou bez jediné aserce. Jejich
+seznam a sjednocení na `Skip` jsou v
+[AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md) (řádek 1, dávky 2 a 3).
 
 ### 4.7 Spouštění a CI
 
-| Workflow | Trigger | Obsah |
-|---|---|---|
-| `node-tests.yml` | každý push, PR, ručně | unit + frontend unit, RF dry run (syntaxe + keywordy) |
-| `cloudflare-worker-tests.yml` | push/PR se změnou `cloudflare-worker/**`, ručně | worker |
-| `rf-tests.yml` | neděle 19:00 UTC (po nedělním samotestu), ručně | API, pak frontend (`if: always()`), reporty jako artefakt na 14 dní |
+Přehled workflow, sad, spouštěčů a artefaktů je v
+[ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md), kapitoly C1 a C5. Tady jen
+zdůvodnění. Lokální podmnožiny jdou přes tagy (`--include smoke` po nasazení,
+`--exclude zapis` pro opakované běhy).
 
-Běží na `ubuntu-latest`. Lokální podmnožiny přes tagy (`--include smoke`
-po nasazení, `--exclude zapis` pro opakované běhy).
+**Proč ne při každém pushi.** Robot Framework nespouštím při každém pushi.
+Běží proti produkci, část testů zapisuje a při opakovaných bězích se už
+ukázalo, že Apps Script začne pod zátěží zpomalovat. Navíc push do repozitáře
+automaticky neznamená, že je stejná verze opravdu nasazená do obou částí
+aplikace. Po nasazení proto spouštím ručně smoke testy a celý RF běh nechávám
+pravidelně jednou týdně. Unit testy naproti tomu běží při každém pushi a PR,
+protože jsou rychlé, izolované a bez vedlejších efektů.
 
 **Poučení z provozu:** 8.–9. 8. 2026 se `frontend.robot` v CI celý
 přeskakoval (chyběly secrety `RF_TEST_USER_ID`/`RF_TEST_PIN`) a běh přesto
 skončil zeleně. Odhaleno z logu GitHub Actions a porovnáním git historie
-workflow s historií zavedení profilů; opraveno 9. 8.
-
-Robot Framework nespouštím při každém pushi. Běží proti produkci, část testů
-zapisuje a při opakovaných bězích se už ukázalo, že Apps Script začne pod
-zátěží zpomalovat. Navíc push do repozitáře automaticky neznamená, že je stejná
-verze opravdu nasazená do obou částí aplikace.
-
-Po nasazení proto spouštím ručně smoke testy a celý RF běh nechávám pravidelně
-jednou týdně. Unit testy naproti tomu běží při každém pushi a PR, protože jsou
-rychlé, izolované a bez vedlejších efektů.
+workflow s historií zavedení profilů; opraveno 9. 8. Druhé poučení je z října
+2026: týdenní běh byl deset týdnů červený bez upozornění (PRIBEHY-CHYB.md,
+příběh 2), proto plánovaný běh dnes hlásí selhání notifikací.
 
 ### 4.8 Nestabilita (flaky testy)
 
-Tag `krehky` označuje testy s prokázanou náchylností na timing. Postup:
-nejdřív izolovaný rerun, u zápisových testů ověření dat, hledání vzorce
-napříč běhy (mění se sada padajících testů → vnější vliv; padá stále týž
-→ spíš bug).
+Tag `krehky` se testu dává až po prokázání vnější příčiny, kterou nejde
+rozumně odstranit (typicky zátěž platformy nebo externí zdroj). Je-li příčina
+v aplikaci nebo v testu, opravuje se ona, ne tag. Pravidla, postup a seznam
+označených testů jsou v [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md),
+kapitola C3 (revize dnešních 12 označených testů je dávka 10 v
+[AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md)). Obecný diagnostický postup
+je ve skillu `kulturni-radar-workflow`.
 
 Dva doložené případy:
 
@@ -324,13 +339,6 @@ Dva doložené případy:
   v aplikaci, tedy reálný bug, ne flake.
 - **Zápisové testy (21. 8.):** pokaždé jiná skladba selhání (45/4, 44/5)
   → kumulativní zátěž Apps Scriptu, potvrzeno izolovanou reprodukcí 5/5.
-
-Tag `krehky` nedávám testu jen proto, že jednou spadl. Nejdřív se snažím
-zjistit, jestli je příčina v aplikaci, v samotném testu nebo opravdu někde
-venku. Jako křehký ho označím až ve chvíli, kdy se podaří prokázat vnější
-příčinu, kterou nedává smysl nebo nejde rozumně odstranit – typicky zátěž
-platformy nebo závislost na externím zdroji. Pokud je problém v testu nebo v
-aplikaci, radši ho opravím, než abych ho schoval za označení „flaky“.
 
 ### 4.9 Volba nástrojů
 
@@ -388,16 +396,11 @@ blokující problém.
 
 ## 6. Architektura testů a údržba
 
-`resources.robot` sdílí proměnné (`BASE_URL`, `SITE_URL`, `FRAME`,
-`DATUM_RE`) mezi oběma suitami. Zavedeno poté, co se regex dat v obou
-souborech rozjel (do 7. 8. 2026). Stabilita selektorů je řešena v aplikaci
-(`data-iso`, `data-id`, `data-klic`, v3.57), viz `Docs/AUDIT-SELEKTORU.md`.
-
-Pokud by RF sada narostla zhruba na dvojnásobek, už bych ji nenechával v
-jednom velkém `frontend.robot`. Rozdělil bych ji podle oblastí, které už dnes
-odpovídají tagům – mapa, kalendář, filtry, zápisy – a každá suita by měla
-vlastní setup. Opakující se kroky bych vytáhl do sdílených keywordů a scénáře,
-které se liší hlavně vstupními daty, převedl na `Test Template`.
+Struktura a odpovědnosti testovacího kódu (`resources.robot`, klíčová slova,
+stabilní selektory, pravidla pro tým a plán rozdělení `frontend.robot`) jsou
+v [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md), kapitoly B1 a B4. Katalog
+stabilních `data-*` atributů v appce je v
+[AUDIT-SELEKTORU.md](AUDIT-SELEKTORU.md).
 
 ## 7. Role a způsob práce
 
@@ -460,20 +463,20 @@ V projektu se už několikrát ukázalo, proč je to potřeba, například:
 
 ## 10. Známé mezery a další kroky
 
-Seřazeno podle poměru přínos / cena.
+Jen strategické mezery, seřazené podle poměru přínos / cena. Technické mezery
+testovacího kódu jsou v [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md) (Známé
+mezery), plán oprav stávajících testů v
+[AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md) a akční položky v
+[BACKLOG.md](BACKLOG.md).
 
-1. Sjednotit testy závislé na datech na `Skip If` (místo WARN a PASS).
-2. Návrat stavu u notifikačního testu přesunout do `[Teardown]`.
-3. Data-driven testy (`Test Template`): toggle ★/✓/🏛, neplatné PINy,
-   responzivní pásma.
-4. Aktualizovat `Docs/PROVOZ.md`: tabulka triggerů neobsahuje
-   `runSelfTest`, `watchdogDailyCheck`, `sendUserNotifications`,
-   `zpracovatSledovanaMesta`.
-5. Browser matrix (Chromium, Firefox, WebKit) v `rf-tests.yml`.
-6. Spouštění RF v Dockeru pro shodné prostředí lokálně i v CI.
-7. Zapnout Dependabot alerts a projít nalezené zranitelnosti v závislostech.
-8. Základní kontrola přístupnosti (axe-core přes Browser Library), nízká
+1. Browser matrix (Chromium, Firefox, WebKit) v `rf-tests.yml`.
+2. Spouštění RF v Dockeru pro shodné prostředí lokálně i v CI.
+3. Dependabot alerts a projití nalezených zranitelností v závislostech:
+   viz BACKLOG, sekce „Nápady k budoucímu zvážení“.
+4. Základní kontrola přístupnosti (axe-core přes Browser Library), nízká
    priorita.
+5. Lokalizační testy (řazení, časová zóna, formáty dat, kódování): viz
+   [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md), kapitola A4, a BACKLOG.
 
 ## Historie dokumentu
 
@@ -484,3 +487,4 @@ Seřazeno podle poměru přínos / cena.
 | 7. 10. 2026 | Doplněna sekce 1.1 Platforma a dvě prostředí, 4.9 Volba nástrojů, upřesněn rozsah testů s WARN (4.6) |
 | 8. 10. 2026 | Doplněny tajné hodnoty a zabezpečení veřejného repa (4.4) |
 | 28. 10. 2026 | Opraven počet testů s WARN (9 testů, 11 výskytů) a odkaz na audit souladu testů |
+| 28. 10. 2026 | Konsolidace s ARCHITEKTURA-TESTU.md: role dokumentů, rizika R9 až R11, počty testů odkazem na README, aktualizované verze knihoven a tajné hodnoty (4.4), zkrácené kapitoly 4.6 až 4.8, 6 a 10 |

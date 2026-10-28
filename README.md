@@ -38,7 +38,7 @@ Documentation is in Czech.*
 | Jednotkové testy frontendu (čisté funkce z `Index.html`) | `node:test` | 209 | každý push (CI) |
 | Kontrola syntaxe a klíčových slov RF sady (dry run) | Robot Framework | 61 | každý push (CI) |
 | E2E testy proti produkci: frontend + API kontrakt | Robot Framework + Browser Library (Playwright), RequestsLibrary | 52 + 9 | týdně (CI) a smoke po každém nasazení |
-| Testy e-mailového Workeru | `node:test` | 7 | každý push (CI) |
+| Testy e-mailového Workeru | `node:test` | 7 | push nebo PR se změnou `cloudflare-worker/**` (CI) |
 | Cvičné API testy produkčního API | SoapUI, Bruno, JMeter | 8 + 8 + zátěžový scénář | ručně, viz [api-tests/](api-tests/README.md) |
 
 ## Jak pracuji
@@ -100,7 +100,7 @@ potíží viz [Docs/PROVOZ.md](Docs/PROVOZ.md).
 | `cloudflare-worker/` | Worker pro e-mailové tipy a jeho testy |
 | `api-tests/` | cvičné API testy (SoapUI, Bruno, JMeter) |
 | `Docs/` | testovací dokumentace, architektura, provoz, CHANGELOG, BACKLOG |
-| `.github/workflows/` | CI: Node testy a RF dry run, týdenní E2E, testy Workeru |
+| `.github/workflows/` | CI: Node testy, RF dry run a pojistka souladu testů s architekturou, týdenní E2E, testy Workeru, publikace reportu na GitHub Pages |
 
 ## Zprovoznění a provoz
 

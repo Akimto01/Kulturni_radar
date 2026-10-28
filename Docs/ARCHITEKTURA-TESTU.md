@@ -95,6 +95,35 @@ automatizace „běžela“, ale nefungovala (PRIBEHY-CHYB.md, příběh 2).
 | Nasazená verze odpovídá repu | API vrací verzi shodnou s verzí v repu | 1 | Oprava „nasazená“, ale neběžící (doloženo 8. 8. 2026) | Ano; bez předpokladů | API | Smoke po každém nasazení, týdně |
 | Notifikace | Týdenní přehled dorazí do kanálu ntfy | 2 | Systém má umět ohlásit vlastní selhání; mrtvý kanál nic neohlásí | Částečně; obsah zprávy unit, živost kanálu API, doručení na telefon ručně | Unit, API (kontrola kanálu za 48 h) | Unit každý push; API týdně |
 
+Oblasti odpovídají rizikům R1, R9, R3, R2 a R4 v [TESTY.md](TESTY.md), kapitola 3,
+která je jediným zdrojem seznamu rizik. Ostatní rizika (R5 až R8, R10 a R11)
+mají méně kritický dopad na uživatele nebo se řeší mimo testy aplikace
+(B3, C1, C5).
+
+### A4. Lokalizace a internacionalizace
+
+**Rozhodnutí:** appka je záměrně jednojazyčná (čeština, cs-CZ), texty rozhraní
+jsou přímo v kódu a i18n framework se nepoužívá. Překlad do dalších jazyků
+není v plánu, proto se netestuje.
+
+Jednojazyčnost ale neznamená, že lokalizace nehraje roli. Appka je na české
+lokalizaci silně závislá a **tři z osmi říjnových defektů byly lokalizační**:
+dvojí zakódování diakritiky (#31, 80 dní bez povšimnutí), datum jako sériové číslo
+(#17) a text „neuvedeno“ místo data (#23).
+
+| Lokalizační oblast | Kde v kódu | Pokrytí dnes | Mezera |
+|---|---|---|---|
+| Diakritika v URL a požadavcích | `encodeURIComponent` a `decodeURIComponent` (v3.65), odkazy do Google kalendáře | 4 jednotkové testy, E2E s dynamicky vybraným městem s diakritikou | jen karty akcí, ne stálá místa; API `places` s diakritikou netestováno; normalizace NFC/NFD a velikost písmen nepokryté |
+| České formáty dat | převod textu, sériových čísel a rozsahů na datum | zhruba 30 jednotkových testů převodu, API ověřuje formát `d. M. yyyy` | rozsah typu „8.–9. 8. 2026“ vezme první datum (sledováno v BACKLOGu) |
+| Řazení podle češtiny | `localeCompare(…, 'cs')` na čtyřech místech frontendu (města, typy míst) | žádný test | pořadí s „Č“ a „Ch“ |
+| Časová zóna | backend `Europe/Prague`, frontend čas prohlížeče | jeden test hranice půlnoci | testy nenastavují časovou zónu (CI běží v UTC, lokálně SELČ); žádný test přechodu letního času; uživatel v jiné zóně může vidět posunuté dny (neověřeno) |
+
+**Navrženo:** nastavit `TZ=Europe/Prague` pro jednotkové testy v CI, aby se
+lokální a CI běh nelišily; jednotkový test českého řazení; testy pomocných
+funkcí pro datum přes hranici půlnoci a přechod letního času; E2E a API ověření
+stálých míst pro město s diakritikou. Diakritika a české formáty patří mezi
+povinné třídy vstupů podle pravidla B5.5.
+
 ---
 
 ## Část B: Návrh test automation frameworku
@@ -115,7 +144,7 @@ tests/
 cloudflare-worker/*.test.mjs   # testy workeru, samostatná sada
 api-tests/                # cvičné sady SoapUI, Bruno, JMeter (výuka nástrojů, mimo CI)
 .github/workflows/        # pipeline: node-tests, rf-tests, publikovat-report, worker
-.github/scripts/          # generátor veřejného reportu
+.github/scripts/          # generátor veřejného reportu, pojistka souladu testů s architekturou
 ```
 
 Odpovědnosti: **harness** odděluje testy od platformy (Google Apps Script), takže
@@ -187,7 +216,9 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
    bezpečnou výchozí hodnotou nastavenou před rizikovým krokem). Testy ve
    `frontend.robot` sdílejí jednu stránku prohlížeče kvůli rychlosti, proto
    test, který přepne město, ho na konci vrací. Paralelní běh dnes není
-   podporovaný (C4).
+   podporovaný (C4). Audit z 28. 10. ukázal, že stav se dnes vrací hlavně na
+   úspěšné cestě a po pádu testu zůstane sdílená stránka v cizím stavu; náprava
+   je dávka 1 v [AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md).
 5. **UI, nebo API?** Na UI patří jen to, co vzniká v prohlížeči (vykreslení,
    interakce, napojení na API). Kontrakt dat se ověřuje na API, logika
    jednotkově. Data se testují nezávisle na městě, ale **ze všech tříd
@@ -207,13 +238,15 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
 |---|---|---|---|---|
 | Jednotkové testy | 558 testů backendu a frontendu (Node) | každý push a PR | nasazení (pravidlo vlastníka: nenasazuje se s červenou) | vlastník, odznak v README |
 | Statická kontrola testů | `robot --dryrun` celé RF sady (syntaxe, existence klíčových slov, argumenty) | každý push a PR | nasazení | vlastník |
+| Pojistka souladu s architekturou | počty porušení pravidel B4, B5 a C3 proti baseline (`.github/scripts/kontrola-architektury-testu.py`); selže, když porušení přibude | každý push a PR | push s novým porušením | vlastník |
 | Testy workeru | 7 testů e-mailového webhooku | push se změnou `cloudflare-worker/**` | nasazení workeru | vlastník |
 | Smoke po nasazení | 11 E2E a API testů s tagem `smoke` | ručně po každém nasazení | další práci, dokud neprojde | vlastník |
 | Týdenní regrese | API (9) a E2E (52) proti produkci | plán, neděle 19:00 UTC (GitHub plánované běhy zdržuje, skutečný start byl zhruba 2 až 4 h později); ručně | nic automaticky; selhání = úkol na další session | notifikace na telefon (jen plánované běhy), veřejný report |
 | Publikace reportu | stažení artefaktu, kontrola úniku, nasazení na GitHub Pages | po dokončení týdenní regrese (automatické spuštění ověří běh 1. 11.; ručně ověřeno) | nic | veřejné, hodnotitelé |
 
-Lintery (ESLint, Robocop) ani kontrola typů zavedené nejsou; nejbližší náhradou je
-dry run RF. Zavedení Robocopu je **navrženo** jako levný další krok.
+Obecný linter (ESLint, Robocop) ani kontrola typů zavedené nejsou; konvence
+specifické pro tento projekt hlídá pojistka souladu. Zavedení Robocopu je
+**navrženo** jako levný další krok.
 
 ### C2. Umístění testů a pipeline
 
@@ -306,14 +339,29 @@ Postup je popsaný v C3. Každý skutečný defekt projde životním cyklem
 v DEFEKTY.md včetně **analýzy úniku** (na které úrovni měl být chycen a proč
 nebyl) a končí regresním testem nebo pojistkou.
 
-### D3. Důvěryhodnost výsledků a hodnota automatizace
+### D3. Metriky automatizace
 
-| Signál | Dnes | Proč |
-|---|---|---|
-| Stabilita týdenní regrese | sleduje se na notifikacích a v historii Actions | deset tichých červených týdnů ukázalo, že bez sledování výsledek nikoho nezajímá |
-| Odkud přicházejí defekty | 6 z 8 defektů z října odhalila živá kontrola nebo analýza, ne automatické testy | ukazuje slabá místa sady; každý takový defekt skončil novým testem |
-| Síla testů | mutační ověření nových testů (dočasná chyba v kódu musí test shodit) | test, který nespadne na rozbitém kódu, nemá hodnotu |
-| Náklady na údržbu | počet oprav testů bez chyby v appce (CHANGELOG) | navrženo sledovat systematicky |
+Hodnoty k 28. 10. 2026, spočítané z historie GitHub Actions, gitu a DEFEKTY.md.
+
+| Metrika | Dnes | Cíl | Komentář |
+|---|---|---|---|
+| Spolehlivost týdenní regrese | 7 z 22 běhů zelených (31 %); od 23. 8. jen 2 ze 17 | aspoň 3 ze 4 posledních týdenních běhů zelené | nízké číslo je poctivý výchozí bod: deset týdnů nikdo nesledoval |
+| Doba do odhalení selhání CI | 66 dní (23. 8. až 28. 10.) | do 1 dne | notifikace při selhání plánovaného běhu, ověří běh 1. 11. |
+| Rychlost zpětné vazby | jednotkové testy 0,8 s, workflow medián 12 s; týdenní regrese medián 3 min 39 s | jednotkové pod 2 s, týdenní pod 6 min | |
+| Stabilita rychlé sady | 231 z 232 běhů `node-tests.yml` zelených (99,6 %) | udržet | jediný červený běh 4. 8. |
+| Podíl defektů odhalených automatizací | 2 z 8 (25 %); u závažnosti S1 a S2 1 ze 4 | aspoň 40 % | ostatní odhalila živá kontrola (4) a analýza (2), viz DEFEKTY.md |
+| Stáří defektu při odhalení | #31 80 dní, #17 78 až 86 dní | sledovat u nových defektů | dlouhé stáří = slepé místo sady |
+| Údržba testů | 75 z 92 commitů měnících appku mění i testy (81 %); 22 commitů mění jen testy | sledovat podíl oprav testů bez chyby v appce | rozlišení „oprava testu“ vs. „nový test“ zatím ručně |
+| Soulad s architekturou | baseline porušení 11 / 9 / 11 / 61 / 0 / 11 / 6 / 12 (pojistka v CI) | klesat k nule po dávkách issue #34 | |
+| Síla testů | mutační ověření nových testů ručně (12 záznamů v CHANGELOGu) | mutation score (Stryker, issue #13) | |
+
+**Co se zatím měřit nedá:** pokrytí kódu (neměří se), mutation score,
+nestabilita po jednotlivých testech (artefakty expirují po 30 dnech) a cena běhu
+mimo minuty GitHub Actions.
+
+**Metriky slouží k rozhodování, ne k vykazování:** nízká spolehlivost regrese
+vedla k notifikacím a delším čekáním v CI, nízký podíl defektů z automatizace
+k auditu souladu a k pravidlu tříd vstupů (B5.5).
 
 ---
 
@@ -375,10 +423,13 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 
 | Mezera | Návrh |
 |---|---|
-| Chybí linter testů | zavést Robocop v pipeline jednotkových testů |
+| Chybí obecný linter testů (pojistka souladu hlídá jen konvence projektu) | zavést Robocop v pipeline jednotkových testů |
+| Lokalizační mezery (A4) | časová zóna v CI, řazení podle češtiny, přechod letního času, stálá místa s diakritikou |
+| Počty testů se v dokumentech rozcházely | jediný zdroj je tabulka „Testy v číslech“ v README; navrženo hlídat ji skriptem proti repu |
 | Tag `krehky` u 12 testů z doby před pravidlem | revize: ponechat jen u prokázané vnější příčiny |
 | Karanténa flaky testů není v kódu | zavést podle C3 při prvním opakovaném vnějším pádu |
 | Jedna velká E2E suita | rozdělit podle oblastí po dalším růstu (B1) |
+| Opakované scénáře s různými vstupy jsou psané jako samostatné testy | data-driven testy (`Test Template`): toggle ★/✓/🏛, neplatné PINy, responzivní pásma |
 | Bez paralelizace | jen s izolací dat (víc testovacích profilů), dnes nevýhodné |
 | Kapitola D | porovnat s obsahem 4. týdne kurzu po jeho zveřejnění |
 | Stávající testy neodpovídají pravidlům B4, B5 a C3 | audit [AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md) (20 porušení, plán v 10 dávkách po plánovaném běhu 1. 11. 2026); pojistka proti nárůstu `.github/scripts/kontrola-architektury-testu.py` běží v CI v jobu `rf-dryrun` |
@@ -388,3 +439,4 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | Datum | Změna |
 |---|---|
 | 28. 10. 2026 | První verze podle osnovy kurzu (týdny 1–3, týden 4 podle popisu modulu), část E: vznik architektury a API nástroje |
+| 28. 10. 2026 | Konsolidace dokumentace: A4 lokalizace, D3 metriky s hodnotami a cíli, vazba A3 na rizika v TESTY.md, pojistka souladu v C1 |

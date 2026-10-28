@@ -98,8 +98,8 @@ poškozený JSON filtrů v uloženém profilu.
 |---|---|---|---|---|
 | TC01 | TP1 | Obrazovka nabízí dlaždice profilů | E2E | „Přihlašovací obrazovka nabízí dlaždice profilů k výběru“ |
 | TC02 | TP2 / BVA, EP | Všechny třídy z tabulky výše | unit (FE) | `pinVypadaPlatne_ – 4–8 znaků bez mezer…` |
-| TC03 | TP3 / R1, R2 | Chybí profil nebo PIN | unit (BE) | **chybí** |
-| TC04 | TP3 / R3 | Neexistující profil | unit (BE) | **částečně**: `apiPrihlaseniUzivatele_ – správný PIN…` ověřuje jen `ok: false`, ne text chyby |
+| TC03 | TP3 / R1, R2 | Chybí profil nebo PIN | unit (BE) | **doplněno ve v3.45** (původně chybělo): `v3.45: přihlášení – chybí profil nebo PIN → přesná chybová hláška` |
+| TC04 | TP3 / R3 | Neexistující profil | unit (BE) | **doplněno ve v3.45** (původně jen `ok: false`, bez textu chyby): `v3.45: přihlášení – neexistující profil → „profil nenalezen“ a žádný stav v úložišti` |
 | TC05 | TP3 / R4 | Nesprávný PIN | unit (BE), E2E, Bruno/SoapUI | `apiPrihlaseniUzivatele_ – správný PIN…`; „Špatný PIN zobrazí chybu a nepřihlásí“; `Login - spatny PIN` |
 | TC06 | TP3 / R5 + TP4 | Správný PIN vrátí data bez hashe | unit (BE), Bruno/SoapUI | `apiPrihlaseniUzivatele_ – … nikdy pinHash`; `Login - spravny PIN` |
 | TC07 | TP3 | Poškozený JSON filtrů nezpůsobí pád | unit (BE) | `apiPrihlaseniUzivatele_ – rozbité JSON filtry…` |
@@ -139,10 +139,11 @@ se nepoužívají, testy jsou psané imperativně s českými názvy keywordů.
 
 | Zjištění | Návrh |
 |---|---|
-| TC03: větev „chybí profil nebo PIN“ nemá unit test; TC04: neexistující profil se testuje jen přes `ok: false`, bez ověření chyby, takže test nerozliší „profil nenalezen“ od jiného selhání | doplnit test pro TC03, zpřísnit aserci u TC04 |
+| TC03: větev „chybí profil nebo PIN“ nemá unit test; TC04: neexistující profil se testuje jen přes `ok: false`, bez ověření chyby, takže test nerozliší „profil nenalezen“ od jiného selhání | doplnit test pro TC03, zpřísnit aserci u TC04. **Doplněno ve v3.45** (testy v tabulce výše) |
 | TC13: zobrazení chyby serveru se netestuje, přitom se 7.–8. 10. reálně stalo | unit test frontendu s podvrženou odpovědí `fetch`, případně E2E s podvrženou odpovědí sítě |
-| Server nemá omezení počtu pokusů o PIN; nejkratší PIN má 4 znaky | bezpečnostní riziko (hádání PINu). U rodinné appky vědomě přijatelné, na klientském projektu by šlo o nález k řešení (limit pokusů, zpoždění) |
+| Server nemá omezení počtu pokusů o PIN; nejkratší PIN má 4 znaky | bezpečnostní riziko (hádání PINu). U rodinné appky vědomě přijatelné, na klientském projektu by šlo o nález k řešení (limit pokusů, zpoždění). **Vyřešeno ve v3.45** (5 pokusů, zámek 15 min, každých dalších 5 chyb zámek zdvojnásobí) |
 
 Analýza tak přinesla jeden chybějící test, jednu slabou aserci a jedno bezpečnostní
 zjištění, které v matici pokrytí nebyly vidět, protože matice pracuje
-na úrovni oblastí, ne jednotlivých pravidel.
+na úrovni oblastí, ne jednotlivých pravidel. Všechna tři zjištění jsou od v3.45
+(26. 10. 2026) vyřešená, otevřené zůstává jen TC13 (zobrazení chyby serveru).

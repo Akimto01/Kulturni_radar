@@ -1,8 +1,7 @@
 # Audit selektorů v Index.html — návrh (BACKLOG.md „Audit/úklid selektorů")
 
-Stav: body **A, B, C implementovány a nasazeny 23. 8. 2026** (Index.html v3.57,
-viz CHANGELOG.md). Body D–H zůstávají jen návrhem k případnému budoucímu
-schválení.
+Stav: body **A, B, C implementovány a nasazeny 23. 8. 2026** (Index.html v3.57),
+body **D až H nasazeny 27. 10. 2026** (Index.html v3.64), viz CHANGELOG.md.
 Vychází z `apps-script/Index.html` ke commitu `d81f913` (21. 8. 2026) a
 `tests/robot/frontend.robot` ke stejnému stavu repa (23. 8. 2026).
 

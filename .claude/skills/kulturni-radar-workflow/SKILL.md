@@ -129,7 +129,7 @@ tenhle symptom.
 
 ### Tagy testů (`[Tags]`, zavedeno 29. 8. 2026)
 
-Všech 59 testů v `frontend.robot`/`api.robot` má nativní RF `[Tags]` —
+Všech 61 testů v `frontend.robot`/`api.robot` má nativní RF `[Tags]` –
 jde spustit jen podmnožinu přes `--include`/`--exclude`, místo vždy celé
 sady. Kategorie (viz `git log` k zavedení pro plné zdůvodnění u
 každého testu):
@@ -138,7 +138,7 @@ každého testu):
 |---|---|
 | `smoke` | pár nejrychlejších/nejdůležitějších testů – rychlá kontrola „appka žije“ po nasazení |
 | `zapis` | skutečně zapisuje do produkčních dat (notifikace, ★/✓/🏛 toggle, kontaktní formulář) |
-| `krehky` | historicky prokázaně náchylné na timing/flake (mapa/kalendář testy z „testovací dluh #14-19“, viz CHANGELOG.md; zápisové testy pod zátěží, viz sekce 8 výš) |
+| `krehky` | náchylné na vnější nestabilitu; pravidlo (tag jen po prokázané vnější příčině) a seznam testů jsou v `Docs/ARCHITEKTURA-TESTU.md`, kapitola C3 (dnešních 12 testů čeká na revizi, dávka 10 issue #34) |
 | `mapa` | vše kolem Leaflet mapy a pinů (frontend i `lat`/`lng` schema v API) |
 | `kalendar` | vše kolem kalendářního widgetu |
 | `filtr` | čistě klientské chip/kategorie filtry, bez zápisu |
