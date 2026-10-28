@@ -24,6 +24,7 @@ Documentation is in Czech.*
 | Matice pokrytí (co je pokryté, na jaké úrovni a co ne) | [Docs/POKRYTI.md](Docs/POKRYTI.md) |
 | Testovací analýza: od testovací báze k testovacím případům | [Docs/TESTOVACI-ANALYZA.md](Docs/TESTOVACI-ANALYZA.md) |
 | Rozbor tří testů: jak navrhuji testy | [Docs/Quality Check/UKAZKY-TESTU.md](Docs/Quality%20Check/UKAZKY-TESTU.md) |
+| Příběhy chyb: od příznaku přes diagnózu k pojistce | [Docs/PRIBEHY-CHYB.md](Docs/PRIBEHY-CHYB.md) |
 | Historie změn včetně diagnózy každé chyby | [Docs/CHANGELOG.md](Docs/CHANGELOG.md) |
 | Cíle projektu a doporučené pořadí práce | [Docs/BACKLOG.md](Docs/BACKLOG.md) |
 
