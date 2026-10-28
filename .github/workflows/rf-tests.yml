@@ -3,7 +3,11 @@ name: RF testy (API + frontend)
 on:
   workflow_dispatch:        # ruční spuštění z GitHubu
   schedule:
-    - cron: '0 19 * * 0'    # neděle 19:00 UTC – po samotestu radaru
+    # neděle 20:20 UTC (21:20 SEČ, 22:20 SELČ): po nedělním triggeru zpracovatSledovanaMesta
+    # ve 20:00 místního času a mimo celou hodinu (GitHub doporučuje plánovat mimo začátek
+    # hodiny, kdy je fronta plánovaných běhů nejvytíženější); cron je v UTC a nepřechází
+    # na letní čas
+    - cron: '20 20 * * 0'
 
 jobs:
   rf-testy:
