@@ -42,8 +42,9 @@ jobs:
           # Hledá se ve všech textových souborech. Část řetězců v log.html a report.html
           # je komprimovaná, ale RF je generuje z output.xml, takže únik v nich by byl
           # vždy i v output.xml, kde je text prostý.
-          # PIN je krátký a prosté hledání by hlásilo falešné shody (kód knihovny v HTML,
-          # zlomky časů, čísla), proto se hledá jen v uvozovkách nebo jako celý text prvku.
+          # PIN má mít 8 znaků, takže stačí prosté hledání. Kratší PIN by dával falešné
+          # shody (kód knihovny v HTML, zlomky časů, čísla): v tom případě se krok
+          # ohlásí jako ::warning:: a hledá se jen v uvozovkách nebo jako celý text prvku.
           nalez=0
           if [ -n "$NTFY_TOPIC" ]; then
             while IFS= read -r soubor; do
@@ -52,10 +53,16 @@ jobs:
             done < <(grep -rlF -- "$NTFY_TOPIC" vysledky/ || true)
           fi
           if [ -n "$RF_TEST_PIN" ]; then
+            if [ "${#RF_TEST_PIN}" -ge 8 ]; then
+              hledani=(-e "$RF_TEST_PIN")
+            else
+              echo "::warning::RF_TEST_PIN má méně než 8 znaků, kontrola úniku PINu je jen přibližná (hledá se v uvozovkách a jako celý text prvku)"
+              hledani=(-e "'$RF_TEST_PIN'" -e "\"$RF_TEST_PIN\"" -e ">$RF_TEST_PIN<")
+            fi
             while IFS= read -r soubor; do
               echo "::error::Únik tajné hodnoty RF_TEST_PIN v souboru $soubor"
               nalez=1
-            done < <(grep -rlF -e "'$RF_TEST_PIN'" -e "\"$RF_TEST_PIN\"" -e ">$RF_TEST_PIN<" -- vysledky/ || true)
+            done < <(grep -rlF "${hledani[@]}" -- vysledky/ || true)
           fi
           exit $nalez
 
