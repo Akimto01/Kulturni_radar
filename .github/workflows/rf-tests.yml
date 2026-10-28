@@ -36,4 +36,18 @@ jobs:
         with:
           name: rf-reporty
           path: vysledky/
-          retention-days: 14
+          retention-days: 30
+
+      - name: Upozornění na selhání (ntfy)
+        if: failure()
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -fsS \
+            -H "Title: Kulturni radar: tydenni RF testy selhaly" \
+            -H "Priority: high" \
+            -H "Tags: warning" \
+            -H "Click: $RUN_URL" \
+            -d "Behy RF testu proti produkci skoncily chybou. Log a reporty: $RUN_URL" \
+            "https://ntfy.sh/$NTFY_TOPIC"
