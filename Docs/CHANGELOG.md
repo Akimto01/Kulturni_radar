@@ -33,9 +33,15 @@ Starý PIN byl shodný s testovací hodnotou, kterou používají veřejné unit
 - Při `Log Level NONE` RF stále zapisuje do `output.xml` hodnoty iterační proměnné `FOR`. Tajná data se nesmí procházet cyklem.
 - RF v `[Documentation]` rozvíjí proměnné: tajnou proměnnou v dokumentaci escapovat (`\${…}`).
 - Krátký PIN se nehledá spolehlivě prostým `grep` (falešné shody v kódu knihovny, časech a číslech). Proto 8 znaků a pojistka v kroku.
+### Zbytková položka vyřešena: téma ntfy profilu rf-test (28. 10. 2026, `af89207`)
+- **Co:** test notifikací generuje téma profilu rf-test (`radar-` + 32 hex, `apiVygenerovatNtfyTema_`). Hodnota se zapisovala do reportů frontendu: `Get Attribute` a přiřazení proměnné, chybové zprávy asercí, `playwright-log.txt`. Kdo téma zná, může číst notifikace profilu. Citlivost nižší než u produkčního `NTFY_TOPIC`, ale veřejně dostupná.
+- **Jak:** test „Notifikace: vygenerování ntfy tématu…“ jede kolem čtení odkazu při `Set Log Level NONE` (`TRY/FINALLY`), podmínky `IF` jsou přes `$proměnnou`, aby hodnota nebyla v textu podmínky, a aserce jsou po obnovení logování bez hodnot ve zprávě. Kontrola úniku v `rf-tests.yml` hledá navíc obecný vzor `radar-[0-9a-f]{32}`, takže pokryje téma kteréhokoli profilu.
+- **Rozhodnutí: `playwright-log.txt` se do artefaktů nenahrává.** Browser Library do něj zapisuje i hodnoty vrácené z DOM mimo dosah úrovně logování RF, takže ho nelze maskovat. Kontrolní krok ho před nahráním maže. Pro diagnostiku pádů v CI slouží `log.html` a screenshoty, ladicí log zůstává při lokálních bězích.
+- **Ověření:** lokální běh testu: vzor `radar-[0-9a-f]{32}` má 0 výskytů v `output.xml`, `log.html` i `report.html` (v `playwright-log.txt` 2, proto se maže). Blok kontroly nad výstupem skončil exit 0, na umělém výskytu exit 1. V artefaktu běhu #22 (CI) je 0 výskytů vzoru, 0 výskytů PINu a soubor `playwright-log.txt` chybí. Artefakt z běhu #19, který ještě obsahoval téma profilu z doby před opravou, jsem smazal.
+- **Běhy po opravě nebyly zelené, příčina není oprava:** #20 (frontend 0/52, přihlášení v Suite Setup viselo přes 15 s, tlačítko „Přihlašuji…“, žádná chyba PINu), #21 (51/52, „🏛 Oblíbené místo“, zápis přes 10 s) a #22 (51/52, „Notifikace: vygenerování ntfy tématu“, po uložení filtrů se dialog nezavřel do 10 s, maskovaná část testu prošla). Pokaždé jiný test a vždy čekání na zápis nebo přihlášení na Apps Scriptu, stejný vzorec jako v běhu #17. Kontrola úniku prošla ve všech třech a artefakty se nahrály. Řeší položka „Timeouty v CI“ v BACKLOGu. Zelený běh s novou kontrolou byl #19 (před touto opravou).
+- Po pádech jsem ověřil stav rf-test: 0 označených akcí, 0 označených míst, přihlášení s novým PINem funguje.
 ### Otevřené
-- Vygenerované téma ntfy profilu rf-test (test notifikací) se dál zapisuje do reportů frontendu. Citlivost je nižší (jen profil rf-test) a kontrola úniku ho nepokrývá, viz BACKLOG.
-- Screenshoty pádů (`browser/screenshot/*.png`) jsem na přítomnost PINu ani tématu neanalyzoval.
+- Screenshoty pádů (`browser/screenshot/*.png`): prohlédl jsem jeden (běh #20), PIN je v poli maskovaný tečkami a téma na něm není. Ostatní jsem neprošel, kontrola úniku v CI PNG nehledá.
 
 ## CI: týdenní RF běh byl 10 týdnů červený – 28. 10. 2026
 ### Co se stalo
