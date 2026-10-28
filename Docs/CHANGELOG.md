@@ -1,5 +1,42 @@
 # Changelog
 
+## Bezpečnost: únik tajných hodnot v artefaktech CI – 28. 10. 2026
+Issue #33 (závažnost: vysoká, veřejně dostupné tajemství; priorita: okamžitá). Hodnoty se tu z principu neuvádějí.
+### Co unikalo a kde
+- **PIN profilu rf-test.** Keyword „Přihlásit se do radaru“ zadával PIN přes `Fill Text`. Browser Library zapsala hodnotu do zprávy „Fills the text …“ v `frontend/output.xml` (3 až 9 výskytů na artefakt) a `frontend/log.html`.
+- **Téma ntfy (secret `NTFY_TOPIC`)**, na třech místech:
+  1. vyřešená URL ve zprávách `RequestsLibrary.GET` (`api/output.xml`, `api/log.html`),
+  2. dokumentace testu: RF v `[Documentation]` rozvíjí proměnné, takže zápis `${NTFY_TOPIC}` v textu se propsal jako hodnota do `output.xml`, `log.html` i `report.html`. První rozbor to přehlédl, protože hledal jen vzor `ntfy.sh/`,
+  3. po první opravě: hodnoty iterační proměnné cyklu `FOR` (každý řádek odpovědi ntfy obsahuje pole `topic`). RF je zapisuje do `output.xml` i při `Set Log Level NONE`. Zachytila to nová kontrola v CI (běh #18), artefakt se proto nenahrál. Příčina potvrzena lokálně na umělé odpovědi s fiktivním tématem: cyklus `FOR` 2 výskyty, jeden `Evaluate` 0.
+- Artefakty `rf-reporty` týdenního workflow. Repo je veřejné, artefakty si mohl stáhnout kdokoli přihlášený. Logy běhů v Actions secrets maskují a nic neprozradily.
+### Od kdy podle kódu
+- Téma: `GET https://ntfy.sh/${NTFY_TOPIC}/json` v `api.robot` od 2. 8. 2026 (`16b8207`).
+- PIN: `Fill Text` s `${pin}` od 8. 8. 2026 (`3285555`, uživatelské profily), secret `RF_TEST_PIN` vznikl 7. 8. 2026.
+- V době nálezu existovaly 4 artefakty (běhy #14 až #17, vždy postižené). Starší artefakty už expirovaly (retence 14 dní), takže rozsah za dobu od srpna nejde zpětně ověřit a hodnoty jsem považoval za kompromitované.
+### Jak nalezeno
+Při přípravě veřejného RF reportu (issue #11) vzniklo podezření, že `log.html` a `output.xml` obsahují tajné hodnoty. Ověřeno stažením artefaktu a spočítáním výskytů (jen počty a názvy keywordů).
+### Poznámka k PINu
+Starý PIN byl shodný s testovací hodnotou, kterou používají veřejné unit testy v repu (nalezeno v `kulturni_radar.gs`, `unit.test.js` a `frontend.test.js`). Byl tedy slabý a uhodnutelný i bez úniku v reportech.
+### Oprava
+- Smazány všechny 4 artefakty, lokální stažené kopie také.
+- `Fill Secret` místo `Fill Text` pro PIN (`b2efc37`). U testu živosti ntfy `Set Log Level NONE` s `TRY/FINALLY`, stav se kontroluje až po obnovení logování (`b2efc37`), escapovaná proměnná v dokumentaci, zprávy se počítají jedním `Evaluate` místo `FOR` (`6e80329`).
+- Nový krok „Kontrola úniku tajných hodnot“ v `rf-tests.yml`: prohledá `vysledky/` na hodnoty obou secretů, při nálezu vypíše jen název souboru a secretu a skončí chybou. Upload artefaktu je na úspěchu kontroly závislý, takže uniklý report se nenahraje, a notifikace na ntfy při selhání (`74eb619`) pokryje i únik. U PINu kratšího než 8 znaků krok hlásí `::warning::` a hledá jen v uvozovkách a jako celý text prvku (`7b98fd4`).
+### Výměna hodnot (28. 10. 2026)
+- Nový PIN rf-test (8 náhodných alfanumerických znaků), hash vypočten skutečnou `hashPin_` přes `tests/harness.js` a ručně vložen do listu UŽIVATELÉ.
+- Nové téma ntfy: Script Property `NTFY_TOPIC`, GitHub secret, odběr v telefonu. Test notifikací z menu dorazil na nové téma.
+- GitHub secrets `RF_TEST_PIN` a `NTFY_TOPIC` přenastaveny. Lokální uživatelské proměnné `RF_TEST_PIN` a `TEST_PIN` (SoapUI a Bruno sdílejí profil rf-test, jinak by omylem spuštěný test se starým PINem profil zamkl) nastaveny na nový PIN.
+### Ověření
+- Lokální smoke 11/11 s novým PINem, v jeho výstupu 0 výskytů PINu.
+- Ruční běh #19: API 9/9, frontend 52/52, kontrola úniku prošla, artefakt nahrán (retence 30 dní), v něm 0 výskytů nového PINu a žádné téma s délkou nového secretu. Přesnou hodnotu tématu lokálně neznám, kontrolu s reálnou hodnotou provedl krok v CI.
+- Běh #18 ukázal, že kontrola funguje: našla únik, který jsem lokálně nezachytil, a report se nenahrál.
+### Poučení
+- Při `Log Level NONE` RF stále zapisuje do `output.xml` hodnoty iterační proměnné `FOR`. Tajná data se nesmí procházet cyklem.
+- RF v `[Documentation]` rozvíjí proměnné: tajnou proměnnou v dokumentaci escapovat (`\${…}`).
+- Krátký PIN se nehledá spolehlivě prostým `grep` (falešné shody v kódu knihovny, časech a číslech). Proto 8 znaků a pojistka v kroku.
+### Otevřené
+- Vygenerované téma ntfy profilu rf-test (test notifikací) se dál zapisuje do reportů frontendu. Citlivost je nižší (jen profil rf-test) a kontrola úniku ho nepokrývá, viz BACKLOG.
+- Screenshoty pádů (`browser/screenshot/*.png`) jsem na přítomnost PINu ani tématu neanalyzoval.
+
 ## CI: týdenní RF běh byl 10 týdnů červený – 28. 10. 2026
 ### Co se stalo
 - Workflow `rf-tests.yml` (neděle 19:00 UTC, proti produkci) selhal v běhách #6 až #15 (23. 8. až 25. 10. 2026), poslední zelený byl #5 (16. 8.). Nikdo si toho nevšiml, protože selhání nikam nehlásí. Odznak RF testů v novém README byl kvůli tomu červený.
