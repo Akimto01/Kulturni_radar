@@ -25,6 +25,7 @@ Documentation is in Czech.*
 | Testovací analýza: od testovací báze k testovacím případům | [Docs/TESTOVACI-ANALYZA.md](Docs/TESTOVACI-ANALYZA.md) |
 | Rozbor tří testů: jak navrhuji testy | [Docs/Quality Check/UKAZKY-TESTU.md](Docs/Quality%20Check/UKAZKY-TESTU.md) |
 | Příběhy chyb: od příznaku přes diagnózu k pojistce | [Docs/PRIBEHY-CHYB.md](Docs/PRIBEHY-CHYB.md) |
+| Správa defektů: stupnice závažnosti a priority, životní cyklus, analýza úniků | [Docs/DEFEKTY.md](Docs/DEFEKTY.md) |
 | Historie změn včetně diagnózy každé chyby | [Docs/CHANGELOG.md](Docs/CHANGELOG.md) |
 | Cíle projektu a doporučené pořadí práce | [Docs/BACKLOG.md](Docs/BACKLOG.md) |
 

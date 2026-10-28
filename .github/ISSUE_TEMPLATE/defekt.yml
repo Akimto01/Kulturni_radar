@@ -1,0 +1,121 @@
+name: Defekt
+description: Nahlásit chybu v appce, testech nebo CI (stupnice a životní cyklus viz Docs/DEFEKTY.md)
+title: "Defekt: "
+labels: ["bug"]
+projects: ["Akimto01/1"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Stupnice závažnosti a priority a životní cyklus defektu jsou popsané
+        v [Docs/DEFEKTY.md](https://github.com/Akimto01/Kulturni_radar/blob/main/Docs/DEFEKTY.md).
+        **Nikdy sem nevkládej tajné hodnoty** (PIN, tokeny, ntfy témata): repo je veřejné.
+
+  - type: textarea
+    id: shrnuti
+    attributes:
+      label: Shrnutí
+      description: Jednou až dvěma větami, co je špatně a kde.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: oblast
+    attributes:
+      label: Oblast
+      options:
+        - Web (kulturniradar.cz, Index.html)
+        - Backend (Apps Script, kulturni_radar.gs)
+        - Data (Google Sheet)
+        - Testy nebo CI
+        - Cloudflare Worker
+        - Jiné
+    validations:
+      required: true
+
+  - type: input
+    id: verze
+    attributes:
+      label: Verze a prostředí
+      description: Backend vX.YY, Index.html vX.YY, prohlížeč nebo běh CI, profil (město).
+      placeholder: "backend v3.50, Index.html v3.65, Chrome, profil Brno"
+    validations:
+      required: true
+
+  - type: textarea
+    id: kroky
+    attributes:
+      label: Kroky k reprodukci
+      placeholder: |
+        1. Otevřít kulturniradar.cz
+        2. Přepnout město na …
+        3. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: ocekavano
+    attributes:
+      label: Očekávaný výsledek
+    validations:
+      required: true
+
+  - type: textarea
+    id: skutecnost
+    attributes:
+      label: Skutečný výsledek
+    validations:
+      required: true
+
+  - type: dropdown
+    id: zavaznost
+    attributes:
+      label: Závažnost (dopad)
+      options:
+        - "S1 Kritická: bezpečnost, únik nebo ztráta dat"
+        - "S2 Vysoká: hlavní funkce nefunguje nebo ukazuje chybná data, bez obejití"
+        - "S3 Střední: funguje s omezením nebo s nepřesnými daty"
+        - "S4 Nízká: zavádějící informace, drobná chyba"
+        - "S5 Triviální: čistě kosmetická vada"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priorita
+    attributes:
+      label: Priorita (naléhavost)
+      options:
+        - "P1 Okamžitá: ihned, ostatní práce počká"
+        - "P2 Vysoká: v téže nebo nejbližší pracovní session"
+        - "P3 Střední: podle plánu, zhruba do dvou týdnů"
+        - "P4 Nízká: až na ni přijde řada"
+        - "P5 Sledovat: opravit jen pokud se zhorší"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: jak_nalezeno
+    attributes:
+      label: Jak nalezeno
+      description: Aktivita, která defekt odhalila poprvé. Živá kontrola = průzkumné testování na produkci (web, API, data).
+      options:
+        - Automatický test (jednotkový)
+        - Automatický test (E2E nebo API)
+        - Živá kontrola
+        - Monitoring nebo samotest
+        - Analýza nebo review
+        - Uživatel
+    validations:
+      required: true
+
+  - type: textarea
+    id: dukazy
+    attributes:
+      label: Důkazy
+      description: Screenshot, výřez logu, odkaz na běh CI. Bez tajných hodnot.
+
+  - type: markdown
+    attributes:
+      value: |
+        Po analýze se do komentáře doplní: **kořenová příčina**, **oprava** (verze, commit),
+        **regresní test** a **analýza úniku** (na které úrovni testů měl být defekt chycen a proč nebyl).
