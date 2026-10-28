@@ -381,6 +381,7 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | Jedna velká E2E suita | rozdělit podle oblastí po dalším růstu (B1) |
 | Bez paralelizace | jen s izolací dat (víc testovacích profilů), dnes nevýhodné |
 | Kapitola D | porovnat s obsahem 4. týdne kurzu po jeho zveřejnění |
+| Stávající testy neodpovídají pravidlům B4, B5 a C3 | audit [AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md) (20 porušení, plán v 10 dávkách po plánovaném běhu 1. 11. 2026); pojistka proti nárůstu `.github/scripts/kontrola-architektury-testu.py` běží v CI v jobu `rf-dryrun` |
 
 ## Historie dokumentu
 

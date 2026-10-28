@@ -273,9 +273,10 @@ invarianty**, ne konkrétní hodnoty: schéma odpovědi (`lat`/`lng`), regex
 Testy závislé na datech se chovají dvojím způsobem:
 
 - `Skip If`, když data chybí (např. počasí, ikona první karty),
-- `Log … level=WARN` a projití, celkem v 10 testech ve `frontend.robot`
-  (např. chipy typů míst a podkategorií, přepínání profilů, kalendář
-  a většina testů mapy).
+- `Log … level=WARN` a projití, celkem v 9 testech ve `frontend.robot`
+  (11 výskytů; např. chip podkategorií, přepínání profilů, kalendář
+  a většina testů mapy). Stav k 28. 10. 2026, plán oprav je v
+  [AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md).
 
 Varianta s `WARN` je starší a dnes ji nepovažuju za ideální. Když potřebná
 data nejsou k dispozici, test sice projde, ale reálně nic neověří a v souhrnu
@@ -482,3 +483,4 @@ Seřazeno podle poměru přínos / cena.
 | 30. 9. 2026 | Přepracováno na test plan dle 29119-3, zpětná rekonstrukce |
 | 7. 10. 2026 | Doplněna sekce 1.1 Platforma a dvě prostředí, 4.9 Volba nástrojů, upřesněn rozsah testů s WARN (4.6) |
 | 8. 10. 2026 | Doplněny tajné hodnoty a zabezpečení veřejného repa (4.4) |
+| 28. 10. 2026 | Opraven počet testů s WARN (9 testů, 11 výskytů) a odkaz na audit souladu testů |

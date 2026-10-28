@@ -287,6 +287,18 @@ Frontend (`tests/frontend-harness.js`, `nactiFrontendFunkce(['fn1','fn2'])`):
   `tests/frontend.test.js` a napsat testy stejným stylem jako u
   `gcalUrl_`/`mapsUrl_`/`sestavTextSdileni_`.
 
+### Pravidla pro nové a upravované testy (od 28. 10. 2026)
+
+- Nové a upravované testy se řídí `Docs/ARCHITEKTURA-TESTU.md`, hlavně B5
+  (pravidla test designu). Audit stávajících testů a plán jejich oprav je
+  v `Docs/AUDIT-SOULADU-TESTU.md`.
+- **Před commitem testu dvě otázky:** zvolil jsem aspoň dvě třídy vstupů
+  (s diakritikou i bez, prázdné město, jiný profil než výchozí)? Splní toto
+  čekání i starý stav stránky?
+- Pojistka v CI (`python .github/scripts/kontrola-architektury-testu.py`, job
+  `rf-dryrun`) nesmí hlásit růst porušení. Při opravě porušení spustit skript
+  s `--zapsat-baseline` a commitnout sníženou baseline.
+
 ## 5. Release šablona — balíček + Claude Code prompt v jednom kroku
 
 Vytěženo ze session 8. 8. 2026, kde se tenhle cyklus opakoval ~15×
