@@ -23,6 +23,17 @@ ${FRAME}          %{RF_FRAME=}
 # Mezera po tečce je nepovinná (\s?) – frontend i API ji občas vrací bez mezery.
 ${DATUM_RE}       ^\\d{1,2}\\.\\s?\\d{1,2}\\.\\s?\\d{4}$
 
+# Čekání na odpověď serveru (Apps Script). Výchozí hodnoty = dnešní lokální
+# chování; CI je v rf-tests.yml zvyšuje přes --variable, protože odezva Apps
+# Scriptu pod zátěží kolísá (běhy #17, #20 až #22: zápis nebo přihlášení přes
+# 10 resp. 15 s). Lokálně se nic nemění, přísnost se nesnižuje.
+#   CEKANI_ZAPIS       dokončení zápisu (★/✓/🏛, uložení filtrů, ntfy téma)
+#   CEKANI_PRIHLASENI  přihlášení (seznam profilů, zmizení login overlaye)
+#   CEKANI_NAVIGACE    Browser timeout (page.goto a akce bez vlastního timeoutu)
+${CEKANI_ZAPIS}          10s
+${CEKANI_PRIHLASENI}     15s
+${CEKANI_NAVIGACE}       10s
+
 # v3.13: přihlašovací údaje VYHRAZENÉHO testovacího uživatelského profilu
 # ("RF Test") – NIKDY reálný rodinný profil. CI běží ★/✓ toggle testy, které
 # zapisují do OZNAČENÍ; díky vlastnímu profilu se nedotknou rodinné historie.

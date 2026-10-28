@@ -32,7 +32,7 @@ Přihlašovací obrazovka nabízí dlaždice profilů k výběru
     New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Click    ${FRAME} \#uzivatel-badge
-    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
+    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=${CEKANI_PRIHLASENI}
     ${pocet}=    Get Element Count    ${FRAME} \#login-dlazdice .dlazdice-uzivatel
     Should Be True    ${pocet} >= 1    Má se nabídnout aspoň jeden uživatelský profil
     ${existuje}=    Get Element Count    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id="${RF_TEST_USER_ID}"]
@@ -51,7 +51,7 @@ Testovací profil je bez příznaku na přihlašovací obrazovce skrytý (vlastn
     New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Click    ${FRAME} \#uzivatel-badge
-    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
+    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=${CEKANI_PRIHLASENI}
     ${testovaci}=    Get Element Count    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id^="rf-"]
     Should Be Equal As Integers    ${testovaci}    0
     ...    msg=Testovací profil je vidět i bez příznaku kr_testovaci_profily – veřejná přihlašovací obrazovka ho nemá ukazovat
@@ -114,7 +114,7 @@ Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastn
     New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Click    ${FRAME} \#uzivatel-badge
-    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
+    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=${CEKANI_PRIHLASENI}
     Click    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id="${RF_TEST_USER_ID}"]
     Wait For Elements State    ${FRAME} \#login-pin-sekce.zobrazit    visible    timeout=5s
     Fill Text    ${FRAME} \#login-pin    0000000
@@ -258,8 +258,8 @@ Notifikace: vygenerování ntfy tématu, uložení a znovunačtení po přihlá�
     # test tak mohl projít i s ještě neproběhlým voláním na serveru
     # (přesně tohle způsobilo rozdílnou hodnotu tématu mezi RF logem
     # a ručním ověřením v Sheetu 21. 8. 2026).
-        Wait For Elements State    ${FRAME} \#notif-ntfy-rotovat:not([disabled])    visible    timeout=10s
-        Wait For Elements State    ${FRAME} \#notif-ntfy-s-tematem    visible    timeout=10s
+        Wait For Elements State    ${FRAME} \#notif-ntfy-rotovat:not([disabled])    visible    timeout=${CEKANI_ZAPIS}
+        Wait For Elements State    ${FRAME} \#notif-ntfy-s-tematem    visible    timeout=${CEKANI_ZAPIS}
         ${odkaz}=    Get Attribute    ${FRAME} \#notif-ntfy-odkaz    href
         ${tvar_ok}=    Evaluate    $odkaz.startswith('https://ntfy.sh/radar-')
         ${rotovano}=    Evaluate    $odkaz_pred == '' or $odkaz != $odkaz_pred
@@ -272,7 +272,7 @@ Notifikace: vygenerování ntfy tématu, uložení a znovunačtení po přihlá�
     ...    msg=Rotace měla vygenerovat NOVÉ téma, ne zachovat staré (hodnoty se kvůli tajnosti nevypisují)
 
     Click    ${FRAME} \#filtry-ulozit
-    Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=10s
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=${CEKANI_ZAPIS}
 
     # Reload + nové přihlášení – ověří, že se stav skutečně načetl ZE SERVERU
     # (apiPrihlaseniUzivatele_ → notifikace → sestavPrihlasenehoUzivatele_),
@@ -292,7 +292,7 @@ Notifikace: vygenerování ntfy tématu, uložení a znovunačtení po přihlá�
     # profil trvale se zapnutými notifikacemi.
     Click    ${FRAME} \#notif-kanal-ntfy
     Click    ${FRAME} \#filtry-ulozit
-    Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=10s
+    Wait For Elements State    ${FRAME} \#filtry-dialog.open    detached    timeout=${CEKANI_ZAPIS}
 
 Přepínač profilů je naplněn z meta API
     [Tags]    ui
@@ -642,7 +642,7 @@ Označení ★ se skutečně promítne do filtru „★ Oblíbené" (integrace, 
     Click    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.hvezda
     Wait For Elements State
     ...    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.hvezda:not(.ukladani)
-    ...    visible    timeout=10s
+    ...    visible    timeout=${CEKANI_ZAPIS}
 
     Click    ${FRAME} \#chip-oblibene
     Sleep    300ms
@@ -660,7 +660,7 @@ Označení ★ se skutečně promítne do filtru „★ Oblíbené" (integrace, 
     Click    ${FRAME} .karta[data-id="${id_karty}"] >> .ikona-oznaceni.hvezda
     Wait For Elements State
     ...    ${FRAME} .karta[data-id="${id_karty}"] >> .ikona-oznaceni.hvezda:not(.ukladani)
-    ...    visible    timeout=10s
+    ...    visible    timeout=${CEKANI_ZAPIS}
     Ikona první karty má být    hvezda    ${puvodni}
     ...    msg=Po návratu na „Vše" a druhém přepnutí se nepodržel původní stav
 
@@ -1207,7 +1207,7 @@ Ověřit plný cyklus označení (přidat i odebrat) s reloadem
     ...    msg=Krok 1 (přepnutí na opak): optimistická odezva se neprojevila – ${trida_ikony}
     Wait For Elements State
     ...    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.${trida_ikony}:not(.ukladani)
-    ...    visible    timeout=10s
+    ...    visible    timeout=${CEKANI_ZAPIS}
     Reload
     # v3.13→oprava: přihlášení žije jen v paměti (dle rozhodnutí 7. 8. 2026,
     # žádné localStorage), takže Reload appku vrátí na dlaždice – bez
@@ -1225,7 +1225,7 @@ Ověřit plný cyklus označení (přidat i odebrat) s reloadem
     ...    msg=Krok 2 (návrat na původní): optimistická odezva se neprojevila – ${trida_ikony}
     Wait For Elements State
     ...    ${FRAME} .karta >> nth=0 >> .ikona-oznaceni.${trida_ikony}:not(.ukladani)
-    ...    visible    timeout=10s
+    ...    visible    timeout=${CEKANI_ZAPIS}
     Reload
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
@@ -1244,6 +1244,10 @@ Otevřít radar
     Skip If    '${RF_TEST_USER_ID}' == '' or '${RF_TEST_PIN}' == ''
     ...    RF_TEST_USER_ID/RF_TEST_PIN nenastaveny – frontend suita vyžaduje vyhrazený testovací profil (viz resources.robot)
     New Browser    chromium    headless=True
+    # Browser timeout platí pro page.goto a akce bez vlastního timeoutu (testy,
+    # co si otevírají vlastní stránku, ho dědí). Výchozí 10 s = výchozí hodnota
+    # knihovny, CI ho zvyšuje (CEKANI_NAVIGACE, viz resources.robot).
+    Set Browser Timeout    ${CEKANI_NAVIGACE}
     New Context    viewport={'width': 1280, 'height': 900}
     New Page       ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
@@ -1279,12 +1283,12 @@ Přihlásit se do radaru
     IF    ${overlay_otevreny} == 0
         Click    ${FRAME} \#uzivatel-badge
     END
-    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=15s
+    Wait For Elements State    ${FRAME} \#login-dlazdice .dlazdice-uzivatel >> nth=0    visible    timeout=${CEKANI_PRIHLASENI}
     Click    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id="${uzivatel_id}"]
     Wait For Elements State    ${FRAME} \#login-pin-sekce.zobrazit    visible    timeout=5s
     Fill Secret    ${FRAME} \#login-pin    $pin
     Click    ${FRAME} \#login-potvrdit
-    Wait For Elements State    ${FRAME} \#login-overlay    hidden    timeout=15s
+    Wait For Elements State    ${FRAME} \#login-overlay    hidden    timeout=${CEKANI_PRIHLASENI}
 
 Otevřít radar na mobilním viewportu
     [Documentation]    v3.43 (M): pomocná keyword pro testy prvků
