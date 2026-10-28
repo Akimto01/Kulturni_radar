@@ -1,55 +1,110 @@
 # Kulturní radar
 
-Rodinný automat na hlídání kulturních akcí v okolí (Brno a další města ČR),
-postavený na Google Sheets + Apps Script + Anthropic API (Claude s web searchem).
+[![Node testy](https://github.com/Akimto01/Kulturni_radar/actions/workflows/node-tests.yml/badge.svg)](https://github.com/Akimto01/Kulturni_radar/actions/workflows/node-tests.yml)
+[![RF testy](https://github.com/Akimto01/Kulturni_radar/actions/workflows/rf-tests.yml/badge.svg)](https://github.com/Akimto01/Kulturni_radar/actions/workflows/rf-tests.yml)
+[![Cloudflare Worker testy](https://github.com/Akimto01/Kulturni_radar/actions/workflows/cloudflare-worker-tests.yml/badge.svg)](https://github.com/Akimto01/Kulturni_radar/actions/workflows/cloudflare-worker-tests.yml)
 
-Vznikl jako náhrada za sadu naplánovaných ChatGPT úloh s hodinovou latencí —
-cílem bylo okamžité spuštění kontroly zaškrtnutím políčka v tabulce a push
-notifikace pro celou rodinu.
+Rodinná appka, která pomocí AI s webovým vyhledáváním hlídá kulturní akce
+v Brně a dalších městech ČR. Běží na **[kulturniradar.cz](https://kulturniradar.cz)**.
+Zároveň slouží jako ukázka mé práce testera automatizace: strategie, testy
+na více úrovních, CI a řízený proces od nalezení chyby po její ověření v produkci.
 
-## Co umí
+*In short (EN): a family app that uses an AI agent with web search to track
+cultural events in Czech cities. It doubles as my test automation portfolio:
+test strategy, multi-level test suites, CI and a traceable bug-to-fix process.
+Documentation is in Czech.*
 
-- **Mimořádná kontrola na povel** — zaškrtnutí checkboxu `KRITÉRIA!B11` spustí
-  do pár minut hledání akcí podle aktuálních kritérií (město, dojezd, horizont,
-  kategorie).
-- **Denní kontrola** (~8:00) — totéž automaticky, navíc označí proběhlé akce.
-- **Týdenní přehled** (pondělí ~7:00) a **víkendové tipy** (čtvrtek ~16:00) —
-  čtou jen z databáze (zdarma), seskupené podle kategorií, s časy konání
-  a předpovědí počasí (Open-Meteo).
-- **Stálá místa** — zoo, science centra, hrady, jeskyně… s aktuální otevírací
-  dobou; měsíční automatická aktualizace, sekce ve víkendových tipech.
-- **Notifikace** na telefon (ntfy) i e-mail, s výčtem konkrétních akcí
-  a odkazem na tabulku. Selhání se hlásí stejnými kanály — systém neumí
-  selhat potichu.
-- **Deduplikace** ve třech vrstvách (ID → přesný klíč → fuzzy překryv názvů),
-  audit každého běhu v listu KONTROLY.
+## Pro hodnotitele: kde co najít
+
+| Co | Kde |
+|---|---|
+| Plán, průběh a hotová práce (Kanban, přehled podle cílů, časový plán) | [GitHub Projects board](https://github.com/users/Akimto01/projects/1) |
+| Testovací plán a strategie (rizika, úrovně, kritéria, mezery) | [Docs/TESTY.md](Docs/TESTY.md) |
+| Matice pokrytí (co je pokryté, na jaké úrovni a co ne) | [Docs/POKRYTI.md](Docs/POKRYTI.md) |
+| Testovací analýza: od testovací báze k testovacím případům | [Docs/TESTOVACI-ANALYZA.md](Docs/TESTOVACI-ANALYZA.md) |
+| Rozbor tří testů: jak navrhuji testy | [Docs/Quality Check/UKAZKY-TESTU.md](Docs/Quality%20Check/UKAZKY-TESTU.md) |
+| Historie změn včetně diagnózy každé chyby | [Docs/CHANGELOG.md](Docs/CHANGELOG.md) |
+| Cíle projektu a doporučené pořadí práce | [Docs/BACKLOG.md](Docs/BACKLOG.md) |
+
+## Testy v číslech
+
+| Úroveň | Nástroj | Počet | Kdy běží |
+|---|---|---|---|
+| Jednotkové testy backendu (logika Apps Scriptu přes vlastní harness, bez Googlu) | `node:test` | 349 | každý push (CI) |
+| Jednotkové testy frontendu (čisté funkce z `Index.html`) | `node:test` | 209 | každý push (CI) |
+| Kontrola syntaxe a klíčových slov RF sady (dry run) | Robot Framework | 61 | každý push (CI) |
+| E2E testy proti produkci: frontend + API kontrakt | Robot Framework + Browser Library (Playwright), RequestsLibrary | 52 + 9 | týdně (CI) a smoke po každém nasazení |
+| Testy e-mailového Workeru | `node:test` | 7 | každý push (CI) |
+| Cvičné API testy produkčního API | SoapUI, Bruno, JMeter | 8 + 8 + zátěžový scénář | ručně, viz [api-tests/](api-tests/README.md) |
+
+## Jak pracuji
+
+- **Každá oprava má diagnózu, test a živé ověření.** Nejdřív příčina (ne příznak),
+  pak test, který chybu zachytí (často ověřený mutací: vrátím opravu a test musí
+  spadnout), nasazení a ověření v produkci. Všechno zapsané v CHANGELOGu.
+- **Nalezené chyby se dokumentují jako issues** s odkazem na commit, přiřazené
+  k cílům projektu (milníky) na boardu.
+- **Testy se zlepšují podle toho, co jim uniklo.** Například chyba s dvojitým
+  kódováním profilu unikala testům od srpna, protože E2E testy jely jen
+  s Brnem (bez diakritiky). Teď ji hlídá samostatný regresní test.
+
+### Vybrané nalezené chyby
+
+| Chyba | Jak se našla | Issue |
+|---|---|---|
+| Města s diakritikou (Plzeň, Zlín) ukazovala 0 akcí kvůli dvojitému URL kódování | ruční ověření v prohlížeči při jiné změně | [#31](https://github.com/Akimto01/Kulturni_radar/issues/31) |
+| Pozdní odpověď serveru pro dříve vybrané město přepsala aktuální data | nestabilní E2E test, potvrzeno fault injection | [#26](https://github.com/Akimto01/Kulturni_radar/issues/26) |
+| Hláška prázdného stavu ukazovala čas kontroly jiného města | přepracovaný E2E test, který čeká na skutečný obsah | [#27](https://github.com/Akimto01/Kulturni_radar/issues/27) |
+| Levnější AI model přestal nacházet akce; srpnové vyhodnocení sledovalo špatnou metriku | analýza logu běhů | [#22](https://github.com/Akimto01/Kulturni_radar/issues/22) |
+
+## Co appka umí
+
+- **Hledání akcí pomocí AI** (Claude s webovým vyhledáváním): denní kontrola
+  pro domovské město, dvakrát týdně pro další sledovaná města, mimořádná kontrola na povel.
+- **Web** [kulturniradar.cz](https://kulturniradar.cz): seznam akcí podle dnů,
+  kalendář, mapa, filtry podle kategorií, stálá místa (zoo, hrady, muzea…),
+  mini předpověď počasí, sdílení výběru.
+- **Uživatelské profily** s PINem (limit pokusů): oblíbené a navštívené akce,
+  osobní filtry a notifikace.
+- **Přehledy a notifikace**: týdenní přehled a víkendové tipy e-mailem
+  a na telefon (ntfy).
+- **Samokontrola**: týdenní samotest dat (duplicity, chybějící údaje,
+  kvalita hledání AI, náklady) a denní hlídač vynechané kontroly. Selhání se
+  hlásí stejnými kanály, systém neumí selhat potichu.
 
 ## Architektura ve zkratce
 
 ```
-[Google Sheet]  ←→  [Apps Script (tento repozitář)]  →  [Anthropic API + web search]
-  KRITÉRIA               triggery: onEdit, denní,          tool use: report_events /
-  AKCE, MÍSTA            týdenní, víkendový, měsíční       report_places (garantovaná
-  KONTROLY, …            notifikace: ntfy + e-mail          struktura výstupu)
-                                                        →  [Open-Meteo] (počasí, zdarma)
+[kulturniradar.cz]  ──fetch──→  [Apps Script /exec]  ←→  [Google Sheet (data)]
+ (Cloudflare Pages,              kulturni_radar.gs         AKCE, MÍSTA, KONTROLY, …
+  Index.html)                      │
+                                   ├→ [Anthropic API + web search]  hledání akcí
+                                   ├→ [Open-Meteo / met.no]         počasí
+                                   └→ [Nominatim]                   geokódování
+[Cloudflare Worker] ── e-mail s tipem na akci ──→ fronta EMAIL_TIPY
 ```
 
-Detailně viz `Docs/ARCHITEKTURA.md`; zprovoznění a řešení potíží
-viz `Docs/PROVOZ.md`; historie verzí a lekce z produkčních bugů
-viz `Docs/CHANGELOG.md`.
+Podrobně viz [Docs/ARCHITEKTURA.md](Docs/ARCHITEKTURA.md), provoz a řešení
+potíží viz [Docs/PROVOZ.md](Docs/PROVOZ.md).
 
-## Rychlé zprovoznění
+## Struktura repozitáře
 
-1. V tabulce: Rozšíření → Apps Script → vložit `apps-script/kulturni_radar.gs`.
-2. Nastavení projektu → Vlastnosti skriptu:
-   - `ANTHROPIC_API_KEY` (povinné)
-   - `NTFY_TOPIC` (volitelné — push přes ntfy.sh)
-   - `NOTIFY_EMAIL` (volitelné — e-mail navíc)
-3. V editoru spustit jednou `setupTriggers()` a autorizovat oprávnění.
-4. Na telefonu: aplikace ntfy → Subscribe to topic → název z `NTFY_TOPIC`.
-5. Test: menu tabulky **Kulturní radar → Test notifikací**, pak zaškrtnout B11.
+| Cesta | Obsah |
+|---|---|
+| `apps-script/` | backend (`kulturni_radar.gs`) a frontend (`Index.html`, jeden soubor pro oba nasazovací kanály) |
+| `tests/` | Node testy a harness pro Apps Script, `tests/robot/` E2E a API testy v Robot Frameworku |
+| `cloudflare-worker/` | Worker pro e-mailové tipy a jeho testy |
+| `api-tests/` | cvičné API testy (SoapUI, Bruno, JMeter) |
+| `Docs/` | testovací dokumentace, architektura, provoz, CHANGELOG, BACKLOG |
+| `.github/workflows/` | CI: Node testy a RF dry run, týdenní E2E, testy Workeru |
 
-## Provozní náklady
+## Zprovoznění a provoz
 
-Jeden AI běh (kontrola / aktualizace míst) ≈ jednotky centů (Claude Sonnet
-+ max 5 web searchů). Přehledy a počasí jsou zdarma. Typický měsíc: < 2 USD.
+Nasazení backendu přes `clasp`, frontendu přes `git push` (Cloudflare Pages).
+Vlastnosti skriptu, triggery a řešení častých situací popisuje
+[Docs/PROVOZ.md](Docs/PROVOZ.md).
+
+**Náklady:** jeden běh hledání na modelu Claude Sonnet 5.5 stojí zhruba
+0,12 USD plus poplatky za webová vyhledávání (měřeno 26.–27. 10. 2026).
+Přehledy, počasí a geokódování jsou zdarma. Spotřebu každého běhu zapisuje
+appka do listu KONTROLY a týdně ji vyhodnocuje samotest.
