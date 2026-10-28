@@ -138,7 +138,7 @@ každého testu):
 |---|---|
 | `smoke` | pár nejrychlejších/nejdůležitějších testů – rychlá kontrola „appka žije“ po nasazení |
 | `zapis` | skutečně zapisuje do produkčních dat (notifikace, ★/✓/🏛 toggle, kontaktní formulář) |
-| `krehky` | náchylné na vnější nestabilitu; pravidlo (tag jen po prokázané vnější příčině) a seznam testů jsou v `Docs/ARCHITEKTURA-TESTU.md`, kapitola C3 (dnešních 12 testů čeká na revizi, dávka 10 issue #34) |
+| `krehky` | náchylné na vnější nestabilitu; pravidlo (tag jen po prokázané vnější příčině) a seznam testů jsou v `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola C3 (dnešních 12 testů čeká na revizi, dávka 10 issue #34) |
 | `mapa` | vše kolem Leaflet mapy a pinů (frontend i `lat`/`lng` schema v API) |
 | `kalendar` | vše kolem kalendářního widgetu |
 | `filtr` | čistě klientské chip/kategorie filtry, bez zápisu |
@@ -289,9 +289,9 @@ Frontend (`tests/frontend-harness.js`, `nactiFrontendFunkce(['fn1','fn2'])`):
 
 ### Pravidla pro nové a upravované testy (od 28. 10. 2026)
 
-- Nové a upravované testy se řídí `Docs/ARCHITEKTURA-TESTU.md`, hlavně B5
+- Nové a upravované testy se řídí `Docs/testovani/ARCHITEKTURA-TESTU.md`, hlavně B5
   (pravidla test designu). Audit stávajících testů a plán jejich oprav je
-  v `Docs/AUDIT-SOULADU-TESTU.md`.
+  v `Docs/audity/AUDIT-SOULADU-TESTU.md`.
 - **Před commitem testu dvě otázky:** zvolil jsem aspoň dvě třídy vstupů
   (s diakritikou i bez, prázdné město, jiný profil než výchozí)? Splní toto
   čekání i starý stav stránky?
@@ -701,7 +701,7 @@ aktuálně rozpracované/vybrané úkoly:**
   jen pokud by se v budoucnu chovaly jinak, než se očekává — zatím
   ověřeno funkční přímo přes `gh` CLI, žádný krok navíc.
 - Defekty se zakládají formulářem `.github/ISSUE_TEMPLATE/defekt.yml`
-  (stupnice a cyklus v `Docs/DEFEKTY.md`). Při zavření defektu
+  (stupnice a cyklus v `Docs/kvalita/DEFEKTY.md`). Při zavření defektu
   nastavit ručně pole Stav defektu na Uzavřený: vestavěná automatika
   mění jen Status. Defekt se uzavírá až po ověření v produkci.
 

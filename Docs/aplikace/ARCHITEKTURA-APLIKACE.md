@@ -1,4 +1,4 @@
-# Architektura
+# Architektura aplikace
 
 ## Komponenty
 
@@ -35,7 +35,7 @@
   součástí appky ani jejího verzování/nasazení.
 - **`tests/`** — Node jednotkové testy (`tests/unit.test.js`,
   `tests/frontend.test.js`) a Robot Framework sada (`tests/robot/`); viz
-  `Docs/TESTY.md` pro strategii, `Docs/PROVOZ.md` pro provoz/triggery.
+  `Docs/testovani/TESTY.md` pro strategii, `Docs/aplikace/PROVOZ.md` pro provoz/triggery.
 
 ## Listy tabulky
 
@@ -186,11 +186,11 @@ LOKALITY; bez shody se akce nezapíše (raději nic než nespolehlivá data) a
 Statické SEO/sdílecí meta tagy (description, Open Graph, Twitter Card),
 favicon, `robots.txt`/`sitemap.xml` v repu a per-akce Schema.org Event
 JSON-LD při sdílení konkrétní akce — návrh a zjištění viz
-`Docs/AUDIT-INDEXACE.md` (mj. že Cloudflare do každé zóny vkládá vlastní
+`Docs/audity/AUDIT-INDEXACE.md` (mj. že Cloudflare do každé zóny vkládá vlastní
 „Managed robots.txt“ blok s `Disallow` pro AI crawlery, který soubor
 v repu nemůže přebít — řešitelné jen přes Cloudflare dashboard). Stejná
 session zavedla i konzistentnější `data-*` selektory pro opakované prvky
-UI (karty/chipy/dlaždice) — viz `Docs/AUDIT-SELEKTORU.md`.
+UI (karty/chipy/dlaždice) – viz `Docs/audity/AUDIT-SELEKTORU.md`.
 
 ## Zásady
 

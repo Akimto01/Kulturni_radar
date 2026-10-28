@@ -30,12 +30,12 @@ proto psaná tak, aby se podle nich dalo rozhodnout v code review.
 | Zdroj | Co z něj vychází |
 |---|---|
 | Zdrojový kód (`apps-script/kulturni_radar.gs`, `Index.html`) | jediný úplný popis chování; komentáře u funkcí nesou i důvody rozhodnutí |
-| [ARCHITEKTURA.md](ARCHITEKTURA.md) | architektura aplikace, toky dat, dvě prostředí (statický web, Apps Script) |
-| [CHANGELOG.md](CHANGELOG.md) | historie změn s diagnózou každé chyby: hlavní zdroj rizik |
-| [DEFEKTY.md](DEFEKTY.md), [PRIBEHY-CHYB.md](PRIBEHY-CHYB.md) | klasifikované defekty a analýza úniků |
+| [ARCHITEKTURA-APLIKACE.md](../aplikace/ARCHITEKTURA-APLIKACE.md) | architektura aplikace, toky dat, dvě prostředí (statický web, Apps Script) |
+| [CHANGELOG.md](../CHANGELOG.md) | historie změn s diagnózou každé chyby: hlavní zdroj rizik |
+| [DEFEKTY.md](../kvalita/DEFEKTY.md), [PRIBEHY-CHYB.md](../kvalita/PRIBEHY-CHYB.md) | klasifikované defekty a analýza úniků |
 | [TESTY.md](TESTY.md), [POKRYTI.md](POKRYTI.md), [TESTOVACI-ANALYZA.md](TESTOVACI-ANALYZA.md) | testovací plán, matice pokrytí, odvození testů z testovací báze |
-| [AUDIT-SELEKTORU.md](AUDIT-SELEKTORU.md) | stabilní selektory pro E2E testy |
-| [PROVOZ.md](PROVOZ.md) | provozní postupy, triggery, nasazení |
+| [AUDIT-SELEKTORU.md](../audity/AUDIT-SELEKTORU.md) | stabilní selektory pro E2E testy |
+| [PROVOZ.md](../aplikace/PROVOZ.md) | provozní postupy, triggery, nasazení |
 | Živá aplikace a Google Sheet | ruční průzkum, ověření dat po nasazení |
 | Zpětná vazba rodiny (BACKLOG) | skutečné potíže uživatelů |
 
@@ -218,7 +218,7 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
    test, který přepne město, ho na konci vrací. Paralelní běh dnes není
    podporovaný (C4). Audit z 28. 10. ukázal, že stav se dnes vrací hlavně na
    úspěšné cestě a po pádu testu zůstane sdílená stránka v cizím stavu; náprava
-   je dávka 1 v [AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md).
+   je dávka 1 v [AUDIT-SOULADU-TESTU.md](../audity/AUDIT-SOULADU-TESTU.md).
 5. **UI, nebo API?** Na UI patří jen to, co vzniká v prohlížeči (vykreslení,
    interakce, napojení na API). Kontrakt dat se ověřuje na API, logika
    jednotkově. Data se testují nezávisle na městě, ale **ze všech tříd
@@ -432,7 +432,7 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | Opakované scénáře s různými vstupy jsou psané jako samostatné testy | data-driven testy (`Test Template`): toggle ★/✓/🏛, neplatné PINy, responzivní pásma |
 | Bez paralelizace | jen s izolací dat (víc testovacích profilů), dnes nevýhodné |
 | Kapitola D | porovnat s obsahem 4. týdne kurzu po jeho zveřejnění |
-| Stávající testy neodpovídají pravidlům B4, B5 a C3 | audit [AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md) (20 porušení, plán v 10 dávkách po plánovaném běhu 1. 11. 2026); pojistka proti nárůstu `.github/scripts/kontrola-architektury-testu.py` běží v CI v jobu `rf-dryrun` |
+| Stávající testy neodpovídají pravidlům B4, B5 a C3 | audit [AUDIT-SOULADU-TESTU.md](../audity/AUDIT-SOULADU-TESTU.md) (20 porušení, plán v 10 dávkách po plánovaném běhu 1. 11. 2026); pojistka proti nárůstu `.github/scripts/kontrola-architektury-testu.py` běží v CI v jobu `rf-dryrun` |
 
 ## Historie dokumentu
 

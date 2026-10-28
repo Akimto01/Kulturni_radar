@@ -11,7 +11,7 @@ nechytily, jak se hledala příčina a co se změnilo, aby se to neopakovalo.
 | [2. CI deset týdnů červená a nikdo to neviděl](#2-ci-deset-týdnů-červená-a-nikdo-to-neviděl) | souhra chyby v appce, slabého testu a chybějícího upozornění | od 23. 8. do 28. 10. 2026 | odznak v README |
 | [3. Únik tajných hodnot v reportech testů](#3-únik-tajných-hodnot-v-reportech-testů) | bezpečnostní chyba v testovací infrastruktuře | od 2. 8. (veřejně dostupné od 8. 10.) do 28. 10. 2026 | příprava veřejného reportu, pak automatická pojistka |
 
-Podrobné technické záznamy včetně commitů jsou v [CHANGELOG.md](CHANGELOG.md),
+Podrobné technické záznamy včetně commitů jsou v [CHANGELOG.md](../CHANGELOG.md),
 průběh práce na [boardu](https://github.com/users/Akimto01/projects/1).
 
 ---

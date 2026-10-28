@@ -1,7 +1,7 @@
 # Testovací analýza – ukázka: přihlášení profilem s PINem
 
 Ukázka postupu od testovací báze k testovacím případům na jedné funkci
-Kulturního radaru. Doplňuje `Docs/TESTY.md` (strategie) a `Docs/POKRYTI.md`
+Kulturního radaru. Doplňuje `Docs/testovani/TESTY.md` (strategie) a `Docs/testovani/POKRYTI.md`
 (pokrytí celé aplikace); v terminologii ISO/IEC/IEEE 29119-3 odpovídá
 Test Model a Test Case Specification pro jednu oblast.
 

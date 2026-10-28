@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kulturní radar</title>
-<!-- v3.58: základní SEO/sdílecí meta tagy – návrh viz Docs/AUDIT-INDEXACE.md.
+<!-- v3.58: základní SEO/sdílecí meta tagy – návrh viz Docs/audity/AUDIT-INDEXACE.md.
      Statické, obecné pro celou appku (ne per-akce – appka je client-side
      rendered, per-akce JSON-LD viz sestavEventJsonLd_/vlozitJsonLdAkce_ níže). -->
 <meta name="description" content="Automatické hlídání kulturních akcí v okolí – Brno a další města ČR. Denní přehled podle kategorie, mapa, kalendář a filtrování zdarma.">
@@ -1679,7 +1679,7 @@
       if (odkazNaAkci) {
         zvyraznitAkci_(odkazNaAkci.id);
         // v3.58: sdílená akce → Schema.org Event JSON-LD (indexace pro
-        // Google/AI crawlery, viz Docs/AUDIT-INDEXACE.md).
+        // Google/AI crawlery, viz Docs/audity/AUDIT-INDEXACE.md).
         const nalezenaAkce = vsechnaAkce.find(a => a.id === odkazNaAkci.id);
         if (nalezenaAkce) {
           const jsonLd = sestavEventJsonLd_(
@@ -2667,7 +2667,7 @@
     return { id, profil: params.get('profil') || '' };
   }
 
-  /** v3.58 (indexace pro Google/AI crawlery, návrh viz Docs/AUDIT-INDEXACE.md):
+  /** v3.58 (indexace pro Google/AI crawlery, návrh viz Docs/audity/AUDIT-INDEXACE.md):
    *  PURE – sestaví Schema.org Event JSON-LD objekt pro sdílenou akci
    *  (deep link ?akce=ID&profil=Město). Bez platného data (parseCeskeDatum
    *  vrátí null) vrací null – radši žádná strukturovaná data než Event bez

@@ -7,7 +7,7 @@ být každý defekt chycen a proč nebyl.
 Nový defekt se zakládá formulářem **Defekt** (Issues → New issue). Formulář
 ho rovnou přidá na [board](https://github.com/users/Akimto01/projects/1), kde se
 mu nastaví pole *Závažnost*, *Priorita*, *Jak nalezeno* a *Stav defektu*.
-Podrobné technické záznamy oprav jsou v [CHANGELOG.md](CHANGELOG.md), tři
+Podrobné technické záznamy oprav jsou v [CHANGELOG.md](../CHANGELOG.md), tři
 nejzajímavější defekty jsou rozepsané v [PRIBEHY-CHYB.md](PRIBEHY-CHYB.md).
 
 ## Závažnost (dopad chyby)

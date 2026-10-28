@@ -1,4 +1,4 @@
-"""Pojistka proti nárůstu porušení pravidel z Docs/ARCHITEKTURA-TESTU.md (ratchet).
+"""Pojistka proti nárůstu porušení pravidel z Docs/testovani/ARCHITEKTURA-TESTU.md (ratchet).
 
 Spočítá porušení pravidel, která jdou hlídat automaticky, porovná je s baseline
 v baseline-architektury-testu.json a selže, jen když některý počet VZROSTE.
@@ -9,7 +9,7 @@ Použití (z kořene repa):
     python .github/scripts/kontrola-architektury-testu.py --zapsat-baseline
 
 Potřebuje jen robotframework a standardní knihovnu. Nic nespouští proti produkci,
-soubory jen čte. Pravidla a plán oprav: Docs/AUDIT-SOULADU-TESTU.md.
+soubory jen čte. Pravidla a plán oprav: Docs/audity/AUDIT-SOULADU-TESTU.md.
 """
 import argparse
 import json
@@ -147,7 +147,7 @@ def main():
             print('\nBaseline nepřepisuji: některý počet vzrostl nebo chybí v baseline.')
         else:   # snížení, nebo první vytvoření (soubor ještě neexistuje)
             cesta.write_text(json.dumps({
-                'poznamka': 'Pojistka proti nárůstu porušení, viz Docs/AUDIT-SOULADU-TESTU.md. Baseline se jen snižuje.',
+                'poznamka': 'Pojistka proti nárůstu porušení, viz Docs/audity/AUDIT-SOULADU-TESTU.md. Baseline se jen snižuje.',
                 'pocty': pocty}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
             print(f'\nBaseline přepsána: {cesta}')
             return 0
@@ -156,7 +156,7 @@ def main():
         b = baseline.get(k)
         zprava = 'chybí v baseline' if b is None else f'vzrostl z {b} na {pocty[k]}'
         print(f'::error::Pravidlo {METRIKY[k][0]}, metrika {k} ({METRIKY[k][1]}): {zprava}. '
-              'Oprav nové porušení (viz Docs/ARCHITEKTURA-TESTU.md).')
+              'Oprav nové porušení (viz Docs/testovani/ARCHITEKTURA-TESTU.md).')
         for misto in nalezy[k]:
             print(f'    {misto}')
     for k in pokles:

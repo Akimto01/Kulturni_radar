@@ -46,9 +46,9 @@ jobs:
       - name: RF dry run (syntaxe a argumenty keywordů, bez sítě)
         run: robot --dryrun --output NONE --report NONE --log NONE tests/robot/
 
-      # Pojistka proti nárůstu porušení pravidel z Docs/ARCHITEKTURA-TESTU.md
+      # Pojistka proti nárůstu porušení pravidel z Docs/testovani/ARCHITEKTURA-TESTU.md
       # (ratchet): spočítá porušení, která jdou hlídat automaticky, a selže, jen
       # když některý počet vzroste proti baseline-architektury-testu.json.
-      # Soubory jen čte, nic nespouští proti produkci. Plán oprav: Docs/AUDIT-SOULADU-TESTU.md.
+      # Soubory jen čte, nic nespouští proti produkci. Plán oprav: Docs/audity/AUDIT-SOULADU-TESTU.md.
       - name: Pojistka souladu testů s architekturou (ratchet)
         run: python .github/scripts/kontrola-architektury-testu.py

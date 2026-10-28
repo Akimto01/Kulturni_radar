@@ -20,13 +20,13 @@ Documentation is in Czech.*
 |---|---|
 | Plán, průběh a hotová práce (Kanban, přehled podle cílů, časový plán) | [GitHub Projects board](https://github.com/users/Akimto01/projects/1) |
 | Poslední výsledky E2E testů (report a log Robot Frameworku) | [GitHub Pages](https://akimto01.github.io/Kulturni_radar/) |
-| Testovací plán a strategie (rizika, úrovně, kritéria, mezery) | [Docs/TESTY.md](Docs/TESTY.md) |
-| Architektura automatizace testů (strategie, framework, CI/CD, reporting) | [Docs/ARCHITEKTURA-TESTU.md](Docs/ARCHITEKTURA-TESTU.md) |
-| Matice pokrytí (co je pokryté, na jaké úrovni a co ne) | [Docs/POKRYTI.md](Docs/POKRYTI.md) |
-| Testovací analýza: od testovací báze k testovacím případům | [Docs/TESTOVACI-ANALYZA.md](Docs/TESTOVACI-ANALYZA.md) |
-| Rozbor tří testů: jak navrhuji testy | [Docs/Quality Check/UKAZKY-TESTU.md](Docs/Quality%20Check/UKAZKY-TESTU.md) |
-| Příběhy chyb: od příznaku přes diagnózu k pojistce | [Docs/PRIBEHY-CHYB.md](Docs/PRIBEHY-CHYB.md) |
-| Správa defektů: stupnice závažnosti a priority, životní cyklus, analýza úniků | [Docs/DEFEKTY.md](Docs/DEFEKTY.md) |
+| Testovací plán a strategie (rizika, úrovně, kritéria, mezery) | [Docs/testovani/TESTY.md](Docs/testovani/TESTY.md) |
+| Architektura automatizace testů (strategie, framework, CI/CD, reporting) | [Docs/testovani/ARCHITEKTURA-TESTU.md](Docs/testovani/ARCHITEKTURA-TESTU.md) |
+| Matice pokrytí (co je pokryté, na jaké úrovni a co ne) | [Docs/testovani/POKRYTI.md](Docs/testovani/POKRYTI.md) |
+| Testovací analýza: od testovací báze k testovacím případům | [Docs/testovani/TESTOVACI-ANALYZA.md](Docs/testovani/TESTOVACI-ANALYZA.md) |
+| Rozbor tří testů: jak navrhuji testy | [Docs/archiv/quality-check-2026-10/UKAZKY-TESTU.md](Docs/archiv/quality-check-2026-10/UKAZKY-TESTU.md) |
+| Příběhy chyb: od příznaku přes diagnózu k pojistce | [Docs/kvalita/PRIBEHY-CHYB.md](Docs/kvalita/PRIBEHY-CHYB.md) |
+| Správa defektů: stupnice závažnosti a priority, životní cyklus, analýza úniků | [Docs/kvalita/DEFEKTY.md](Docs/kvalita/DEFEKTY.md) |
 | Historie změn včetně diagnózy každé chyby | [Docs/CHANGELOG.md](Docs/CHANGELOG.md) |
 | Cíle projektu a doporučené pořadí práce | [Docs/BACKLOG.md](Docs/BACKLOG.md) |
 
@@ -88,8 +88,8 @@ Documentation is in Czech.*
 [Cloudflare Worker] ── e-mail s tipem na akci ──→ fronta EMAIL_TIPY
 ```
 
-Podrobně viz [Docs/ARCHITEKTURA.md](Docs/ARCHITEKTURA.md), provoz a řešení
-potíží viz [Docs/PROVOZ.md](Docs/PROVOZ.md).
+Podrobně viz [Docs/aplikace/ARCHITEKTURA-APLIKACE.md](Docs/aplikace/ARCHITEKTURA-APLIKACE.md), provoz a řešení
+potíží viz [Docs/aplikace/PROVOZ.md](Docs/aplikace/PROVOZ.md).
 
 ## Struktura repozitáře
 
@@ -106,7 +106,7 @@ potíží viz [Docs/PROVOZ.md](Docs/PROVOZ.md).
 
 Nasazení backendu přes `clasp`, frontendu přes `git push` (Cloudflare Pages).
 Vlastnosti skriptu, triggery a řešení častých situací popisuje
-[Docs/PROVOZ.md](Docs/PROVOZ.md).
+[Docs/aplikace/PROVOZ.md](Docs/aplikace/PROVOZ.md).
 
 **Náklady:** jeden běh hledání na modelu Claude Sonnet 5.5 stojí zhruba
 0,12 USD plus poplatky za webová vyhledávání (měřeno 26.–27. 10. 2026).

@@ -1,5 +1,5 @@
 {
-  "poznamka": "Pojistka proti nárůstu porušení, viz Docs/AUDIT-SOULADU-TESTU.md. Baseline se jen snižuje.",
+  "poznamka": "Pojistka proti nárůstu porušení, viz Docs/audity/AUDIT-SOULADU-TESTU.md. Baseline se jen snižuje.",
   "pocty": {
     "warn_v_testech": 11,
     "testy_bez_teardownu": 9,

@@ -17,11 +17,11 @@
   6 API a 7 E2E testů a samotest s watchdogem jako návrh.
 - **Role dokumentů:** tento plán říká, **co a proč** se testuje. **Jak** se
   testy píšou a běží, popisuje [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md).
-  Počty testů jsou jen v [README](../README.md) (tabulka „Testy v číslech“)
+  Počty testů jsou jen v [README](../../README.md) (tabulka „Testy v číslech“)
   a jinde se neopakují.
-- **Související dokumenty:** `Docs/POKRYTI.md` (matice pokrytí),
-  `Docs/ARCHITEKTURA.md`, `Docs/PROVOZ.md`, `Docs/AUDIT-SELEKTORU.md`,
-  `Docs/ARCHITEKTURA-TESTU.md`, `Docs/AUDIT-SOULADU-TESTU.md`.
+- **Související dokumenty:** `Docs/testovani/POKRYTI.md` (matice pokrytí),
+  `Docs/aplikace/ARCHITEKTURA-APLIKACE.md`, `Docs/aplikace/PROVOZ.md`, `Docs/audity/AUDIT-SELEKTORU.md`,
+  `Docs/testovani/ARCHITEKTURA-TESTU.md`, `Docs/audity/AUDIT-SOULADU-TESTU.md`.
 
 Původní strategie z 2. 8. už přestala odpovídat tomu, kam se projekt za
 dva měsíce posunul. Testovací sada narostla z 31 testů na stovky (aktuální
@@ -90,7 +90,7 @@ stránka script.google.com        ← hlavní dokument (Google)
 Na statickém webu je `Index.html` přímo hlavním dokumentem. Most mezi
 oběma režimy v kódu appky je funkce `gsr()`: uvnitř Apps Scriptu volá
 `google.script.run`, mimo něj stejné volání převede na `fetch()`
-(podrobněji `Docs/ARCHITEKTURA.md`).
+(podrobněji `Docs/aplikace/ARCHITEKTURA-APLIKACE.md`).
 
 Co z toho plyne pro testování:
 
@@ -114,7 +114,7 @@ watchdog, datová hygiena).
 ## 3. Rizika
 
 Seřazeno podle dopadu na uživatele. R9 až R11 přibyly 28. 10. 2026 po analýze
-defektů ([DEFEKTY.md](DEFEKTY.md)), proto jsou na konci.
+defektů ([DEFEKTY.md](../kvalita/DEFEKTY.md)), proto jsou na konci.
 
 | # | Riziko | Dopad | Doložený incident | Hlavní pokrytí |
 |---|---|---|---|---|
@@ -171,7 +171,7 @@ najednou.
 | Provozní kontroly v produkci | Apps Script `runSelfTest`, `watchdogDailyCheck`, `auditDat_` | triggery v produkci |
 | Ruční | reálný telefon, spot-check obsahu LLM, vizuální kontrola | občas |
 
-Počty testů na jednotlivých úrovních jsou v [README](../README.md), tabulka
+Počty testů na jednotlivých úrovních jsou v [README](../../README.md), tabulka
 „Testy v číslech“ (jediný zdroj). Jednotkové testy backendu a frontendu
 prochází společně za zhruba 1 s, testy workeru běží v samostatné sadě.
 
@@ -237,13 +237,13 @@ Repo je od 8. 10. 2026 veřejné. Před zveřejněním jsem zapnul GitHub
 Secret scanning, který prošel celou historii bez nálezu, a push
 protection, která zablokuje push obsahující rozpoznaný tajný klíč.
 Zapnutí Dependabot alerts pro závislosti (`requirements.txt`,
-`package.json` workeru) je v [BACKLOG.md](BACKLOG.md).
+`package.json` workeru) je v [BACKLOG.md](../BACKLOG.md).
 
 Samotné repo ale tajné hodnoty nezaručí: 28. 10. 2026 se ukázalo, že PIN
 a ntfy téma unikly do reportů v artefaktech CI veřejného repa (#33). Od té doby
 se PIN zadává přes `Fill Secret`, CI před nahráním reportů hledá tajné hodnoty
 a při nálezu report nenahraje a uniklé hodnoty byly vyměněny; příběh je
-v [PRIBEHY-CHYB.md](PRIBEHY-CHYB.md) (příběh 3), mechanika v
+v [PRIBEHY-CHYB.md](../kvalita/PRIBEHY-CHYB.md) (příběh 3), mechanika v
 [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md), kapitola B3.
 
 Samostatné testovací prostředí by tady znamenalo druhý Google Sheet, druhé
@@ -266,7 +266,7 @@ bych to takhle nedělal – tam bych chtěl samostatné testovací prostředí s
   selhání polyká. Notifikační test vrací stav plným cyklem jen v těle testu
   a `[Teardown]` nemá. Stav se tedy vrací **jen na úspěšné cestě**, po pádu
   může u `rf-test` zůstat změna (doloženo po bězích #6 až #14, #17 a #22).
-  Plán oprav: [AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md), řádky 6 a 7,
+  Plán oprav: [AUDIT-SOULADU-TESTU.md](../audity/AUDIT-SOULADU-TESTU.md), řádky 6 a 7,
   dávky 5 a 6.
 - Kontaktní formulář: jediný test, který posílá reálný e-mail, spojený
   s ověřením cooldownu.
@@ -297,7 +297,7 @@ Test závislý na datech se má při chybějících datech hlasitě přeskočit
 (`Skip If`, např. počasí, ikona první karty), ne projít naprázdno. Starší testy
 místo toho jen zalogují `Log … level=WARN` a projdou bez jediné aserce. Jejich
 seznam a sjednocení na `Skip` jsou v
-[AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md) (řádek 1, dávky 2 a 3).
+[AUDIT-SOULADU-TESTU.md](../audity/AUDIT-SOULADU-TESTU.md) (řádek 1, dávky 2 a 3).
 
 ### 4.7 Spouštění a CI
 
@@ -328,7 +328,7 @@ rozumně odstranit (typicky zátěž platformy nebo externí zdroj). Je-li pří
 v aplikaci nebo v testu, opravuje se ona, ne tag. Pravidla, postup a seznam
 označených testů jsou v [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md),
 kapitola C3 (revize dnešních 12 označených testů je dávka 10 v
-[AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md)). Obecný diagnostický postup
+[AUDIT-SOULADU-TESTU.md](../audity/AUDIT-SOULADU-TESTU.md)). Obecný diagnostický postup
 je ve skillu `kulturni-radar-workflow`.
 
 Dva doložené případy:
@@ -400,7 +400,7 @@ Struktura a odpovědnosti testovacího kódu (`resources.robot`, klíčová slov
 stabilní selektory, pravidla pro tým a plán rozdělení `frontend.robot`) jsou
 v [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md), kapitoly B1 a B4. Katalog
 stabilních `data-*` atributů v appce je v
-[AUDIT-SELEKTORU.md](AUDIT-SELEKTORU.md).
+[AUDIT-SELEKTORU.md](../audity/AUDIT-SELEKTORU.md).
 
 ## 7. Role a způsob práce
 
@@ -466,8 +466,8 @@ V projektu se už několikrát ukázalo, proč je to potřeba, například:
 Jen strategické mezery, seřazené podle poměru přínos / cena. Technické mezery
 testovacího kódu jsou v [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md) (Známé
 mezery), plán oprav stávajících testů v
-[AUDIT-SOULADU-TESTU.md](AUDIT-SOULADU-TESTU.md) a akční položky v
-[BACKLOG.md](BACKLOG.md).
+[AUDIT-SOULADU-TESTU.md](../audity/AUDIT-SOULADU-TESTU.md) a akční položky v
+[BACKLOG.md](../BACKLOG.md).
 
 1. Browser matrix (Chromium, Firefox, WebKit) v `rf-tests.yml`.
 2. Spouštění RF v Dockeru pro shodné prostředí lokálně i v CI.

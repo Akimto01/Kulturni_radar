@@ -1,7 +1,7 @@
 # Matice pokrytí – Kulturní radar
 
-Doplněk k `Docs/TESTY.md` (plán: **co a proč** se testuje) a k
-`Docs/ARCHITEKTURA-TESTU.md` (**jak** se testy píšou a běží). Tahle matice
+Doplněk k `Docs/testovani/TESTY.md` (plán: **co a proč** se testuje) a k
+`Docs/testovani/ARCHITEKTURA-TESTU.md` (**jak** se testy píšou a běží). Tahle matice
 ukazuje, **co** je pokryté, na které úrovni a co ne.
 
 ## Jak číst matici
@@ -16,7 +16,7 @@ ukazuje, **co** je pokryté, na které úrovni a co ne.
 | **PROV** | Provozní kontroly v produkci | `runSelfTest`, `watchdogDailyCheck`, `auditDat_` |
 | **RUČ** | Ruční ověření | reálný telefon, vizuální kontrola, spot-check LLM |
 
-Celkové počty testů na jednotlivých úrovních jsou jen v [README](../README.md),
+Celkové počty testů na jednotlivých úrovních jsou jen v [README](../../README.md),
 tabulka „Testy v číslech“, a tady se neopakují. U Node testů jsou uvedené
 hlavní testované funkce, ne přesné počty. U RF testů je v oblastech uveden
 počet testů dané oblasti a tagy, přesný seznam dá
@@ -27,7 +27,7 @@ Hodnocení pokrytí: **●** silné (více úrovní, včetně regresí) · **◐
 
 ## A. Pokrytí podle rizik
 
-Rizika R1–R11 odpovídají sekci 3 v `Docs/TESTY.md` (R9 až R11 přibyly 28. 10. 2026).
+Rizika R1–R11 odpovídají sekci 3 v `Docs/testovani/TESTY.md` (R9 až R11 přibyly 28. 10. 2026).
 
 | Riziko | BE / FE / W | API | E2E | PROV / RUČ | Pokrytí |
 |---|---|---|---|---|---|
@@ -112,7 +112,7 @@ přidaly víc údržby než reálné jistoty.
 - Při nové funkci nebo opravě bugu doplnit řádek v části B, případně
   riziko v části A.
 - Při změně hodnocení (●/◐/○) zapsat důvod do CHANGELOGu.
-- Matici projít při každé revizi `Docs/TESTY.md`.
+- Matici projít při každé revizi `Docs/testovani/TESTY.md`.
 
 Matice vznikla zpětně podle názvů testů a historie v `CHANGELOGu`.
 Ukazuje hlavně to, že pro danou oblast nějaký test existuje a na které úrovni.

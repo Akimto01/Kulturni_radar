@@ -1,11 +1,11 @@
 # Audit souladu testů s architekturou – Kulturní radar
 
-Audit stávajících testů proti pravidlům z [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md),
+Audit stávajících testů proti pravidlům z [ARCHITEKTURA-TESTU.md](../testovani/ARCHITEKTURA-TESTU.md),
 plán jejich oprav a pojistka, která hlídá, aby porušení nepřibývala.
 
 ## Úvod
 
-**Proč.** Dokument [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md) (28. 10. 2026) popisuje
+**Proč.** Dokument [ARCHITEKTURA-TESTU.md](../testovani/ARCHITEKTURA-TESTU.md) (28. 10. 2026) popisuje
 pravidla, podle kterých se testy mají psát. Testy ale vznikaly dřív a po vrstvách
 (viz část E tohoto dokumentu). Audit zjišťuje, kolik stávajících testů pravidla
 porušuje a jaký to má dopad, aby se opravy daly plánovat podle přínosu, ne podle

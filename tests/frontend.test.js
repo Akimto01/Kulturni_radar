@@ -1356,7 +1356,7 @@ test('vycistitVyberPinu_: na prázdné sadě je no-op, nespadne', () => {
 });
 
 // ---------------------------------------------------------------------------
-// v3.58 (indexace pro Google/AI crawlery, návrh Docs/AUDIT-INDEXACE.md):
+// v3.58 (indexace pro Google/AI crawlery, návrh Docs/audity/AUDIT-INDEXACE.md):
 // sestavEventJsonLd_ – Schema.org Event JSON-LD pro sdílenou akci.
 // ---------------------------------------------------------------------------
 
