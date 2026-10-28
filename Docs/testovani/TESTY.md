@@ -166,8 +166,8 @@ najednou.
 | Unit – backend | Node `node:test`, `tests/harness.js` (vm sandbox, stuby Google API) | CI při každém push/PR |
 | Unit – frontend | Node, `tests/frontend-harness.js` (čisté funkce z `Index.html`, bez DOM) | CI při každém push/PR |
 | Unit – worker | Node, `cloudflare-worker/email-webhook.test.mjs` | CI při změně `cloudflare-worker/**` |
-| API kontrakt | RF + RequestsLibrary, `api.robot` | CI neděle 19:00 UTC + ručně |
-| E2E UI | RF + Browser Library (Chromium), `frontend.robot` | CI neděle 19:00 UTC + ručně |
+| API kontrakt | RF + RequestsLibrary, `api.robot` | CI neděle 20:20 UTC + ručně |
+| E2E UI | RF + Browser Library (Chromium), `frontend.robot` | CI neděle 20:20 UTC + ručně |
 | Provozní kontroly v produkci | Apps Script `runSelfTest`, `watchdogDailyCheck`, `auditDat_` | triggery v produkci |
 | Ruční | reálný telefon, spot-check obsahu LLM, vizuální kontrola | občas |
 

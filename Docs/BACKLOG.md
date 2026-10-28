@@ -1,6 +1,6 @@
 # Backlog — Kulturní radar
 
-Poslední aktualizace: 27. 10. 2026. Neplánované nápady a rozpracované položky –
+Poslední aktualizace: 28. 10. 2026. Neplánované nápady a rozpracované položky –
 na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 
 ## Cíle do dubna 2027
@@ -22,29 +22,47 @@ Kulturní radar má být appka pro rodinu a přátele, která zároveň slouží
 - Až po splnění cíle 3 a vyjasnění nákladů; další sledované město jen se smysluplnými zdroji.
 
 ## Doporučené pořadí
-Aktualizováno 28. 10. 2026 podle cílů výše. Hotové body z 26.–27. 10. 2026 (v3.43–v3.50, Index.html v3.60–v3.65) jsou v CHANGELOG.md.
+Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpevnit základ, potom pokrýt kritické funkce, změřit a rozšířit do šířky. Hotové body z 26.–27. 10. 2026 (v3.43–v3.50, Index.html v3.60–v3.65) jsou v CHANGELOG.md.
 
-**Časově vázané ověřovačky (krátké, Claude přes claude-in-chrome; připomínky v kalendáři):**
+**Fáze 1 – ověření (do 2. 11.):**
 1. **Ověřit v3.44 v datech** (~15 min, po čtvrtečním běhu sledovaných měst 29. 10. 10:00) – podíl akcí se souřadnicemi a počasím OK, první HTTP kódy selhání Open-Meteo v KONTROLY; pak přeškrtnout body v „Nálezy ze živé kontroly“. → issue #6
 2. **První týdenní report kvality** (~10 min, po samotestu 1. 11. 18:00) – sekce „Kvalita hledání“ včetně řádku fuzzy sloučení (v3.50); zapojení do runSelfTest není pokryté testem. → issue #7
-3. **Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – podle cíle 3; rozhodnout o rozpočtu a stropu 15 akcí na běh. → issue #8
+3. **Ověřit první plánovaný běh CI 1. 11. 2026** (~30 min, 2. 11.; běh startuje v neděli ve 20:20 UTC) – délka, zpoždění fronty, kontrola úniku, report na Pages, notifikace jen při selhání, rozhodnutí o „Timeouty v CI“, „Proměnlivá nestabilita RF sady“ a chip testech (`0 != N`). → issue #36
+4. Volitelně **`TZ=Europe/Prague` pro jednotkové testy v CI** (~15 min, netýká se RF běhu). → issue #37
 
-**Cíl 1 – portfolio:**
-4. ~~**README jako rozcestník** (~45 min) – CI odznaky, testovací pyramida v číslech, odkazy na dokumentaci a výstupy.~~ **HOTOVO 28. 10. 2026** (commit 5b044a7, viz CHANGELOG.md). → issue #9
-5. ~~**Příběhy chyb** (~1–2 h na kus) – kandidáti: dvojité kódování u měst s diakritikou (v3.65), závod pozdních odpovědí potvrzený fault injection (v3.61), Haiku a špatně zvolená metrika (v3.47), test čekající na staré karty (v3.62).~~ **HOTOVO 28. 10. 2026** (commit fd7c012, `Docs/PRIBEHY-CHYB.md`): napsané jsou tři příběhy (diakritika v3.65, CI deset týdnů červená včetně závodu odpovědí v3.61 a testu čekajícího na staré karty v3.62, únik tajných hodnot). Kandidát Haiku a špatně zvolená metrika (v3.47) zůstává nenapsaný, případně doplnit jako čtvrtý příběh. → issue #10
-6. ~~**Veřejný RF report z CI** (~1 h) – log.html/report.html přes GitHub Pages.~~ **HOTOVO 28. 10. 2026** (commit f2404f8, viz CHANGELOG). Stránka https://akimto01.github.io/Kulturni_radar/ se po každém týdenním běhu aktualizuje sama, první automatické ověření bude plánovaný běh 1. 11. 2026. → issue #11
-7. ~~**Dokumentace výstavby architektury testů** (~2–3 h) – od strategie přes Node harness, RF/Browser, API nástroje po CI a dry run; podklady v CHANGELOG.md a Docs/TESTY.md.~~ **HOTOVO 28. 10. 2026** (commit 1283c99, `Docs/ARCHITEKTURA-TESTU.md`, viz CHANGELOG). → issue #12
-8. **Mutační testování (Stryker)** (~2 h) – mutation score místo ručních mutací. → issue #13
-9. **Video nebo GIF z běhu testů** (~30 min). → issue #14
-9a. ~~**Správa defektů: formulář, životní cyklus a analýza úniků** (~1,5–2 h) – včetně zpětného přepisu defektů z 26.–27. 10. 2026 se závažností a prioritou.~~ **HOTOVO 28. 10. 2026** (commit fd18940, `Docs/DEFEKTY.md`, viz CHANGELOG). → issue #32
-9b. **Sjednocení testů s architekturou** (~12 h, 10 dávek po plánovaném běhu 1. 11. 2026; audit `Docs/audity/AUDIT-SOULADU-TESTU.md`). → issue #34
+**Fáze 2 – zpevnění základu (po 2. 11.):**
+5. **Sjednocení testů s architekturou, dávka 1** (~1,5–2 h): suite-level teardown a `Close Page`. Pak dávky 2 (~45 min), 3 (~1 h) a 5 (~1–1,5 h). Audit `Docs/audity/AUDIT-SOULADU-TESTU.md`. → issue #34
+
+**Fáze 3 – pokrytí kritických funkcí:**
+6. **Pokrytí kritických funkcí backendu** (~5 h): nejdřív stub tabulky (`SpreadsheetApp`) a triggerů (`ScriptApp`) v harnessu, pak platba AI, triggery a hlídač. → issue #35
+7. **Práh pokrytí backendu v CI jako ratchet** (~30 min, až po #35). → issue #38
+
+**Fáze 4 – měření:**
+8. **Měření pokrytí frontendu** (~1 h): harness doplní prázdné řádky podle pozice funkce. → issue #39
+9. **Mutační testování (Stryker)** (~2 h) – mutation score místo ručních mutací. → issue #13
+
+**Fáze 5 – šířka:**
+10. **Lokalizační testy podle A4** (~4–6 h, odhad nejistý): řazení podle češtiny, datum přes půlnoc a přechod letního času, stálá místa s diakritikou (E2E a API). Část `TZ` viz bod 4.
+11. **R2 a R5 z POKRYTI.md:** kontrola verze frontendu ve smoke a smoke přes `FRAME` v CI.
+12. **Přímý API test přihlášení** (login přes skutečné API).
+13. **Katalog testů na GitHub Pages** (~30 min), **hlídání počtů testů v README skriptem** (~30 min) a **sdílený skript kontroly úniku** (~30 min, položky v Testovacím dluhu).
+14. **Sjednocení testů s architekturou, zbylé dávky** (4, 6 až 10; zbývá z ~12 h). → issue #34
+15. **Video nebo GIF z běhu testů** (~30 min). → issue #14
+
+**Hotovo (Cíl 1, podrobnosti v CHANGELOG.md):**
+- ~~**README jako rozcestník** (~45 min) – CI odznaky, testovací pyramida v číslech, odkazy na dokumentaci a výstupy.~~ **HOTOVO 28. 10. 2026** (commit 5b044a7, viz CHANGELOG.md). → issue #9
+- ~~**Příběhy chyb** (~1–2 h na kus) – kandidáti: dvojité kódování u měst s diakritikou (v3.65), závod pozdních odpovědí potvrzený fault injection (v3.61), Haiku a špatně zvolená metrika (v3.47), test čekající na staré karty (v3.62).~~ **HOTOVO 28. 10. 2026** (commit fd7c012, `Docs/PRIBEHY-CHYB.md`): napsané jsou tři příběhy (diakritika v3.65, CI deset týdnů červená včetně závodu odpovědí v3.61 a testu čekajícího na staré karty v3.62, únik tajných hodnot). Kandidát Haiku a špatně zvolená metrika (v3.47) zůstává nenapsaný, případně doplnit jako čtvrtý příběh. → issue #10
+- ~~**Veřejný RF report z CI** (~1 h) – log.html/report.html přes GitHub Pages.~~ **HOTOVO 28. 10. 2026** (commit f2404f8, viz CHANGELOG). Stránka https://akimto01.github.io/Kulturni_radar/ se po každém týdenním běhu aktualizuje sama, první automatické ověření bude plánovaný běh 1. 11. 2026. → issue #11
+- ~~**Dokumentace výstavby architektury testů** (~2–3 h) – od strategie přes Node harness, RF/Browser, API nástroje po CI a dry run; podklady v CHANGELOG.md a Docs/TESTY.md.~~ **HOTOVO 28. 10. 2026** (commit 1283c99, `Docs/ARCHITEKTURA-TESTU.md`, viz CHANGELOG). → issue #12
+- ~~**Správa defektů: formulář, životní cyklus a analýza úniků** (~1,5–2 h) – včetně zpětného přepisu defektů z 26.–27. 10. 2026 se závažností a prioritou.~~ **HOTOVO 28. 10. 2026** (commit fd18940, `Docs/DEFEKTY.md`, viz CHANGELOG). → issue #32
 
 **Cíl 2 – otevření přátelům (souběžně s cílem 3):**
-10. **Design s dcerou → Android** (~3–4 h aktivní práce po designu) – čeká na dceru; koncept ikony varianta C předschválen 27. 8. 2026.
-11. **Zakládání nového profilu bez ruční práce v Sheetu** (odhad po návrhu). → issue #15
-12. **Přihlašovací obrazovka pro víc uživatelů** (odhad po návrhu) – dnes ukazuje jména všech profilů každému návštěvníkovi. → issue #16
+- **Design s dcerou → Android** (~3–4 h aktivní práce po designu) – čeká na dceru; koncept ikony varianta C předschválen 27. 8. 2026.
+- **Zakládání nového profilu bez ruční práce v Sheetu** (odhad po návrhu). → issue #15
+- **Přihlašovací obrazovka pro víc uživatelů** (odhad po návrhu) – dnes ukazuje jména všech profilů každému návštěvníkovi. → issue #16
 
-**Cíl 3 – kvalita akcí:** viz ověřovačka 3; další kroky podle vyhodnocení.
+**Cíl 3 – kvalita akcí:**
+- **Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – rozhodnout o rozpočtu a stropu 15 akcí na běh; další kroky podle vyhodnocení. → issue #8
 
 **Ruční úklid (Vojta, kdykoli):** smazat 5 řádků „neuvedeno“ v AKCE (v3.48); projít 5 podezřelých fuzzy sloučení (CHANGELOG v3.50); volitelně 2 staré skryté duplicity v MÍSTA (v3.46).
 
@@ -144,8 +162,11 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
 - Sledovat (řeší dávka 8 issue #34, `Docs/audity/AUDIT-SOULADU-TESTU.md`, řádky 11 a 17): RF test „Přepnutí na město s diakritikou“ vybírá první prohledané město s diakritikou (dnes Plzeň); kdyby nemělo budoucí akce, test falešně spadne – pak upravit výběr.
 - **PROVOZ.md: doplnit `runSelfTest` a `watchdogDailyCheck`** (převzato z TESTY.md, dřívější sekce 10): tabulka triggerů neobsahuje ani `sendUserNotifications` a `zpracovatSledovanaMesta`.
 - **Hlídat počty testů v README skriptem proti repu** (~30 min): skript porovná tabulku „Testy v číslech“ s reálnými počty (`node --test`, `robot --dryrun`) a poběží v CI vedle pojistky souladu. README je jediný zdroj počtů (TESTY.md, POKRYTI.md na něj odkazují).
-- **Lokalizační testy podle `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola A4** (~4–6 h, odhad nejistý): `TZ=Europe/Prague` pro jednotkové testy v CI, test českého řazení, datum přes půlnoc a přechod letního času, E2E a API pro stálá místa s diakritikou.
+- **Lokalizační testy podle `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola A4** (~4–6 h, odhad nejistý; `TZ=Europe/Prague` v CI je samostatná položka níže): test českého řazení, datum přes půlnoc a přechod letního času, E2E a API pro stálá místa s diakritikou.
 - **Revize tagu `krehky` u 12 testů:** viz dávka 10 issue #34 (`Docs/audity/AUDIT-SOULADU-TESTU.md`) a `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola C3. Bez vlastního odhadu. → issue #34
+- **TZ pro jednotkové testy v CI** (~15 min): `TZ=Europe/Prague` v kroku Spustit testy v `node-tests.yml`, ať testy běží stejně lokálně i v CI (součást A4). → issue #37
+- **Práh pokrytí backendu v CI (ratchet)** (~30 min, až po issue #35): selže při poklesu pokrytí řádků `kulturni_radar.gs` pod uloženou hodnotu. → issue #38
+- **Měření pokrytí frontendu** (~1 h): harness `Index.html` doplní prázdné řádky podle pozice funkce, ať jde změřit pokrytí. → issue #39
 - **Pokrytí kritických funkcí backendu** (~5 h): platba AI (`runCheck_`, `dailyCheck`, `callAnthropicPlaces_`, `updateMista`, `apiNajdiProUzivatele_`), `apiSetFiltry_`, `setupTriggers`, `watchdogDailyCheck`, `notifyFail_` a přehledy, větve `apiToggle_`, `nastavPin_`. Předpoklad: stub tabulky (`SpreadsheetApp`) a `ScriptApp` v harnessu. Měření z 28. 10. 2026 viz `Docs/testovani/POKRYTI.md`. → issue #35
 - **Katalog testů na GitHub Pages** (~30 min): `publikovat-report.yml` vygeneruje `python -m robot.testdoc tests/robot/` a zveřejní ho vedle reportu a logu (přidat na seznam povolených souborů webu, odkaz z index.html, projde stejnou kontrolou úniku). Tím se podloží tvrzení v TESTY.md §9, že testdoc nahrazuje Test Case Specification podle ISO 29119.
 

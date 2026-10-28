@@ -1,5 +1,11 @@
 # Changelog
 
+## Docs: BACKLOG plán po 28. 10. (fáze 1 až 5), nové issues, čas nedělního běhu – 28. 10. 2026
+- **Čas týdenního běhu:** cron `rf-tests.yml` z `0 19 * * 0` na `20 20 * * 0` (neděle 20:20 UTC, 21:20 SEČ, 22:20 SELČ): po nedělním triggeru `zpracovatSledovanaMesta` ve 20:00 místního času a mimo celou hodinu, kdy je fronta plánovaných běhů GitHubu nejvytíženější. Časy opraveny v `ARCHITEKTURA-TESTU.md` (C1) a `TESTY.md` (4.2).
+- **BACKLOG, Doporučené pořadí:** přepsáno na pět fází (ověření do 2. 11., zpevnění základu, pokrytí kritických funkcí, měření, šířka); hotové body zůstaly v bloku Hotovo.
+- **Nové issues** (Cíl 1, štítek testing, board Todo): #36 Ověřit první plánovaný běh CI 1. 11. 2026 (Termín 2. 11., 0,5 h), #37 TZ pro jednotkové testy v CI (0,25 h), #38 Práh pokrytí backendu v CI (0,5 h), #39 Měření pokrytí frontendu (1 h). Termíny nastaveny i u #6 (29. 10.), #7 (1. 11.) a #8 (9. 11.).
+- Bez zásahu do `apps-script/`, bez bumpu verze a bez nasazení.
+
 ## Testy: měření pokrytí backendu, korekce matice pokrytí, úklid – 28. 10. 2026
 - **Běhy z 28. 10. (kontrola po dnešních změnách):** Node 558/558, test workeru 7/7, `robot --dryrun` 61/61, pojistka souladu bez nárůstu (baseline 11 / 9 / 11 / 61 / 0 / 11 / 6 / 12). Jeden plný lokální běh RF proti produkci se stejnými proměnnými jako CI (`CEKANI_ZAPIS:30s`, `CEKANI_PRIHLASENI:40s`, `CEKANI_NAVIGACE:30s`): API 8 PASS a 1 SKIP (ntfy test, lokálně není `NTFY_TOPIC`), frontend 52/52 za 188 s. Žádný pád, takže nebylo co přiřazovat dnešním změnám, auditu #34 ani zátěži Apps Scriptu.
 - **Kontrola úniku z workflow nad výstupy běhu:** PIN, ntfy témata `radar-<32 hex>` ani `EMAIL_WEBHOOK_TOKEN` v reportech nenalezeny. `playwright-log.txt` obsahoval ntfy téma profilu, CI ho před nahráním maže, lokálně smazán. Stav profilu rf-test po běhu: notifikace bez kanálů a bez e-mailu (ntfy téma zůstává podle návrhu), ★ a ✓ nikde, 🏛 v Brně žádné.
