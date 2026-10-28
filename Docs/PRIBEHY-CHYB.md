@@ -76,7 +76,7 @@ ikonu, ale **žádnou kartu na stránce**.
 
 **Kořenová příčina (pravděpodobná).** Test opakovaného přepínání měst přibyl
 21. 8. a první červený běh byl 23. 8. Test rychle přepínal přes první tři města
-v abecedním seznamu (Brno a dvě dosud neprohledaná města bez akcí) a po každém
+v abecedním seznamu (dnes Brno a dvě dosud neprohledaná města bez akcí; obsah seznamu v srpnu z historie ověřit nejde) a po každém
 přepnutí čekal jen na to, až bude vidět nějaká karta. To splnily ještě karty
 předchozího města, takže test nečekal na načtení a nechával běžet překrývající se
 požadavky. Appka přitom neměla ochranu proti pozdní odpovědi: zpožděná odpověď pro
