@@ -236,7 +236,7 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
 
 | Sada | Obsah | Spouštění | Blokuje | Kdo sleduje |
 |---|---|---|---|---|
-| Jednotkové testy | 578 testů backendu a frontendu (Node) | každý push a PR | nasazení (pravidlo vlastníka: nenasazuje se s červenou) | vlastník, odznak v README |
+| Jednotkové testy | 590 testů backendu a frontendu (Node) | každý push a PR | nasazení (pravidlo vlastníka: nenasazuje se s červenou) | vlastník, odznak v README |
 | Statická kontrola testů | `robot --dryrun` celé RF sady (syntaxe, existence klíčových slov, argumenty) | každý push a PR | nasazení | vlastník |
 | Pojistka souladu s architekturou | počty porušení pravidel B4, B5 a C3 proti baseline (`.github/scripts/kontrola-architektury-testu.py`); selže, když porušení přibude | každý push a PR | push s novým porušením | vlastník |
 | Kontrola počtů testů v README | porovná tabulku „Testy v číslech“ se skutečností (Node, RF přes robot.api, worker) | každý push a PR | push s rozdílem | vlastník |
@@ -353,7 +353,7 @@ Hodnoty k 28. 10. 2026, spočítané z historie GitHub Actions, gitu a DEFEKTY.m
 | Podíl defektů odhalených automatizací | 2 z 8 (25 %); u závažnosti S1 a S2 1 ze 4 | aspoň 40 % | ostatní odhalila živá kontrola (4) a analýza (2), viz DEFEKTY.md |
 | Stáří defektu při odhalení | #31 80 dní, #17 78 až 86 dní | sledovat u nových defektů | dlouhé stáří = slepé místo sady |
 | Údržba testů | 75 z 92 commitů měnících appku mění i testy (81 %); 22 commitů mění jen testy | sledovat podíl oprav testů bez chyby v appce | rozlišení „oprava testu“ vs. „nový test“ zatím ručně |
-| Pokrytí kódu backendu | 84,6 % řádků, 81,3 % větví (Node, harness, k 29. 10. 2026) | neklesat, kritické funkce podle [POKRYTI.md](POKRYTI.md) nad 70 % | CI zatím jen vypisuje, bez prahu; kritické funkce pod 70 % jsou `callAnthropicPlaces_`, `runCheck_`, `apiNajdiProUzivatele_`, `apiToggle_` |
+| Pokrytí kódu backendu | 86,8 % řádků, 81,7 % větví (Node, harness, k 29. 10. 2026) | neklesat, kritické funkce podle [POKRYTI.md](POKRYTI.md) nad 70 % | CI zatím jen vypisuje, bez prahu; kritické funkce pod 70 % jsou `callAnthropicPlaces_`, `apiNajdiProUzivatele_`, `apiToggle_` |
 | Pokrytí kódu frontendu | 98,9 % řádků ve vykrojených funkcích (57 ze 113, 440 z 445 řádků), 25,3 % celého skriptu `Index.html` (440 z 1736 řádků); Node, `tests/pokryti-frontendu.js` | neklesat, zvyšovat podíl vykrojených funkcí | zbytek skriptu (vykreslování, mapa, kalendář, obsluha událostí) pokrývá jen E2E; tabulka z `--experimental-test-coverage` u `Index.html` nesedí, proto vlastní skript |
 | Soulad s architekturou | baseline porušení 11 / 9 / 11 / 61 / 0 / 11 / 6 / 12 (pojistka v CI) | klesat k nule po dávkách issue #34 | |
 | Síla testů | mutační ověření nových testů ručně (12 záznamů v CHANGELOGu) | mutation score (Stryker, issue #13) | |
@@ -446,3 +446,4 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | 28. 10. 2026 | D3: metrika pokrytí kódu backendu (82,2 % řádků), pokrytí odebráno z toho, co se neměří |
 | 29. 10. 2026 | D3: metrika pokrytí kódu frontendu (98,9 % vykrojených funkcí, 25,3 % celého skriptu), skript `tests/pokryti-frontendu.js` |
 | 29. 10. 2026 | D3: pokrytí backendu 84,6 % řádků a 81,3 % větví po dávce 1 z #35 (harness se stubem tabulky, zámku a triggerů; `setupTriggers` a `watchdogDailyCheck` 100 % řádků) |
+| 29. 10. 2026 | D3: pokrytí backendu 86,8 % řádků a 81,7 % větví po dávce 2 z #35 (platba AI v `runCheck_` a `dailyCheck`, obě 100 % řádků); `runCheck_` odebrána ze seznamu funkcí pod 70 % |

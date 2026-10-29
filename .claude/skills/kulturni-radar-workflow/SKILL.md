@@ -325,6 +325,10 @@ Frontend (`tests/frontend-harness.js`, `nactiFrontendFunkce(['fn1','fn2'])`):
 - Pojistka v CI (`python .github/scripts/kontrola-architektury-testu.py`, job
   `rf-dryrun`) nesmí hlásit růst porušení. Při opravě porušení spustit skript
   s `--zapsat-baseline` a commitnout sníženou baseline.
+- **Mutační ověření:** pomocný skript musí po neaplikované mutaci (zarážka nenalezena)
+  skončit chybou a testy nepouštět. Jinak neaplikovaná mutace vypadá jako nezachycená,
+  nebo naopak jako chycená. Ověřit, že se zdroj opravdu změnil (`git diff --stat` nebo
+  počet nahrazení), než se testy spustí. Zjištěno 29. 10. 2026 v #35 dávce 2.
 
 ### Tajné hodnoty v RF reportech (incident #33, 28. 10. 2026)
 

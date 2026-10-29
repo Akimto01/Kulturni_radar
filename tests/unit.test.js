@@ -4276,3 +4276,259 @@ test('#35 watchdogDailyCheck: chyba čtení tabulky se nepropustí jako výjimka
   assert.doesNotThrow(() => ctx.watchdogDailyCheck());
   assert.equal(ctx.__odeslaneEmaily.length, 0);
 });
+
+// ---------------------------------------------------------------------------
+// #35 dávka 2: platba AI v runCheck_ a dailyCheck (zámek, zápis do AKCE a KONTROL,
+// notifikace, chyby, deduplikace s produkčními tvary dat). Fronta fetchů
+// obsahuje jen odpovědi AI: jakékoli další volání sítě (Nominatim, počasí) by
+// ve frontě chybělo a test by ho zachytil počtem volání (zajistitSouradnice_
+// chyby polyká, proto se kontroluje počet, ne jen výjimka).
+// ---------------------------------------------------------------------------
+
+/** Stub UrlFetchApp.fetch se záznamem URL a payloadu; prázdná fronta vyhodí výjimku. */
+function fetchSZaznamem_(fronta, volane) {
+  return (url, options) => {
+    volane.push({ url, payload: options && options.payload ? JSON.parse(options.payload) : null });
+    const d = fronta.shift();
+    if (d === undefined) throw new Error('Stub: neočekávané volání sítě: ' + url);
+    return { getResponseCode: () => d.code, getContentText: () => JSON.stringify(d.body) };
+  };
+}
+
+const USAGE_AI = { input_tokens: 1000, output_tokens: 200, server_tool_use: { web_search_requests: 3 } };
+const odpovedAi_ = (events) => anthropicResp({
+  stop_reason: 'tool_use',
+  content: [{ type: 'tool_use', name: 'report_events', input: { events } }],
+  usage: USAGE_AI,
+});
+const AKCE_RC = { id: 'x', datum_od: '6. 8. 2026', nazev: 'Test', misto: 'Sál', obec: 'Brno', kategorie: 'koncerty', stav: 'potvrzeno' };
+const SERIAL_6_8_2026 = Math.round((Date.UTC(2026, 7, 6) - Date.UTC(1899, 11, 30)) / 86400000);
+
+/** Tabulka KRITÉRIA se zápisem: čtení přes getDisplayValue, B11/B12 přes getValue/setValue. */
+function fakeKriteriaZapis_(cells) {
+  return { cells, getRange: (a1) => ({
+    getDisplayValue: () => String(cells[a1] === undefined ? '' : cells[a1]),
+    getValue: () => cells[a1],
+    setValue: (v) => { cells[a1] = v; },
+  }) };
+}
+
+/** Existující řádek AKCE (25 sloupců) s daným datem začátku. */
+function radekAkce_(datumOd) {
+  const r = Array(25).fill('');
+  r[0] = 'stare-id'; r[1] = datumOd; r[4] = 'Test'; r[5] = 'Sál'; r[6] = 'Brno'; r[13] = 'potvrzeno'; r[24] = 'Brno';
+  return r;
+}
+
+/** Fixture: tabulka se všemi listy, které runCheck_/dailyCheck potřebují, souřadnice
+ *  pro Sál/Brno předvyplněné (žádné geokódování), zdroje pro Brno, zámek a fronta AI. */
+function pripravKontrolu_(v = {}) {
+  const volane = [];
+  const fronta = (v.fronta || []).slice();
+  const krit = fakeKriteriaZapis_({ B2: 'Brno', B3: '90 min', B4: '2 týdny', B5: 'vše', B6: 'ano', B7: 'ano',
+    B8: 'ČR', B9: '', B11: v.checkbox === undefined ? true : v.checkbox, B12: '' });
+  const listy = {
+    'KRITÉRIA': krit,
+    ZDROJE: [['Název', 'URL', 'Profil', 'Priorita']].concat(v.zdroje === undefined ? [['Web', 'https://example.org', 'Brno', 'A']] : v.zdroje),
+    AKCE: [Array.from({ length: 25 }, (_, i) => 'sl' + i)].concat(v.akce || []),
+    KONTROLY: [[]],
+    LOKALITY: [[], ['id1', 'Brno', '', '', '', '', 'čeká na naplnění', '']],
+    'SOUŘADNICE': [['Klíč', 'Lat', 'Lng', 'Zdrojový text', 'Zjištěno'], ['sál|brno', 49.19, 16.61, 'Sál, Brno', '']],
+  };
+  if (v.emailTipy) listy.EMAIL_TIPY = [['ID', 'Přijato', 'Odesílatel', 'Předmět', 'Text', 'Stav', 'ID akce', 'Zpracováno kdy', 'Poznámka']].concat(v.emailTipy);
+  const ss = fakeSpreadsheet(listy);
+  const ctx = nactiRadar({
+    ss, zamek: v.zamek === undefined ? true : v.zamek,
+    urlFetch: fetchSZaznamem_(fronta, volane),
+    properties: v.properties || { ANTHROPIC_API_KEY: 'test-key', NTFY_TOPIC: 't' },
+  });
+  return { ctx, ss, krit, volane, fronta, akce: ss.getSheetByName('AKCE'), kontroly: ss.getSheetByName('KONTROLY') };
+}
+
+const jenAiVolani_ = (volane, pocet) => {
+  assert.equal(volane.length, pocet, 'počet volání sítě (jen AI, žádné Nominatim ani počasí)');
+  volane.forEach(c => assert.equal(c.url, 'https://api.anthropic.com/v1/messages'));
+};
+
+// --- runCheck_ ---
+
+test('#35 runCheck_: zámek obsazený → AI se nezavolá, do AKCE ani KONTROL se nic nezapíše', () => {
+  const f = pripravKontrolu_({ zamek: false, fronta: [odpovedAi_([AKCE_RC])] });
+  f.ctx.runCheck_('denní kontrola');
+  assert.equal(f.volane.length, 0);
+  assert.equal(f.fronta.length, 1, 'fronta odpovědí nedotčená');
+  assert.equal(f.akce.rows.length, 1, 'v AKCE jen hlavička');
+  assert.equal(f.kontroly.rows.length, 1, 'v KONTROLÁCH jen hlavička');
+  assert.equal(f.ctx.__odeslaneEmaily.length, 0);
+  assert.equal(f.ctx.__zamek.uvolneno, 0, 'nezískaný zámek se neuvolňuje');
+});
+
+test('#35 runCheck_: úspěch → nová akce v AKCE, řádek v KONTROLÁCH (počty, model, tokeny M–O), LOKALITY, notifikace, zámek uvolněn', () => {
+  const f = pripravKontrolu_({ fronta: [odpovedAi_([AKCE_RC])] });
+  f.ctx.runCheck_('denní kontrola');
+
+  jenAiVolani_(f.volane, 1);
+  assert.equal(f.volane[0].payload.model, 'claude-sonnet-5-5');
+  assert.match(f.volane[0].payload.messages[0].content, /Profil lokality \(střed hledání\): Brno/);
+  assert.match(f.volane[0].payload.messages[0].content, /Typ běhu: denní kontrola/);
+
+  assert.equal(f.akce.rows.length, 2);
+  const a = f.akce.rows[1];
+  assert.equal([a[0], a[1], a[4], a[5], a[6], a[8], a[13], a[14], a[24]].join('|'),
+    'x|6. 8. 2026|Test|Sál|Brno|koncerty|potvrzeno|ANO|Brno');
+
+  const k = f.kontroly.rows[1];
+  assert.equal(k[1], 'denní kontrola');
+  assert.match(k[2], /^Brno; .+; do 90 min; 2 týdny$/);
+  assert.equal([k[3], k[4], k[5], k[6], k[8], k[9]].join('|'), '1|1|0|0|0|1', 'nalezeno|nové|změněné|zrušené|beze změny|zdroje');
+  assert.match(k[10], /claude-sonnet-5-5/);
+  assert.equal([k[12], k[13], k[14]].join('|'), '1000|200|3', 'tokeny vstup|výstup|hledání (M–O)');
+
+  const lok = f.ss.getSheetByName('LOKALITY').rows[1];
+  assert.ok(String(lok[7]).startsWith(dnesCz_()), 'poslední kontrola profilu = dnes');
+  assert.equal(lok[6], 'základ naplněn');
+
+  assert.equal(f.ctx.__odeslaneEmaily.length, 1);
+  const m = f.ctx.__odeslaneEmaily[0];
+  assert.equal(m.komu, 'ntfy-t@ntfy.sh');
+  assert.equal(m.predmet, 'Denní kontrola dokončena');
+  assert.match(m.telo, /Nové \(1\):/);
+  assert.match(m.telo, /Test \(6\. 8\. 2026\)/);
+
+  assert.equal(f.ctx.__zamek.tryLock[0], 5000);
+  assert.equal(f.ctx.__zamek.uvolneno, 1);
+});
+
+test('#35 runCheck_: chyba AI (HTTP 500) → výjimka, AKCE a KONTROLY beze změny, žádná notifikace z runCheck_, zámek uvolněn', () => {
+  const f = pripravKontrolu_({ fronta: [anthropicResp({ error: 'boom' }, 500)] });
+  assert.throws(() => f.ctx.runCheck_('denní kontrola'), /Anthropic API vrátilo 500/);
+  jenAiVolani_(f.volane, 1);
+  assert.equal(f.akce.rows.length, 1);
+  assert.equal(f.kontroly.rows.length, 1);
+  assert.equal(f.ctx.__odeslaneEmaily.length, 0, 'hlášení selhání dělá až volající (dailyCheck, onEditInstallable)');
+  assert.equal(f.ctx.__zamek.uvolneno, 1, 'zámek uvolněn ve finally i při výjimce');
+});
+
+test('#35 runCheck_: chybějící ANTHROPIC_API_KEY nebo žádné zdroje → výjimka bez volání AI, zámek uvolněn', () => {
+  const bezKlice = pripravKontrolu_({ properties: { NTFY_TOPIC: 't' }, fronta: [odpovedAi_([AKCE_RC])] });
+  assert.throws(() => bezKlice.ctx.runCheck_('denní kontrola'), /ANTHROPIC_API_KEY/);
+  assert.equal(bezKlice.volane.length, 0);
+  assert.equal(bezKlice.ctx.__zamek.uvolneno, 1);
+
+  const bezZdroju = pripravKontrolu_({ zdroje: [], fronta: [odpovedAi_([AKCE_RC])] });
+  assert.throws(() => bezZdroju.ctx.runCheck_('denní kontrola'), /nejsou v ZDROJÍCH žádné zdroje/);
+  assert.equal(bezZdroju.volane.length, 0);
+  assert.equal(bezZdroju.ctx.__zamek.uvolneno, 1);
+});
+
+test('#35 runCheck_: existující akce s datem jako sériové číslo (produkční tvar, #17) se pozná, duplicita nevznikne', () => {
+  const f = pripravKontrolu_({ akce: [radekAkce_(SERIAL_6_8_2026)], fronta: [odpovedAi_([AKCE_RC])] });
+  f.ctx.runCheck_('denní kontrola');
+  assert.equal(f.akce.rows.length, 2, 'beze změny počtu řádků: žádná duplicita');
+  const k = f.kontroly.rows[1];
+  assert.equal([k[3], k[4], k[8]].join('|'), '1|0|1', 'nalezeno 1, nové 0, beze změny 1');
+});
+
+test('#35 runCheck_: existující akce s datem jako objekt Date (produkční tvar) se pozná, duplicita nevznikne', () => {
+  const f = pripravKontrolu_({ fronta: [odpovedAi_([AKCE_RC])] });
+  f.akce.rows.push(radekAkce_(new f.ctx.__Date(2026, 7, 6)));
+  f.ctx.runCheck_('denní kontrola');
+  assert.equal(f.akce.rows.length, 2);
+  const k = f.kontroly.rows[1];
+  assert.equal([k[3], k[4], k[8]].join('|'), '1|0|1');
+});
+
+// --- mimořádná kontrola (onEditInstallable) ---
+
+const udalostB11_ = (a1 = 'B11', nazevListu = 'KRITÉRIA', hodnota = true) => ({
+  range: { getSheet: () => ({ getName: () => nazevListu }), getA1Notation: () => a1, getValue: () => hodnota },
+});
+
+test('#35 onEditInstallable: úspěch → checkbox B11 se vypne, B12 dostane čas, notifikace „Mimořádná kontrola dokončena“', () => {
+  const f = pripravKontrolu_({ fronta: [odpovedAi_([AKCE_RC])] });
+  f.ctx.onEditInstallable(udalostB11_());
+  jenAiVolani_(f.volane, 1);
+  assert.equal(f.krit.cells.B11, false);
+  assert.ok(String(f.krit.cells.B12).startsWith(dnesCz_()));
+  assert.equal(f.ctx.__odeslaneEmaily[0].predmet, 'Mimořádná kontrola dokončena');
+  assert.match(f.volane[0].payload.messages[0].content, /Typ běhu: mimořádná kontrola/);
+});
+
+test('#35 onEditInstallable: selhání AI → checkbox B11 zůstane zaškrtnutý, notifikace „Mimořádná kontrola selhala“, výjimka se propustí', () => {
+  const f = pripravKontrolu_({ fronta: [anthropicResp({ error: 'boom' }, 500)] });
+  assert.throws(() => f.ctx.onEditInstallable(udalostB11_()), /Anthropic API vrátilo 500/);
+  assert.equal(f.krit.cells.B11, true, 'schválně se nevypíná (PROVOZ.md)');
+  assert.equal(f.krit.cells.B12, '');
+  assert.equal(f.ctx.__odeslaneEmaily.length, 1);
+  assert.equal(f.ctx.__odeslaneEmaily[0].predmet, 'Mimořádná kontrola selhala');
+  assert.match(f.ctx.__odeslaneEmaily[0].telo, /^Chyba: Anthropic API vrátilo 500/);
+  assert.equal(f.ctx.__zamek.uvolneno, 1);
+});
+
+test('#35 onEditInstallable: jiná buňka, jiný list, odškrtnutí nebo už vypnutý checkbox → AI se nezavolá (ochrana proti platbě navíc)', () => {
+  const f = pripravKontrolu_({ fronta: [odpovedAi_([AKCE_RC])] });
+  f.ctx.onEditInstallable(udalostB11_('B10'));
+  f.ctx.onEditInstallable(udalostB11_('B11', 'AKCE'));
+  f.ctx.onEditInstallable(udalostB11_('B11', 'KRITÉRIA', false));
+  f.ctx.onEditInstallable(undefined);
+  assert.equal(f.volane.length, 0);
+  // dvojklik: událost říká TRUE, ale B11 v tabulce už mezitím někdo vypnul
+  f.krit.cells.B11 = false;
+  f.ctx.onEditInstallable(udalostB11_());
+  assert.equal(f.volane.length, 0);
+  assert.equal(f.ctx.__odeslaneEmaily.length, 0);
+});
+
+// --- dailyCheck ---
+
+const EMAIL_TIP_RC = { id: 'tip-1', datum_od: '7. 8. 2026', nazev: 'Tip koncert', misto: 'Sál', obec: 'Brno', kategorie: 'koncerty', stav: 'potvrzeno' };
+
+test('#35 dailyCheck: pořadí (proběhlé, e-mailové tipy, runCheck_, souřadnice) a statistiky tipů v notifikaci', () => {
+  const prosla = radekAkce_('1. 1. 2020'); prosla[0] = 'stara'; prosla[4] = 'Stará akce';
+  const f = pripravKontrolu_({
+    akce: [prosla],
+    emailTipy: [['t1', '', 'a@b.cz', 'Předmět', 'Koncert v Brně', 'nové', '', '', '']],
+    fronta: [odpovedAi_([EMAIL_TIP_RC]), odpovedAi_([AKCE_RC])],
+  });
+  const poradi = [];
+  ['markPastEvents', 'zpracovatEmailTipy_', 'runCheck_', 'doplnitChybejiciSouradnice_'].forEach(n => {
+    const puvodni = f.ctx[n];
+    f.ctx[n] = (...a) => { poradi.push(n); return puvodni(...a); };
+  });
+
+  f.ctx.dailyCheck();
+
+  assert.equal(poradi.join(' > '), 'markPastEvents > zpracovatEmailTipy_ > runCheck_ > doplnitChybejiciSouradnice_');
+  jenAiVolani_(f.volane, 2);   // 1× e-mailový tip, 1× denní kontrola
+  assert.equal(f.akce.rows[1][13], 'proběhlo', 'proběhlá akce označena');
+  assert.equal(f.ss.getSheetByName('EMAIL_TIPY').rows[1][5], 'zpracováno-ok');
+  const reporty = f.ctx.__odeslaneEmaily.filter(m => m.predmet === 'Denní kontrola dokončena');
+  assert.equal(reporty.length, 1, 'jediný report, ne dva');
+  assert.match(reporty[0].telo, /E-mailové tipy: 1 přišlo \(1 zpracováno, 0 nešlo ověřit, 0 chyba\)/);
+  assert.equal(f.ctx.__zamek.uvolneno, 1);
+});
+
+test('#35 dailyCheck: selhání uvnitř → notifikace „Denní kontrola selhala“ s textem chyby, výjimka se propustí, souřadnice se nedoplňují', () => {
+  const f = pripravKontrolu_({ fronta: [anthropicResp({ error: 'boom' }, 500)] });
+  const poradi = [];
+  const puvodni = f.ctx.doplnitChybejiciSouradnice_;
+  f.ctx.doplnitChybejiciSouradnice_ = (...a) => { poradi.push('souradnice'); return puvodni(...a); };
+
+  assert.throws(() => f.ctx.dailyCheck(), /Anthropic API vrátilo 500/);
+
+  assert.equal(f.ctx.__odeslaneEmaily.length, 1);
+  assert.equal(f.ctx.__odeslaneEmaily[0].predmet, 'Denní kontrola selhala');
+  assert.match(f.ctx.__odeslaneEmaily[0].telo, /^Chyba: Anthropic API vrátilo 500/);
+  assert.equal(poradi.length, 0);
+  assert.equal(f.akce.rows.length, 1);
+  assert.equal(f.ctx.__zamek.uvolneno, 1);
+});
+
+test('#35 dailyCheck: zámek obsazený → bez AI a bez notifikace, ostatní kroky (označení proběhlých, souřadnice) proběhnou', () => {
+  const prosla = radekAkce_('1. 1. 2020'); prosla[0] = 'stara';
+  const f = pripravKontrolu_({ zamek: false, akce: [prosla], fronta: [odpovedAi_([AKCE_RC])] });
+  f.ctx.dailyCheck();
+  assert.equal(f.volane.length, 0);
+  assert.equal(f.ctx.__odeslaneEmaily.length, 0, 'obsazený zámek se nehlásí');
+  assert.equal(f.akce.rows[1][13], 'proběhlo');
+});
