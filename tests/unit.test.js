@@ -5324,3 +5324,59 @@ test('3b-1: upsertEvents_ – stav „Zrušeno “ (velké písmeno, mezera) se 
   assert.equal(stats.zmeneneNazvy.length, 1);
   assert.equal(stats.zmeneneNazvy[0].t, 'Divadlo v parku (21. 6. 2026)');
 });
+
+// ---------------------------------------------------------------------------
+// #13 dávka 3b-2: upsertEvents_ – změna data a stavu, sloupec Změna, cizí profil (#176, #187, #191, #196)
+// ---------------------------------------------------------------------------
+
+function upsertJedenRadek_(radek, akce, profil = 'Brno') {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([radek])) });
+  const stats = nactiRadar().upsertEvents_(ss, { profil }, [akce]);
+  return { stats, row: ss.getSheetByName('AKCE').getRange(2, 1, 1, 25).getValues()[0], sh: ss.getSheetByName('AKCE') };
+}
+
+function existujiciUpsert_(p) {
+  return akceRadekFuzzy_(Object.assign({ id: 'u-1', nazev: 'Koncert na nábřeží', datumOd: '15. 6. 2026', datumDo: '15. 6. 2026', misto: 'Nábřeží' }, p));
+}
+
+test('3b-2: upsertEvents_ – shoda s řádkem cizího profilu ho nezmění a nic se nespočítá', () => {
+  const { stats, row, sh } = upsertJedenRadek_(
+    existujiciUpsert_({ profil: 'Praha' }),
+    novaAkceUpsert_({ datum_od: '16. 6. 2026', datum_do: '16. 6. 2026', stav: 'zrušeno' }));
+
+  assert.equal(stats.zmenene + stats.zrusene + stats.bezZmeny + stats.nove, 0);
+  assert.equal(row[1], '15. 6. 2026', 'datum se nezměnilo');
+  assert.equal(row[13], 'potvrzeno', 'stav se nezměnil');
+  assert.equal(row[15], 'NE', 'sloupec Změna zůstal');
+  assert.equal(row[17], '1. 6. 2026', 'Poslední kontrola zůstala');
+  assert.equal(sh.getLastRow(), 2, 'nový řádek se nepřidal');
+});
+
+test('3b-2: upsertEvents_ – posun data začátku (datum do a stav stejné) je změna, sloupec Změna = ANO', () => {
+  const { stats, row } = upsertJedenRadek_(existujiciUpsert_(), novaAkceUpsert_({ datum_od: '16. 6. 2026' }));
+
+  assert.equal(stats.zmenene, 1);
+  assert.equal(stats.bezZmeny, 0);
+  assert.equal(row[1], '16. 6. 2026');
+  assert.equal(row[15], 'ANO');
+  assert.equal(row[14], 'NE', 'Novinka zůstává z původního řádku');
+  assert.equal(row[16], '1. 6. 2026', 'První nález zůstává');
+});
+
+test('3b-2: upsertEvents_ – změna stavu (datum stejné, jiný než zrušeno) je změna a zapíše se', () => {
+  const { stats, row } = upsertJedenRadek_(existujiciUpsert_(), novaAkceUpsert_({ stav: 'přesunuto' }));
+
+  assert.equal(stats.zmenene, 1);
+  assert.equal(stats.zrusene, 0);
+  assert.equal(row[13], 'přesunuto');
+  assert.equal(row[15], 'ANO');
+});
+
+test('3b-2: upsertEvents_ – beze změny data a stavu zůstane sloupec Změna NE a posune se jen Poslední kontrola', () => {
+  const { stats, row } = upsertJedenRadek_(existujiciUpsert_(), novaAkceUpsert_());
+
+  assert.equal(stats.bezZmeny, 1);
+  assert.equal(stats.zmenene, 0);
+  assert.equal(row[15], 'NE');
+  assert.notEqual(row[17], '1. 6. 2026', 'Poslední kontrola je dnešní');
+});
