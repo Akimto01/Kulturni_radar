@@ -364,6 +364,7 @@ Frontend (`tests/frontend-harness.js`, `nactiFrontendFunkce(['fn1','fn2'])`):
   `rf-dryrun`) nesmí hlásit růst porušení. Při opravě porušení spustit skript
   s `--zapsat-baseline` a commitnout sníženou baseline.
 - **Změna kritické funkce backendu = počkat na mutační CI** (`mutacni-testy.yml`, kritická sada, práh 95 %): běží při změně `kulturni_radar.gs`, `tests/unit.test.js`, `tests/harness.js` a `tests/mutace/**`. Při pádu pod práh doplnit testy (přežilé mutanty v reportu artefaktu `mutacni-report-kriticka-sada`, triáž v `Docs/testovani/MUTACE-TRIAZ.md`), práh nesnižovat. Týdenní běh celého backendu (sobota 3:40 UTC) jen měří, bez prahu.
+- **Nové testy = aktualizovat počty v README (tabulka Testy v číslech) ve stejném commitu; každý commit musí projít CI, ne jen poslední v dávce (29. 10. 2026 byla CI třikrát červená kvůli počtům v README).**
 - **Mutační ověření:** pomocný skript musí po neaplikované mutaci (zarážka nenalezena)
   skončit chybou a testy nepouštět. Jinak neaplikovaná mutace vypadá jako nezachycená,
   nebo naopak jako chycená. Ověřit, že se zdroj opravdu změnil (`git diff --stat` nebo

@@ -1,6 +1,6 @@
 # Backlog — Kulturní radar
 
-Poslední aktualizace: 28. 10. 2026. Neplánované nápady a rozpracované položky –
+Poslední aktualizace: 29. 10. 2026. Neplánované nápady a rozpracované položky –
 na rozdíl od CHANGELOG.md, který dokumentuje hotové změny.
 
 ## Cíle do dubna 2027
@@ -9,10 +9,12 @@ Kulturní radar má být appka pro rodinu a přátele, která zároveň slouží
 **1. Testy a kvalita kódu jako ukázka**
 - Repo musí jít ukázat bez dalšího vysvětlování: CI zelené, CHANGELOG a BACKLOG aktuální, každá oprava s testem a živým ověřením.
 - Víc forem výstupů: README jako rozcestník; „příběhy chyb“ (problém → diagnóza → test → oprava); veřejný RF report z CI; dokumentace postupné výstavby architektury testů (od strategie přes framework po CI); systematické mutační testování (Stryker); krátké video nebo GIF z běhu testů.
+- Dokumentace a přehled projektu (Fáze 6 v Doporučeném pořadí): AGENTS.md, rozcestník podle rolí, katalog testů, OpenAPI specifikace, případová studie, historie incidentů; udržování hlídají kontroly v CI nebo varování, ne paměť.
 
 **2. Otevření přátelům: design a Android**
 - Design s dcerou, pak Android (PWA → Trusted Web Activity → Google Play).
 - Před otevřením přátelům vyřešit zakládání nového profilu bez ruční práce v Sheetu a přihlašovací obrazovku, která dnes každému návštěvníkovi ukazuje jména všech profilů.
+- Před otevřením také model hrozeb, přehled zpracování osobních údajů a licencí zdrojů a základní měření přístupnosti (viz Cíl 2 níže).
 
 **3. Kvalita a počet nalezených akcí**
 - Měřítko z týdenního reportu: denní kontrola Brna průměrně ≥ 1,2 nové akce na běh a nejvýš 1 nulový běh za týden; sledovaná města bez dlouhodobě prázdných výsledků.
@@ -47,9 +49,24 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 10. **Lokalizační testy podle A4** (~4–6 h, odhad nejistý): řazení podle češtiny, datum přes půlnoc a přechod letního času, stálá místa s diakritikou (E2E a API). Část `TZ` viz bod 4. → issue #40
 11. **R2 a R5 z POKRYTI.md:** kontrola verze frontendu ve smoke a smoke přes `FRAME` v CI. → issue #41 (R2), #42 (R5)
 12. **Přímý API test přihlášení** (login přes skutečné API). → issue #43
-13. **Katalog testů na GitHub Pages** (~30 min), ~~**hlídání počtů testů v README skriptem** (~30 min)~~ **HOTOVO 29. 10. 2026** a **sdílený skript kontroly úniku** (~30 min, položky v Testovacím dluhu). → issue #44, #45, #46
+13. **Sdílený skript kontroly úniku** (~30 min, položky v Testovacím dluhu) a ~~**hlídání počtů testů v README skriptem** (~30 min)~~ **HOTOVO 29. 10. 2026**; katalog testů (#44) je ve Fázi 6, bod 19. → issue #45, #46
 14. **Sjednocení testů s architekturou, zbylé dávky** (4, 6 až 10; zbývá z ~12 h). → issue #34
-15. **Video nebo GIF z běhu testů** (~30 min). → issue #14
+15. **Video nebo GIF z běhu testů** (~30 min) a 3 screenshoty do README jako produktový přehled (~20 min). → issue #14
+
+**Fáze 6 – dokumentace a přehled projektu (Cíl 1):**
+Pořadí: AGENTS.md, smoke, rozcestník, katalog, kontrola odkazů, případová studie, linter, OpenAPI, ostatní. Revizní issues (model hrozeb, osobní údaje, případová studie, čtvrtletně) se zakládají až s prvním vytvořením dokumentu.
+16. **AGENTS.md a tenký CLAUDE.md** (~0,5 h): hlavní nástrojově neutrální soubor, CLAUDE.md jen odkazuje. → issue #53
+17. **Denní API smoke test v GitHub Actions** (~1 h): čtecí dotazy, notifikace jen při selhání, metrika dostupnosti do D3 a přehledu #52. → issue #54
+18. **Rozcestník podle rolí v Docs/README.md** (~1 h): 11 rolí, stav oblastí máme, základ, plánováno #N. → issue #55
+19. **Katalog testů na GitHub Pages** (~1 h) a odkazy z POKRYTI.md na scénáře v katalogu (riziko, test). Přesunuto z bodu 13. → issue #44
+20. **Kontrola odkazů a úplnosti rozcestníku v CI** (~1 h, až po #55), s negativní zkouškou. → issue #56
+21. **Případová studie na jednu stránku** (~1,5 h), čísla jen odkazem na README a D3; revize čtvrtletně. → issue #57
+22. **Robocop (RF) a ruff (Python) v CI s baseline** (~1,5 h); ESLint pro `.gs` jen jako poznámka na později. → issue #58
+23. **OpenAPI 3.1** (~3,5 h): specifikace se Spectralem a Redocem na Pages (~2 h) a po ní kontrola odpovědí proti schématu v API testech (~1,5 h); Swagger UI ne (Try it out proti produkci a otevřené #50), Schemathesis jen jako pozdější nápad pro čtecí dotazy. → issue #59, #60
+24. **Historie incidentů** (~45 min): tabulka a rozšíření kontroly defektů (uzavřený S1 nebo S2 bez řádku je nález). → issue #61
+25. **Varování „kód změněn, dokument ne“** (~1,5 h), při End a v pondělním přehledu, s negativní zkouškou. → issue #62
+26. **Průběh milníků v pondělním přehledu #52** (~0,5 h), generuje se. → issue #63
+27. **Náklady AI v čase v týdenním reportu kvality** (~1 h), generuje se. → issue #64
 
 **Hotovo (Cíl 1, podrobnosti v CHANGELOG.md):**
 - ~~**README jako rozcestník** (~45 min) – CI odznaky, testovací pyramida v číslech, odkazy na dokumentaci a výstupy.~~ **HOTOVO 28. 10. 2026** (commit 5b044a7, viz CHANGELOG.md). → issue #9
@@ -62,10 +79,14 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 - **Design s dcerou → Android** (~3–4 h aktivní práce po designu) – čeká na dceru; koncept ikony varianta C předschválen 27. 8. 2026.
 - **Zakládání nového profilu bez ruční práce v Sheetu** (odhad po návrhu). → issue #15
 - **Přihlašovací obrazovka pro víc uživatelů** (odhad po návrhu) – dnes ukazuje jména všech profilů každému návštěvníkovi. → issue #16
+- **Model hrozeb** (~1,5 h; navazuje na #50, revize čtvrtletně) – aktiva, útoky, ochrany, otevřené slabiny. → issue #65
+- **Zpracování osobních údajů a licence zdrojů** (~1,5 h; revize čtvrtletně) – profily, e-maily, ntfy; OpenStreetMap, Open-Meteo, MET Norway, Nominatim a další. → issue #66
+- **Přístupnost: jednorázové měření** (~45 min) – Lighthouse nebo axe, výsledky do TESTY.md s plánem. → issue #67
+- **Uživatelská příručka** (spouštěč před pozváním prvního přítele, zatím nepsat, odhad po návrhu). → issue #68
 - **Předpoklad otevření přátelům: ověřování identity u zápisových akcí** (odhad po návrhu) – `toggle`, `toggle-misto`, `filtry`, `set-notifikace` a `vygenerovat-ntfy-tema` dnes berou jen veřejné `uzivatelId`, takže jde měnit cizí data a přesměrovat cizí notifikace. Musí se vyřešit před otevřením, souvisí s #16. → issue #50
 
 **Cíl 3 – kvalita akcí:**
-- **Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – rozhodnout o rozpočtu a stropu 15 akcí na běh; další kroky podle vyhodnocení. → issue #8
+- **Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – rozhodnout o rozpočtu a stropu 15 akcí na běh; další kroky podle vyhodnocení; výstupem je dokument s vyhodnocením AI, ne jen rozhodnutí. → issue #8
 
 **Ruční úklid (Vojta, kdykoli):** smazat 5 řádků „neuvedeno“ v AKCE (v3.48); projít 5 podezřelých fuzzy sloučení (CHANGELOG v3.50); volitelně 2 staré skryté duplicity v MÍSTA (v3.46).
 
