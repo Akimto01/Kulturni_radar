@@ -23,3 +23,5 @@ cloudflare-worker/.wrangler/
 
 # lokální nastavení Claude Code (oprávnění nástrojů), patří jen k tomuto stroji
 /.claude/settings.json
+# Python cache ze skriptů v .github/scripts
+__pycache__/

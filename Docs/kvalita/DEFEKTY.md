@@ -52,6 +52,24 @@ přátelům), závažnost zůstává, dokud se nezmění chování chyby.
 Defekt se uzavírá až po ověření v produkci, ne po nasazení: řada oprav v tomto
 projektu závisí na datech, která přinese až další běh (týdenní kontrola, samotest).
 
+### Uzavírací komentář
+
+Při zavření defektu se přidá komentář s těmito čtyřmi sekcemi (vzor ke zkopírování; kontrola úplnosti hledá všechny čtyři názvy). Pak se na boardu nastaví Stav defektu Uzavřený (Status Done se nastaví sám).
+
+```markdown
+### Kořenová příčina
+Co a proč bylo špatně (funkce, podmínka, data).
+
+### Oprava
+Backend vX.YY, Index.html vX.YY, commit abc1234. Co se změnilo.
+
+### Regresní test
+Název testu (soubor). Mutace: co se v kódu vrátilo a že test spadl.
+
+### Analýza úniku
+Na které úrovni testů měl být defekt chycen, proč nebyl a co se změnilo, aby se to neopakovalo.
+```
+
 ## Jak nalezeno
 
 Pole sleduje, která aktivita defekt odhalila. Hodnoty: *Automatický test
@@ -59,6 +77,12 @@ Pole sleduje, která aktivita defekt odhalila. Hodnoty: *Automatický test
 samotest*, *Analýza nebo review*, *Uživatel*. Živá kontrola znamená průzkumné
 testování na produkci (web, API, data v tabulce), typicky při ověření po nasazení.
 Počítá se aktivita, která defekt odhalila poprvé.
+
+## Kontrola úplnosti
+
+Skript `.github/scripts/kontrola-defektu.py` projde všechny issues se štítkem bug a jen čte (nic neopravuje): hlídá (a) vyplněná pole boardu a milník, (b) sekce formuláře `defekt.yml` a titulek „Defekt: “ (výjimka pro issues do #33, které vznikly před formulářem), (c) soulad stavů (zavřené = Uzavřený, Zamítnutý nebo Nereprodukovatelný a Status Done, otevřené = jiný stav), (d) uzavírací komentář se čtyřmi sekcemi u zavřených defektů (u starších stačí komentář „Zpětná klasifikace“ s analýzou úniku) a (e) shodu tabulky klasifikace v tomto souboru s boardem. Výstup je tabulka nálezů, při nálezu exit 1.
+
+Spouští se ručně: `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-defektu.py`, vždy na konci session (při „End“) a po založení nebo zavření defektu. Neběží v CI schválně: board je uživatelský projekt, výchozí `GITHUB_TOKEN` ho nepřečte a samostatný secret jen kvůli kontrole nechceme (viz #33, kde únik tajných hodnot z CI vznikl právě takhle). Kontrola v CI s read-only tokenem je v BACKLOGu jako nápad k budoucímu zvážení.
 
 ## Zpětná klasifikace defektů 26.–28. 10. 2026
 
@@ -75,10 +99,13 @@ Počítá se aktivita, která defekt odhalila poprvé.
 | [#48](https://github.com/Akimto01/Kulturni_radar/issues/48) | Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu | S3 | P3 | Analýza nebo review | Potvrzený |
 | [#49](https://github.com/Akimto01/Kulturni_radar/issues/49) | Sledovaná města: běh narazí na limit 6 min, přepočet počasí se nespustí a selhání se nenahlásí | S3 | P2 | Živá kontrola | Ověřuje se |
 | [#50](https://github.com/Akimto01/Kulturni_radar/issues/50) | Server neověřuje identitu uživatele u zápisových akcí: stačí veřejné `uzivatelId` | S2 | P3 | Analýza nebo review | Potvrzený |
+| [#4](https://github.com/Akimto01/Kulturni_radar/issues/4) | Cloudflare: crawlery GPTBot a ClaudeBot blokované, `robots.txt`, `sitemap.xml` a `favicon.svg` se na kulturniradar.cz neservírují (doplněno 29. 10. při kontrole úplnosti) | S4 | P4 | Živá kontrola | Potvrzený |
 
 #48 (29. 10. 2026) je první defekt založený formulářem `defekt.yml`, ne zpětnou klasifikací: nalezen čtením kódu při psaní tabulky triggerů v `PROVOZ.md` (#47), oprava spolu s testy v #35.
 
 #49 (29. 10. 2026) našla živá kontrola při ověřovačce #6: čtvrteční běh `zpracovatSledovanaMesta` skončil na časovém limitu 6 minut (361 s) uprostřed volání AI třetího města a přepočet počasí se vůbec nespustil. Čtení kódu potvrdilo, že rozpočet 4,5 minuty se kontroluje jen před městem (město trvá kolem 2 minut), počasí běží až za smyčkou a přerušení na limitu se nikam nezapíše. Hypotéza, že datum na hraně předpovědi (dnes + 7) skončí jako CHYBA místo NA, se nepotvrdila: `vyhodnotPocasiUdalosti_` vrací CHYBA jen tehdy, když neodpověděl Open-Meteo ani met.no; tři záznamy CHYBA s datem 5. 11. jsou nejspíš starší stav, který se kvůli #49 nepřepsal. Samostatný defekt proto nevznikl.
+
+#4 (založeno 31. 8. 2026 z BACKLOGu) bylo při kontrole úplnosti 29. 10. 2026 klasifikováno zpětně: S4 (appka funguje, jen není dohledatelná pro AI crawlery a chybí soubory pro indexaci), P4 (bez časové tísně, vyžaduje práci v Cloudflare dashboardu), Živá kontrola (po nasazení v3.58 se `curl` na `robots.txt` a `sitemap.xml` vrátil SPA fallback; blokaci crawlerů Cloudflare podle dokumentace přidává do `robots.txt` automaticky).
 
 #50 (29. 10. 2026) našlo čtení kódu při psaní testů #35 dávky 4: akce `toggle`, `toggle-misto`, `filtry`, `set-notifikace` a `vygenerovat-ntfy-tema` berou jen veřejné `uzivatelId` (seznam profilů vrací `api=uzivatele` bez přihlášení), takže jde měnit cizí data a přesměrovat cizí notifikace na libovolný e-mail. Závažnost S2, priorita P3, protože dnes appku používá jen rodina; musí se vyřešit před otevřením přátelům (Cíl 2), souvisí s #16.
 
