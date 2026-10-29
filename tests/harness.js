@@ -5,11 +5,46 @@
  * Zásada: služby, které jednotkové testy nemají potřebovat (UrlFetchApp,
  * ScriptApp, LockService…), vyhazují výjimku – kdyby se jich testovaný
  * kód dotkl, test spadne nahlas, ne potichu.
+ *
+ * Volitelné volby (výchozí chování beze změny, služba je zakázaná, dokud si ji
+ * test nevyžádá; #35):
+ *  - ss:        SpreadsheetApp.getActiveSpreadsheet() vrátí předaný fakeSpreadsheet
+ *  - zamek:     true/false – LockService.getScriptLock().tryLock vrátí tuto hodnotu;
+ *               volání a uvolnění v ctx.__zamek ({ tryLock: [ms…], uvolneno: N })
+ *  - triggery:  pole existujících triggerů (ScriptApp.getProjectTriggers); smazané a
+ *               založené triggery v ctx.__triggery ({ smazane: [], vytvorene: [] })
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { pathToFileURL } = require('node:url');
+
+/** Stub ScriptApp pro volby.triggery: builder newTrigger(...) zaznamenává každý
+ *  vytvořený trigger jako { funkce, typ, udalost, den, hodina, denVMesici,
+ *  kazdychDni, tabulka }. */
+function stubScriptApp(existujici, zaznam) {
+  return {
+    WeekDay: { MONDAY: 'MONDAY', TUESDAY: 'TUESDAY', WEDNESDAY: 'WEDNESDAY', THURSDAY: 'THURSDAY',
+               FRIDAY: 'FRIDAY', SATURDAY: 'SATURDAY', SUNDAY: 'SUNDAY' },
+    getProjectTriggers: () => existujici.slice(),
+    deleteTrigger: (t) => { zaznam.smazane.push(t); },
+    newTrigger: (funkce) => {
+      const z = { funkce, typ: null, udalost: null, den: null, hodina: null,
+                  denVMesici: null, kazdychDni: null, tabulka: null };
+      const b = {
+        forSpreadsheet: (ss) => { z.typ = 'tabulka'; z.tabulka = ss; return b; },
+        onEdit: () => { z.udalost = 'onEdit'; return b; },
+        timeBased: () => { z.typ = 'cas'; return b; },
+        atHour: (h) => { z.hodina = h; return b; },
+        everyDays: (n) => { z.kazdychDni = n; return b; },
+        onWeekDay: (d) => { z.den = d; return b; },
+        onMonthDay: (n) => { z.denVMesici = n; return b; },
+        create: () => { zaznam.vytvorene.push(z); return z; },
+      };
+      return b;
+    },
+  };
+}
 
 function formatujDatum(d, vzor) {
   const dd = d.getDate(), mm = d.getMonth() + 1, yyyy = d.getFullYear();
@@ -36,6 +71,8 @@ function nactiRadar(volby = {}) {
   const odeslane = [];   // zachycené MailApp.sendEmail volání
   const ctxSleepMs = []; // zachycené Utilities.sleep (retry pauzy)
   const cacheStore = {}; // v3.26: in-memory stub CacheService.getScriptCache()
+  const triggeryZaznam = { smazane: [], vytvorene: [] };   // volby.triggery
+  const zamekZaznam = { tryLock: [], uvolneno: 0 };        // volby.zamek
   const cacheSelze = !!volby.cacheThrows;   // simulace výpadku CacheService (fail-open testy)
 
   const ctx = {
@@ -76,7 +113,7 @@ function nactiRadar(volby = {}) {
       sendEmail: (komu, predmet, telo, options) => { odeslane.push({ komu, predmet, telo, options }); },
     },
     SpreadsheetApp: {
-      getActiveSpreadsheet: () => ({ getUrl: () => 'https://sheet.example/test' }),
+      getActiveSpreadsheet: () => volby.ss || ({ getUrl: () => 'https://sheet.example/test' }),
     },
     // v3.26: stub CacheService – vždy přítomný (jako MailApp/PropertiesService),
     // ať existující testy funkcí, co teď cache i invalidují, nemusí nic navíc
@@ -102,8 +139,13 @@ function nactiRadar(volby = {}) {
       }),
     },
     UrlFetchApp: volby.urlFetch ? { fetch: volby.urlFetch } : zakazano('UrlFetchApp'),
-    ScriptApp: zakazano('ScriptApp'),
-    LockService: zakazano('LockService'),
+    ScriptApp: volby.triggery ? stubScriptApp(volby.triggery, triggeryZaznam) : zakazano('ScriptApp'),
+    LockService: typeof volby.zamek === 'boolean' ? {
+      getScriptLock: () => ({
+        tryLock: (ms) => { zamekZaznam.tryLock.push(ms); return volby.zamek; },
+        releaseLock: () => { zamekZaznam.uvolneno++; },
+      }),
+    } : zakazano('LockService'),
   };
 
   const cestaKGs = path.join(__dirname, '..', 'apps-script', 'kulturni_radar.gs');
@@ -116,6 +158,8 @@ function nactiRadar(volby = {}) {
   ctx.__odeslaneEmaily = odeslane;
   ctx.__sleepMs = ctxSleepMs;
   ctx.__cacheStore = cacheStore;
+  ctx.__triggery = triggeryZaznam;
+  ctx.__zamek = zamekZaznam;
   ctx.__props = props;   // v3.45: přímý pohled do Script Properties (stav zámku PINu)
   // Konstruktor Date ze sandboxu – `instanceof Date` napříč realmy nefunguje,
   // takže testy musí Date vytvářet uvnitř stejného realmu jako skript.

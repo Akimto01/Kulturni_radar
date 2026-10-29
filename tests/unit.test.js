@@ -4145,3 +4145,134 @@ test('v3.50: sestavReportKvality_ – řádek s počtem fuzzy sloučení, jen kd
   h.fuzzy = { aktualni: 4, predchozi: 2 };
   assert.match(r.sestavReportKvality_(h), /fuzzy sloučení v AKCE: 4 \| dříve: 2/);
 });
+
+// ---------------------------------------------------------------------------
+// #35 dávka 1: rozšíření harnessu (volby ss, zamek, triggery), setupTriggers,
+// watchdogDailyCheck
+// ---------------------------------------------------------------------------
+
+test('#35 harness: výchozí stav – ScriptApp a LockService dál vyhazují, getActiveSpreadsheet vrací jen minimální stub', () => {
+  const ctx = nactiRadar();
+  assert.throws(() => ctx.ScriptApp.getProjectTriggers(), /ScriptApp/);
+  assert.throws(() => ctx.LockService.getScriptLock(), /LockService/);
+  assert.equal(ctx.SpreadsheetApp.getActiveSpreadsheet().getUrl(), 'https://sheet.example/test');
+  assert.equal(ctx.__triggery.vytvorene.length, 0);
+  assert.equal(ctx.__zamek.uvolneno, 0);
+});
+
+test('#35 harness: volby ss, zamek a triggery zapnou stuby a zaznamenávají volání', () => {
+  const ss = fakeSpreadsheet({});
+  const stary = { id: 'stary' };
+  const ctx = nactiRadar({ ss, zamek: false, triggery: [stary] });
+  assert.equal(ctx.SpreadsheetApp.getActiveSpreadsheet(), ss, 'vrací předanou tabulku');
+
+  const zamek = ctx.LockService.getScriptLock();
+  assert.equal(zamek.tryLock(5000), false, 'tryLock vrací zadanou hodnotu');
+  zamek.releaseLock();
+  assert.equal(ctx.__zamek.tryLock[0], 5000);
+  assert.equal(ctx.__zamek.uvolneno, 1);
+
+  assert.equal(ctx.ScriptApp.getProjectTriggers().length, 1);
+  ctx.ScriptApp.deleteTrigger(stary);
+  ctx.ScriptApp.newTrigger('f').timeBased().onWeekDay(ctx.ScriptApp.WeekDay.SUNDAY).atHour(20).create();
+  assert.equal(ctx.__triggery.smazane[0], stary);
+  const z = ctx.__triggery.vytvorene[0];
+  assert.equal(`${z.funkce}|${z.typ}|${z.den}|${z.hodina}`, 'f|cas|SUNDAY|20');
+});
+
+// Změna rozvrhu triggerů musí jít ruku v ruce s Docs/aplikace/PROVOZ.md (tabulka
+// triggerů) a s kontrolou souběhu s cronem RF testů v GitHub Actions
+// (rf-tests.yml, UTC bez letního času, dnes neděle 20:20 UTC = 21:20 SEČ
+// / 22:20 SELČ, tedy po nedělním zpracovatSledovanaMesta ve 20:00).
+const OCEKAVANE_TRIGGERY = [
+  // funkce | typ | událost | den | hodina | den v měsíci | každých dní
+  'onEditInstallable|tabulka|onEdit|-|-|-|-',
+  'dailyCheck|cas|-|-|8|-|1',
+  'sendUserNotifications|cas|-|-|9|-|1',
+  'weeklyDigest|cas|-|MONDAY|7|-|-',
+  'weekendDigest|cas|-|THURSDAY|16|-|-',
+  'updateMista|cas|-|-|6|1|-',
+  'runSelfTest|cas|-|SUNDAY|18|-|-',
+  'watchdogDailyCheck|cas|-|-|20|-|1',
+  'zpracovatSledovanaMesta|cas|-|SUNDAY|20|-|-',
+  'zpracovatSledovanaMesta|cas|-|THURSDAY|10|-|-',
+];
+const popisTriggeru_ = (z) => [z.funkce, z.typ, z.udalost, z.den, z.hodina, z.denVMesici, z.kazdychDni]
+  .map(v => (v === null ? '-' : v)).join('|');
+
+test('#35 setupTriggers: přesný rozvrh všech 10 triggerů podle tabulky (včetně neděle 20:00 a čtvrtka 10:00 zpracovatSledovanaMesta)', () => {
+  const ss = fakeSpreadsheet({});
+  const ctx = nactiRadar({ ss, triggery: [] });
+  ctx.setupTriggers();
+  assert.equal(ctx.__triggery.vytvorene.length, 10);
+  assert.equal(ctx.__triggery.vytvorene.map(popisTriggeru_).join('\n'), OCEKAVANE_TRIGGERY.join('\n'));
+  assert.equal(ctx.__triggery.vytvorene[0].tabulka, ss, 'onEdit trigger je navázaný na aktivní tabulku');
+});
+
+test('#35 setupTriggers: idempotence – staré triggery se smažou, nové se založí jednou', () => {
+  const stare = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  const ctx = nactiRadar({ ss: fakeSpreadsheet({}), triggery: stare });
+  ctx.setupTriggers();
+  assert.equal(ctx.__triggery.smazane.length, 3, 'všechny dosavadní triggery smazány');
+  assert.equal(ctx.__triggery.vytvorene.length, 10, 'nových přesně 10, žádné navíc');
+  const funkce = ctx.__triggery.vytvorene.map(z => z.funkce);
+  assert.equal(funkce.filter(f => f === 'zpracovatSledovanaMesta').length, 2);
+  assert.equal(new Set(funkce).size, 9, '9 různých funkcí');
+});
+
+/** Tabulka s listem KONTROLY (hlavička + zadané řádky [datum, typ]). */
+function kontrolyProWatchdog_(radky) {
+  return fakeSpreadsheet({ KONTROLY: new MemSheet([['Datum', 'Typ']].concat(radky)) });
+}
+const dnesCasText_ = () => dnesCz_() + ' 8:13';   // produkční tvar formatDate_
+
+test('#35 watchdogDailyCheck: dnešní denní kontrola (datum jako text) → žádná notifikace', () => {
+  const ctx = nactiRadar({ ss: kontrolyProWatchdog_([[dnesCasText_(), 'denní kontrola']]), properties: { NTFY_TOPIC: 't' } });
+  ctx.watchdogDailyCheck();
+  assert.equal(ctx.__odeslaneEmaily.length, 0);
+});
+
+test('#35 watchdogDailyCheck: dnešní denní kontrola (datum jako objekt Date) → žádná notifikace', () => {
+  const ss = kontrolyProWatchdog_([]);
+  const ctx = nactiRadar({ ss, properties: { NTFY_TOPIC: 't' } });
+  // Date musí vzniknout ve stejném realmu jako skript (viz cross-realm past), proto až po načtení ctx
+  ss.getSheetByName('KONTROLY').appendRow([new ctx.__Date(), 'Denní kontrola']);
+  ctx.watchdogDailyCheck();
+  assert.equal(ctx.__odeslaneEmaily.length, 0);
+});
+
+test('#35 watchdogDailyCheck: chybí dnešní denní kontrola → notifikace s předmětem a odkazem na tabulku', () => {
+  // včerejší denní kontrola + dnešní JINÝ typ (sledované město) nestačí
+  const ctx = nactiRadar({
+    ss: kontrolyProWatchdog_([
+      ['1. 1. 2020 8:13', 'denní kontrola'],
+      [dnesCasText_(), 'sledované město'],
+    ]),
+    properties: { NTFY_TOPIC: 't' },
+  });
+  ctx.watchdogDailyCheck();
+  assert.equal(ctx.__odeslaneEmaily.length, 1);
+  const m = ctx.__odeslaneEmaily[0];
+  assert.equal(m.komu, 'ntfy-t@ntfy.sh');
+  assert.equal(m.predmet, 'Watchdog: denní kontrola dnes neproběhla');
+  assert.match(m.telo, /chybí dnešní záznam denní kontroly/);
+  assert.match(m.telo, /https:\/\/sheet\.example\/test/);
+});
+
+test('#35 watchdogDailyCheck: prázdný list KONTROLY (jen hlavička) i chybějící list → nic se neodešle', () => {
+  const prazdny = nactiRadar({ ss: kontrolyProWatchdog_([]), properties: { NTFY_TOPIC: 't' } });
+  prazdny.watchdogDailyCheck();
+  const bezListu = nactiRadar({ ss: fakeSpreadsheet({}), properties: { NTFY_TOPIC: 't' } });
+  bezListu.watchdogDailyCheck();
+  assert.equal(prazdny.__odeslaneEmaily.length, 0);
+  assert.equal(bezListu.__odeslaneEmaily.length, 0);
+});
+
+test('#35 watchdogDailyCheck: chyba čtení tabulky se nepropustí jako výjimka', () => {
+  const ctx = nactiRadar({ properties: { NTFY_TOPIC: 't' } });
+  // Ruční přepis místo volby ss: volba ss vrací hotovou tabulku, výjimku z
+  // getActiveSpreadsheet() (výpadek služby) neumí simulovat.
+  ctx.SpreadsheetApp.getActiveSpreadsheet = () => { throw new Error('tabulka nedostupná'); };
+  assert.doesNotThrow(() => ctx.watchdogDailyCheck());
+  assert.equal(ctx.__odeslaneEmaily.length, 0);
+});

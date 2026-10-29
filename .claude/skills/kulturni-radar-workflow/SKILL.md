@@ -346,8 +346,9 @@ GitHub maskuje secrets jen v konzoli, ne v souborech z testů (`output.xml`,
 `node --test --experimental-test-coverage tests/unit.test.js tests/frontend.test.js`
 (CI zatím jen vypisuje). Funguje jen proto, že `tests/harness.js` předává
 `vm.runInContext` jako `filename` URL souboru (`pathToFileURL`); holé jméno se
-v reportu neukáže. Backend 82,2 % řádků k 28. 10. Matice pokrytí podle názvů
-testů nadhodnocuje, tvrzení o pokrytí opírat o měření.
+v reportu neukáže. Aktuální hodnoty v README (Testy v číslech) a
+ARCHITEKTURA-TESTU.md, D3. Matice pokrytí podle názvů testů nadhodnocuje,
+tvrzení o pokrytí opírat o měření.
 
 Frontend (`Index.html`) se měří skriptem `node tests/pokryti-frontendu.js`
 ze syrových dat V8 (`NODE_V8_COVERAGE`), protože tabulka
@@ -355,9 +356,9 @@ ze syrových dat V8 (`NODE_V8_COVERAGE`), protože tabulka
 zvláštní skript pro každou vykrojenou funkci a node je nesloučí (ukázalo se
 94 %, 2 % i 6 % podle varianty). Funkce se spouští s předponou ze mezer
 stejné délky jako text před ní v souboru (offsety V8 pak sedí na řádky),
-`filename` zůstává `Index.html#název`, ne `file://` URL. Hodnoty k 29. 10.
-2026: 98,9 % řádků ve vykrojených funkcích (57 ze 113), 25,3 % celého
-skriptu (zbytek pokrývají jen E2E). Metoda je přibližná: řádek se bere jako
+`filename` zůstává `Index.html#název`, ne `file://` URL. Aktuální hodnoty
+v README (Testy v číslech) a ARCHITEKTURA-TESTU.md, D3; zbytek skriptu
+pokrývají jen E2E. Metoda je přibližná: řádek se bere jako
 pokrytý, pokud jeho první znak kódu má počet spuštění větší než 0. CI krok
 „Pokrytí frontendu“ jen vypisuje, bez prahu (issue #39).
 

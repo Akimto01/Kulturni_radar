@@ -34,7 +34,7 @@ Documentation is in Czech.*
 
 | Úroveň | Nástroj | Počet | Kdy běží |
 |---|---|---|---|
-| Jednotkové testy backendu (logika Apps Scriptu přes vlastní harness, bez Googlu) | `node:test` | 360 | každý push (CI) |
+| Jednotkové testy backendu (logika Apps Scriptu přes vlastní harness, bez Googlu) | `node:test` | 369 | každý push (CI) |
 | Jednotkové testy frontendu (čisté funkce z `Index.html`) | `node:test` | 209 | každý push (CI) |
 | Kontrola syntaxe a klíčových slov RF sady (dry run) | Robot Framework | 61 | každý push (CI) |
 | E2E testy proti produkci: frontend + API kontrakt | Robot Framework + Browser Library (Playwright), RequestsLibrary | 52 + 9 | týdně (CI) a smoke po každém nasazení |
@@ -43,7 +43,7 @@ Documentation is in Czech.*
 
 Počty v této tabulce hlídá CI (skript `.github/scripts/kontrola-poctu-testu.py` v jobu `rf-dryrun`): při rozdílu proti repu workflow selže.
 
-Pokrytí řádků backendu jednotkovými testy: 82,2 % (k 28. 10. 2026, měří a vypisuje CI v jobu `node-testy`). Pokrytí frontendu (`node tests/pokryti-frontendu.js`, k 29. 10. 2026): 98,9 % řádků ve vykrojených funkcích (57 ze 113), 25,3 % celého skriptu `Index.html`, protože zbytek pokrývají jen E2E testy.
+Pokrytí řádků backendu jednotkovými testy: 84,6 % (k 29. 10. 2026, měří a vypisuje CI v jobu `node-testy`). Pokrytí frontendu (`node tests/pokryti-frontendu.js`, k 29. 10. 2026): 98,9 % řádků ve vykrojených funkcích (57 ze 113), 25,3 % celého skriptu `Index.html`, protože zbytek pokrývají jen E2E testy.
 
 ## Jak pracuji
 
