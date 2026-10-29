@@ -18,15 +18,13 @@ Pravidla:
 
 Výstup: tabulka problémů (issue, pravidlo, co chybí); exit 1 při nálezu.
 """
-import json
 import os
 import re
-import subprocess
 import sys
 
-OWNER = 'Akimto01'
-REPO = 'Akimto01/Kulturni_radar'
-PROJEKT = '1'
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # python -I nepřidává složku skriptu
+import gh_projekt  # noqa: E402  (sdílené načítání issues a boardu)
+
 DEFEKTY_MD = os.path.join(os.path.dirname(__file__), '..', '..', 'Docs', 'kvalita', 'DEFEKTY.md')
 
 # Výjimka z pravidel b) a d): issues do tohoto čísla včetně vznikly před formulářem
@@ -43,22 +41,12 @@ POLE_BOARDU = [('závažnost', 'Závažnost'), ('priorita', 'Priorita'),
                ('jak nalezeno', 'Jak nalezeno'), ('stav defektu', 'Stav defektu')]
 
 
-def gh_json(args):
-    r = subprocess.run(['gh'] + args, capture_output=True, text=True, encoding='utf-8')
-    if r.returncode != 0:
-        sys.exit('gh ' + ' '.join(args[:3]) + ' selhalo: ' + r.stderr.strip())
-    return json.loads(r.stdout)
-
-
 def nacist_defekty():
-    return gh_json(['issue', 'list', '--repo', REPO, '--label', 'bug', '--state', 'all',
-                    '--limit', '300', '--json', 'number,title,state,body,milestone,comments'])
+    return gh_projekt.nacist_issues('bug')
 
 
 def nacist_board():
-    data = gh_json(['project', 'item-list', PROJEKT, '--owner', OWNER, '--format', 'json', '-L', '500'])
-    return {i['content']['number']: i for i in data['items']
-            if i.get('content', {}).get('type') == 'Issue' and i['content'].get('repository') == REPO}
+    return gh_projekt.nacist_board()
 
 
 def radky_defekty_md():

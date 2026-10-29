@@ -258,7 +258,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
   - Dependabot (bezpečnostní aktualizace npm závislostí)
   - Milestones (seskupení issues podle verze/fáze, např. „Notifikace A–F")
   - GitHub Wiki (zvažováno, ale `Docs/*.md` verzovaný v repu je pravděpodobně lepší volba pro tenhle projekt)
-  - **Kontrola defektů v CI s read-only tokenem** (nápad 29. 10. 2026): `.github/scripts/kontrola-defektu.py` dnes běží jen ručně, protože výchozí `GITHUB_TOKEN` board (uživatelský projekt) nepřečte. Možnost: fine-grained token jen pro čtení projektu jako secret, plánovaný běh jednou týdně s notifikací při nálezu. Zvážit až se ukáže, že ruční spouštění při „End“ nestačí; samostatný secret jen kvůli kontrole zatím nechceme (viz #33).
+  - **Kontrola defektů a boardu v CI s read-only tokenem** (nápad 29. 10. 2026, rozšířeno téhož dne): `.github/scripts/kontrola-defektu.py` a `kontrola-boardu.py` dnes běží jen ručně, protože výchozí `GITHUB_TOKEN` board (uživatelský projekt) nepřečte. Možnost: fine-grained token jen pro čtení projektu jako secret, plánovaný běh jednou týdně s notifikací při nálezu. Zvážit až se ukáže, že ruční spouštění při „End“ nestačí; samostatný secret jen kvůli kontrole zatím nechceme (viz #33).
 
 ## Plán rozvoje — schváleno 4. 8. 2026, aktualizováno 8. 8. 2026
 1. ~~**Rodinné profily**~~ — **HOTOVO 7.–8. 8. 2026** (backend v3.20, frontend

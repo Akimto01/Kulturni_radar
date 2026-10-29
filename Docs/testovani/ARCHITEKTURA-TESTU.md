@@ -240,6 +240,7 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
 | Statická kontrola testů | `robot --dryrun` celé RF sady (syntaxe, existence klíčových slov, argumenty) | každý push a PR | nasazení | vlastník |
 | Pojistka souladu s architekturou | počty porušení pravidel B4, B5 a C3 proti baseline (`.github/scripts/kontrola-architektury-testu.py`); selže, když porušení přibude | každý push a PR | push s novým porušením | vlastník |
 | Kontrola počtů testů v README | porovná tabulku „Testy v číslech“ se skutečností (Node, RF přes robot.api, worker) | každý push a PR | push s rozdílem | vlastník |
+| Kontrola boardu a defektů | `.github/scripts/kontrola-boardu.py` a `kontrola-defektu.py` (jen čtou): pole boardu, stavy, WIP limit, Odhad u Todo, checklisty, soulad BACKLOG.md a DEFEKTY.md s issues | ručně při „End“ (konec každé pracovní session) | nic (nálezy se opraví před další prací) | vlastník; neběží v CI, protože board je uživatelský projekt a výchozí `GITHUB_TOKEN` ho nepřečte, viz [DEFEKTY.md](../kvalita/DEFEKTY.md), Kontrola úplnosti |
 | Testy workeru | 7 testů e-mailového webhooku | push se změnou `cloudflare-worker/**` | nasazení workeru | vlastník |
 | Smoke po nasazení | 11 E2E a API testů s tagem `smoke` | ručně po každém nasazení | další práci, dokud neprojde | vlastník |
 | Týdenní regrese | API (9) a E2E (52) proti produkci | plán, neděle 20:20 UTC (21:20 SEČ, 22:20 SELČ; od 28. 10. 2026, dřív 19:00 UTC; GitHub plánované běhy zdržuje, dřívější skutečný start byl zhruba 2 až 4 h po plánu); ručně | nic automaticky; selhání = úkol na další session | notifikace na telefon (jen plánované běhy), veřejný report |
@@ -450,3 +451,4 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | 29. 10. 2026 | D3: pokrytí backendu 90,1 % řádků a 82,6 % větví po dávce 3 z #35 (`updateMista`, `callAnthropicPlaces_`, `apiNajdiProUzivatele_` 100 % řádků); ze seznamu funkcí pod 70 % zůstává `apiToggle_` |
 | 29. 10. 2026 | D3: pokrytí backendu 90,3 % řádků a 83,0 % větví po dávce 3b z #35 (`spustKontroluCore_`, `menuRunNow` a obsazený zámek ve `zpracovatSledovanaMesta` pod testem) |
 | 29. 10. 2026 | D3: pokrytí backendu 92,0 % řádků a 85,0 % větví po dávce 4 z #35 (`apiSetFiltry_`, `apiToggle_`, `nastavPin_`, přehledy a `notifyFail_` 100 % řádků); mezi funkcemi pod 70 % žádná kritická nezůstává |
+| 29. 10. 2026 | C1: řádek Kontrola boardu a defektů (ruční skripty při konci session, ne v CI) |

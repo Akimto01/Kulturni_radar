@@ -259,13 +259,19 @@ do SKILL.md (nová automatizace, nový diagnostický postup, zastaralá
 informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
 úpravu ke schválení, ne ji jen zmínit mimochodem.
 
-### Defekty na konci session (od 29. 10. 2026)
+### Kontroly projektu na konci session (od 29. 10. 2026)
 
-- Při „End“ (i při rozloučení) spustit kontrolu úplnosti defektů: `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-defektu.py`
-  (jen čte, exit 1 při nálezu) a nálezy uvést ve shrnutí; neopravovat automaticky, navrhnout opravu.
+- Při „End“ (i při rozloučení) spustit oba kontrolní skripty (jen čtou, exit 1 při chybě):
+  `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-defektu.py` (defekty: pole boardu, formulář, stavy, uzavírací komentář, DEFEKTY.md)
+  a `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-boardu.py` (všechna issues: Status, milník, štítek, Odhad, checklisty, BACKLOG.md).
+  Nálezy (chyby i varování) uvést ve shrnutí; neopravovat automaticky, navrhnout opravu.
 - Defekt se zakládá vždy formulářem `defekt.yml` a po založení se vyplní všechna pole boardu (Závažnost, Priorita, Jak nalezeno, Stav defektu, milník).
 - Při zavírání defektu uzavírací komentář podle šablony v `Docs/kvalita/DEFEKTY.md` (Kořenová příčina, Oprava, Regresní test, Analýza úniku),
-  pak Stav defektu Uzavřený. Kontrola neběží v CI schválně (board je uživatelský projekt, viz DEFEKTY.md, Kontrola úplnosti).
+  pak Stav defektu Uzavřený.
+- **WIP limit:** nejvýš 3 issues najednou In Progress (konstanta `WIP_LIMIT` v `kontrola-boardu.py`); víc je varování.
+- **Odhad u Todo:** issue ve stavu Todo nebo In Progress musí mít vyplněný Odhad (h), bez něj kontrola hlásí chybu. Todo jen pro vybrané na nejbližší práci
+  (Doporučené pořadí, fáze 1 a 2), ostatní Backlog.
+- Kontroly neběží v CI schválně (board je uživatelský projekt, viz DEFEKTY.md, Kontrola úplnosti).
 
 ### Explicitní hranice session (Start/End)
 Kromě automatického rozpoznání farewell frází platí i explicitní
