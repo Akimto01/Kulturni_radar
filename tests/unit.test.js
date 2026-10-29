@@ -5278,3 +5278,49 @@ test('#35 weeklyDigest a weekendDigest: selhání → notifyFail_ s příslušn�
   assert.throws(() => v.weekendDigest());
   assert.equal(v.__odeslaneEmaily[0].predmet, 'Víkendové tipy selhaly');
 });
+
+// ---------------------------------------------------------------------------
+// #13 dávka 3b-1: upsertEvents_ – zrušená akce (mutanty #213 až #218)
+// ---------------------------------------------------------------------------
+
+/** Akce přicházející z AI pro profil Brno; přepsatelná pole přes `p`. */
+function novaAkceUpsert_(p) {
+  return Object.assign({
+    id: 'u-1', datum_od: '15. 6. 2026', datum_do: '15. 6. 2026', nazev: 'Koncert na nábřeží',
+    misto: 'Nábřeží', obec: 'Brno', kategorie: 'koncert;hudba', stav: 'potvrzeno',
+  }, p);
+}
+
+test('3b-1: upsertEvents_ – akce, která se změnila na „zrušeno“, se počítá jako zrušená a ne jako změněná', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([akceRadekFuzzy_({
+    id: 'u-1', nazev: 'Koncert na nábřeží', datumOd: '15. 6. 2026', datumDo: '15. 6. 2026', misto: 'Nábřeží' })])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [novaAkceUpsert_({ stav: 'zrušeno' })]);
+
+  assert.equal(stats.zrusene, 1);
+  assert.equal(stats.zmenene, 0);
+  assert.equal(stats.zmeneneNazvy.length, 0);
+  assert.equal(JSON.stringify(stats.zruseneNazvy), JSON.stringify([{ d: '2026-06-15', kat: 'koncert', t: 'Koncert na nábřeží (15. 6. 2026)' }]));
+  const row = ss.getSheetByName('AKCE').getRange(2, 1, 1, 25).getValues()[0];
+  assert.equal(row[13], 'zrušeno', 'stav se zapíše do listu');
+  assert.equal(row[15], 'ANO', 'zrušení je změna – sloupec Změna');
+});
+
+test('3b-1: upsertEvents_ – stav „Zrušeno “ (velké písmeno, mezera) se pozná jako zrušení; ostatní změny zůstávají změněné', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([
+    akceRadekFuzzy_({ id: 'u-1', nazev: 'Koncert na nábřeží', datumOd: '15. 6. 2026', datumDo: '15. 6. 2026' }),
+    akceRadekFuzzy_({ id: 'u-2', nazev: 'Divadlo v parku', datumOd: '20. 6. 2026', datumDo: '20. 6. 2026' }),
+  ])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [
+    novaAkceUpsert_({ stav: 'Zrušeno ' }),
+    novaAkceUpsert_({ id: 'u-2', nazev: 'Divadlo v parku', datum_od: '21. 6. 2026', datum_do: '21. 6. 2026', kategorie: '' }),
+  ]);
+
+  assert.equal(stats.zrusene, 1);
+  assert.equal(stats.zmenene, 1);
+  assert.equal(stats.zruseneNazvy.length, 1);
+  assert.equal(stats.zruseneNazvy[0].t, 'Koncert na nábřeží (15. 6. 2026)');
+  assert.equal(stats.zmeneneNazvy.length, 1);
+  assert.equal(stats.zmeneneNazvy[0].t, 'Divadlo v parku (21. 6. 2026)');
+});
