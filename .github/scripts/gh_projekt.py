@@ -2,7 +2,7 @@
 
 Jen čte přes `gh` (subprocess), nic nemění. Potřebuje `gh` s přístupem k boardu, tedy
 `GH_TOKEN=$(gh auth token --user Akimto01)`. Výchozí GITHUB_TOKEN board nepřečte
-(uživatelský projekt), proto kontroly neběží v CI (viz Docs/kvalita/DEFEKTY.md).
+(uživatelský projekt), v CI proto jde secret BOARD_READ_TOKEN (viz Docs/kvalita/DEFEKTY.md).
 """
 import json
 import os
@@ -38,13 +38,77 @@ def nacist_issues(stitek=None):
     return gh_json(args)
 
 
+# Board se čte přes GraphQL (gh api graphql), ne přes `gh project item-list`: ten i pro osobní
+# board vyžaduje scopy read:org a read:discussion, token má mít jen read:project.
+BOARD_DOTAZ = """
+query($login: String!, $cislo: Int!, $kurzor: String) {
+  user(login: $login) { projectV2(number: $cislo) { items(first: 100, after: $kurzor) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      id
+      content { __typename ... on Issue {
+        number title body url
+        repository { nameWithOwner url }
+        labels(first: 50) { nodes { name } }
+        milestone { title description dueOn }
+      } }
+      fieldValues(first: 50) { nodes {
+        __typename
+        ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { name } } }
+        ... on ProjectV2ItemFieldNumberValue { number field { ... on ProjectV2FieldCommon { name } } }
+        ... on ProjectV2ItemFieldDateValue { date field { ... on ProjectV2FieldCommon { name } } }
+      } }
+    }
+  } } }
+}
+"""
+
+
+def _polozka_boardu(uzel):
+    """Uzel GraphQL -> položka ve tvaru dřívějšího `gh project item-list` (klíče malými písmeny)."""
+    c = uzel['content']
+    polozka = {
+        'id': uzel['id'],
+        'content': {'type': c['__typename'], 'number': c['number'], 'title': c['title'], 'body': c['body'],
+                    'url': c['url'], 'repository': c['repository']['nameWithOwner']},
+        'title': c['title'],
+        'repository': c['repository']['url'],
+        'labels': [l['name'] for l in c['labels']['nodes']],
+    }
+    if c['milestone']:
+        polozka['milestone'] = c['milestone']
+    for v in uzel['fieldValues']['nodes']:
+        pole = (v.get('field') or {}).get('name')
+        if not pole:
+            continue
+        # hodnota podle typu pole: single select (name), číslo (number), datum (date)
+        hodnota = v.get('name', v.get('number', v.get('date')))
+        if hodnota is not None:
+            polozka[pole.lower()] = hodnota
+    return polozka
+
+
 def nacist_board():
     """Položky boardu (jen issues z tohoto repa) jako slovník číslo issue -> položka se všemi
     poli (klíče malými písmeny: status, odhad (h), termín, závažnost, priorita, jak nalezeno,
-    stav defektu, milestone, labels)."""
-    data = gh_json(['project', 'item-list', PROJEKT, '--owner', '@me', '--format', 'json', '-L', '1000'])
-    return {i['content']['number']: i for i in data['items']
-            if i.get('content', {}).get('type') == 'Issue' and i['content'].get('repository') == REPO}
+    stav defektu, milestone, labels). Pole se berou podle názvu, ne podle pevných ID."""
+    polozky = {}
+    kurzor = None
+    while True:
+        args = ['api', 'graphql', '-f', 'query=' + BOARD_DOTAZ, '-F', 'login=' + OWNER, '-F', 'cislo=' + PROJEKT]
+        if kurzor:
+            args += ['-F', 'kurzor=' + kurzor]
+        data = gh_json(args)
+        if data.get('errors') or not (data.get('data') or {}).get('user'):
+            sys.exit('gh api graphql (board) selhalo: ' + json.dumps(data.get('errors') or 'uživatel nenalezen', ensure_ascii=False)[:300])
+        stranka = data['data']['user']['projectV2']['items']
+        for uzel in stranka['nodes']:
+            c = uzel['content']
+            if c and c['__typename'] == 'Issue' and c['repository']['nameWithOwner'] == REPO:
+                polozky[c['number']] = _polozka_boardu(uzel)
+        if not stranka['pageInfo']['hasNextPage']:
+            return polozky
+        kurzor = stranka['pageInfo']['endCursor']
 
 
 def projit_backlog(text):
