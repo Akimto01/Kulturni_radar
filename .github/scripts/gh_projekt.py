@@ -42,7 +42,7 @@ def nacist_board():
     """Položky boardu (jen issues z tohoto repa) jako slovník číslo issue -> položka se všemi
     poli (klíče malými písmeny: status, odhad (h), termín, závažnost, priorita, jak nalezeno,
     stav defektu, milestone, labels)."""
-    data = gh_json(['project', 'item-list', PROJEKT, '--owner', OWNER, '--format', 'json', '-L', '1000'])
+    data = gh_json(['project', 'item-list', PROJEKT, '--owner', '@me', '--format', 'json', '-L', '1000'])
     return {i['content']['number']: i for i in data['items']
             if i.get('content', {}).get('type') == 'Issue' and i['content'].get('repository') == REPO}
 
