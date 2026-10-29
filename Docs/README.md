@@ -30,6 +30,7 @@ Počty testů jsou jen v hlavním README (tabulka „Testy v číslech“).
 | [testovani/POKRYTI.md](testovani/POKRYTI.md) | matice pokrytí: které riziko a oblast je pokrytá na jaké úrovni a co ne |
 | [testovani/TESTOVACI-ANALYZA.md](testovani/TESTOVACI-ANALYZA.md) | ukázka testovací analýzy od testovací báze k testovacím případům |
 | [testovani/MUTACNI-TESTOVANI.md](testovani/MUTACNI-TESTOVANI.md) | mutační testování Strykerem: spuštění, zapojení, výklad výsledků a triáž přeživších |
+| [testovani/MUTACE-TRIAZ.md](testovani/MUTACE-TRIAZ.md) | triáž 98 přeživších a nepokrytých mutantů kritické sady (podklad k #13) |
 
 ## Kvalita a defekty
 

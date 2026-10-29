@@ -68,7 +68,7 @@ Každý přeživší a každý `NoCoverage` mutant se zařadí do jedné ze tř�
   (např. jen ve skutečném Googlu). Zapíše se; případně se kód zjednoduší.
 
 Před doplněním testu se ověří, že přeživší není artefaktem nastavení: mutace se ručně aplikuje na kopii
-(`RADAR_ZDROJ=… node --test tests/unit.test.js`) a testy musí opravdu projít.
+(`RADAR_ZDROJ=… node --test tests/unit.test.js`) a testy musí opravdu projít. Rozpis kritické sady (98 mutantů) je v [MUTACE-TRIAZ.md](MUTACE-TRIAZ.md).
 
 ## Zatím neplatí
 
