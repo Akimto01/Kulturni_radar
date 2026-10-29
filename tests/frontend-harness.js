@@ -11,11 +11,13 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 function nactiFrontendFunkce(nazvyFunkci) {
-  const html = fs.readFileSync(
-    path.join(__dirname, '..', 'apps-script', 'Index.html'), 'utf8');
+  const cestaKHtml = path.join(__dirname, '..', 'apps-script', 'Index.html');
+  const html = fs.readFileSync(cestaKHtml, 'utf8');
   const scriptMatch = html.match(/<script>([\s\S]*)<\/script>/);
   if (!scriptMatch) throw new Error('V Index.html nebyl nalezen <script> blok.');
   const js = scriptMatch[1];
+  // Pozice <script> bloku v souboru (pro předponu, viz níže).
+  const posunScriptu = scriptMatch.index + scriptMatch[0].indexOf(js);
 
   const ctx = { console, URLSearchParams };
   vm.createContext(ctx);
@@ -40,7 +42,15 @@ function nactiFrontendFunkce(nazvyFunkci) {
     if (konec < 0) throw new Error('Funkce "' + nazev + '": nenalezen konec těla (nevyvážené závorky?).');
 
     const telo = js.slice(zacatekDeklarace, konec + 1);
-    vm.runInContext(telo, ctx, { filename: 'Index.html#' + nazev });
+    // Předpona ze mezer a původních zalomení řádků má stejnou délku a stejné
+    // řádky jako text před funkcí v Index.html, takže offsety V8 sedí na
+    // skutečný soubor a coverage přiřadí pokrytí správným řádkům i sloupcům.
+    const predpona = html.slice(0, posunScriptu + zacatekDeklarace).replace(/[^\r\n]/g, ' ');
+    // filename zůstává „Index.html#název“, ne file:// URL: tabulka z
+    // node --experimental-test-coverage nesloučí víc skriptů téhož souboru a
+    // řádek Index.html by ukázal nesmyslné procento. Skutečné pokrytí počítá
+    // tests/pokryti-frontendu.js ze syrových dat V8.
+    vm.runInContext(predpona + telo, ctx, { filename: 'Index.html#' + nazev });
   });
 
   return ctx;

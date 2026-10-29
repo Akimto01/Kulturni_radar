@@ -353,11 +353,12 @@ Hodnoty k 28. 10. 2026, spočítané z historie GitHub Actions, gitu a DEFEKTY.m
 | Podíl defektů odhalených automatizací | 2 z 8 (25 %); u závažnosti S1 a S2 1 ze 4 | aspoň 40 % | ostatní odhalila živá kontrola (4) a analýza (2), viz DEFEKTY.md |
 | Stáří defektu při odhalení | #31 80 dní, #17 78 až 86 dní | sledovat u nových defektů | dlouhé stáří = slepé místo sady |
 | Údržba testů | 75 z 92 commitů měnících appku mění i testy (81 %); 22 commitů mění jen testy | sledovat podíl oprav testů bez chyby v appce | rozlišení „oprava testu“ vs. „nový test“ zatím ručně |
-| Pokrytí kódu backendu | 82,2 % řádků, 80,9 % větví (Node, harness); frontend se měřit nedá (harness vykrajuje funkce) | neklesat, kritické funkce podle [POKRYTI.md](POKRYTI.md) nad 70 % | CI zatím jen vypisuje, bez prahu; kritické funkce pod 70 % jsou `callAnthropicPlaces_`, `runCheck_`, `apiNajdiProUzivatele_`, `apiToggle_` |
+| Pokrytí kódu backendu | 82,2 % řádků, 80,9 % větví (Node, harness) | neklesat, kritické funkce podle [POKRYTI.md](POKRYTI.md) nad 70 % | CI zatím jen vypisuje, bez prahu; kritické funkce pod 70 % jsou `callAnthropicPlaces_`, `runCheck_`, `apiNajdiProUzivatele_`, `apiToggle_` |
+| Pokrytí kódu frontendu | 98,9 % řádků ve vykrojených funkcích (57 ze 113, 440 z 445 řádků), 25,3 % celého skriptu `Index.html` (440 z 1736 řádků); Node, `tests/pokryti-frontendu.js` | neklesat, zvyšovat podíl vykrojených funkcí | zbytek skriptu (vykreslování, mapa, kalendář, obsluha událostí) pokrývá jen E2E; tabulka z `--experimental-test-coverage` u `Index.html` nesedí, proto vlastní skript |
 | Soulad s architekturou | baseline porušení 11 / 9 / 11 / 61 / 0 / 11 / 6 / 12 (pojistka v CI) | klesat k nule po dávkách issue #34 | |
 | Síla testů | mutační ověření nových testů ručně (12 záznamů v CHANGELOGu) | mutation score (Stryker, issue #13) | |
 
-**Co se zatím měřit nedá:** pokrytí kódu frontendu, mutation score,
+**Co se zatím měřit nedá:** mutation score,
 nestabilita po jednotlivých testech (artefakty expirují po 30 dnech) a cena běhu
 mimo minuty GitHub Actions.
 
@@ -443,3 +444,4 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | 28. 10. 2026 | První verze podle osnovy kurzu (týdny 1–3, týden 4 podle popisu modulu), část E: vznik architektury a API nástroje |
 | 28. 10. 2026 | Konsolidace dokumentace: A4 lokalizace, D3 metriky s hodnotami a cíli, vazba A3 na rizika v TESTY.md, pojistka souladu v C1 |
 | 28. 10. 2026 | D3: metrika pokrytí kódu backendu (82,2 % řádků), pokrytí odebráno z toho, co se neměří |
+| 29. 10. 2026 | D3: metrika pokrytí kódu frontendu (98,9 % vykrojených funkcí, 25,3 % celého skriptu), skript `tests/pokryti-frontendu.js` |

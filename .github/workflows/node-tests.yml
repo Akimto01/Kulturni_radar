@@ -21,6 +21,11 @@ jobs:
           TZ: Europe/Prague
         run: node --test --experimental-test-coverage tests/unit.test.js tests/frontend.test.js
 
+      # Tabulka výše u Index.html není spolehlivá (víc skriptů téhož souboru), skutečné
+      # pokrytí frontendu počítá tento skript ze syrových dat V8. Zatím jen výpis.
+      - name: Pokrytí frontendu (Index.html)
+        run: node tests/pokryti-frontendu.js
+
   # Dry run RF sady (nález z přípravy quality checku 7.-8. 10. 2026): ověří
   # syntaxi .robot souborů a názvy/argumenty keywordů bez přístupu k produkci,
   # takže je levný a nezávislý na stavu Apps Scriptu. Prohlížeče se

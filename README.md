@@ -43,7 +43,7 @@ Documentation is in Czech.*
 
 Počty v této tabulce hlídá CI (skript `.github/scripts/kontrola-poctu-testu.py` v jobu `rf-dryrun`): při rozdílu proti repu workflow selže.
 
-Pokrytí řádků backendu jednotkovými testy: 82,2 % (k 28. 10. 2026, měří a vypisuje CI v jobu `node-testy`). Frontend se měřit nedá, harness vykrajuje funkce z `Index.html`.
+Pokrytí řádků backendu jednotkovými testy: 82,2 % (k 28. 10. 2026, měří a vypisuje CI v jobu `node-testy`). Pokrytí frontendu (`node tests/pokryti-frontendu.js`, k 29. 10. 2026): 98,9 % řádků ve vykrojených funkcích (57 ze 113), 25,3 % celého skriptu `Index.html`, protože zbytek pokrývají jen E2E testy.
 
 ## Jak pracuji
 
