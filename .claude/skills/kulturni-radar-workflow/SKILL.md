@@ -769,7 +769,11 @@ Zavedeno 31. 8. 2026 jako portfolio-ready ukázka Kanban workflow
 `gh project view 1 --owner Akimto01 --web` (title „Kulturní radar -
 práce", 4 sloupce Backlog/Todo/In Progress/Done). Labely: `feature`, `bug`,
 `docs`, `testing`, `research` (+ výchozí GitHub labely, nepoužívané
-pro tenhle projekt).
+pro tenhle projekt) a `prehled` (jen issue #52 „Vývoj: stav projektu
+(automaticky)“, zavřené a zamčené, tělo přepisuje workflow; `kontrola-boardu.py`
+a `navrh-session.py` ho ignorují, není úkol). Automatická kontrola
+(`kontrola-projektu.yml`) běží denně 6:40 UTC (7:40 SEČ, 8:40 SELČ), v pondělí
+s týdenním souhrnem a přepsáním #52, jinak notifikace jen při nálezu.
 
 **BACKLOG.md zůstává hlavní znalostní bází, Kanban je jen doplněk pro
 aktuálně rozpracované/vybrané úkoly:**
