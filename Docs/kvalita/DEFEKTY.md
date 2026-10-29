@@ -22,13 +22,15 @@ nejzajímavější defekty jsou rozepsané v [PRIBEHY-CHYB.md](PRIBEHY-CHYB.md).
 
 ## Priorita (naléhavost opravy)
 
-| Stupeň | Název | Kdy řešit | Typický případ |
-|---|---|---|---|
-| **P1** | Okamžitá (*Highest*) | Ihned, ostatní práce počká. | S1, nebo S2, na kterou narazí každý |
-| **P2** | Vysoká (*High*) | V téže nebo nejbližší pracovní session. | S2 s omezeným dopadem, S3 postihující všechny |
-| **P3** | Střední (*Medium*) | Podle plánu, zhruba do dvou týdnů. | běžná položka Doporučeného pořadí v BACKLOGu |
-| **P4** | Nízká (*Low*) | Až na ni přijde řada, bez termínu. | Testovací dluh, drobnosti |
-| **P5** | Sledovat (*Lowest*) | Zapsat a sledovat, opravit jen pokud se zhorší. | položky „Sledovat, bez akce“ v BACKLOGu |
+| Stupeň | Název | Kdy řešit | Typický případ | Lhůta pro kontrolu |
+|---|---|---|---|---|
+| **P1** | Okamžitá (*Highest*) | Ihned, ostatní práce počká. | S1, nebo S2, na kterou narazí každý | 1 den |
+| **P2** | Vysoká (*High*) | V téže nebo nejbližší pracovní session. | S2 s omezeným dopadem, S3 postihující všechny | 3 dny |
+| **P3** | Střední (*Medium*) | Podle plánu, zhruba do dvou týdnů. | běžná položka Doporučeného pořadí v BACKLOGu | 14 dní |
+| **P4** | Nízká (*Low*) | Až na ni přijde řada, bez termínu. | Testovací dluh, drobnosti | bez lhůty |
+| **P5** | Sledovat (*Lowest*) | Zapsat a sledovat, opravit jen pokud se zhorší. | položky „Sledovat, bez akce“ v BACKLOGu | bez lhůty |
+
+Lhůta je doba od založení defektu, do které se má začít řešit nebo aspoň ověřit; lhůtu hlídá kontrola boardu (`.github/scripts/kontrola-boardu.py`) jako varování „defekt po lhůtě“, ne jako chybu. Měří se od založení, protože GitHub neukládá, kdy se změnila Priorita. Defekt ve stavu Ověřuje se se nehlídá (čeká na data, ne na práci). Lhůty jsou konstanta `LHUTY_DNI` v `.github/scripts/gh_projekt.py`.
 
 **Závažnost popisuje dopad chyby, priorita pořadí její opravy.** Většinou jdou
 spolu, ale ne vždy: závod pozdních odpovědí (#26) je S2, protože zobrazí chybná

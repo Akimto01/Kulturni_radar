@@ -302,6 +302,22 @@ Doplňkově, kvůli prevenci zapomnění:
   "End" před tím, než uděláš závěrečné shrnutí/retrospektivu. Bez
   potvrzení "End" se shrnutí negeneruje automaticky.
 
+### Start: návrh session z boardu (od 29. 10. 2026)
+
+- Při „Start“, ideálně s časem (např. „Start, mám 60 minut“ nebo „Start, mám cca 3 h“), spustit
+  `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/navrh-session.py --cas "<čas>"` a oba kontrolní skripty
+  (`kontrola-defektu.py`, `kontrola-boardu.py`). Výstup předat do hlavního chatu, kde Claude z kandidátů sestaví plán
+  s ohledem na dočasná omezení, která skript nezná (např. „do neděle neměnit RF testy“). Po potvrzení přesunout vybrané
+  na boardu do In Progress (WIP limit 3).
+- Bez uvedeného času se Claude na čas zeptá. Skript přijímá např. `60`, `90 min`, `1,5h`, `2:30`, `cca 3h`; `--test` ověří převod času.
+- Skript jen čte. Kandidáti: Termín dnes nebo po termínu, defekty P1 a P2, In Progress, defekty P3 po polovině lhůty, Todo podle
+  Doporučeného pořadí, nejbližší fáze Backlogu; položky bez Odhadu nabídne zvlášť.
+
+### Týdenní revize boardu (pondělí, ~15 min)
+
+- V pondělí po nedělních bězích (sledovaná města 20:00, týdenní RF 21:20): spustit oba kontrolní skripty a projít lhůty defektů
+  (varování „defekt po lhůtě“), posun mezi Backlog a Todo (Todo jen pro nejbližší práci) a zavřít hotové (uzavírací komentář podle šablony).
+
 ## Referenční vzorce pro psaní nových testů (harness)
 
 Backend (`tests/harness.js`, `nactiRadar(volby)`):
@@ -786,6 +802,13 @@ aktuálně rozpracované/vybrané úkoly:**
   (stupnice a cyklus v `Docs/kvalita/DEFEKTY.md`). Při zavření defektu
   nastavit ručně pole Stav defektu na Uzavřený: vestavěná automatika
   mění jen Status. Defekt se uzavírá až po ověření v produkci.
+- **Konvence pro `navrh-session.py` (psát záměrně):**
+  - **Závislost:** „až po #N“ (i „(až po #N)“, „až po dokončení [#N]“) v řádku BACKLOG.md nebo v těle issue znamená, že issue čeká na #N;
+    dokud je #N otevřené, návrh session issue nenavrhne a vypíše ho v seznamu „Blokováno“. Pro čekání na termín závislost nepoužívat.
+  - **Termín:** Termín po dnešku (typicky ověřovačka čekající na běh) znamená „nenavrhovat dřív“, issue skončí v seznamu „Naplánováno na později“.
+    Stav defektu „Ověřuje se“ bez Termínu se také nenavrhuje (seznam „Čeká na data“), proto u něj vždy nastavit Termín ověření.
+  - **Checklist:** u velkého issue psát odhad do textu položky, např. `- [ ] **1. Úklid** (1,5 až 2 h): …` nebo `(45 min)`; návrh pak nabídne
+    první neodškrtnutou položku s horní mezí odhadu místo celého issue. Bez odhadu v položce se nabídne celé issue podle Odhadu (h) na boardu.
 
 Od 27. 10. 2026: milníky = cíle z BACKLOG.md (Cíl 1–4), pole Odhad (h) a Termín. Zpětné uzavřené issues pro dokončenou práci jsou povolené jako dokumentace průběhu (schváleno 27. 10. 2026, poprvé pro v3.43–v3.65); nové nápady mimo Doporučené pořadí zůstávají jen v BACKLOGu (viz pravidlo výše).
 

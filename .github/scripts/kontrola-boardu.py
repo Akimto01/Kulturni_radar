@@ -21,6 +21,8 @@ Dvě úrovně:
     - víc než WIP_LIMIT issues In Progress
     - In Progress bez změny déle než DNI_BEZ_ZMENY dní
     - Termín v minulosti u otevřeného issue
+    - defekt po lhůtě: otevřený bug starší než lhůta jeho Priority (LHUTY_DNI), stáří od založení
+      (datum změny Priority GitHub neukládá); výjimka pro Stav defektu „Ověřuje se“
 """
 import datetime
 import os
@@ -30,42 +32,20 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # python -I nepřidává složku skriptu
 import gh_projekt  # noqa: E402  (sdílené načítání issues a boardu)
 
-BACKLOG_MD = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'Docs', 'BACKLOG.md')
+BACKLOG_MD = gh_projekt.BACKLOG_MD
 
 STITKY = {'feature', 'bug', 'docs', 'testing', 'research'}
 
 # Todo jen pro vybrané na nejbližší práci (SKILL.md, sekce 9): z Doporučeného pořadí fáze 1 a 2
 # (ověření a zpevnění základu); issue z pozdějších fází ve Todo je varování, ne chyba.
 FAZE_PRO_TODO = {1, 2}
-WIP_LIMIT = 3          # nejvýš tolik issues najednou In Progress
+WIP_LIMIT = gh_projekt.WIP_LIMIT                 # nejvýš tolik issues najednou In Progress
 DNI_BEZ_ZMENY = 14     # In Progress bez změny déle než tolik dní
+LHUTY_DNI = gh_projekt.LHUTY_DNI   # lhůta defektu podle Priority (P1 1 den, P2 3 dny, P3 14 dní)
+STAV_CEKA_NA_DATA = 'Ověřuje se'   # čeká na data, ne na práci: bez varování po lhůtě
 
 
-def issue_ze_zaznamu(zaznam):
-    return [int(c) for c in re.findall(r'#(\d+)', zaznam)]
-
-
-def projit_backlog(text):
-    """Vrátí seznam (číslo řádku, [čísla issues], přeškrtnutá, fáze) pro řádky s „→ issue #N“;
-    fáze = číslo fáze v sekci Doporučené pořadí, jinak None."""
-    vysledek = []
-    sekce = ''
-    faze = None
-    for cislo, radek in enumerate(text.split('\n'), 1):
-        radek = radek.rstrip('\r')
-        if radek.startswith('## '):
-            sekce = radek[3:].strip()
-            faze = None
-        m_faze = re.match(r'^\*\*Fáze (\d+)', radek)
-        if m_faze and sekce == 'Doporučené pořadí':
-            faze = int(m_faze.group(1))
-        m = re.search(r'→\s*issue\s+((?:#\d+(?:\s*\([^)]*\))?(?:\s*,\s*)?)+)', radek)
-        if not m:
-            continue
-        preskrtnuta = bool(re.match(r'^\s*(?:[-*]|\d+[a-z]?\.)\s+~~', radek))
-        vysledek.append((cislo, issue_ze_zaznamu(m.group(1)), preskrtnuta,
-                         faze if sekce == 'Doporučené pořadí' else None))
-    return vysledek
+projit_backlog = gh_projekt.projit_backlog
 
 
 def zkontrolovat(issues, board, backlog_text, dnes=None):
@@ -101,6 +81,13 @@ def zkontrolovat(issues, board, backlog_text, dnes=None):
                         varovani.append((n, 'termín', 'Termín ' + termin[:10] + ' je v minulosti'))
                 except ValueError:
                     chyby.append((n, 'termín', 'neplatné datum Termínu „' + termin + '“'))
+            priorita = ((polozka or {}).get('priorita') or '').split(' ')[0]
+            if ('bug' in {l['name'] for l in i.get('labels', [])} and priorita in LHUTY_DNI
+                    and (polozka or {}).get('stav defektu') != STAV_CEKA_NA_DATA and i.get('createdAt')):
+                stari = (dnes - datetime.date.fromisoformat(i['createdAt'][:10])).days
+                if stari > LHUTY_DNI[priorita]:
+                    varovani.append((n, 'po lhůtě', 'defekt %s: lhůta %d d, otevřený %d d' % (
+                        priorita, LHUTY_DNI[priorita], stari)))
             if status == 'In Progress':
                 in_progress.append(n)
                 zmena = datetime.date.fromisoformat((i.get('updatedAt') or '')[:10]) if i.get('updatedAt') else None
