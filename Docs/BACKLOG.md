@@ -28,7 +28,7 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 
 **Fáze 1 – ověření (do 2. 11.):**
 1. **Ověřit v3.44 v datech** (~15 min; **posunuto na 2. 11.**: čtvrteční běh 29. 10. skončil na časovém limitu a počasí nepřepočetl, viz #49, ověřovačka se opakuje po opravě a nedělním běhu 1. 11.) – podíl akcí se souřadnicemi a počasím OK, první HTTP kódy selhání Open-Meteo v KONTROLY; pak přeškrtnout body v „Nálezy ze živé kontroly“. → issue #6
-1a. **Opravit #49, část 1 před nedělí** (~1,5 h): rozpočet podle naměřené délky města (A), přepočet počasí před smyčkou měst (B), zápis přerušení rozpočtem do KONTROL. Část 2 po neděli: počasí jako samostatný trigger (C) a záznam o tvrdém ukončení (D) + vlastní časový strop pro aktualizujPocasi_ (např. ~60 s, zbytek ponechat v dosavadním stavu); dnes nemá rozpočet ani strop volání, při plošném výpadku Open-Meteo řádově minuty (analýza 29. 10.). Analýza a varianty v issue #49. → issue #49
+1a. **#49, část 1 před nedělí:** ~~rozpočet podle naměřené délky města (A), přepočet počasí před smyčkou měst (B), zápis přerušení rozpočtem do KONTROL (~1,5 h)~~ **HOTOVO a nasazeno v3.51 (29. 10. 2026), ověřuje se 2. 11.** Část 2 po neděli: počasí jako samostatný trigger (C) a záznam o tvrdém ukončení (D) + vlastní časový strop pro aktualizujPocasi_ (např. ~60 s, zbytek ponechat v dosavadním stavu); dnes nemá rozpočet ani strop volání, při plošném výpadku Open-Meteo řádově minuty (analýza 29. 10.). Analýza a varianty v issue #49. → issue #49
 2. **První týdenní report kvality** (~10 min, po samotestu 1. 11. 18:00) – sekce „Kvalita hledání“ včetně řádku fuzzy sloučení (v3.50); zapojení do runSelfTest není pokryté testem. → issue #7
 3. **Ověřit první plánovaný běh CI 1. 11. 2026** (~30 min, 2. 11.; běh startuje v neděli ve 20:20 UTC) – délka, zpoždění fronty, kontrola úniku, report na Pages, notifikace jen při selhání, rozhodnutí o „Timeouty v CI“, „Proměnlivá nestabilita RF sady“ a chip testech (`0 != N`). → issue #36
 4. ~~Volitelně **`TZ=Europe/Prague` pro jednotkové testy v CI** (~15 min, netýká se RF běhu).~~ **HOTOVO 29. 10. 2026** (viz CHANGELOG). → issue #37
@@ -38,7 +38,7 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 5a. **Opravit #48 tichá selhání** (~30 min, po nedělním samotestu 1. 11.): samotest hlídá všechny triggery ze setupTriggers, sendUserNotifications hlásí chybu přes notifyFail_, pole aktualizovano v odpovědi apiNajdiProUzivatele_; testy podle scénáře v #35, nasazení backendu. → issue #48
 
 **Fáze 3 – pokrytí kritických funkcí:**
-6. **Pokrytí kritických funkcí backendu** (~5 h): nejdřív stub tabulky (`SpreadsheetApp`) a triggerů (`ScriptApp`) v harnessu, pak platba AI, triggery a hlídač. → issue #35
+6. **Pokrytí kritických funkcí backendu** (zbývá jen scénář #48, ~0,5 h; hotové: stub tabulky a triggerů v harnessu, platba AI, triggery a hlídač). → issue #35
 7. **Práh pokrytí backendu v CI jako ratchet** (~30 min, až po #35). → issue #38
 
 **Fáze 4 – měření:**
