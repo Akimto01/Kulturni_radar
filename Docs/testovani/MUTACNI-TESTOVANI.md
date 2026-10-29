@@ -16,9 +16,10 @@ node tests/mutace/spustit.js --kriticke       # 10 kritických funkcí z POKRYTI
 node tests/mutace/spustit.js --funkce parseCzDate_,apiToggle_
 node tests/mutace/spustit.js --rozsah 273-277 # řádky v kulturni_radar.gs
 node tests/mutace/spustit.js --vse            # celý backend, 5 378 mutantů, ~40 min
+node tests/mutace/spustit.js --vse --prah 0   # bez prahu pádu (týdenní běh v CI)
 ```
 
-Další argumenty se předají Strykeru (např. `--concurrency 2`). Zdrojem pravdy zůstává
+`--prah N` přepíše `thresholds.break` z konfigurace (0 = bez prahu; Stryker nemá argument pro práh, skript proto zapíše přepsanou kopii konfigurace do `.stryker-src/`). Další argumenty se předají Strykeru (např. `--concurrency 2`). Zdrojem pravdy zůstává
 `apps-script/kulturni_radar.gs`, skript ho jen zkopíruje, nic nemění. Výstupy: tabulka v konzoli,
 `tests/mutace/reports/mutation.json` (v `.gitignore`).
 
@@ -77,7 +78,33 @@ Každý přeživší a každý `NoCoverage` mutant se zařadí do jedné ze tř�
 Před doplněním testu se ověří, že přeživší není artefaktem nastavení: mutace se ručně aplikuje na kopii
 (`RADAR_ZDROJ=… node --test tests/unit.test.js`) a testy musí opravdu projít. Rozpis kritické sady (98 mutantů) je v [MUTACE-TRIAZ.md](MUTACE-TRIAZ.md).
 
-## Zatím neplatí
+## CI, práh a týdenní běh (od 29. 10. 2026)
 
-Mutační testování není v CI (celý backend ~40 min, kritická sada ~3 min) a skóre nemá práh. Mutuje se jen
-backend a jen proti `tests/unit.test.js`; frontend (`Index.html`) a E2E testy ne.
+Workflow `.github/workflows/mutacni-testy.yml`:
+
+- **Kritická sada s prahem:** při `push` a `pull_request` se změnou `apps-script/kulturni_radar.gs`, `tests/unit.test.js`,
+  `tests/harness.js`, `tests/mutace/**` (nebo samotného workflow) běží `node tests/mutace/spustit.js --kriticke` s prahem
+  `thresholds.break` **95** z `tests/mutace/stryker.config.json` (`high` 97, `low` 95). Pod prahem Stryker skončí kódem 1 a job spadne.
+  Na Linuxu trvá běh 1 min 41 s až 2 min 42 s (naměřeno 29. 10. 2026, třikrát), celý job s instalací ~2 až 3 min.
+- **Celý backend týdně a ručně:** sobota 3:40 UTC (a `workflow_dispatch` s volbou `kriticke` nebo `vse`), `--vse --prah 0`, bez prahu,
+  `timeout-minutes: 90`. Naměřeno 29. 10. 2026: 41 min 22 s, **skóre 62,8 %** (5 378 mutantů: 3 373 zabito, 2 timeout, 1 327 přežilo,
+  676 bez pokrytí). Je to první měření, výchozí bod pro případné zlepšování; brána to není. Selže-li plánovaný běh, ntfy do
+  `NTFY_TOPIC_DEV` (fallback `NTFY_TOPIC`), stejně jako u týdenních RF testů.
+- **Report:** artefakty `mutacni-report-kriticka-sada` a `mutacni-report-cely-backend` (`mutation.json`, `mutation.html`), 14 dní.
+  Žádné secrets kromě ntfy v kroku upozornění; `permissions: contents: read`.
+
+**Proč práh 95:** kritická sada má 96,9 % (434 z 448) a 14 mutantů, které žádný test nezabije (8 ekvivalentních a 6 mezer v kódu, viz
+[MUTACE-TRIAZ.md](MUTACE-TRIAZ.md)). Práh 95 dává rezervu ~8 mutantů proti náhodnému kolísání (timeouty závisí na zátěži stroje),
+ale odstranění testů celé podskupiny pod něj spadne (ověřeno: bez testů dávky 3b-3 klesl `upsertEvents_` z 94,5 % na 90,4 %).
+Vyšší práh by padal kvůli mutantům, které testem opravit nejde; `high` 97 je jen hranice „zelené“ v reportu. Po opravě #48 (mutanty
+#352 až #354) a odstranění nedosažitelných obran se práh může zvednout; snižovat se nesmí. Pod prahem se doplňují testy.
+
+Pozor: ne každý odstraněný test skóre sníží. Test 3b-1 (zrušená akce) po doplnění 3b-5 nezabíjí nic, co by nezabil i 3b-5; skóre drží
+souhrn testů, ne jednotlivý test.
+
+## Co zatím neplatí
+
+Mutuje se jen backend a jen proti `tests/unit.test.js`; frontend (`Index.html`) a E2E testy ne. Celý backend má 62,8 %: nejvíc přeživších
+je v `vsechnyPodkategorie_` (103), `volatAnthropicSTool_` (79), `readEventsApi_` (61), `upsertMista_` (52), `callAnthropicPlaces_` (46),
+`callAnthropic_` (41), `aktualizujPocasi_` (41), `notifyOk_` (40), `smazatPotvrzeneDuplicity_` (32) a `upsertEvents_` (30).
+Rozdělení podle řádku funkce: konstanty za funkcí se počítají k ní. Práh pro celý backend ani triáž jeho mutantů neexistují.

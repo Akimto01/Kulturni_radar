@@ -240,7 +240,7 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
 | Statická kontrola testů | `robot --dryrun` celé RF sady (syntaxe, existence klíčových slov, argumenty) | každý push a PR | nasazení | vlastník |
 | Pojistka souladu s architekturou | počty porušení pravidel B4, B5 a C3 proti baseline (`.github/scripts/kontrola-architektury-testu.py`); selže, když porušení přibude | každý push a PR | push s novým porušením | vlastník |
 | Kontrola počtů testů v README | porovná tabulku „Testy v číslech“ se skutečností (Node, RF přes robot.api, worker) | každý push a PR | push s rozdílem | vlastník |
-| Mutační testování | Stryker (`node tests/mutace/spustit.js --kriticke`) mutuje kopii backendu a ověřuje, že jednotkové testy mutaci zachytí; postup v [MUTACNI-TESTOVANI.md](MUTACNI-TESTOVANI.md) | ručně (kritická sada ~3 min, celý backend ~40 min), zatím ne v CI | nic | vlastník |
+| Mutační testování | Stryker (`node tests/mutace/spustit.js --kriticke`, v CI workflow `mutacni-testy.yml`) mutuje kopii backendu a ověřuje, že jednotkové testy mutaci zachytí; postup v [MUTACNI-TESTOVANI.md](MUTACNI-TESTOVANI.md) | kritická sada při změně backendu nebo jeho testů (push a PR, `mutacni-testy.yml`, ~2 až 3 min); celý backend týdně v sobotu 3:40 UTC a ručně (~41 min), bez prahu | kritická sada: push nebo PR pod 95 % | vlastník |
 | Kontrola soupisu nástrojů v README | `.github/scripts/kontrola-nastroju.py` (jen čte): nástroje ze zdrojů v repu (`package.json`, `requirements.txt`, knihovny v `.robot`, akce třetích stran, `clasp`, `wrangler`, `api-tests/`, unpkg) musí mít řádek s identifikátorem v tabulkách sekce „Nástroje a technologie“; samotest vč. negativních zkoušek | každý push a PR (job `rf-dryrun`) | push s nástrojem bez řádku | vlastník |
 | Kontrola boardu a defektů | `.github/scripts/kontrola-boardu.py` a `kontrola-defektu.py` (jen čtou): pole boardu, stavy, WIP limit, Odhad u Todo, lhůty defektů, checklisty, soulad BACKLOG.md a DEFEKTY.md s issues; `navrh-session.py` navrhuje práci podle času | automaticky denně 6:40 UTC workflow `kontrola-projektu.yml` (v pondělí týdenní souhrn, jinak notifikace ntfy jen při nálezu), ručně při „Start“ a „End“ | nic (nálezy se opraví před další prací) | vlastník (ntfy); token `BOARD_READ_TOKEN` je classic jen se scope `read:project`, protože fine-grained token uživatelský projekt číst neumí; riziko je přijatelné (jen čtení, veřejný obsah, na účtu jediný projekt, platnost do 27. 1. 2027 s připomínkou #51), viz [DEFEKTY.md](../kvalita/DEFEKTY.md), Kontrola úplnosti |
 | Testy workeru | 7 testů e-mailového webhooku | push se změnou `cloudflare-worker/**` | nasazení workeru | vlastník |
@@ -360,9 +360,10 @@ Hodnoty k 28. 10. 2026, spočítané z historie GitHub Actions, gitu a DEFEKTY.m
 | Pokrytí kódu frontendu | 98,9 % řádků ve vykrojených funkcích (57 ze 113, 440 z 445 řádků), 25,3 % celého skriptu `Index.html` (440 z 1736 řádků); Node, `tests/pokryti-frontendu.js` | neklesat, zvyšovat podíl vykrojených funkcí | zbytek skriptu (vykreslování, mapa, kalendář, obsluha událostí) pokrývá jen E2E; tabulka z `--experimental-test-coverage` u `Index.html` nesedí, proto vlastní skript |
 | Soulad s architekturou | baseline porušení 11 / 9 / 11 / 61 / 0 / 11 / 6 / 12 (pojistka v CI) | klesat k nule po dávkách issue #34 | |
 | Síla testů | mutační ověření nových testů ručně (12 záznamů v CHANGELOGu) | průběžně, doplňuje ho metrika níže | ruční mutace zůstávají u nových testů, Stryker pokrývá vybrané funkce |
-| Mutační skóre kritických funkcí | 96,9 % (448 mutantů v 10 kritických funkcích z [POKRYTI.md](POKRYTI.md): 434 zabito, 11 přežilo, 3 bez pokrytí; Stryker, 29. 10. 2026, po dávce 3 z #13; výchozí hodnota 78,1 %, po dávce 1 82,4 %, po dávce 2 87,1 %; bez 8 ekvivalentních mutantů 98,6 %) | neklesat, zvyšovat po dávkách testů z #13; práh se stanoví po triáži přeživších (ekvivalentní mutanty se odečtou) | ručně, zatím ne v CI; postup a výklad v [MUTACNI-TESTOVANI.md](MUTACNI-TESTOVANI.md) |
+| Mutační skóre kritických funkcí | 96,9 % (448 mutantů v 10 kritických funkcích z [POKRYTI.md](POKRYTI.md): 434 zabito, 11 přežilo, 3 bez pokrytí; Stryker, 29. 10. 2026, po dávce 3 z #13; výchozí hodnota 78,1 %, po dávce 1 82,4 %, po dávce 2 87,1 %; bez 8 ekvivalentních mutantů 98,6 %) | práh pádu 95 % (`thresholds.break`; zelená od 97 %); snižovat se nesmí, pod prahem doplnit testy | CI při změně backendu nebo jeho testů (`mutacni-testy.yml`), 29. 10. 2026 na Linuxu 96,9 %; postup a výklad v [MUTACNI-TESTOVANI.md](MUTACNI-TESTOVANI.md) |
+| Mutační skóre celého backendu | 62,8 % (5 378 mutantů: 3 373 zabito, 2 timeout, 1 327 přežilo, 676 bez pokrytí; první měření 29. 10. 2026, 41 min na Linuxu) | zatím bez cíle a bez prahu, jen sledovat; nápad na zlepšování v BACKLOGu | týdně v sobotu 3:40 UTC (`mutacni-testy.yml`, artefakt 14 dní), ntfy při selhání běhu |
 
-**Co se zatím měřit nedá:** mutační skóre celého backendu průběžně (kritická sada se měří ručně),
+**Co se zatím měřit nedá:** mutační skóre frontendu,
 nestabilita po jednotlivých testech (artefakty expirují po 30 dnech) a cena běhu
 mimo minuty GitHub Actions.
 
@@ -438,6 +439,7 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | Jedna velká E2E suita | rozdělit podle oblastí po dalším růstu (B1) |
 | Opakované scénáře s různými vstupy jsou psané jako samostatné testy | data-driven testy (`Test Template`): toggle ★/✓/🏛, neplatné PINy, responzivní pásma |
 | Bez paralelizace | jen s izolací dat (víc testovacích profilů), dnes nevýhodné |
+| Mutační skóre celého backendu je 62,8 % | triáž přeživších po funkcích, až se rozhodne o cíli (nápad v BACKLOGu); kritická sada 96,9 % a práh 95 % |
 | Kapitola D | porovnat s obsahem 4. týdne kurzu po jeho zveřejnění |
 | Stávající testy neodpovídají pravidlům B4, B5 a C3 | audit [AUDIT-SOULADU-TESTU.md](../audity/AUDIT-SOULADU-TESTU.md) (20 porušení, plán v 10 dávkách po plánovaném běhu 1. 11. 2026); pojistka proti nárůstu `.github/scripts/kontrola-architektury-testu.py` běží v CI v jobu `rf-dryrun` |
 
@@ -458,5 +460,6 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | 29. 10. 2026 | C1 a D3: mutační testování Strykerem (řádek v C1, metrika mutační skóre kritických funkcí 78,1 %), [MUTACNI-TESTOVANI.md](MUTACNI-TESTOVANI.md) |
 | 29. 10. 2026 | D3: mutační skóre kritických funkcí 86,8 % po dávce 2 z #13 (`digestRange_` 52 z 53 mutantů zabito, zbylý je ekvivalentní na stroji s českým výchozím locale; backend 421 na 426 testů) |
 | 29. 10. 2026 | D3: mutační skóre kritických funkcí 96,9 % po dávce 3 z #13 (`upsertEvents_` 138 ze 146 mutantů zabito, zbytek ekvivalentní nebo nedosažitelný; zpřísněný `MemSheet`; pevné locale `en-US` v běhu Strykeru; backend 426 na 447 testů) |
+| 29. 10. 2026 | C1 a D3: mutační testy v CI (`mutacni-testy.yml`): kritická sada s prahem 95 % při změně backendu nebo jeho testů, celý backend týdně bez prahu; první skóre celého backendu 62,8 % |
 | 29. 10. 2026 | D3: mutační skóre kritických funkcí 82,4 % po dávce 1 z #13 (`parseCzDate_`, `apiSetFiltry_`, `apiToggle_`, `runCheck_`, `apiNajdiProUzivatele_`; 18 mutantů zabito, bonusem #226 v `upsertEvents_`; `serioveCisloNaDatum_` 100 %), backend 413 na 421 testů |
 | 29. 10. 2026 | C1: kontrola boardu a defektů běží automaticky (workflow `kontrola-projektu.yml`, token jen pro čtení) |
