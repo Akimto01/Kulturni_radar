@@ -45,7 +45,7 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 10. **Lokalizační testy podle A4** (~4–6 h, odhad nejistý): řazení podle češtiny, datum přes půlnoc a přechod letního času, stálá místa s diakritikou (E2E a API). Část `TZ` viz bod 4. → issue #40
 11. **R2 a R5 z POKRYTI.md:** kontrola verze frontendu ve smoke a smoke přes `FRAME` v CI. → issue #41 (R2), #42 (R5)
 12. **Přímý API test přihlášení** (login přes skutečné API). → issue #43
-13. **Katalog testů na GitHub Pages** (~30 min), **hlídání počtů testů v README skriptem** (~30 min) a **sdílený skript kontroly úniku** (~30 min, položky v Testovacím dluhu). → issue #44, #45, #46
+13. **Katalog testů na GitHub Pages** (~30 min), ~~**hlídání počtů testů v README skriptem** (~30 min)~~ **HOTOVO 29. 10. 2026** a **sdílený skript kontroly úniku** (~30 min, položky v Testovacím dluhu). → issue #44, #45, #46
 14. **Sjednocení testů s architekturou, zbylé dávky** (4, 6 až 10; zbývá z ~12 h). → issue #34
 15. **Video nebo GIF z běhu testů** (~30 min). → issue #14
 
@@ -161,7 +161,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
 - **Sjednocení testů s architekturou** (audit z 28. 10. 2026, `Docs/audity/AUDIT-SOULADU-TESTU.md`): oprava 20 porušení pravidel B4, B5 a C3 v 10 dávkách, ~12 h, dávky začínají po plánovaném běhu 1. 11. 2026. Nárůst porušení do té doby hlídá pojistka v CI (`.github/scripts/kontrola-architektury-testu.py`). → issue #34
 - Sledovat (řeší dávka 8 issue #34, `Docs/audity/AUDIT-SOULADU-TESTU.md`, řádky 11 a 17): RF test „Přepnutí na město s diakritikou“ vybírá první prohledané město s diakritikou (dnes Plzeň); kdyby nemělo budoucí akce, test falešně spadne – pak upravit výběr.
 - ~~**PROVOZ.md: doplnit `runSelfTest` a `watchdogDailyCheck`** (převzato z TESTY.md, dřívější sekce 10): tabulka triggerů neobsahuje ani `sendUserNotifications` a `zpracovatSledovanaMesta`.~~ **HOTOVO 29. 10. 2026** (viz CHANGELOG). → issue #47
-- **Hlídat počty testů v README skriptem proti repu** (~30 min): skript porovná tabulku „Testy v číslech“ s reálnými počty (`node --test`, `robot --dryrun`) a poběží v CI vedle pojistky souladu. README je jediný zdroj počtů (TESTY.md, POKRYTI.md na něj odkazují). → issue #45
+- ~~**Hlídat počty testů v README skriptem proti repu** (~30 min): skript porovná tabulku „Testy v číslech“ s reálnými počty (`node --test`, `robot --dryrun`) a poběží v CI vedle pojistky souladu. README je jediný zdroj počtů (TESTY.md, POKRYTI.md na něj odkazují).~~ **HOTOVO 29. 10. 2026** (viz CHANGELOG). → issue #45
 - **Lokalizační testy podle `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola A4** (~4–6 h, odhad nejistý; `TZ=Europe/Prague` v CI je samostatná položka níže): test českého řazení, datum přes půlnoc a přechod letního času, E2E a API pro stálá místa s diakritikou. → issue #40
 - **Revize tagu `krehky` u 12 testů:** viz dávka 10 issue #34 (`Docs/audity/AUDIT-SOULADU-TESTU.md`) a `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola C3. Bez vlastního odhadu. → issue #34
 - ~~**TZ pro jednotkové testy v CI** (~15 min): `TZ=Europe/Prague` v kroku Spustit testy v `node-tests.yml`, ať testy běží stejně lokálně i v CI (součást A4).~~ **HOTOVO 29. 10. 2026** (viz CHANGELOG). → issue #37

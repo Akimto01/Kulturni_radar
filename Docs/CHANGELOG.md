@@ -5,6 +5,12 @@
 - **Ověření:** 558/558 prochází s `TZ=UTC`, `TZ=Europe/Prague`, `TZ=Pacific/Auckland` i `TZ=America/Los_Angeles`, seznam výsledků po jednotlivých testech je pro UTC a Europe/Prague shodný. Žádný test se tedy podle zóny nechová jinak. Stub `Utilities.formatDate` v harnessu formátuje podle zóny procesu, nastavení `TZ` ho proto přibližuje skutečnému skriptu.
 - `ARCHITEKTURA-TESTU.md` A4: část o časové zóně přepnuta z „navrženo“ na zavedeno, zbývá řazení podle češtiny, přechod letního času a stálá místa s diakritikou. Closes #37.
 
+## CI: kontrola počtu testů v README (#45) – 29. 10. 2026
+- **Nový skript** `.github/scripts/kontrola-poctu-testu.py` (jen standardní knihovna a `robotframework`): přečte počty z tabulky „Testy v číslech“ v README a porovná je s repem. Node testy počítá jako volání `test(` na začátku řádku v `tests/unit.test.js` (349), `tests/frontend.test.js` (209) a `cloudflare-worker/email-webhook.test.mjs` (7), shoda s `node --test` ověřena; RF testy přes `robot.api.TestSuiteBuilder` nad `tests/robot` včetně rozdělení api (9) a frontend (52), celkem 61. Při rozdílu vypíše tabulku README vs. repo a skončí chybou.
+- **Zapojení:** job `rf-dryrun` v `node-tests.yml`, krok za pojistkou souladu.
+- **Ověření:** dnešní stav projde; dočasně změněné číslo v README (350 místo 349, mimo commit) skončí kódem 1 s označeným rozdílem.
+- README: věta pod tabulkou, že počty hlídá CI. `ARCHITEKTURA-TESTU.md` (Známé mezery): z „navrženo“ na zavedeno. Cvičné API testy (SoapUI, Bruno, JMeter) se nekontrolují. Closes #45.
+
 ## Docs: defekt Tichá selhání (#48) – 29. 10. 2026
 - **Issue #48** (první defekt založený formulářem `defekt.yml`, ne zpětně): `runSelfTest` nehlídá existenci triggerů `sendUserNotifications` a `zpracovatSledovanaMesta` a `sendUserNotifications` nemá `try/catch` ani `notifyFail_`. Závažnost S3, priorita P3, jak nalezeno Analýza nebo review (při psaní tabulky triggerů pro #47), stav Potvrzený, board Backlog, milník Cíl 1. Oprava spolu s testy v #35.
 - `DEFEKTY.md`: řádek v tabulce klasifikace s poznámkou o prvním defektu z formuláře. BACKLOG: položka v Testovacím dluhu, → issue #48.

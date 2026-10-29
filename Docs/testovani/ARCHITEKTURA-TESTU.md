@@ -239,6 +239,7 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
 | Jednotkové testy | 558 testů backendu a frontendu (Node) | každý push a PR | nasazení (pravidlo vlastníka: nenasazuje se s červenou) | vlastník, odznak v README |
 | Statická kontrola testů | `robot --dryrun` celé RF sady (syntaxe, existence klíčových slov, argumenty) | každý push a PR | nasazení | vlastník |
 | Pojistka souladu s architekturou | počty porušení pravidel B4, B5 a C3 proti baseline (`.github/scripts/kontrola-architektury-testu.py`); selže, když porušení přibude | každý push a PR | push s novým porušením | vlastník |
+| Kontrola počtů testů v README | porovná tabulku „Testy v číslech“ se skutečností (Node, RF přes robot.api, worker) | každý push a PR | push s rozdílem | vlastník |
 | Testy workeru | 7 testů e-mailového webhooku | push se změnou `cloudflare-worker/**` | nasazení workeru | vlastník |
 | Smoke po nasazení | 11 E2E a API testů s tagem `smoke` | ručně po každém nasazení | další práci, dokud neprojde | vlastník |
 | Týdenní regrese | API (9) a E2E (52) proti produkci | plán, neděle 20:20 UTC (21:20 SEČ, 22:20 SELČ; od 28. 10. 2026, dřív 19:00 UTC; GitHub plánované běhy zdržuje, dřívější skutečný start byl zhruba 2 až 4 h po plánu); ručně | nic automaticky; selhání = úkol na další session | notifikace na telefon (jen plánované běhy), veřejný report |
@@ -426,7 +427,7 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 |---|---|
 | Chybí obecný linter testů (pojistka souladu hlídá jen konvence projektu) | zavést Robocop v pipeline jednotkových testů |
 | Lokalizační mezery (A4) | řazení podle češtiny, přechod letního času, stálá místa s diakritikou |
-| Počty testů se v dokumentech rozcházely | jediný zdroj je tabulka „Testy v číslech“ v README; navrženo hlídat ji skriptem proti repu |
+| Počty testů se v dokumentech rozcházely | jediný zdroj je tabulka „Testy v číslech“ v README; od 29. 10. 2026 ji hlídá CI skriptem `.github/scripts/kontrola-poctu-testu.py` (issue #45) |
 | Tag `krehky` u 12 testů z doby před pravidlem | revize: ponechat jen u prokázané vnější příčiny |
 | Karanténa flaky testů není v kódu | zavést podle C3 při prvním opakovaném vnějším pádu |
 | Jedna velká E2E suita | rozdělit podle oblastí po dalším růstu (B1) |
