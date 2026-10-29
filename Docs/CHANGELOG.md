@@ -1,5 +1,10 @@
 # Changelog
 
+## CI: TZ=Europe/Prague pro jednotkové testy (#37) – 29. 10. 2026
+- **`node-tests.yml`:** krok Spustit testy má `env: TZ: Europe/Prague`, takže jednotkové testy v CI běží ve stejné zóně jako backend (`Europe/Prague`) a lokálně na stroji v SEČ/SELČ.
+- **Ověření:** 558/558 prochází s `TZ=UTC`, `TZ=Europe/Prague`, `TZ=Pacific/Auckland` i `TZ=America/Los_Angeles`, seznam výsledků po jednotlivých testech je pro UTC a Europe/Prague shodný. Žádný test se tedy podle zóny nechová jinak. Stub `Utilities.formatDate` v harnessu formátuje podle zóny procesu, nastavení `TZ` ho proto přibližuje skutečnému skriptu.
+- `ARCHITEKTURA-TESTU.md` A4: část o časové zóně přepnuta z „navrženo“ na zavedeno, zbývá řazení podle češtiny, přechod letního času a stálá místa s diakritikou. Closes #37.
+
 ## Docs: board se sloupcem Backlog, issues pro fázi 5, pravidlo v SKILL – 28. 10. 2026
 - **Board:** Status má novou volbu Backlog (pořadí Backlog, Todo, In Progress, Done; ostatní volby si ponechaly id, statusy existujících položek se nezměnily). Backlog dostaly #4, #5, #8, #13, #14, #15, #16, #35, #38 a #39 (#4 a #5 podle nového pravidla, nejsou vybrané na nejbližší práci). Pohled Kanban ověřen v prohlížeči: Backlog se zobrazuje jako první sloupec. Fáze 1 (#6, #7, #36, #37) a #34 zůstávají Todo.
 - **Nové issues ve stavu Backlog** (Cíl 1, Odhad): #40 Lokalizační testy (A4, 5 h), #41 Kontrola verze frontendu ve smoke testu (R2, 1 h), #42 Smoke přes Apps Script iframe v CI (R5, 1 h), #43 Přímý API test přihlášení (0,5 h), #44 Katalog testů na GitHub Pages (0,5 h), #45 Hlídat počty testů v README skriptem (0,5 h), #46 Sdílený skript kontroly úniku (0,5 h, až po #36), #47 PROVOZ.md: doplnit triggery (0,5 h, štítek docs). BACKLOG má u příslušných položek → issue #N.

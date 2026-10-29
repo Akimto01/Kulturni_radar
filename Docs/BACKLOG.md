@@ -28,7 +28,7 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 1. **Ověřit v3.44 v datech** (~15 min, po čtvrtečním běhu sledovaných měst 29. 10. 10:00) – podíl akcí se souřadnicemi a počasím OK, první HTTP kódy selhání Open-Meteo v KONTROLY; pak přeškrtnout body v „Nálezy ze živé kontroly“. → issue #6
 2. **První týdenní report kvality** (~10 min, po samotestu 1. 11. 18:00) – sekce „Kvalita hledání“ včetně řádku fuzzy sloučení (v3.50); zapojení do runSelfTest není pokryté testem. → issue #7
 3. **Ověřit první plánovaný běh CI 1. 11. 2026** (~30 min, 2. 11.; běh startuje v neděli ve 20:20 UTC) – délka, zpoždění fronty, kontrola úniku, report na Pages, notifikace jen při selhání, rozhodnutí o „Timeouty v CI“, „Proměnlivá nestabilita RF sady“ a chip testech (`0 != N`). → issue #36
-4. Volitelně **`TZ=Europe/Prague` pro jednotkové testy v CI** (~15 min, netýká se RF běhu). → issue #37
+4. ~~Volitelně **`TZ=Europe/Prague` pro jednotkové testy v CI** (~15 min, netýká se RF běhu).~~ **HOTOVO 29. 10. 2026** (viz CHANGELOG). → issue #37
 
 **Fáze 2 – zpevnění základu (po 2. 11.):**
 5. **Sjednocení testů s architekturou, dávka 1** (~1,5–2 h): suite-level teardown a `Close Page`. Pak dávky 2 (~45 min), 3 (~1 h) a 5 (~1–1,5 h). Audit `Docs/audity/AUDIT-SOULADU-TESTU.md`. → issue #34
@@ -164,7 +164,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
 - **Hlídat počty testů v README skriptem proti repu** (~30 min): skript porovná tabulku „Testy v číslech“ s reálnými počty (`node --test`, `robot --dryrun`) a poběží v CI vedle pojistky souladu. README je jediný zdroj počtů (TESTY.md, POKRYTI.md na něj odkazují). → issue #45
 - **Lokalizační testy podle `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola A4** (~4–6 h, odhad nejistý; `TZ=Europe/Prague` v CI je samostatná položka níže): test českého řazení, datum přes půlnoc a přechod letního času, E2E a API pro stálá místa s diakritikou. → issue #40
 - **Revize tagu `krehky` u 12 testů:** viz dávka 10 issue #34 (`Docs/audity/AUDIT-SOULADU-TESTU.md`) a `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola C3. Bez vlastního odhadu. → issue #34
-- **TZ pro jednotkové testy v CI** (~15 min): `TZ=Europe/Prague` v kroku Spustit testy v `node-tests.yml`, ať testy běží stejně lokálně i v CI (součást A4). → issue #37
+- ~~**TZ pro jednotkové testy v CI** (~15 min): `TZ=Europe/Prague` v kroku Spustit testy v `node-tests.yml`, ať testy běží stejně lokálně i v CI (součást A4).~~ **HOTOVO 29. 10. 2026** (viz CHANGELOG). → issue #37
 - **Práh pokrytí backendu v CI (ratchet)** (~30 min, až po issue #35): selže při poklesu pokrytí řádků `kulturni_radar.gs` pod uloženou hodnotu. → issue #38
 - **Měření pokrytí frontendu** (~1 h): harness `Index.html` doplní prázdné řádky podle pozice funkce, ať jde změřit pokrytí. → issue #39
 - **Pokrytí kritických funkcí backendu** (~5 h): platba AI (`runCheck_`, `dailyCheck`, `callAnthropicPlaces_`, `updateMista`, `apiNajdiProUzivatele_`), `apiSetFiltry_`, `setupTriggers`, `watchdogDailyCheck`, `notifyFail_` a přehledy, větve `apiToggle_`, `nastavPin_`. Předpoklad: stub tabulky (`SpreadsheetApp`) a `ScriptApp` v harnessu. Měření z 28. 10. 2026 viz `Docs/testovani/POKRYTI.md`. → issue #35

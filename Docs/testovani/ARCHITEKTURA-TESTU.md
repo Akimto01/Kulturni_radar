@@ -116,10 +116,10 @@ dvojí zakódování diakritiky (#31, 80 dní bez povšimnutí), datum jako sér
 | Diakritika v URL a požadavcích | `encodeURIComponent` a `decodeURIComponent` (v3.65), odkazy do Google kalendáře | 4 jednotkové testy, E2E s dynamicky vybraným městem s diakritikou | jen karty akcí, ne stálá místa; API `places` s diakritikou netestováno; normalizace NFC/NFD a velikost písmen nepokryté |
 | České formáty dat | převod textu, sériových čísel a rozsahů na datum | zhruba 30 jednotkových testů převodu, API ověřuje formát `d. M. yyyy` | rozsah typu „8.–9. 8. 2026“ vezme první datum (sledováno v BACKLOGu) |
 | Řazení podle češtiny | `localeCompare(…, 'cs')` na čtyřech místech frontendu (města, typy míst) | žádný test | pořadí s „Č“ a „Ch“ |
-| Časová zóna | backend `Europe/Prague`, frontend čas prohlížeče | jeden test hranice půlnoci | testy nenastavují časovou zónu (CI běží v UTC, lokálně SELČ); žádný test přechodu letního času; uživatel v jiné zóně může vidět posunuté dny (neověřeno) |
+| Časová zóna | backend `Europe/Prague`, frontend čas prohlížeče | jeden test hranice půlnoci | jednotkové testy v CI běží v `TZ=Europe/Prague` (zavedeno 29. 10. 2026, issue #37; výsledky jsou stejné i v UTC a jiných zónách); žádný test přechodu letního času; uživatel v jiné zóně může vidět posunuté dny (neověřeno) |
 
-**Navrženo:** nastavit `TZ=Europe/Prague` pro jednotkové testy v CI, aby se
-lokální a CI běh nelišily; jednotkový test českého řazení; testy pomocných
+**Zavedeno (29. 10. 2026, issue #37):** `TZ=Europe/Prague` pro jednotkové testy v CI, aby se
+lokální a CI běh nelišily. **Navrženo:** jednotkový test českého řazení; testy pomocných
 funkcí pro datum přes hranici půlnoci a přechod letního času; E2E a API ověření
 stálých míst pro město s diakritikou. Diakritika a české formáty patří mezi
 povinné třídy vstupů podle pravidla B5.5.
@@ -425,7 +425,7 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | Mezera | Návrh |
 |---|---|
 | Chybí obecný linter testů (pojistka souladu hlídá jen konvence projektu) | zavést Robocop v pipeline jednotkových testů |
-| Lokalizační mezery (A4) | časová zóna v CI, řazení podle češtiny, přechod letního času, stálá místa s diakritikou |
+| Lokalizační mezery (A4) | řazení podle češtiny, přechod letního času, stálá místa s diakritikou |
 | Počty testů se v dokumentech rozcházely | jediný zdroj je tabulka „Testy v číslech“ v README; navrženo hlídat ji skriptem proti repu |
 | Tag `krehky` u 12 testů z doby před pravidlem | revize: ponechat jen u prokázané vnější příčiny |
 | Karanténa flaky testů není v kódu | zavést podle C3 při prvním opakovaném vnějším pádu |
