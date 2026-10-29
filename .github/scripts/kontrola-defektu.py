@@ -17,7 +17,9 @@ Pravidla:
   e) Docs/kvalita/DEFEKTY.md: řádek v tabulce klasifikace, hodnoty shodné s boardem
 
 Výstup: tabulka problémů (issue, pravidlo, co chybí); exit 1 při nálezu.
+S přepínačem --json stejné nálezy jako JSON (chyby, varovani, souhrn otevřených defektů podle priority).
 """
+import json
 import os
 import re
 import sys
@@ -68,14 +70,26 @@ def kod_stupne(hodnota):
     return str(hodnota or '').split(' ')[0]
 
 
-def zkontrolovat():
+def souhrn_defektu(defekty, board):
+    """Otevřené defekty podle Priority (P1 až P5, „bez“ = Priorita nevyplněná); jen pro --json."""
+    pocty = {'P1': 0, 'P2': 0, 'P3': 0, 'P4': 0, 'P5': 0, 'bez': 0}
+    for d in defekty:
+        if d['state'] != 'OPEN':
+            continue
+        kod = kod_stupne((board.get(d['number']) or {}).get('priorita'))
+        pocty[kod if kod in pocty else 'bez'] += 1
+    return {'otevrene_podle_priority': pocty}
+
+
+def zkontrolovat(defekty=None, board=None):
+    """Vrací (počet defektů, problémy); data se bez argumentů načtou z GitHubu."""
     problemy = []   # (issue, pravidlo, co chybí)
 
     def pridej(cislo, pravidlo, co):
         problemy.append((cislo, pravidlo, co))
 
-    defekty = nacist_defekty()
-    board = nacist_board()
+    defekty = nacist_defekty() if defekty is None else defekty
+    board = nacist_board() if board is None else board
     md = radky_defekty_md()
 
     for d in sorted(defekty, key=lambda x: x['number']):
@@ -147,7 +161,20 @@ def zkontrolovat():
 
 def main():
     sys.stdout.reconfigure(encoding='utf-8')
-    pocet, problemy = zkontrolovat()
+    json_vystup = '--json' in sys.argv[1:]
+    defekty = nacist_defekty()
+    board = nacist_board()
+    pocet, problemy = zkontrolovat(defekty, board)
+    if json_vystup:
+        # strojově čitelný výstup: stejné nálezy jako textová tabulka (všechny jsou chyby, varování nejsou)
+        print(json.dumps({
+            'skript': 'kontrola-defektu',
+            'zkontrolovano': {'defektu': pocet},
+            'chyby': [{'issue': c, 'pravidlo': p, 'co': co} for c, p, co in problemy],
+            'varovani': [],
+            'souhrn': souhrn_defektu(defekty, board),
+        }, ensure_ascii=False, indent=2))
+        return 1 if problemy else 0
     print('Zkontrolováno defektů (issues se štítkem bug): %d' % pocet)
     if not problemy:
         print('Bez nálezů.')

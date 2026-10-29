@@ -1,0 +1,113 @@
+name: Kontrola projektu (board, defekty, návrh práce)
+
+# Automatický běh kontrol z .github/scripts (kontrola-boardu.py, kontrola-defektu.py,
+# navrh-session.py). Skripty jen čtou. Board je uživatelský projekt Akimto01 a výchozí
+# GITHUB_TOKEN ho nepřečte, proto secret BOARD_READ_TOKEN: classic token jen se scope
+# read:project, platnost do 27. 1. 2027 (obnova: issue "Obnovit BOARD_READ_TOKEN").
+# Zdůvodnění a rizika: Docs/kvalita/DEFEKTY.md, kapitola Kontrola úplnosti.
+#
+# Režimy:
+#   denni    ticho, notifikace jen při chybě kontroly, defektu P1 nebo P2 po lhůtě
+#            nebo termínu dnes či v minulosti
+#   pondeli  vždy souhrn (počty, defekty podle priority, In Progress, termíny, návrh práce)
+#            (důvody denního režimu, pokud jsou, jdou na začátek jako „Naléhavé“, s jeho prioritou)
+# Plánovaný běh: denně 6:40 UTC (7:40 SEČ, 8:40 SELČ; mimo celou hodinu, cron je v UTC bez
+# letního času), v pondělí automaticky režim pondeli. Ruční běh: režim se vybírá.
+
+on:
+  schedule:
+    - cron: '40 6 * * *'
+  workflow_dispatch:
+    inputs:
+      rezim:
+        description: 'Režim kontroly'
+        type: choice
+        options:
+          - denni
+          - pondeli
+        default: denni
+
+permissions:
+  contents: read
+
+jobs:
+  kontrola:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Určit režim
+        id: rezim
+        env:
+          UDALOST: ${{ github.event_name }}
+          VSTUP: ${{ inputs.rezim }}
+        run: |
+          if [ "$UDALOST" = "workflow_dispatch" ]; then
+            R="$VSTUP"
+          elif [ "$(date -u +%u)" = "1" ]; then
+            R=pondeli
+          else
+            R=denni
+          fi
+          echo "Režim: $R"
+          echo "rezim=$R" >> "$GITHUB_OUTPUT"
+
+      # Token jen pro tento krok. Skripty končí kódem 1 při nálezu (to je v pořádku, výsledek
+      # je v JSON); selhání samotné kontroly (např. vypršelý token) pozná další krok podle
+      # neplatného JSON.
+      - name: Spustit kontroly (token jen pro čtení)
+        env:
+          GH_TOKEN: ${{ secrets.BOARD_READ_TOKEN }}
+        run: |
+          python .github/scripts/kontrola-boardu.py --json > "$RUNNER_TEMP/board.json" || true
+          python .github/scripts/kontrola-defektu.py --json > "$RUNNER_TEMP/defekty.json" || true
+          python .github/scripts/navrh-session.py --cas 3h --json > "$RUNNER_TEMP/navrh.json" || true
+
+      - name: Sestavit zprávu
+        id: zprava
+        env:
+          REZIM: ${{ steps.rezim.outputs.rezim }}
+        run: |
+          python .github/scripts/sestav-notifikaci.py --rezim "$REZIM" \
+            --board "$RUNNER_TEMP/board.json" --defekty "$RUNNER_TEMP/defekty.json" \
+            --navrh "$RUNNER_TEMP/navrh.json" --vystup "$RUNNER_TEMP/zprava.txt" > "$RUNNER_TEMP/meta.json"
+          echo "odeslat=$(jq -r .odeslat "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"
+          echo "titulek=$(jq -r .titulek "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"
+          echo "priorita=$(jq -r .priorita "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"
+          echo "tagy=$(jq -r .tagy "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"
+
+      - name: Odeslat notifikaci (ntfy)
+        if: steps.zprava.outputs.odeslat == 'true'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TITULEK: ${{ steps.zprava.outputs.titulek }}
+          PRIORITA: ${{ steps.zprava.outputs.priorita }}
+          TAGY: ${{ steps.zprava.outputs.tagy }}
+        run: |
+          curl -fsS \
+            -H "Title: $TITULEK" \
+            -H "Priority: $PRIORITA" \
+            -H "Tags: $TAGY" \
+            -H "Click: https://github.com/users/Akimto01/projects/1" \
+            --data-binary "@$RUNNER_TEMP/zprava.txt" \
+            "https://ntfy.sh/$NTFY_TOPIC"
+
+      - name: Upozornění na selhání kontroly (ntfy)
+        # jen plánovaný běh; ruční běh sleduje ten, kdo ho spustil
+        if: failure() && github.event_name == 'schedule'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -fsS \
+            -H "Title: Kulturni radar: kontrola projektu selhala" \
+            -H "Priority: high" \
+            -H "Tags: warning" \
+            -H "Click: $RUN_URL" \
+            -d "Automaticka kontrola boardu skoncila chybou (casta pricina: vyprseny BOARD_READ_TOKEN, viz issue Obnovit BOARD_READ_TOKEN). Log: $RUN_URL" \
+            "https://ntfy.sh/$NTFY_TOPIC"

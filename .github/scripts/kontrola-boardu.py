@@ -6,6 +6,8 @@ a výchozí GITHUB_TOKEN ho nepřečte (viz Docs/kvalita/DEFEKTY.md, Kontrola ú
 
     GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-boardu.py
 
+S přepínačem --json stejné chyby a varování jako JSON (plus souhrn In Progress a termínů na týden).
+
 Dvě úrovně:
   CHYBA (exit 1)
     - otevřené issue chybí na boardu nebo nemá Status, milník nebo štítek (feature, bug, docs,
@@ -25,6 +27,7 @@ Dvě úrovně:
       (datum změny Priority GitHub neukládá); výjimka pro Stav defektu „Ověřuje se“
 """
 import datetime
+import json
 import os
 import re
 import sys
@@ -131,8 +134,30 @@ def vypis(radky, uroven):
         print('%-7s %-12s %-9s %s' % ('#' + str(cislo) if cislo else '-', pravidlo, uroven, co))
 
 
+def souhrn(issues, board, dnes=None, dnu=7):
+    """Souhrn pro --json: issues In Progress a termíny v příštích `dnu` dnech (včetně dneška)."""
+    dnes = dnes or datetime.date.today()
+    otevrena = {i['number']: i for i in issues if i['state'] == 'OPEN'}
+    in_progress = [{'issue': n, 'titulek': otevrena[n]['title']} for n in sorted(otevrena)
+                   if (board.get(n) or {}).get('status') == 'In Progress']
+    terminy = []
+    for n in sorted(otevrena):
+        t = (board.get(n) or {}).get('termín')
+        if not t:
+            continue
+        try:
+            datum = datetime.date.fromisoformat(t[:10])
+        except ValueError:
+            continue
+        if dnes <= datum <= dnes + datetime.timedelta(days=dnu):
+            terminy.append({'issue': n, 'titulek': otevrena[n]['title'], 'datum': datum.isoformat()})
+    terminy.sort(key=lambda x: (x['datum'], x['issue']))
+    return {'in_progress': in_progress, 'terminy_tyden': terminy}
+
+
 def main():
     sys.stdout.reconfigure(encoding='utf-8')
+    json_vystup = '--json' in sys.argv[1:]
     issues = gh_projekt.nacist_issues()
     board = gh_projekt.nacist_board()
     with open(BACKLOG_MD, encoding='utf-8') as f:
@@ -140,6 +165,16 @@ def main():
     chyby, varovani = zkontrolovat(issues, board, backlog)
 
     otevrena = sum(1 for i in issues if i['state'] == 'OPEN')
+    if json_vystup:
+        # strojově čitelný výstup: stejné chyby a varování jako textová tabulka
+        print(json.dumps({
+            'skript': 'kontrola-boardu',
+            'zkontrolovano': {'issues': len(issues), 'otevrenych': otevrena, 'polozek_boardu': len(board)},
+            'chyby': [{'issue': c, 'pravidlo': p, 'co': co} for c, p, co in chyby],
+            'varovani': [{'issue': c, 'pravidlo': p, 'co': co} for c, p, co in varovani],
+            'souhrn': souhrn(issues, board),
+        }, ensure_ascii=False, indent=2))
+        return 1 if chyby else 0
     print('Zkontrolováno issues: %d (otevřených %d), položek boardu: %d' % (len(issues), otevrena, len(board)))
     if chyby or varovani:
         print('\n%-7s %-12s %-9s %s' % ('issue', 'pravidlo', 'úroveň', 'co chybí'))

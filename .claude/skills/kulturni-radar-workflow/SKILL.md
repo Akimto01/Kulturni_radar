@@ -271,7 +271,9 @@ informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
 - **WIP limit:** nejvýš 3 issues najednou In Progress (konstanta `WIP_LIMIT` v `kontrola-boardu.py`); víc je varování.
 - **Odhad u Todo:** issue ve stavu Todo nebo In Progress musí mít vyplněný Odhad (h), bez něj kontrola hlásí chybu. Todo jen pro vybrané na nejbližší práci
   (Doporučené pořadí, fáze 1 a 2), ostatní Backlog.
-- Kontroly neběží v CI schválně (board je uživatelský projekt, viz DEFEKTY.md, Kontrola úplnosti).
+- **Ranní kontrola běží sama:** workflow `kontrola-projektu.yml` (denně 6:40 UTC, v pondělí týdenní souhrn) pošle notifikaci ntfy jen při nálezu (v pondělí vždy).
+  Token `BOARD_READ_TOKEN` je classic jen se scope `read:project` (fine-grained token uživatelský projekt číst neumí), platí do 27. 1. 2027,
+  obnova je issue „Obnovit BOARD_READ_TOKEN“ (Termín 20. 1. 2027); při vypršení workflow selže a upozorní. Ruční spuštění skriptů zůstává (viz výše).
 
 ### Explicitní hranice session (Start/End)
 Kromě automatického rozpoznání farewell frází platí i explicitní
@@ -304,7 +306,8 @@ Doplňkově, kvůli prevenci zapomnění:
 
 ### Start: návrh session z boardu (od 29. 10. 2026)
 
-- Při „Start“, ideálně s časem (např. „Start, mám 60 minut“ nebo „Start, mám cca 3 h“), spustit
+- Ranní kontrola (workflow `kontrola-projektu.yml`) už mohla poslat notifikaci; při „Start“ na ni navázat (zeptat se, co přišlo) a návrh práce znovu spustit s aktuálním časem:
+  při „Start“, ideálně s časem (např. „Start, mám 60 minut“ nebo „Start, mám cca 3 h“), spustit
   `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/navrh-session.py --cas "<čas>"` a oba kontrolní skripty
   (`kontrola-defektu.py`, `kontrola-boardu.py`). Výstup předat do hlavního chatu, kde Claude z kandidátů sestaví plán
   s ohledem na dočasná omezení, která skript nezná (např. „do neděle neměnit RF testy“). Po potvrzení přesunout vybrané

@@ -3,6 +3,7 @@
 
     GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/navrh-session.py --cas 60
     GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/navrh-session.py --cas "cca 3h"
+    python .github/scripts/navrh-session.py --cas 3h --json   # stejný návrh jako JSON
     python .github/scripts/navrh-session.py --test      # ověří převod času a výběr (bez GitHubu)
 
 Kandidáti v tomto pořadí (každé issue jen jednou, u každého důvod a Odhad v hodinách):
@@ -30,6 +31,7 @@ nezapočítá. Na konci součet, zbývající čas a nálezy kontroly boardu. Sk
 import argparse
 import datetime
 import importlib.util
+import json
 import os
 import re
 import sys
@@ -185,7 +187,7 @@ def sestavit_kandidaty(issues, board, backlog_text, dnes, lhuty=None):
 
     kandidati, videno = [], set(vynechana)
 
-    def pridej(n, duvod):
+    def pridej(n, duvod, kategorie):
         if n in videno or n not in otevrena:
             return
         videno.add(n)
@@ -198,7 +200,7 @@ def sestavit_kandidaty(issues, board, backlog_text, dnes, lhuty=None):
                 odhad = o[0]
                 titulek = '%s (%s)' % (nazev_polozky(polozka), o[1])
                 duvod += '; první neodškrtnutá položka checklistu'
-        kandidati.append({'n': n, 'titulek': titulek, 'duvod': duvod, 'odhad': odhad})
+        kandidati.append({'n': n, 'titulek': titulek, 'duvod': duvod, 'odhad': odhad, 'kategorie': kategorie})
 
     def je_bug(n):
         return 'bug' in {l['name'] for l in otevrena[n].get('labels', [])}
@@ -210,26 +212,26 @@ def sestavit_kandidaty(issues, board, backlog_text, dnes, lhuty=None):
     for n in sorted(otevrena):
         t = termin(n)
         if t and t <= dnes:
-            pridej(n, 'Termín %d. %d. (%s)' % (t.day, t.month, 'dnes' if t == dnes else 'po termínu'))
+            pridej(n, 'Termín %d. %d. (%s)' % (t.day, t.month, 'dnes' if t == dnes else 'po termínu'), 'termin')
     # 2. defekty P1 a P2
     for n in sorted(otevrena):
         if je_bug(n) and priorita(n) in ('P1', 'P2'):
-            pridej(n, 'defekt %s' % priorita(n))
+            pridej(n, 'defekt %s' % priorita(n), 'defekt_p1_p2')
     # 3. In Progress
     for n in sorted(otevrena):
         if (board.get(n) or {}).get('status') == 'In Progress':
-            pridej(n, 'rozpracované (In Progress), dokončit před novou prací')
+            pridej(n, 'rozpracované (In Progress), dokončit před novou prací', 'in_progress')
     # 4. defekty P3 po polovině lhůty
     for n in sorted(otevrena):
         if je_bug(n) and priorita(n) == 'P3' and otevrena[n].get('createdAt'):
             stari = (dnes - datetime.date.fromisoformat(otevrena[n]['createdAt'][:10])).days
             if stari >= lhuty['P3'] / 2:
-                pridej(n, 'defekt P3, otevřený %d dní z lhůty %d' % (stari, lhuty['P3']))
+                pridej(n, 'defekt P3, otevřený %d dní z lhůty %d' % (stari, lhuty['P3']), 'defekt_p3')
     # 5. Todo v pořadí Doporučeného pořadí (pak ostatní Todo)
     poradi = [n for _, cisla, _, _ in zaznamy for n in cisla]
     for n in poradi + sorted(otevrena):
         if (board.get(n) or {}).get('status') == 'Todo':
-            pridej(n, 'Todo (Doporučené pořadí)' if n in poradi else 'Todo')
+            pridej(n, 'Todo (Doporučené pořadí)' if n in poradi else 'Todo', 'todo')
     # 6. první položky Backlogu z nejbližší další fáze; když v ní není nic navrhnutelného (vše
     #    blokované, naplánované na později nebo bez Odhadu), pokračuje se další fází, dokud se
     #    navrhnutelná položka nenajde nebo fáze nedojdou
@@ -242,7 +244,7 @@ def sestavit_kandidaty(issues, board, backlog_text, dnes, lhuty=None):
         polozky = [n for n in dict.fromkeys(poradi) if faze_backlogu.get(n) == faze]
         navrhnutelna = [n for n in polozky if _hodnota_odhadu(board.get(n)) is not None]
         for n in polozky:
-            pridej(n, 'Backlog, fáze %d Doporučeného pořadí' % faze)   # i bez Odhadu: vypíše se zvlášť
+            pridej(n, 'Backlog, fáze %d Doporučeného pořadí' % faze, 'backlog')   # i bez Odhadu: vypíše se zvlášť
         if navrhnutelna:
             break
     return {'kandidati': kandidati, 'pozdeji': pozdeji, 'blokovano': blokovano, 'ceka': ceka}
@@ -278,9 +280,9 @@ def vypis_tabulku(radky, hlavicka):
                                        fmt_h(k['odhad']) if k['odhad'] is not None else '-', k['duvod']))
 
 
-def navrh(minuty):
-    sys.stdout.reconfigure(encoding='utf-8')
-    dnes = datetime.date.today()
+def sestavit_navrh(minuty, dnes=None):
+    """Celý návrh session jako slovník (zdroj pro textový i JSON výstup, takže si odpovídají)."""
+    dnes = dnes or datetime.date.today()
     issues = gh_projekt.nacist_issues()
     board = gh_projekt.nacist_board()
     with open(gh_projekt.BACKLOG_MD, encoding='utf-8') as f:
@@ -289,47 +291,80 @@ def navrh(minuty):
     data = sestavit_kandidaty(issues, board, backlog, dnes)
     kandidati = data['kandidati']
     vybrane, bez_odhadu, nevesly, zbyva = vybrat(kandidati, minuty)
-    soucet = sum(k['odhad'] for k in vybrane)
+    chyby, varovani = _kontrola_boardu().zkontrolovat(issues, board, backlog, dnes)
+    return {
+        'skript': 'navrh-session',
+        'cas_minut': minuty,
+        'datum': dnes.isoformat(),
+        'otevrenych_issues': sum(1 for i in issues if i['state'] == 'OPEN'),
+        'kandidati': kandidati,
+        'vybrane': vybrane,
+        'soucet_h': sum(k['odhad'] for k in vybrane),
+        'zbyva_h': zbyva,
+        'bez_odhadu': bez_odhadu,
+        'nevesly': nevesly,
+        'pozdeji': [dict(p, datum=p['datum'].isoformat()) for p in data['pozdeji']],
+        'blokovano': data['blokovano'],
+        'ceka': data['ceka'],
+        'kontrola_boardu': {
+            'chyby': [{'issue': c, 'pravidlo': p, 'co': co} for c, p, co in chyby],
+            'varovani': [{'issue': c, 'pravidlo': p, 'co': co} for c, p, co in varovani],
+        },
+    }
 
-    print('Návrh session na %d min (%s h), %s' % (minuty, fmt_h(minuty / 60.0), dnes.strftime('%d. %m. %Y')))
-    print('Kandidátů: %d (otevřených issues: %d)\n' % (len(kandidati), sum(1 for i in issues if i['state'] == 'OPEN')))
+
+def vypis_navrh(n):
+    """Textový výstup návrhu z jeho slovníku."""
+    minuty = n['cas_minut']
+    datum = datetime.date.fromisoformat(n['datum'])
+    print('Návrh session na %d min (%s h), %s' % (minuty, fmt_h(minuty / 60.0), datum.strftime('%d. %m. %Y')))
+    print('Kandidátů: %d (otevřených issues: %d)\n' % (len(n['kandidati']), n['otevrenych_issues']))
     hlavicka = ('issue', 'titulek', 'Odhad h', 'důvod')
     print('Vybráno podle Odhadu:')
-    if vybrane:
-        vypis_tabulku(vybrane, hlavicka)
-        print('\nSoučet Odhadů: %s h, zbývá %s h (%d min)' % (fmt_h(soucet), fmt_h(zbyva), round(zbyva * 60)))
+    if n['vybrane']:
+        vypis_tabulku(n['vybrane'], hlavicka)
+        print('\nSoučet Odhadů: %s h, zbývá %s h (%d min)' % (fmt_h(n['soucet_h']), fmt_h(n['zbyva_h']), round(n['zbyva_h'] * 60)))
     else:
         print('  Dnes není co rozumně navrhnout: nic z kandidátů se nevejde do času nebo nic nečeká na práci.')
-        print('  (zbývá celých %s h; viz seznamy níže)' % fmt_h(zbyva))
-    if bez_odhadu:
+        print('  (zbývá celých %s h; viz seznamy níže)' % fmt_h(n['zbyva_h']))
+    if n['bez_odhadu']:
         print('\nBez Odhadu (nezapočítáno, doplnit Odhad nebo rozhodnout ručně):')
-        vypis_tabulku(bez_odhadu, hlavicka)
-    if nevesly:
+        vypis_tabulku(n['bez_odhadu'], hlavicka)
+    if n['nevesly']:
         print('\nNevešlo se do času (Odhad větší než zbývající čas):')
-        vypis_tabulku(nevesly[:8], hlavicka)
-        if len(nevesly) > 8:
-            print('  … a dalších %d' % (len(nevesly) - 8))
-    if data['pozdeji']:
+        vypis_tabulku(n['nevesly'][:8], hlavicka)
+        if len(n['nevesly']) > 8:
+            print('  … a dalších %d' % (len(n['nevesly']) - 8))
+    if n['pozdeji']:
         print('\nNaplánováno na později (Termín po dnešku, nenavrhuje se):')
-        for p in data['pozdeji']:
-            print('  %-6s %-52s %-11s %s' % ('#' + str(p['n']), p['titulek'][:52],
-                                          '%d. %d.' % (p['datum'].day, p['datum'].month), p['poznamka']))
-    if data['blokovano']:
+        for p in n['pozdeji']:
+            d = datetime.date.fromisoformat(p['datum'])
+            print('  %-6s %-52s %-11s %s' % ('#' + str(p['n']), p['titulek'][:52], '%d. %d.' % (d.day, d.month), p['poznamka']))
+    if n['blokovano']:
         print('\nBlokováno (čeká na otevřené issue, nenavrhuje se):')
-        for b in data['blokovano']:
+        for b in n['blokovano']:
             print('  %-6s %-52s %s' % ('#' + str(b['n']), b['titulek'][:52], b['duvod']))
-    if data['ceka']:
+    if n['ceka']:
         print('\nČeká na data (Stav defektu Ověřuje se bez Termínu, nenavrhuje se; doplnit Termín):')
-        for c in data['ceka']:
+        for c in n['ceka']:
             print('  %-6s %s' % ('#' + str(c['n']), c['titulek'][:70]))
 
-    chyby, varovani = _kontrola_boardu().zkontrolovat(issues, board, backlog, dnes)
+    chyby, varovani = n['kontrola_boardu']['chyby'], n['kontrola_boardu']['varovani']
     print('\nKontrola boardu: %d chyb, %d varování' % (len(chyby), len(varovani)))
-    for cislo, pravidlo, co in chyby:
-        print('  CHYBA     %-7s %-12s %s' % ('#' + str(cislo) if cislo else '-', pravidlo, co))
-    for cislo, pravidlo, co in varovani:
-        print('  VAROVÁNÍ  %-7s %-12s %s' % ('#' + str(cislo) if cislo else '-', pravidlo, co))
+    for x in chyby:
+        print('  CHYBA     %-7s %-12s %s' % ('#' + str(x['issue']) if x['issue'] else '-', x['pravidlo'], x['co']))
+    for x in varovani:
+        print('  VAROVÁNÍ  %-7s %-12s %s' % ('#' + str(x['issue']) if x['issue'] else '-', x['pravidlo'], x['co']))
     print('\nPozn.: skript nezná dočasná omezení (např. „do neděle neměnit RF testy“), ta zohlední plán.')
+
+
+def navrh(minuty, json_vystup=False):
+    sys.stdout.reconfigure(encoding='utf-8')
+    n = sestavit_navrh(minuty)
+    if json_vystup:
+        print(json.dumps(n, ensure_ascii=False, indent=2))
+    else:
+        vypis_navrh(n)
 
 
 def vlastni_test():
@@ -477,6 +512,7 @@ def main():
     ap = argparse.ArgumentParser(description='Návrh session z boardu podle času (jen čte).')
     ap.add_argument('--cas', help='k dispozici je tolik času, např. 60, 90m, 1,5h, 2:30, "cca 3h"')
     ap.add_argument('--test', action='store_true', help='ověří převod času, odhady a výběr a skončí')
+    ap.add_argument('--json', action='store_true', help='stejný návrh jako JSON (strojově čitelný výstup)')
     args = ap.parse_args()
     if args.test:
         return vlastni_test()
@@ -487,7 +523,7 @@ def main():
     except ValueError as e:
         print(str(e), file=sys.stderr)
         return 2
-    navrh(minuty)
+    navrh(minuty, args.json)
     return 0
 
 

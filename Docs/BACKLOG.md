@@ -259,7 +259,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
   - Dependabot (bezpečnostní aktualizace npm závislostí)
   - Milestones (seskupení issues podle verze/fáze, např. „Notifikace A–F")
   - GitHub Wiki (zvažováno, ale `Docs/*.md` verzovaný v repu je pravděpodobně lepší volba pro tenhle projekt)
-  - **Kontrola defektů a boardu v CI s read-only tokenem** (nápad 29. 10. 2026, rozšířeno téhož dne): `.github/scripts/kontrola-defektu.py` a `kontrola-boardu.py` dnes běží jen ručně, protože výchozí `GITHUB_TOKEN` board (uživatelský projekt) nepřečte. Možnost: fine-grained token jen pro čtení projektu jako secret, plánovaný běh jednou týdně s notifikací při nálezu. Zvážit až se ukáže, že ruční spouštění při „End“ nestačí; samostatný secret jen kvůli kontrole zatím nechceme (viz #33).
+  - ~~**Kontrola defektů a boardu v CI s read-only tokenem** (nápad 29. 10. 2026)~~ **REALIZOVÁNO 29. 10. 2026:** workflow `.github/workflows/kontrola-projektu.yml` (denně 6:40 UTC, v pondělí souhrn), classic token `BOARD_READ_TOKEN` jen se scope `read:project` (fine-grained token uživatelský projekt číst neumí), platnost do 27. 1. 2027, obnova issue #51 (viz CHANGELOG a `Docs/kvalita/DEFEKTY.md`, Kontrola úplnosti).
   - **Plánování session z boardu, rozšíření** (nápad 29. 10. 2026): `navrh-session.py` zatím nezná dočasná omezení ani závislosti mezi issues a bere Odhad (h) tak, jak je zadaný. Možnosti: pole „Blokováno do“ nebo „Čeká na“ na boardu, měření skutečného času oproti Odhadu pro přesnější návrhy; zvážit až se ukáže, že ruční doplňování plánu v hlavním chatu nestačí.
 
 ## Plán rozvoje — schváleno 4. 8. 2026, aktualizováno 8. 8. 2026
