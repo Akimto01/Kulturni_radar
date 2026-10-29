@@ -1544,6 +1544,125 @@ test('v3.56 (testovací dluh, krok 2 auditu): zpracovatSledovanaMesta – přesk
 });
 
 // ---------------------------------------------------------------------------
+// v3.51 (#49): rozpočet běhu podle délky města, počasí před smyčkou,
+// záznam přerušení do KONTROL. Limit 330 s, minimální odhad města 150 s.
+// ---------------------------------------------------------------------------
+
+const S_ = 1000;   // ms v sekundě, ať jsou hranice čitelné
+
+test('v3.51 (#49): smiZacitDalsiMesto_ – první město (nic změřeno) začne při uplynulo 179 s', () => {
+  assert.equal(r.smiZacitDalsiMesto_(179 * S_, []), true, '179 + 150 = 329 s < 330 s');
+  assert.equal(r.smiZacitDalsiMesto_(0, undefined), true);
+});
+
+test('v3.51 (#49): smiZacitDalsiMesto_ – první město (nic změřeno) nezačne při uplynulo 180 s, odhad je 150 s', () => {
+  assert.equal(r.smiZacitDalsiMesto_(180 * S_, []), false, '180 + 150 = 330 s, ne méně');
+  assert.equal(r.smiZacitDalsiMesto_(400 * S_, []), false);
+});
+
+test('v3.51 (#49): smiZacitDalsiMesto_ – hranice limitu 330 s: těsně pod začne, přesně na limitu a nad ne', () => {
+  // odhad = nejdelší město 150 s (rovno minimu), uplynulo + 150 s < 330 s
+  assert.equal(r.smiZacitDalsiMesto_(179 * S_ + 999, [150 * S_]), true, '329,999 s < 330 s');
+  assert.equal(r.smiZacitDalsiMesto_(180 * S_, [150 * S_]), false, 'přesně 330 s už ne (přísně menší)');
+  assert.equal(r.smiZacitDalsiMesto_(200 * S_, [150 * S_]), false);
+});
+
+test('v3.51 (#49): smiZacitDalsiMesto_ – odhad se bere z nejdelšího dosavadního města', () => {
+  const delky = [100 * S_, 200 * S_, 120 * S_];   // nejdelší 200 s
+  assert.equal(r.smiZacitDalsiMesto_(129 * S_ + 999, delky), true, '129,999 + 200 < 330');
+  assert.equal(r.smiZacitDalsiMesto_(130 * S_, delky), false, '130 + 200 = 330, ne méně');
+});
+
+test('v3.51 (#49): smiZacitDalsiMesto_ – odhad je nejméně 150 s i když byla dosavadní města kratší', () => {
+  // kdyby se minimum nepoužilo, 180 + 60 = 240 < 330 by začalo
+  assert.equal(r.smiZacitDalsiMesto_(180 * S_, [60 * S_]), false);
+  assert.equal(r.smiZacitDalsiMesto_(179 * S_, [60 * S_]), true);
+});
+
+test('v3.51 (#49): sestavRadekPreruseniSledovanychMest_ – typ, počty a uplynulý čas v řádku', () => {
+  const radek = r.sestavRadekPreruseniSledovanychMest_(2, 3, 244800);
+  assert.equal(radek.typ, 'sledovaná města přerušena');
+  assert.equal(radek.rozsah, 'Zpracováno měst: 2, zbývá: 3');
+  assert.match(radek.poznamka, /po 245 s/);
+  assert.match(radek.poznamka, /rozpočet 330 s/);
+});
+
+/** Spustí zpracovatSledovanaMesta se zadanými městy (všechna nikdy nezpracovaná)
+ *  a řízenými hodinami: každé volání AI posune čas o `delkaMestaMs`, počasí o
+ *  `delkaPocasiMs`. Vrací {ctx, ss, poradi, volaneAi}. */
+function spustitSledovanaMestaSHodinami_(mesta, delkaMestaMs, delkaPocasiMs) {
+  let cas = 0;
+  const poradi = [];
+  const odpovedi = mesta.map(() => anthropicResp({
+    stop_reason: 'tool_use',
+    content: [{ type: 'tool_use', name: 'report_events', input: { events: [] } }],
+  }));
+  const zaklad = frontaFetchu(odpovedi);
+  const ctx = nactiRadar({
+    properties: { ANTHROPIC_API_KEY: 'test-key' },
+    urlFetch: (url) => { poradi.push('ai'); cas += delkaMestaMs; return zaklad(url); },
+  });
+  ctx.__Date.now = () => cas;
+  ctx.aktualizujPocasi_ = () => { poradi.push('pocasi'); cas += delkaPocasiMs; };
+  ctx.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) };
+  const ss = fakeSpreadsheet({
+    'KRITÉRIA': fakeKriteria_({ B2: 'Brno', B3: '90 min', B4: '2', B5: 'vše', B6: 'ano', B7: 'ano' }),
+    'SLEDOVANÁ MĚSTA': new MemSheet([['Město']].concat(mesta.map(m => [m]))),
+    LOKALITY: new MemSheet([[]].concat(mesta.map((m, i) => ['id' + i, m, '', '', '', '', '', '']))),
+    ZDROJE: new MemSheet([['Název', 'URL', 'Profil', 'Priorita']]),
+    AKCE: new MemSheet([[]]),
+    KONTROLY: new MemSheet([[]]),
+  });
+  ctx.SpreadsheetApp.getActiveSpreadsheet = () => ss;
+  ctx.zpracovatSledovanaMesta();
+  return { ctx, ss, poradi };
+}
+
+test('v3.51 (#49): zpracovatSledovanaMesta – počasí běží PŘED městy a jeho čas se počítá do rozpočtu, přerušení se zapíše do KONTROL', () => {
+  // počasí 100 s, město 120 s: po 1. městě uplynulo 220 s, 220 + odhad 150 > 330 → 2. město se nezačne
+  const v = spustitSledovanaMestaSHodinami_(['Praha', 'Ostrava', 'Plzeň'], 120 * S_, 100 * S_);
+  assert.equal(v.poradi[0], 'pocasi', 'počasí je první');
+  assert.equal(v.poradi.filter(x => x === 'ai').length, 1, 'AI se zavolá jen pro první město');
+  const kontroly = v.ss.getSheetByName('KONTROLY').rows.filter(rad => rad[1] === 'sledovaná města přerušena');
+  assert.equal(kontroly.length, 1, 'právě jeden řádek o přerušení');
+  assert.equal(kontroly[0][2], 'Zpracováno měst: 1, zbývá: 2');
+});
+
+test('v3.51 (#49): zpracovatSledovanaMesta – počasí 200 s: žádné město se nezačne, řádek přerušení „Zpracováno měst: 0, zbývá 3“', () => {
+  // 200 s + minimální odhad 150 s = 350 s > 330 s, zabité volání AI by přišlo nazmar
+  const v = spustitSledovanaMestaSHodinami_(['Praha', 'Ostrava', 'Plzeň'], 120 * S_, 200 * S_);
+  assert.equal(v.poradi.filter(x => x === 'ai').length, 0, 'AI se nezavolá vůbec');
+  const radek = v.ss.getSheetByName('KONTROLY').rows.find(rad => rad[1] === 'sledovaná města přerušena');
+  assert.ok(radek, 'řádek o přerušení existuje');
+  assert.equal(radek[2], 'Zpracováno měst: 0, zbývá: 3');
+});
+
+test('v3.51 (#49): zpracovatSledovanaMesta – odhad z naměřené délky města: město 170 s zastaví druhé město (s minimem 150 s by začalo)', () => {
+  // po 1. městě uplynulo 170 s: 170 + naměřených 170 = 340 > 330, ale 170 + 150 = 320 < 330
+  const v = spustitSledovanaMestaSHodinami_(['Praha', 'Ostrava'], 170 * S_, 0);
+  assert.equal(v.poradi.filter(x => x === 'ai').length, 1, 'druhé město se nezačne');
+  const radek = v.ss.getSheetByName('KONTROLY').rows.find(rad => rad[1] === 'sledovaná města přerušena');
+  assert.equal(radek[2], 'Zpracováno měst: 1, zbývá: 1');
+});
+
+test('v3.51 (#49): zpracovatSledovanaMesta – když se všechna města vejdou, nic se nepřeruší a řádek do KONTROL nevznikne', () => {
+  // město 60 s, počasí 10 s: po 2 městech 130 s, odhad 150 → 280 < 330, takže začne i 3.
+  const v = spustitSledovanaMestaSHodinami_(['Praha', 'Ostrava', 'Plzeň'], 60 * S_, 10 * S_);
+  assert.equal(v.poradi.filter(x => x === 'ai').length, 3);
+  const preruseni = v.ss.getSheetByName('KONTROLY').rows.filter(rad => rad[1] === 'sledovaná města přerušena');
+  assert.equal(preruseni.length, 0);
+});
+
+test('v3.51 (#49): zpracovatSledovanaMesta – reálný případ z 29. 10.: město 130 s zastaví třetí město před limitem', () => {
+  // dvě města po 130 s = 260 s; 3. město by potřebovalo 260 + 150 = 410 > 330
+  const v = spustitSledovanaMestaSHodinami_(['Třinec', 'Olomouc', 'Plzeň'], 130 * S_, 5 * S_);
+  assert.equal(v.poradi.filter(x => x === 'ai').length, 2, 'třetí město se nezačne');
+  const radek = v.ss.getSheetByName('KONTROLY').rows.find(rad => rad[1] === 'sledovaná města přerušena');
+  assert.ok(radek, 'řádek o přerušení existuje');
+  assert.equal(radek[2], 'Zpracováno měst: 2, zbývá: 1');
+});
+
+// ---------------------------------------------------------------------------
 // v3.19: Víkendové tipy – volitelný druhý příjemce (NOTIFY_EMAIL_VIKEND)
 // ---------------------------------------------------------------------------
 

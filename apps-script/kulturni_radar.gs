@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.50 (27. 10. 2026) – týdenní report kvality uvádí i počet fuzzy sloučení v AKCE (sloupec Z)
- * (předchozí: 3.49 – seznam profilů označí testovací profily (ID „rf-…“), frontend je veřejně skryje)
+ * Verze: 3.51 (29. 10. 2026) – sledovaná města: rozpočet běhu podle délky města, počasí před smyčkou měst, záznam přerušení do KONTROL (#49)
+ * (předchozí: 3.50 – týdenní report kvality uvádí i počet fuzzy sloučení v AKCE (sloupec Z))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.50';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.51';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -2976,10 +2976,49 @@ function serazenaSledovanaMesta_(mesta, kontroly) {
   });
 }
 
+// v3.51 (#49): rozpočet běhu zpracovatSledovanaMesta. Limit Apps Scriptu je
+// 6 min, město trvá ~2 min (callAnthropic_ s web search), takže rozpočet musí
+// počítat s délkou města, ne jen s časem před jeho začátkem.
+const SLEDOVANA_LIMIT_MS = 6 * 60 * 1000 - 30 * 1000;   // limit 6 min minus rezerva 30 s = 330 s
+const SLEDOVANA_MIN_ODHAD_MESTA_MS = 150 * 1000;        // spodní mez odhadu délky jednoho města
+
+/** PURE: smí běh začít další město? Odhad jeho délky = nejdelší dosavadní město,
+ *  nejméně SLEDOVANA_MIN_ODHAD_MESTA_MS (když žádné není změřené, jen to minimum);
+ *  město začne jen když uplynulo + odhad < SLEDOVANA_LIMIT_MS. Vzorec platí i pro
+ *  PRVNÍ město: zabité zaplacené volání AI je horší než přeskočený běh, a
+ *  přerušení je vidět v KONTROLÁCH (logPreruseniSledovanychMest_). */
+function smiZacitDalsiMesto_(uplynuloMs, delkyMestMs) {
+  const delky = delkyMestMs || [];
+  const odhad = Math.max.apply(null, [SLEDOVANA_MIN_ODHAD_MESTA_MS].concat(delky));
+  return uplynuloMs + odhad < SLEDOVANA_LIMIT_MS;
+}
+
+/** PURE: obsah řádku KONTROL o běhu přerušeném rozpočtem {typ, rozsah, poznamka}. */
+function sestavRadekPreruseniSledovanychMest_(zpracovano, zbyva, uplynuloMs) {
+  return {
+    typ: 'sledovaná města přerušena',
+    rozsah: 'Zpracováno měst: ' + zpracovano + ', zbývá: ' + zbyva,
+    poznamka: 'Běh ukončen rozpočtem po ' + Math.round(uplynuloMs / 1000) + ' s (rozpočet '
+      + Math.round(SLEDOVANA_LIMIT_MS / 1000) + ' s z limitu Apps Scriptu 360 s). '
+      + 'Zbylá města zpracuje další běh (řazení podle stáří poslední kontroly).',
+  };
+}
+
+/** Zapíše do KONTROL řádek o běhu přerušeném rozpočtem (stejný tvar jako
+ *  logKontrolaPocasi_). Chyba zápisu nesmí shodit běh. */
+function logPreruseniSledovanychMest_(ss, zpracovano, zbyva, uplynuloMs) {
+  try {
+    const sh = ss.getSheetByName(SHEET.KONTROLY);
+    if (!sh) return;
+    const r = sestavRadekPreruseniSledovanychMest_(zpracovano, zbyva, uplynuloMs);
+    sh.appendRow([formatDate_(new Date()), r.typ, r.rozsah, 0, 0, 0, 0, 0, 0, 0, r.poznamka, 'Apps Script automatizace']);
+  } catch (e) { Logger.log('Log do KONTROL (přerušení sledovaných měst) selhal: ' + e); }
+}
+
 /** Hlavní běh: projde sledovaná města, pro každé (mimo domácí profil, mimo
  *  ty už dnes zpracované) spustí hledání – stejná kritéria (dojezd/horizont/
  *  kategorie) jako domácí profil, jen jiné město. Časově rozpočtováno
- *  (~4,5 min) jako doplnitSouradniceZpetne; PŘESKAKUJE dnes už hotová města
+ *  (v3.51: smiZacitDalsiMesto_, limit 330 s podle délky města); PŘESKAKUJE dnes už hotová města
  *  (viz jeDnesJizZpracovano_), takže opakované ruční spuštění postupně
  *  projde celý seznam, ne pořád jen jeho začátek. Bez notifikace.
  *
@@ -2994,21 +3033,34 @@ function zpracovatSledovanaMesta() {
   if (!lock.tryLock(5000)) { Logger.log('zpracovatSledovanaMesta: jiný běh právě probíhá – končím.'); return; }
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   try {
+    const t0 = Date.now();
+    // v3.51 (#49): počasí PŘED smyčkou měst. Je levné (bez AI) a dřív běželo až
+    // za smyčkou, takže když běh narazil na limit 6 min, nespustilo se vůbec.
+    // Jeho čas se teď započítá do uplynulého času rozpočtu. Akce nalezené až
+    // v tomhle běhu dostanou počasí při příštím běhu.
+    aktualizujPocasi_(ss);
+
     const krit = ss.getSheetByName(SHEET.KRITERIA);
     const zakladniCfg = readCriteria_(krit);
     const kontroly = readPosledniKontrolyLokalit_(ss);
     const mesta = serazenaSledovanaMesta_(readSledovanaMesta_(ss), kontroly);
     const dnes = new Date();
-    const t0 = Date.now();
+    const delkyMestMs = [];   // v3.51: naměřená délka každého zpracovaného města
     let zpracovano = 0, preskocenoDnes = 0;
     for (let i = 0; i < mesta.length; i++) {
-      if (Date.now() - t0 > 4.5 * 60 * 1000) {
-        Logger.log('zpracovatSledovanaMesta: přerušeno kvůli časovému limitu po ' + zpracovano + ' městech (zbývá ' + (mesta.length - i) + ').');
-        break;
-      }
       const mesto = mesta[i];
       if (norm_(mesto) === norm_(zakladniCfg.profil)) continue;   // domácí profil řeší dailyCheck
       if (jeDnesJizZpracovano_(kontroly.get(norm_(mesto)), dnes)) { preskocenoDnes++; continue; }
+      // v3.51 (#49): rozpočet podle délky města, ne pevných 4,5 min před městem
+      // (město trvá ~2 min, takže třetí město začalo a běh skončil na limitu).
+      if (!smiZacitDalsiMesto_(Date.now() - t0, delkyMestMs)) {
+        const zbyva = mesta.slice(i).filter(m =>
+          norm_(m) !== norm_(zakladniCfg.profil) && !jeDnesJizZpracovano_(kontroly.get(norm_(m)), dnes)).length;
+        Logger.log('zpracovatSledovanaMesta: přerušeno rozpočtem po ' + zpracovano + ' městech (zbývá ' + zbyva + ').');
+        logPreruseniSledovanychMest_(ss, zpracovano, zbyva, Date.now() - t0);
+        break;
+      }
+      const tMesta = Date.now();
       try {
         const cfg = cfgProMesto_(zakladniCfg, mesto);
         const zdroje = readSources_(ss, mesto);
@@ -3021,15 +3073,13 @@ function zpracovatSledovanaMesta() {
       } catch (e) {
         Logger.log('Sledované město "' + mesto + '" selhalo: ' + e);
       }
+      delkyMestMs.push(Date.now() - tMesta);   // i selhané město se počítá do odhadu
     }
     Logger.log('zpracovatSledovanaMesta: hotovo, zpracováno ' + zpracovano + ' z ' + mesta.length
       + ' měst (přeskočeno jako dnes už hotové: ' + preskocenoDnes + ').');
-
     // v3.22: počasí u akcí se přepočítává PŘI KAŽDÉM běhu tohoto triggeru
     // (neděle 20:00 + čtvrtek 10:00), ne jen jednou při vzniku akce – blíž
-    // datu konání je předpověď přesnější. Vlastní try/catch uvnitř, takže
-    // selhání sem nespadne.
-    aktualizujPocasi_(ss);
+    // datu konání je předpověď přesnější. Od v3.51 běží na začátku běhu (viz výš).
   } finally {
     lock.releaseLock();
   }

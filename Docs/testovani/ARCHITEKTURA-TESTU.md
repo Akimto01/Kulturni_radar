@@ -236,7 +236,7 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
 
 | Sada | Obsah | Spouštění | Blokuje | Kdo sleduje |
 |---|---|---|---|---|
-| Jednotkové testy | 558 testů backendu a frontendu (Node) | každý push a PR | nasazení (pravidlo vlastníka: nenasazuje se s červenou) | vlastník, odznak v README |
+| Jednotkové testy | 569 testů backendu a frontendu (Node) | každý push a PR | nasazení (pravidlo vlastníka: nenasazuje se s červenou) | vlastník, odznak v README |
 | Statická kontrola testů | `robot --dryrun` celé RF sady (syntaxe, existence klíčových slov, argumenty) | každý push a PR | nasazení | vlastník |
 | Pojistka souladu s architekturou | počty porušení pravidel B4, B5 a C3 proti baseline (`.github/scripts/kontrola-architektury-testu.py`); selže, když porušení přibude | každý push a PR | push s novým porušením | vlastník |
 | Kontrola počtů testů v README | porovná tabulku „Testy v číslech“ se skutečností (Node, RF přes robot.api, worker) | každý push a PR | push s rozdílem | vlastník |

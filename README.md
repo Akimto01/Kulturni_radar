@@ -34,7 +34,7 @@ Documentation is in Czech.*
 
 | Úroveň | Nástroj | Počet | Kdy běží |
 |---|---|---|---|
-| Jednotkové testy backendu (logika Apps Scriptu přes vlastní harness, bez Googlu) | `node:test` | 349 | každý push (CI) |
+| Jednotkové testy backendu (logika Apps Scriptu přes vlastní harness, bez Googlu) | `node:test` | 360 | každý push (CI) |
 | Jednotkové testy frontendu (čisté funkce z `Index.html`) | `node:test` | 209 | každý push (CI) |
 | Kontrola syntaxe a klíčových slov RF sady (dry run) | Robot Framework | 61 | každý push (CI) |
 | E2E testy proti produkci: frontend + API kontrakt | Robot Framework + Browser Library (Playwright), RequestsLibrary | 52 + 9 | týdně (CI) a smoke po každém nasazení |
