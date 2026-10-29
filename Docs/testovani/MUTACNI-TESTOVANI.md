@@ -1,0 +1,76 @@
+# Mutační testování (Stryker)
+
+Odpovídá na otázku, kterou pokrytí řádků nezodpoví: **zachytí testy změnu chování?** Stryker v kódu
+udělá drobnou změnu (mutaci, např. `>` na `>=`, podmínka na `true`, prázdné tělo funkce), pustí testy
+a sleduje, jestli aspoň jeden spadne. Jde o issue #13. Metrika „mutační skóre kritických funkcí“ je
+v [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md), D3, řádek v C1.
+
+## Spuštění
+
+Z kořene repa (Node 22 nebo novější). Nástroje jsou v `tests/mutace/` s vlastním `package.json`, aby
+kořen repa žádný neměl (Cloudflare Pages by ho při `git push` mohl instalovat).
+
+```
+cd tests/mutace && npm ci && cd ../..         # jednou: instalace (pevné verze z package-lock.json)
+node tests/mutace/spustit.js --kriticke       # 10 kritických funkcí z POKRYTI.md, 448 mutantů, ~3 min
+node tests/mutace/spustit.js --funkce parseCzDate_,apiToggle_
+node tests/mutace/spustit.js --rozsah 273-277 # řádky v kulturni_radar.gs
+node tests/mutace/spustit.js --vse            # celý backend, 5 378 mutantů, ~40 min
+```
+
+Další argumenty se předají Strykeru (např. `--concurrency 2`). Zdrojem pravdy zůstává
+`apps-script/kulturni_radar.gs`, skript ho jen zkopíruje, nic nemění. Výstupy: tabulka v konzoli,
+`tests/mutace/reports/mutation.json` (v `.gitignore`).
+
+Dobu běhu určuje hlavně start procesů, ne počet jader: kritická sada trvá ~3 min 40 s při 4 procesech
+i ~3 min 10 s při 8 (Windows, k 29. 10. 2026), tedy ~0,45 s na mutant.
+
+## Jak je to zapojené
+
+- **Kopie `.js`:** Stryker nezná příponu `.gs`. `spustit.js` zkopíruje backend bajt po bajtu do
+  `.stryker-src/kulturni_radar.js` (čísla řádků sedí) a nastaví `RADAR_ZDROJ`.
+- **Harness:** `tests/harness.js` při nastavené `RADAR_ZDROJ` načte instrumentovanou kopii. Instrumentovaný
+  kód běží ve `vm` a svůj jmenný prostor Strykeru hledá v globálu vm kontextu, ne testovacího procesu, proto
+  harness předá do kontextu objekt z hooku Strykeru a zapíše do něj aktivního mutanta. Bez toho jsou všechny
+  mutanty `NoCoverage`. Bez `RADAR_ZDROJ` a mimo Stryker se chování harnessu nemění.
+- **Runner:** `@stryker-mutator/tap-runner` nad `tests/unit.test.js` (413 testů, ~1 s na mutant) s měřením
+  pokrytí: mutant, který žádný test nespustí, se vůbec neprovádí (`NoCoverage`).
+- **Vlastní TAP reporter** `tests/mutace/tap-reporter.js`: vestavěný reporter Node padá na neplatném `Date`
+  v selhané aserci (`RangeError: Invalid time value`), proces skončí dřív, než hook zapíše výsledek, a Stryker
+  by zabitého mutanta označil jako `RuntimeError`.
+- **Rozsah:** mutuje se jen tělo pojmenované funkce, ne pomocné funkce, které volá (např. `apiToggle_` bez
+  `toggleOznaceni_`). Skóre jedné funkce proto neříká vše o tom, co deleguje.
+
+## Jak číst výsledek
+
+| Stav | Význam | Co s tím |
+|---|---|---|
+| **Killed** (zabitý) | aspoň jeden test s mutací spadl | v pořádku, test chytá tuto změnu chování |
+| **Survived** (přeživší) | všechny testy prošly i s mutací | vyžaduje triáž (viz níže) |
+| **Timeout** | mutace způsobila zacyklení nebo extrémní zpomalení, běh byl přerušen | počítá se jako zabitý; závisí na zátěži stroje, může při opakování přejít na Killed |
+| **NoCoverage** | žádný test kód s mutací vůbec nespustil | mezera v testech (nebo kód, který jde spustit jen v Googlu) |
+| **RuntimeError** | mutant rozbil samotný běh testů | po zavedení vlastního reporteru by se neměl objevovat; jinak hlásit |
+
+**Mutační skóre** = (zabité + timeout) / všechny mutanty; mutanty bez pokrytí jsou ve jmenovateli, takže skóre
+je přísnější než „skóre pokrytých“, které Stryker vypíše vedle.
+
+**Ekvivalentní mutant** mění kód, ale ne pozorovatelné chování (např. `i < n` na `i <= n` u smyčky, jejíž
+poslední průchod nic nemění, nebo změna textu logu, který nikdo nečte). Žádný test ho zabít nemůže, a proto
+ho nemá smysl zabíjet. Ekvivalentní mutanty se při triáži odečtou od jmenovatele a zapíšou s důvodem.
+
+## Triáž přeživších
+
+Každý přeživší a každý `NoCoverage` mutant se zařadí do jedné ze tří kategorií:
+
+- **(a) skutečná mezera v testu:** změna chování, kterou test měl chytit. Doplní se test a mutant se ověří.
+- **(b) ekvivalentní mutant:** změna neovlivní chování. Zdůvodní se jednou větou.
+- **(c) mezera v kódu, kterou testem neopravíš:** mrtvý nebo nedosažitelný kód, obrana, kterou nejde vyvolat
+  (např. jen ve skutečném Googlu). Zapíše se; případně se kód zjednoduší.
+
+Před doplněním testu se ověří, že přeživší není artefaktem nastavení: mutace se ručně aplikuje na kopii
+(`RADAR_ZDROJ=… node --test tests/unit.test.js`) a testy musí opravdu projít.
+
+## Zatím neplatí
+
+Mutační testování není v CI (celý backend ~40 min, kritická sada ~3 min) a skóre nemá práh. Mutuje se jen
+backend a jen proti `tests/unit.test.js`; frontend (`Index.html`) a E2E testy ne.

@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "tap",
+  "tap": {
+    "testFiles": [
+      "tests/unit.test.js"
+    ],
+    "nodeArgs": [
+      "--test-reporter=./tests/mutace/tap-reporter.js",
+      "-r",
+      "{{hookFile}}",
+      "{{testFile}}"
+    ]
+  },
+  "coverageAnalysis": "perTest",
+  "reporters": [
+    "clear-text",
+    "json"
+  ],
+  "clearTextReporter": {
+    "allowColor": false,
+    "reportTests": false
+  },
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": "always",
+  "concurrency": 4,
+  "jsonReporter": {
+    "fileName": "tests/mutace/reports/mutation.json"
+  }
+}

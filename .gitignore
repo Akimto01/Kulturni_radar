@@ -25,3 +25,9 @@ cloudflare-worker/.wrangler/
 /.claude/settings.json
 # Python cache ze skriptů v .github/scripts
 __pycache__/
+
+# mutační testování (Stryker, issue #13, viz tests/mutace/spustit.js): závislosti, výstupy a pracovní kopie
+tests/mutace/node_modules/
+tests/mutace/reports/
+.stryker-tmp/
+.stryker-src/

@@ -1,0 +1,12 @@
+{
+  "name": "kulturni-radar-testy",
+  "private": true,
+  "description": "Nastroje pro testovani repa (mutacni testovani Strykerem). Aplikace samotna zadne npm zavislosti nema.",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/tap-runner": "10.0.0"
+  }
+}

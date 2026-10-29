@@ -29,6 +29,7 @@ Počty testů jsou jen v hlavním README (tabulka „Testy v číslech“).
 | [testovani/ARCHITEKTURA-TESTU.md](testovani/ARCHITEKTURA-TESTU.md) | architektura automatizace: **jak** jsou testy postavené a jak běží (strategie, framework, CI/CD, metriky) |
 | [testovani/POKRYTI.md](testovani/POKRYTI.md) | matice pokrytí: které riziko a oblast je pokrytá na jaké úrovni a co ne |
 | [testovani/TESTOVACI-ANALYZA.md](testovani/TESTOVACI-ANALYZA.md) | ukázka testovací analýzy od testovací báze k testovacím případům |
+| [testovani/MUTACNI-TESTOVANI.md](testovani/MUTACNI-TESTOVANI.md) | mutační testování Strykerem: spuštění, zapojení, výklad výsledků a triáž přeživších |
 
 ## Kvalita a defekty
 

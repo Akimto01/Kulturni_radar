@@ -149,9 +149,24 @@ function nactiRadar(volby = {}) {
     } : zakazano('LockService'),
   };
 
-  const cestaKGs = path.join(__dirname, '..', 'apps-script', 'kulturni_radar.gs');
+  // Mutační testování (Stryker, issue #13): Stryker nezná příponu .gs, mutuje se proto kopie .js
+  // a harness ji načte místo originálu, když je nastavená RADAR_ZDROJ (cesta od kořene repa).
+  const cestaKGs = process.env.RADAR_ZDROJ
+    ? path.join(__dirname, '..', process.env.RADAR_ZDROJ)
+    : path.join(__dirname, '..', 'apps-script', 'kulturni_radar.gs');
   const kod = fs.readFileSync(cestaKGs, 'utf8');
   vm.createContext(ctx);
+  // Instrumentovaný kód hledá jmenný prostor Strykeru (aktivní mutant, měření pokrytí) v globálním
+  // objektu SVÉHO kontextu, tedy ve vm sandboxu, kde ho nikdo nenastavil a kam nevidí ani process.env.
+  // Sdílíme proto objekt, který v testovacím procesu založil hook tap-runneru, a aktivního mutanta
+  // do něj zapíšeme z proměnné prostředí (mimo vm to za Stryker dělá sám instrumentovaný kód).
+  const strykerNs = global[process.env.STRYKER_NAMESPACE || '__stryker__'];
+  if (strykerNs) {
+    if (strykerNs.activeMutant === undefined && process.env.__STRYKER_ACTIVE_MUTANT__) {
+      strykerNs.activeMutant = process.env.__STRYKER_ACTIVE_MUTANT__;
+    }
+    ctx[process.env.STRYKER_NAMESPACE || '__stryker__'] = strykerNs;
+  }
   // filename jako file:// URL, ať node --experimental-test-coverage přiřadí
   // pokrytí ke zdrojovému souboru (holé jméno se v reportu neukáže).
   vm.runInContext(kod, ctx, { filename: pathToFileURL(cestaKGs).href });

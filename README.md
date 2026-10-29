@@ -131,6 +131,7 @@ Soupis toho, co projekt používá. První sloupec obsahuje identifikátor v zp�
 | Nástroj | K čemu | Kde v repu | Verze |
 |---|---|---|---|
 | `node:test` | jednotkové testy backendu (přes vlastní harness bez Googlu), frontendu a Workeru | `tests/unit.test.js`, `tests/frontend.test.js`, `tests/harness.js`, `cloudflare-worker/email-webhook.test.mjs` | Node 22 (CI) |
+| StrykerJS (`@stryker-mutator/core`, `@stryker-mutator/tap-runner`) | mutační testování backendu: mutuje kopii `kulturni_radar.gs` a ověřuje, že jednotkové testy mutaci zachytí; spouští se ručně (`node tests/mutace/spustit.js --kriticke`), zatím ne v CI, postup v [MUTACNI-TESTOVANI.md](Docs/testovani/MUTACNI-TESTOVANI.md) | `tests/mutace/package.json` (devDependencies), `tests/mutace/stryker.config.json`, `tests/mutace/spustit.js` | 10.0.0 |
 | Robot Framework (`robotframework`) | E2E a API testy proti produkci, dry run v každém pushi; standardní knihovny (Collections, OperatingSystem, String) jsou jeho součástí | `tests/robot/` | 7.5 |
 | Browser Library (`robotframework-browser`) | E2E testy frontendu v prohlížeči (Playwright, Chromium) | `tests/robot/frontend.robot`, `tests/robot/requirements.txt` | 20.6.0 |
 | RequestsLibrary (`robotframework-requests`) | testy kontraktu API | `tests/robot/api.robot`, `tests/robot/requirements.txt` | 0.9.7 |

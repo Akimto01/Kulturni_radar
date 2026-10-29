@@ -43,7 +43,8 @@ KNIHOVNA_NA_BALIK = {'Browser': 'robotframework-browser', 'RequestsLibrary': 'ro
 # pokrývá řádek github-actions; kontrolují se jen akce třetích stran.
 OFICIALNI_AKCE_PREFIX = 'actions/'
 
-PRUNE = {'node_modules', '.git', '.wrangler', '__pycache__'}
+# .stryker-tmp a .stryker-src: pracovní kopie mutačního testování (obsahují kopie package.json a zdrojů)
+PRUNE = {'node_modules', '.git', '.wrangler', '__pycache__', '.stryker-tmp', '.stryker-src', 'reports'}
 
 
 def _soubory(koren, maska):
@@ -203,6 +204,7 @@ def vlastni_test():
         zapsat(koren, 'cloudflare-worker/package.json', json.dumps({'dependencies': {'postal-mime': '^3.0.0'}, 'devDependencies': {'wrangler': '^4.0.0'}}))
         zapsat(koren, 'cloudflare-worker/wrangler.toml', 'name = "x"\n')
         zapsat(koren, 'cloudflare-worker/node_modules/zbytecny/package.json', json.dumps({'dependencies': {'nemelo-se-cist': '1'}}))
+        zapsat(koren, '.stryker-tmp/sandbox-x/package.json', json.dumps({'dependencies': {'kopie-ze-sandboxu': '1'}}))
         zapsat(koren, 'tests/robot/requirements.txt', 'robotframework==7.5  # test\nrobotframework-browser==20.6.0\nrobotframework-requests==0.9.7\n')
         zapsat(koren, 'tests/robot/api.robot', '*** Settings ***\nLibrary           RequestsLibrary\nLibrary    Collections\nLibrary\tString\nResource          resources.robot\n')
         zapsat(koren, 'tests/robot/frontend.robot', '*** Settings ***\nLibrary           Browser\nLibrary           moje.py\n')
@@ -228,7 +230,7 @@ def vlastni_test():
         repo(tmp)
         nastroje, chybi = zkontrolovat(tmp, readme(*VSE))
         over(set(nastroje) == set(VSE), 'zdroje: sebrané nástroje %s' % sorted(nastroje))
-        over('nemelo-se-cist' not in nastroje, 'zdroje: node_modules se nečte')
+        over('nemelo-se-cist' not in nastroje and 'kopie-ze-sandboxu' not in nastroje, 'zdroje: node_modules a .stryker-tmp se nečtou')
         over('collections' not in nastroje and 'string' not in nastroje and 'actions/checkout' not in nastroje, 'výjimky: standardní knihovny RF a actions/* se nevyžadují')
         over(chybi == [], 'úplná tabulka: kontrola projde (chybí %s)' % chybi)
 
