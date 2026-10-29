@@ -8,6 +8,7 @@
  *   node tests/mutace/spustit.js --rozsah 273-277
  *   node tests/mutace/spustit.js --kriticke     (10 kritických funkcí z POKRYTI.md, ~3 min)
  *   node tests/mutace/spustit.js --vse          (celý backend, ~40 min)
+ *   --prah N            přepíše práh pádu (thresholds.break z stryker.config.json); 0 = bez prahu (týdenní běh celého backendu)
  *   další argumenty se předají Strykeru (např. --concurrency 2)
  *
  * Proč kopie: Stryker nezná příponu .gs. Skript zkopíruje apps-script/kulturni_radar.gs
@@ -40,6 +41,7 @@ function main(argv) {
   const radky = text.split('\n');
   const mutate = [];
   const predat = [];
+  let prah = null;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--funkce') {
       for (const f of argv[++i].split(',')) mutate.push(kopieRel + ':' + rozsahFunkce(radky, f.trim()));
@@ -47,6 +49,9 @@ function main(argv) {
       mutate.push(kopieRel + ':' + argv[++i]);
     } else if (argv[i] === '--kriticke') {
       for (const f of KRITICKE) mutate.push(kopieRel + ':' + rozsahFunkce(radky, f));
+    } else if (argv[i] === '--prah') {
+      prah = Number(argv[++i]);
+      if (!Number.isFinite(prah)) throw new Error('--prah vyžaduje číslo (0 = bez prahu)');
     } else if (argv[i] === '--vse') {
       mutate.push(kopieRel);
     } else {
@@ -59,12 +64,21 @@ function main(argv) {
   fs.mkdirSync(path.dirname(cil), { recursive: true });
   fs.copyFileSync(zdroj, cil);
 
+  // Stryker nemá argument pro práh, proto při --prah vznikne přepsaná kopie konfigurace (v .stryker-src/).
+  let konfigurace = 'tests/mutace/stryker.config.json';
+  if (prah !== null) {
+    const cfg = JSON.parse(fs.readFileSync(path.join(koren, konfigurace), 'utf8'));
+    cfg.thresholds = Object.assign({}, cfg.thresholds, { break: prah === 0 ? null : prah });
+    konfigurace = '.stryker-src/stryker.config.json';
+    fs.writeFileSync(path.join(koren, konfigurace), JSON.stringify(cfg, null, 2));
+  }
+
   const nm = path.join(__dirname, 'node_modules', '@stryker-mutator');
   const stryker = path.join(nm, 'core', 'bin', 'stryker.js');
   if (!fs.existsSync(stryker)) throw new Error('Stryker není nainstalovaný: cd tests/mutace && npm ci');
   // plugin se hledá od pracovní složky (kořen repa), proto absolutní cesta do tests/mutace/node_modules
   const plugin = path.join(nm, 'tap-runner', 'dist', 'src', 'index.js');
-  const r = spawnSync(process.execPath, [stryker, 'run', 'tests/mutace/stryker.config.json',
+  const r = spawnSync(process.execPath, [stryker, 'run', konfigurace,
     '--plugins', plugin, '--mutate', mutate.join(','), ...predat], {
     cwd: koren, stdio: 'inherit', env: { ...process.env, RADAR_ZDROJ: kopieRel, RADAR_LOCALE: 'en-US', LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' },
   });

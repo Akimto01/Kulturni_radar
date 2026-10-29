@@ -1,0 +1,118 @@
+name: Mutační testy (Stryker)
+
+# Kritická sada (10 funkcí, ~3 min) běží při změně backendu nebo jeho testů a hlídá práh
+# thresholds.break z tests/mutace/stryker.config.json (95 %). Celý backend (~40 min) běží jednou
+# týdně a ručně, bez prahu: je to měření, ne brána. Postup a výklad: Docs/testovani/MUTACNI-TESTOVANI.md.
+
+on:
+  push:
+    paths:
+      - 'apps-script/kulturni_radar.gs'
+      - 'tests/unit.test.js'
+      - 'tests/harness.js'
+      - 'tests/mutace/**'
+      - '.github/workflows/mutacni-testy.yml'
+  pull_request:
+    paths:
+      - 'apps-script/kulturni_radar.gs'
+      - 'tests/unit.test.js'
+      - 'tests/harness.js'
+      - 'tests/mutace/**'
+      - '.github/workflows/mutacni-testy.yml'
+  workflow_dispatch:
+    inputs:
+      rozsah:
+        description: 'Rozsah mutací'
+        type: choice
+        options:
+          - kriticke
+          - vse
+        default: kriticke
+  schedule:
+    # sobota 3:40 UTC: mimo celou hodinu (fronta plánovaných běhů je na začátku hodiny nejvytíženější),
+    # cron je v UTC a nepřechází na letní čas
+    - cron: '40 3 * * 6'
+
+permissions:
+  contents: read
+
+jobs:
+  kriticka-sada:
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.rozsah == 'kriticke')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/mutace/package-lock.json
+
+      - name: Instalace Strykeru
+        working-directory: tests/mutace
+        run: npm ci
+
+      # Práh pádu (95 %) je v tests/mutace/stryker.config.json; pod ním Stryker skončí nenulovým kódem.
+      - name: Mutační testy kritické sady
+        env:
+          TZ: Europe/Prague
+        run: node tests/mutace/spustit.js --kriticke
+
+      - name: Report (artefakt)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: mutacni-report-kriticka-sada
+          path: tests/mutace/reports/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  cely-backend:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.rozsah == 'vse')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/mutace/package-lock.json
+
+      - name: Instalace Strykeru
+        working-directory: tests/mutace
+        run: npm ci
+
+      # --prah 0: bez prahu, týdenní běh celého backendu skóre jen měří
+      - name: Mutační testy celého backendu
+        env:
+          TZ: Europe/Prague
+        run: node tests/mutace/spustit.js --vse --prah 0
+
+      - name: Report (artefakt)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: mutacni-report-cely-backend
+          path: tests/mutace/reports/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upozornění na selhání (ntfy)
+        # jen plánovaný běh; ruční běh sleduje ten, kdo ho spustil
+        if: failure() && github.event_name == 'schedule'
+        env:
+          # vývojové upozornění: téma NTFY_TOPIC_DEV, dokud neexistuje, NTFY_TOPIC
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC_DEV || secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -fsS \
+            -H "Title: Kulturni radar - vyvoj: tydenni mutacni testy selhaly" \
+            -H "Priority: high" \
+            -H "Tags: warning" \
+            -H "Click: $RUN_URL" \
+            -d "Tydenni beh mutacnich testu celeho backendu skoncil chybou. Log a report: $RUN_URL" \
+            "https://ntfy.sh/$NTFY_TOPIC"

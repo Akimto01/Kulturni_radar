@@ -13,9 +13,15 @@
     ]
   },
   "coverageAnalysis": "perTest",
+  "thresholds": {
+    "high": 97,
+    "low": 95,
+    "break": 95
+  },
   "reporters": [
     "clear-text",
-    "json"
+    "json",
+    "html"
   ],
   "clearTextReporter": {
     "allowColor": false,
@@ -26,5 +32,8 @@
   "concurrency": 4,
   "jsonReporter": {
     "fileName": "tests/mutace/reports/mutation.json"
+  },
+  "htmlReporter": {
+    "fileName": "tests/mutace/reports/mutation.html"
   }
 }
