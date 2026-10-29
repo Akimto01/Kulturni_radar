@@ -5199,6 +5199,71 @@ test('#35 weekendDigest: stálá místa (aktivní, top 5 podle skóre) v sekci s
   assert.ok(volane.every(u => /open-meteo/.test(u)), 'jen pokus o počasí, nic jiného');
 });
 
+/** Stálá místa pro testy přehledů: [název, typ, doba, skóre]; profil Brno, obec Brno, aktivní. */
+const mistaPrehled_ = (polozky) => [['ID', 'Název', 'Typ', 'Obec']].concat(polozky.map(([nazev, typ, doba, skore]) =>
+  ['id-' + nazev, nazev, typ, 'Brno', '', doba, '', '', '', skore, 'aktivní', '', '', '', 'Brno']));
+
+/** Část těla přehledu od nadpisu „Stálá místa“ do odkazu na tabulku. */
+const blokMist_ = (telo) => telo.slice(telo.indexOf('Stálá místa'), telo.indexOf('\n\nKompletní přehled'));
+
+test('digestRange_: profil s mezerami kolem názvu v KRITÉRIÍCH se ořízne (hlavička i výběr akcí)', () => {
+  const { ctx } = ctxPrehled_([2026, 10, 4], { listy: { 'KRITÉRIA': fakeKriteria_({ B2: '  Brno ' }) },
+    akce: [akcePrehled_('Dnešní', '4. 11. 2026')] });
+  ctx.weeklyDigest();
+  const telo = ctx.__odeslaneEmaily[0].telo;
+  assert.match(telo, /^Brno · 4\. 11\. 2026–10\. 11\. 2026/);
+  assert.match(telo, /Dnešní/);
+});
+
+test('digestRange_: bez stálých míst (list chybí i list jen s hlavičkou) se blok „Stálá místa“ vůbec nepřidá', () => {
+  const bezListu = ctxPrehled_([2026, 10, 4], { akce: [akcePrehled_('Dnešní', '4. 11. 2026')] });
+  bezListu.ctx.weeklyDigest();
+  assert.doesNotMatch(bezListu.ctx.__odeslaneEmaily[0].telo, /Stálá místa/);
+
+  const prazdny = ctxPrehled_([2026, 10, 4], { listy: { 'MÍSTA': mistaPrehled_([]) } });
+  prazdny.ctx.weeklyDigest();
+  assert.doesNotMatch(prazdny.ctx.__odeslaneEmaily[0].telo, /Stálá místa/);
+});
+
+test('weeklyDigest spuštěný v neděli: jediná sobota okna je jeho poslední den, nadpis stálých míst nese její datum', () => {
+  const { ctx } = ctxPrehled_([2026, 10, 8], { listy: { 'MÍSTA': mistaPrehled_([['Zoo-A', 'zoo', '8–18', 9]]) },
+    urlFetch: frontaFetchu(['throw', 'throw']) });   // neděle 8. 11. → okno 8.–14. 11., sobota 14. 11.
+  ctx.weeklyDigest();
+  const telo = ctx.__odeslaneEmaily[0].telo;
+  assert.match(telo, /^Brno · 8\. 11\. 2026–14\. 11\. 2026/);
+  assert.match(telo, /Stálá místa \(14\. 11\. 2026\)/);
+});
+
+test('digestRange_: stálá místa seskupená podle typu, typy řazené česky, nadpis s velkým písmenem, chybějící typ = ostatní, otevírací doba jen když je', () => {
+  // pořadí podle skóre: zoo, chrám, hrad, (bez typu), hrad; česky řazené typy: hrad, chrám, ostatní, zoo
+  const mista = mistaPrehled_([['Zoo-C', 'zoo', '8–18', 9], ['Chram-B', 'chrám', '', 8], ['Hrad-A', 'hrad', '9–17', 7],
+    ['Bez-typu', '', '', 6], ['Hrad-D', 'hrad', '', 5]]);
+  const { ctx } = ctxPrehled_([2026, 10, 5], { listy: { 'MÍSTA': mista }, urlFetch: frontaFetchu(['throw', 'throw']) });
+  ctx.weekendDigest();
+  assert.equal(blokMist_(ctx.__odeslaneEmaily[0].telo), [
+    'Stálá místa (7. 11. 2026)', '',
+    '· Hrad:', '• Hrad-A', '   otevřeno: 9–17', '• Hrad-D', '',
+    '· Chrám:', '• Chram-B', '',
+    '· Ostatní:', '• Bez-typu', '',
+    '· Zoo:', '• Zoo-C', '   otevřeno: 8–18',
+  ].join('\n'));
+});
+
+test('digestRange_: u stálých míst je pod názvem počasí na sobotu s obcí, předpověď se stahuje jednou za obec', () => {
+  const volane = [];
+  const predpoved = { code: 200, body: { daily: { time: ['2026-11-07'], weather_code: [3], temperature_2m_max: [11.4], precipitation_probability_max: [20] } } };
+  const mista = mistaPrehled_([['Zoo-C', 'zoo', '8–18', 9], ['Hrad-A', 'hrad', '', 7]]);
+  const { ctx } = ctxPrehled_([2026, 10, 5], { listy: { 'MÍSTA': mista }, urlFetch: frontaFetchu([GEO_BRNO, predpoved], volane) });
+  ctx.weekendDigest();
+  const pocasi = '   počasí (Brno): zataženo, max 11 °C, srážky 20 %';
+  assert.equal(blokMist_(ctx.__odeslaneEmaily[0].telo), [
+    'Stálá místa (7. 11. 2026)', '',
+    '· Hrad:', '• Hrad-A', pocasi, '',
+    '· Zoo:', '• Zoo-C', '   otevřeno: 8–18', pocasi,
+  ].join('\n'));
+  assert.equal(volane.length, 2, 'geokódování a předpověď jen jednou, druhé místo ve stejné obci čerpá z cache');
+});
+
 test('#35 weeklyDigest a weekendDigest: selhání → notifyFail_ s příslušným předmětem a výjimka se propustí', () => {
   const t = nactiRadar({ ss: fakeSpreadsheet({}), properties: { NTFY_TOPIC: 't' } });
   assert.throws(() => t.weeklyDigest());

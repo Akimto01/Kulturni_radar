@@ -30,7 +30,7 @@ Kdyby se všech 85 mutantů kategorie (a) zabilo, skóre by bylo 435 z 448 = 97.
 
 Tři čtvrtiny přeživších jsou v `upsertEvents_` (53 z 98) a `digestRange_` (21 z 98). Jsou to funkce s nejmenším ověřením výsledku: testy kontrolují zápis do listu nebo že funkce doběhla, ale ne seznamy názvů ve statistikách, nadpisy bloků ani sloučení duplicit v rámci jednoho běhu.
 
-## (b) Ekvivalentní mutanty (7)
+## (b) Ekvivalentní mutanty (7, po dávce 2 osm)
 
 | # | Funkce, řádek | Mutace | Proč je ekvivalentní |
 |---|---|---|---|
@@ -41,6 +41,8 @@ Tři čtvrtiny přeživších jsou v `upsertEvents_` (53 z 98) a `digestRange_` 
 | #36 | `runCheck_`, ř. 772 | `'Jiný běh právě probíhá – končím.'` → `""` | Jen text ladicího záznamu `Logger.log`; chování, návratová hodnota ani zápis se nemění a nikdo ho nečte. |
 | #323 | `apiNajdiProUzivatele_`, ř. 2395 | `{ osobniFiltry = {}; }` → `{}` | Pokud `JSON.parse` vyhodí výjimku, přiřazení do `osobniFiltry` se nikdy neprovede, proměnná zůstává `{}` z deklarace. Přiřazení `{}` v `catch` je zbytečné. |
 | #458 | `parseCzDate_`, ř. 4270 | `''` → `"Stryker was here!"` | Pro nepravdivé `v` dá původní kód `''`, mutant `'Stryker was here!'`; ani jeden řetězec neobsahuje datum, regulární výraz nenajde nic a funkce vrátí `null` v obou případech. |
+
+**Doplněno po dávce 2:** #425 (`digestRange_`, ř. 3661, `localeCompare(b, 'cs')` → `localeCompare(b, "")`) byl původně v (a). Test českého řazení ho zabíjí, když běží sám (prázdný řetězec jako locale vyhodí `RangeError`). V běhu celého souboru ale přežívá: V8 po prvním volání `localeCompare` bez locale (např. `shrnoutKodySelhani_` v jiném testu) bere prázdný locale jako výchozí collator, a ten je na tomto stroji `cs-CZ`, tedy stejný. Je to ekvivalentní mutant **závislý na prostředí**: v CI s výchozím `en-US` by řazení `chrám` před `hrad` test shodilo. Proto (b), nově 8.
 
 ## (c) Mezery v kódu (6)
 
@@ -84,11 +86,20 @@ Hotovo. Po dávce 1: **369 zabito, 65 přežilo, 14 bez pokrytí, skóre 82,4 %*
 - **Žádné zhoršení:** žádný dříve zabitý mutant nepřežil.
 - **8 nových testů** (backend 413 na 421), každý zabíjí aspoň jeden mutant: `parseCzDate_` bez mezer za tečkou (#461, #465), `apiToggle_` zneplatnění cache (#259), `runCheck_` zaškrtávátko a čas v KRITÉRIÍCH (#37, #40, #45, #46, #47, #64), `runCheck_` souřadnice po zápisu (#61), `runCheck_` zneplatnění cache (#226), `apiNajdiProUzivatele_` filtr bez kategorie (#331), souřadnice po zápisu (#345), hranice `serioveCisloNaDatum_` (#12, #15). Zbylé mutanty dávky (#292, #244, #256, #59, #320, #341) zabily doplněné aserce v existujících testech (`ok: false`, přesný text chyby).
 
+## Stav dávky 2 (29. 10. 2026)
+
+Hotovo. Po dávce 2: **389 zabito, 49 přežilo, 10 bez pokrytí, skóre 86,8 %** (po dávce 1: 369, 65, 14, 82,4 %).
+
+- **Zabito 20 z 21 mutantů dávky 2** (`digestRange_` #390, #393, #397, #413 až #416, #421, #423, #424, #428 až #432, #436, #437, #442, #444, #445). Jediný přeživší #425 je ekvivalentní na tomto stroji, viz výše. Samotná funkce: 52 z 53 mutantů zabito (98,1 %).
+- **Žádné zhoršení:** žádný dříve zabitý mutant nepřežil.
+- **5 nových testů** (backend 421 na 426), každý zabíjí aspoň jeden mutant (každý test zvlášť proti aktivnímu mutantu v zachovaném sandboxu): profil s mezerami (#390), bez stálých míst (#393), `weeklyDigest` v neděli (#397), blok stálých míst: typy, řazení, nadpisy, detaily (#413 až #416, #421, #423, #424, #428 až #432, #436, #437), počasí u stálých míst (#442, #444, #445; také #413 až #415, #421, #423, #424, #428 až #432, #436, #437).
+- **Pozor na locale:** test českého řazení je stabilní na obou typech stroje. Na stroji s českým výchozím locale (tento) jen #425 nelze zabít; na CI (`en-US`) by byl zabit.
+
 ## Plán dávek testů
 
 | Dávka | Funkce | Mutantů (a) | Stav |
 |---|---|---|---|
 | 1 | `parseCzDate_`, `serioveCisloNaDatum_` (hranice 30000 a 80000, mimo kritickou sadu), `apiSetFiltry_`, `apiToggle_`, `runCheck_`, `apiNajdiProUzivatele_` | 18 (+2 u `serioveCisloNaDatum_`) | hotovo, všech 18 (+2) zabito |
-| 2 | `digestRange_` | 21 | čeká |
+| 2 | `digestRange_` | 21 (z toho #425 je ekvivalentní na českém locale) | hotovo, 20 z 21 zabito |
 | 3 | `upsertEvents_` (včetně zpřísnění `MemSheet`) | 45 (z 46, #226 zabila dávka 1) | čeká |
 
