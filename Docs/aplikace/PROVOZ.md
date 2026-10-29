@@ -12,13 +12,20 @@ Bez `NTFY_TOPIC`/`NOTIFY_EMAIL` běhy jen zapisují do tabulky.
 
 ## Triggery (vytváří `setupTriggers()` — spustit po každé změně jejich sestavy)
 
-| Funkce             | Kdy                        | Co dělá |
-|--------------------|----------------------------|---------|
-| `onEditInstallable`| při úpravě tabulky         | reaguje jen na zaškrtnutí KRITÉRIA!B11 |
-| `dailyCheck`       | denně ~8:00 (okno 8–9)     | označí proběhlé + denní kontrola |
-| `weeklyDigest`     | pondělí ~7:00              | přehled akcí na 7 dní |
-| `weekendDigest`    | čtvrtek ~16:00             | tipy na pátek–neděli |
-| `updateMista`      | 1. den v měsíci ~6:00      | obnova stálých míst a otevíracích dob |
+| Funkce | Kdy | Co dělá | Jak poznat selhání |
+|---|---|---|---|
+| `onEditInstallable` | při úpravě tabulky | reaguje jen na zaškrtnutí KRITÉRIA!B11, pak spustí mimořádnou kontrolu | notifikace „Mimořádná kontrola selhala“; checkbox B11 zůstane zaškrtnutý |
+| `dailyCheck` | denně ~8:00 (okno 8–9) | označí proběhlé akce, zpracuje frontu EMAIL_TIPY, provede denní kontrolu a doplní chybějící souřadnice | notifikace „Denní kontrola selhala“; chybí-li dnešní záznam v KONTROLÁCH, ohlásí to `watchdogDailyCheck` ve 20:00 |
+| `sendUserNotifications` | denně ~9:00 (po `dailyCheck`) | pošle uživatelům osobní přehled akcí podle jejich nastavení notifikací (ntfy, e-mail) a zapíše čas posledního odeslání | funkce nemá vlastní notifikaci o selhání, chybu ukáže jen Spuštění v Apps Scriptu; u uživatelů, kterým se neposlalo, log „Notifikace <jméno>: přeskočeno – <důvod>“; suchý běh z menu |
+| `weeklyDigest` | pondělí ~7:00 | přehled akcí na 7 dní | notifikace „Týdenní přehled selhal“ |
+| `weekendDigest` | čtvrtek ~16:00 | tipy na pátek až neděli, volitelně i na adresu `NOTIFY_EMAIL_VIKEND` | notifikace „Víkendové tipy selhaly“ |
+| `updateMista` | 1. den v měsíci ~6:00 | obnova stálých míst a otevíracích dob přes Anthropic API, zapíše řádek „aktualizace stálých míst“ do KONTROL | notifikace „Aktualizace stálých míst selhala“; úspěch hlásí „Stálá místa aktualizována“ |
+| `runSelfTest` | neděle ~18:00 | samotest: listy, KRITÉRIA, Script Properties, přítomnost triggerů (`onEditInstallable`, `dailyCheck`, `weeklyDigest`, `weekendDigest`, `updateMista`, `runSelfTest`, `watchdogDailyCheck`), PŘEHLED, počasí, audit dat, OZNAČENÍ a týdenní report kvality hledání | výsledek vždy přijde jako notifikace „Samotest: OK“ nebo „Samotest: N problémů“; nepřijde-li, samotest neproběhl. Přítomnost triggerů `sendUserNotifications` a `zpracovatSledovanaMesta` nekontroluje |
+| `watchdogDailyCheck` | denně ~20:00 | ohlásí, pokud v KONTROLÁCH chybí dnešní záznam denní kontroly | notifikace „Watchdog: denní kontrola dnes neproběhla“; sám při chybě jen zapíše do logu („Watchdog selhal“), bez notifikace |
+| `zpracovatSledovanaMesta` | neděle ~20:00 a čtvrtek ~10:00 | tiché doplnění dat sledovaných měst (nejstarší kontrola první, časový rozpočet 4,5 min, město už dnes zpracované se přeskočí), pak přepočet POČASÍ u budoucích akcí; bez notifikace | jen v logu: „Sledované město „X“ selhalo“ a „hotovo, zpracováno N z M měst“; stav v KONTROLÁCH (typ „sledované město“) |
+| RF testy v GitHub Actions (`rf-tests.yml`) | neděle 20:20 UTC (cron `20 20 * * 0`), tedy 21:20 SEČ, v létě 22:20 SELČ | API a frontend testy proti produkci | červený běh a při plánovaném běhu notifikace ntfy; GitHub e-maily o selhání plánovaných běhů neposílá |
+
+**Čas v GitHub Actions je v UTC a nepřechází na letní čas.** Triggery Apps Scriptu běží v místním čase projektu, takže po změně času (březen, říjen) se jejich souběh s RF během posune o hodinu. Kontrolovat zejména nedělní `zpracovatSledovanaMesta` (okno 20–21 místního času): RF běh má startovat až po něm.
 
 Pozn.: Google denní/týdenní triggery rozprostírá do ±hodinového okna — čas
 v notifikaci je směrodatný.
