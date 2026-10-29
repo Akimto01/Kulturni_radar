@@ -5380,3 +5380,90 @@ test('3b-2: upsertEvents_ – beze změny data a stavu zůstane sloupec Změna N
   assert.equal(row[15], 'NE');
   assert.notEqual(row[17], '1. 6. 2026', 'Poslední kontrola je dnešní');
 });
+
+// ---------------------------------------------------------------------------
+// #13 dávka 3b-3: upsertEvents_ – duplicity v jednom běhu, indexy ID a fuzzy
+// (#82, #83, #125, #137, #139, #156, #159, #160, #165 až #169)
+// ---------------------------------------------------------------------------
+
+function upsertBeh_(radky, akce) {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat(radky)) });
+  const stats = nactiRadar().upsertEvents_(ss, { profil: 'Brno' }, akce);
+  return { stats, sh: ss.getSheetByName('AKCE') };
+}
+
+test('3b-3: upsertEvents_ – shoda přes ID i při úplně jiném názvu a místě, nová akce se nezaloží', () => {
+  const { stats, sh } = upsertBeh_([existujiciUpsert_()], [novaAkceUpsert_({ nazev: 'Večer jazzu', misto: 'Klub Fléda' })]);
+
+  assert.equal(stats.nove, 0);
+  assert.equal(stats.bezZmeny, 1);
+  assert.equal(sh.getLastRow(), 2);
+});
+
+test('3b-3: upsertEvents_ – akce bez ID se nespáruje s existujícím řádkem bez ID, když jde o jinou akci', () => {
+  const { stats, sh } = upsertBeh_([existujiciUpsert_({ id: '' })],
+    [novaAkceUpsert_({ id: '', nazev: 'Výstava fotografií', misto: 'Galerie' })]);
+
+  assert.equal(stats.nove, 1);
+  assert.equal(stats.bezZmeny + stats.zmenene, 0);
+  assert.equal(sh.getLastRow(), 3);
+  assert.equal(sh.rows[1][4], 'Koncert na nábřeží', 'existující řádek zůstal');
+});
+
+test('3b-3: upsertEvents_ – dvě různé akce téhož dne a profilu zůstanou oddělené (jiné ID, jiný název)', () => {
+  const { stats, sh } = upsertBeh_([existujiciUpsert_()],
+    [novaAkceUpsert_({ id: 'u-9', nazev: 'Výstava fotografií', misto: 'Galerie' })]);
+
+  assert.equal(stats.nove, 1);
+  assert.equal(stats.zmenene + stats.bezZmeny, 0);
+  assert.equal(sh.getLastRow(), 3);
+});
+
+test('3b-3: upsertEvents_ – táž akce dvakrát v jednom běhu: jedna nová, druhá beze změny, jeden řádek', () => {
+  const { stats, sh } = upsertBeh_([], [novaAkceUpsert_(), novaAkceUpsert_()]);
+
+  assert.equal(stats.nove, 1);
+  assert.equal(stats.bezZmeny, 1);
+  assert.equal(sh.getLastRow(), 2);
+  assert.equal(sh.rows[1][14], 'ANO', 'Novinka zůstává u první');
+});
+
+test('3b-3: upsertEvents_ – v jednom běhu se akce se stejným ID a jiným názvem spojí do jednoho řádku', () => {
+  const { stats, sh } = upsertBeh_([], [novaAkceUpsert_(), novaAkceUpsert_({ nazev: 'Večer jazzu', misto: 'Klub Fléda' })]);
+
+  assert.equal(stats.nove, 1);
+  assert.equal(stats.bezZmeny, 1);
+  assert.equal(sh.getLastRow(), 2);
+});
+
+test('3b-3: upsertEvents_ – dvě různé akce bez ID v jednom běhu se nespojí', () => {
+  const { stats, sh } = upsertBeh_([], [
+    novaAkceUpsert_({ id: '', nazev: 'Koncert na nábřeží' }),
+    novaAkceUpsert_({ id: '', nazev: 'Výstava fotografií', misto: 'Galerie' }),
+  ]);
+
+  assert.equal(stats.nove, 2);
+  assert.equal(sh.getLastRow(), 3);
+});
+
+test('3b-3: upsertEvents_ – podobné názvy téhož dne v jednom běhu se sloučí (fuzzy index nových řádků)', () => {
+  const { stats, sh } = upsertBeh_([], [
+    novaAkceUpsert_({ id: 'a', nazev: 'Divadelní festival Brno', misto: 'Park' }),
+    novaAkceUpsert_({ id: 'b', nazev: 'Divadelní festival Brno – zahájení', misto: 'Park' }),
+  ]);
+
+  assert.equal(stats.nove, 1);
+  assert.equal(stats.bezZmeny, 1);
+  assert.equal(sh.getLastRow(), 2);
+  assert.equal(sh.rows[1][0], 'a');
+});
+
+test('3b-3: upsertEvents_ – různé dny denní série („13. srpna“ a „14. srpna“) se v jednom běhu nesloučí', () => {
+  const { stats, sh } = upsertBeh_([], [
+    novaAkceUpsert_({ id: 'a', nazev: 'Letní program Brno – 13. srpna', datum_od: '13. 8. 2026', datum_do: '13. 8. 2026' }),
+    novaAkceUpsert_({ id: 'b', nazev: 'Letní program Brno – 14. srpna', misto: 'Park', datum_od: '13. 8. 2026', datum_do: '13. 8. 2026' }),
+  ]);
+
+  assert.equal(stats.nove, 2);
+  assert.equal(sh.getLastRow(), 3);
+});
