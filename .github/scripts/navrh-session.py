@@ -147,6 +147,7 @@ def sestavit_kandidaty(issues, board, backlog_text, dnes, lhuty=None):
     """Vrátí slovník: kandidati (seznam {n, titulek, duvod, odhad}), pozdeji (Naplánováno na později),
     blokovano (Blokováno) a ceka (Čeká na data)."""
     lhuty = lhuty or gh_projekt.LHUTY_DNI
+    issues = gh_projekt.bez_prehledu(issues)
     otevrena = {i['number']: i for i in issues if i['state'] == 'OPEN'}
     stav = {i['number']: i['state'] for i in issues}
     zaznamy = gh_projekt.projit_backlog(backlog_text)
@@ -283,7 +284,7 @@ def vypis_tabulku(radky, hlavicka):
 def sestavit_navrh(minuty, dnes=None):
     """Celý návrh session jako slovník (zdroj pro textový i JSON výstup, takže si odpovídají)."""
     dnes = dnes or datetime.date.today()
-    issues = gh_projekt.nacist_issues()
+    issues = gh_projekt.bez_prehledu(gh_projekt.nacist_issues())
     board = gh_projekt.nacist_board()
     with open(gh_projekt.BACKLOG_MD, encoding='utf-8') as f:
         backlog = f.read()
@@ -503,6 +504,15 @@ def vlastni_test():
     over(abs(k[36]['odhad'] - 0.75) < 1e-9 and '45 min' in k[36]['titulek'], 'checklist s minutami: %r' % k[36]['titulek'])
     over(abs(k[37]['odhad'] - 1.5) < 1e-9, 'rozsah „1 až 1,5 h“: horní mez %s h' % k[37]['odhad'])
     over(abs(k[38]['odhad'] - 12) < 1e-9, 'issue bez checklistu: Odhad z boardu')
+
+    # --- issue se štítkem prehled (automatický přehled projektu) není úkol
+    p = iss(60, 'Přehled projektu (automaticky)', ('prehled',))
+    d = sestavit_kandidaty([p, iss(61, 'Běžné')], {60: {'status': 'Todo', 'odhad (h)': 1, 'termín': '2026-10-29'},
+                                                    61: {'status': 'Todo', 'odhad (h)': 1}}, '', dnes)
+    cisla = [x['n'] for x in d['kandidati']] + [x['n'] for x in d['pozdeji'] + d['blokovano'] + d['ceka']]
+    over(61 in cisla and 60 not in cisla, 'issue se štítkem prehled se nenavrhne ani v seznamech později, blokováno, čeká (%s)' % cisla)
+    d = sestavit_kandidaty([p], {60: {'status': 'In Progress', 'odhad (h)': 1}}, '', dnes)
+    over(not d['kandidati'], 'prehled ve stavu In Progress s termínem dnes nevytvoří kandidáta')
 
     print(chr(10) + ('Test prošel.' if not selhani else 'Test selhal: %d chyb.' % selhani))
     return 1 if selhani else 0

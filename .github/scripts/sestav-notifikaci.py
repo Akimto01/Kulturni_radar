@@ -15,12 +15,13 @@ pošle upozornění, že kontrola selhala, např. při vypršelém tokenu).
 Režimy:
   denni     notifikace jen při chybě kontroly boardu nebo defektů, defektu P1 nebo P2 po lhůtě
             nebo termínu dnes či v minulosti; jinak ticho (odeslat = false)
-  pondeli   souhrn vždy, ve dvou podobách: krátká notifikace na jednu obrazovku telefonu (stav
-            kontroly, defekty podle priority, rozpracované, termíny, „Na řadě“) a plný přehled
-            v Markdownu (počty chyb a varování, defekty, In Progress, termíny na tento týden, návrh
-            práce z navrh-session.py) s odkazy na issues; pokud by denní režim ten den hlásil
-            důvody, jsou na začátku obou v sekci „Naléhavé“ (v notifikaci celá) a priorita se
-            přebírá z denního režimu (chyba nebo P1 = high)
+  pondeli   souhrn vždy, ve dvou podobách: krátká srozumitelná notifikace na jednu obrazovku
+            telefonu, bez kódů (stav kontrol, rozpracováno, otevřené chyby slovy podle priority,
+            termíny tento týden, „Na řadě“) a plný přehled v Markdownu (počty chyb a varování,
+            defekty, In Progress, termíny na tento týden, návrh práce z navrh-session.py) s odkazy
+            na issues, který workflow zapíše do issue „Přehled projektu (automaticky)“; pokud by
+            denní režim ten den hlásil důvody, jsou na začátku obou v sekci „Naléhavé“ (v notifikaci
+            celá) a priorita se přebírá z denního režimu (chyba nebo P1 = high)
 
 Zpráva obsahuje jen čísla a názvy issues z veřejného repa, žádné tajné hodnoty.
 """
@@ -36,6 +37,13 @@ ISSUES_URL = 'https://github.com/Akimto01/Kulturni_radar/issues/'
 MAX_BAJTU = 3500        # ntfy uřízne delší zprávu (limit 4096 B), držíme rezervu
 MAX_RADKU_SEZNAMU = 8   # nejvíc tolik položek v jednom seznamu zprávy
 MAX_NAZEV = 50          # nejvýš tolik znaků názvu issue ve zprávě (s „…“)
+MAX_KRATKY_NAZEV = 30   # totéž v krátké pondělní notifikaci
+DNY = ['pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota', 'neděle']
+# slovní priority otevřených chyb: (1, 2 až 4, 5 a víc), „chyba“ je ženského rodu
+PRIORITY_SLOVY = [('P1', ('kritická', 'kritické', 'kritických')), ('P2', ('vysoká', 'vysoké', 'vysokých')),
+                  ('P3', ('střední', 'střední', 'středních')), ('P4', ('nízká', 'nízké', 'nízkých')),
+                  ('P5', ('ke sledování', 'ke sledování', 'ke sledování'))]
+POZNAMKA_PREHLEDU = '_Automaticky přepisovaný přehled, neplánuje se. Přepisuje ho pondělní běh workflow kontrola-projektu._'
 # název souboru s příponou ntfy zobrazí jako odkaz (AUDIT.md bere jako doménu), proto bez přípony
 SOUBOR = re.compile(r'\b([\w-]+)\.(?:md|py|yml|js|gs|html)\b')
 
@@ -60,15 +68,32 @@ def bez_pripon(text):
     return SOUBOR.sub(r'\1', text)
 
 
-def nazev(titulek):
-    """Název issue bez přípon souborů, nejvýš MAX_NAZEV znaků po celých slovech, s „…“ na konci."""
+def nazev(titulek, limit=MAX_NAZEV):
+    """Název issue bez přípon souborů, nejvýš `limit` znaků po celých slovech, s „…“ na konci."""
     t = bez_pripon(titulek)
-    if len(t) <= MAX_NAZEV:
+    if len(t) <= limit:
         return t
-    rez = t[:MAX_NAZEV - 1]
-    if t[MAX_NAZEV - 1] != ' ' and ' ' in rez:    # řez uprostřed slova: slovo zahodit
+    rez = t[:limit - 1]
+    if t[limit - 1] != ' ' and ' ' in rez:    # řez uprostřed slova: slovo zahodit
         rez = rez.rsplit(' ', 1)[0]
     return rez.rstrip(' ,;:-–') + '…'
+
+
+def kratky_nazev(titulek):
+    """Krátký název pro notifikaci: bez předpony „Defekt: “ a verze na začátku („v3.44: “), pak
+    nejvýš MAX_KRATKY_NAZEV znaků po celých slovech."""
+    t = titulek
+    while True:
+        novy = re.sub(r'^(?:Defekt: |v\d+(?:\.\d+)*:\s*)', '', t)
+        if novy == t:
+            break
+        t = novy
+    return nazev(t or titulek, MAX_KRATKY_NAZEV)
+
+
+def _cesky(n, jedna, dve_ctyri, pet):
+    """Tvar slova podle počtu: 1 termín, 2 termíny, 5 termínů."""
+    return jedna if n == 1 else dve_ctyri if 2 <= n <= 4 else pet
 
 
 def _datum(iso):
@@ -158,26 +183,35 @@ def _hodiny(h):
 
 
 def kratka_pondeli(board, defekty, navrh, duvody):
-    """Krátká pondělní notifikace na jednu obrazovku: Naléhavé (celé, nahoře, pokud je) a pak
-    6 řádků: stav kontroly, defekty, rozpracované, termíny, Na řadě, výzva k otevření přehledu."""
+    """Krátká pondělní notifikace na jednu obrazovku, srozumitelně a bez kódů: Naléhavé (celé, nahoře,
+    pokud je) a pak 6 řádků: stav kontrol, rozpracováno, otevřené chyby, termíny tento týden, Na řadě,
+    výzva k otevření přehledu."""
     chyb = len(board['chyby']) + len(defekty['chyby'])
     var = len(board['varovani'])
-    p = defekty['souhrn']['otevrene_podle_priority']
+    if chyb or var:
+        casti = (['%d %s' % (chyb, _cesky(chyb, 'chyba', 'chyby', 'chyb'))] if chyb else []) + (['%d varování' % var] if var else [])
+        r = ['Kontroly: ' + ' a '.join(casti) + '.']
+    else:
+        r = ['Kontroly v pořádku, bez nálezů.']
     ip = board['souhrn']['in_progress']
+    r.append('Rozpracováno: ' + ('; '.join('#%d %s' % (x['issue'], kratky_nazev(x['titulek'])) for x in ip) or 'nic'))
+    p = defekty['souhrn']['otevrene_podle_priority']
+    chyby = ['%d %s' % (p[k], _cesky(p[k], *tvary)) for k, tvary in PRIORITY_SLOVY if p.get(k)]
+    if p.get('bez'):
+        chyby.append('%d bez priority' % p['bez'])
+    r.append('Otevřené chyby: ' + (', '.join(chyby) or 'žádné'))
     videno = set(x['issue'] for x in ip)
     t = [x for x in board['souhrn']['terminy_tyden'] if x['issue'] not in videno]
-    r = ['Kontrola: v pořádku' if not (chyb or var) else 'Kontrola: chyb %d, varování %d' % (chyb, var),
-         'Defekty: ' + ' · '.join('%s %d' % (k, p[k]) for k in ('P1', 'P2', 'P3', 'P4', 'P5')) +
-         (' · bez priority %d' % p['bez'] if p.get('bez') else ''),
-         'Rozpracované: ' + (', '.join('#%d' % x['issue'] for x in ip) or 'nic')]
     if t:
-        n = min(t, key=lambda x: x['datum'])
-        r.append('Termíny do 7 dní: %d, nejbližší %s #%d' % (len(t), _datum(n['datum']), n['issue']))
+        n = min(t, key=lambda x: (x['datum'], x['issue']))
+        den = DNY[datetime.date.fromisoformat(n['datum']).weekday()]
+        r.append('Tento týden %d %s, první %s %s (#%d %s)' % (len(t), _cesky(len(t), 'termín', 'termíny', 'termínů'), den,
+                                                              _datum(n['datum']), n['issue'], kratky_nazev(n['titulek'])))
     else:
-        r.append('Termíny do 7 dní: žádné')
+        r.append('Tento týden žádné termíny')
     if navrh['vybrane']:
         v = navrh['vybrane'][0]
-        r.append('Na řadě: #%d %s (%s h)' % (v['n'], nazev(v['titulek']), _hodiny(v['odhad'])))
+        r.append('Na řadě: #%d %s (%s h)' % (v['n'], kratky_nazev(v['titulek']), _hodiny(v['odhad'])))
     else:
         r.append('Na řadě: nic k navržení')
     r.append('Klepni pro celý přehled')
@@ -261,7 +295,9 @@ def sestavit_pondeli(board, defekty, navrh, dnes):
             'duvody': [d for d in duvody if not d.startswith('- ')]}
     plny = bez_pripon(chr(10).join(text))
     kratka = zkratit(bez_pripon(chr(10).join(kratka_pondeli(board, defekty, navrh, duvody))))
-    return meta, kratka, plny, na_markdown(plny)
+    md = na_markdown(plny).split(chr(10))
+    md = chr(10).join(md[:1] + ['', POZNAMKA_PREHLEDU] + md[1:])   # za nadpisem (md[1] je prázdný řádek)
+    return meta, kratka, plny, md
 
 
 def main():
@@ -434,22 +470,53 @@ def vlastni_test():
     over('DEFEKTY' in text and 'BACKLOG, app, kod, Index' in text and not re.search(r'\.(md|js|gs|html)', text) and 'Board: ' + BOARD_URL in text, 'soubory: i v denním režimu a v textu nálezů')
 
     # pondělí: krátká notifikace na jednu obrazovku a plný přehled v Markdownu
-    ip1 = [{'issue': 18, 'titulek': 'v3.44 počasí'}, {'issue': 49, 'titulek': 'Defekt'}]
+    ip1 = [{'issue': 18, 'titulek': 'v3.44: počasí CHYBA a chybějící souřadnice'},
+           {'issue': 49, 'titulek': 'Defekt: Sledovaná města: běh narazí na limit 6 min'}]
     ter1 = [{'issue': 7, 'titulek': 'Ověřovačka', 'datum': '2026-11-04'}, {'issue': 6, 'titulek': 'Ověřit', 'datum': '2026-11-03'},
-            {'issue': 18, 'titulek': 'v3.44 počasí', 'datum': '2026-11-05'}]
+            {'issue': 18, 'titulek': 'v3.44: počasí CHYBA a chybějící souřadnice', 'datum': '2026-11-05'}]
     nav1 = navrh(vybrane=[{'n': 13, 'titulek': 'Stryker', 'odhad': 2.0}, {'n': 14, 'titulek': 'Další', 'odhad': 1.0}],
                  pozdeji=[{'n': 8, 'titulek': 'x', 'datum': '2026-11-09'}], blokovano=[{'n': 35, 'titulek': 'y', 'duvod': 'až po #48 (otevřené)'}],
                  ceka=[{'n': 20, 'titulek': 'z'}])
     meta, kratka, _, md = sestavit_pondeli(board(in_progress=ip1, terminy=ter1), defekty(), nav1, dnes)
     radky = kratka.split(chr(10))
     over(len(radky) <= 8 and radky[-1] == 'Klepni pro celý přehled', 'krátká: nejvýš 8 řádků a poslední je výzva (%d řádků, %d B)' % (len(radky), len(kratka.encode('utf-8'))))
-    over(radky[:5] == ['Kontrola: v pořádku', 'Defekty: P1 0 · P2 2 · P3 2 · P4 1 · P5 0', 'Rozpracované: #18, #49',
-                       'Termíny do 7 dní: 2, nejbližší 3. 11. #6', 'Na řadě: #13 Stryker (2 h)'], 'krátká: obsah řádků (stav, defekty, rozpracované, termíny, Na řadě)')
+    over(radky == ['Kontroly v pořádku, bez nálezů.', 'Rozpracováno: #18 počasí CHYBA a chybějící…; #49 Sledovaná města: běh narazí…',
+                   'Otevřené chyby: 2 vysoké, 2 střední, 1 nízká', 'Tento týden 2 termíny, první úterý 3. 11. (#6 Ověřit)',
+                   'Na řadě: #13 Stryker (2 h)', 'Klepni pro celý přehled'], 'krátká: srozumitelné řádky bez kódů (%r)' % radky)
+    over(not re.search(r'P[1-5]\b', kratka) and 'Termíny do 7 dní' not in kratka, 'krátká: bez kódů priorit P1 až P5')
     over('Naléhavé' not in kratka and 'Později' not in kratka and 'Blokováno' not in kratka, 'krátká: bez Naléhavé a bez podrobných sekcí, když není důvod')
     meta, kratka, _, _ = sestavit_pondeli(board(chyby=[chyba], varovani=[p2]), defekty(), nic, dnes)
-    over('Kontrola: chyb 1, varování 1' in kratka, 'krátká: počty chyb a varování')
+    over('Kontroly: 1 chyba a 1 varování.' in kratka, 'krátká: počty chyb a varování slovy')
+    meta, kratka, _, _ = sestavit_pondeli(board(chyby=[chyba, chyba], varovani=[p2, p2]), defekty([{'issue': 4, 'pravidlo': 'a', 'co': 'x'}]), nic, dnes)
+    over('Kontroly: 3 chyby a 2 varování.' in kratka, 'krátká: chyby kontroly boardu a defektů se sčítají, tvar „3 chyby“')
+    meta, kratka, _, _ = sestavit_pondeli(board(chyby=[chyba] * 5), defekty(), nic, dnes)
+    over('Kontroly: 5 chyb.' in kratka, 'krátká: jen chyby bez varování, tvar „5 chyb“')
+    meta, kratka, _, _ = sestavit_pondeli(board(varovani=[p2]), defekty(), nic, dnes)
+    over('Kontroly: 1 varování.' in kratka, 'krátká: jen varování bez chyb')
     meta, kratka, _, _ = sestavit_pondeli(board(), defekty(), nic, dnes)
-    over('Rozpracované: nic' in kratka and 'Termíny do 7 dní: žádné' in kratka and 'Na řadě: nic k navržení' in kratka, 'krátká: prázdné sekce říkají nic, žádné, nic k navržení')
+    over('Rozpracováno: nic' in kratka and 'Tento týden žádné termíny' in kratka and 'Na řadě: nic k navržení' in kratka, 'krátká: prázdné sekce říkají nic, žádné, nic k navržení')
+    # slovní priority: nuly se vynechají, tvary podle počtu
+    def pri(**k):
+        d = defekty()
+        d['souhrn']['otevrene_podle_priority'] = dict({'P1': 0, 'P2': 0, 'P3': 0, 'P4': 0, 'P5': 0, 'bez': 0}, **k)
+        return d
+    for hodnoty, ocek in [({'P1': 1, 'P2': 5, 'bez': 3}, '1 kritická, 5 vysokých, 3 bez priority'), ({'P3': 2, 'P4': 4}, '2 střední, 4 nízké'),
+                          ({'P5': 1}, '1 ke sledování'), ({'P2': 21}, '21 vysokých'), ({}, 'žádné')]:
+        meta, kratka, _, _ = sestavit_pondeli(board(), pri(**hodnoty), nic, dnes)
+        over('Otevřené chyby: ' + ocek + chr(10) in kratka, 'krátká: priority slovy bez nul: %s' % ocek)
+    # den v týdnu a tvary „termín“
+    for datum, den in [('2026-11-03', 'úterý 3. 11.'), ('2026-11-04', 'středa 4. 11.'), ('2026-11-07', 'sobota 7. 11.'), ('2026-11-08', 'neděle 8. 11.')]:
+        meta, kratka, _, _ = sestavit_pondeli(board(terminy=[{'issue': 7, 'titulek': 'Ověřovačka', 'datum': datum}]), defekty(), nic, dnes)
+        over('Tento týden 1 termín, první ' + den + ' (#7 Ověřovačka)' in kratka, 'krátká: den v týdnu %s' % den)
+    meta, kratka, _, _ = sestavit_pondeli(board(terminy=[{'issue': i, 'titulek': 'T', 'datum': '2026-11-0%d' % (3 + i % 3)} for i in range(7, 12)]), defekty(), nic, dnes)
+    over('Tento týden 5 termínů, první úterý 3. 11. (#9 T)' in kratka, 'krátká: tvar „5 termínů“, první podle data')
+    # krátký název
+    for vstup, ocek in [('Defekt: Tichá selhání: samotest nehlídá triggery', 'Tichá selhání: samotest…'), ('v3.44: počasí', 'počasí'),
+                        ('Defekt: v3.44: x', 'x'), ('Mutační testování (Stryker)', 'Mutační testování (Stryker)'),
+                        ('a' * 30, 'a' * 30), ('x' * 28 + ' yyyy', 'x' * 28 + '…'), ('x' * 29 + ' yy', 'x' * 29 + '…'),
+                        ('Ověřit v3.44 v datech', 'Ověřit v3.44 v datech'), ('Defekt: ', 'Defekt: '),
+                        ('Test (AUDIT-SOULADU.md)', 'Test (AUDIT-SOULADU)')]:
+        over(kratky_nazev(vstup) == ocek and len(kratky_nazev(vstup)) <= MAX_KRATKY_NAZEV, 'krátký název %r -> %r' % (vstup, kratky_nazev(vstup)))
     # Naléhavé: celé a nahoře, zbytek pořád nejvýš 8 řádků
     mnoho5 = [{'issue': i, 'pravidlo': 'odhad', 'co': 'In Progress bez Odhadu (h)'} for i in range(1, 6)]
     meta, kratka, _, _ = sestavit_pondeli(board(chyby=mnoho5, terminy=[{'issue': 6, 'titulek': 'Ověřit', 'datum': iso}]), defekty(), nav1, dnes)
@@ -459,7 +526,8 @@ def vlastni_test():
     over(len(zbytek.split(chr(10))) <= 8 and meta['priorita'] == 'high', 'krátká: za Naléhavé zbývá nejvýš 8 řádků (%d)' % len(zbytek.split(chr(10))))
     # plný přehled v Markdownu
     meta, _, _, md = sestavit_pondeli(board(chyby=[chyba], terminy=ter1, in_progress=ip1), defekty(), nav1, dnes)
-    over(md.startswith('## Týdenní souhrn projektu, 02. 11. 2026') and '### Naléhavé' in md and '### In Progress (2)' in md and
+    over(md.startswith('## Týdenní souhrn projektu, 02. 11. 2026' + chr(10) + chr(10) + POZNAMKA_PREHLEDU + chr(10) + chr(10)), 'přehled: nadpis s datem a poznámka, že je přepisovaný automaticky')
+    over('### Naléhavé' in md and '### In Progress (2)' in md and
          '### Termíny do 7 dní (2)' in md and '### Návrh práce na 3 h' in md, 'přehled: nadpisy všech sekcí')
     over('Otevřené defekty: P1 0' in md and 'Později (1)' in md and 'Blokováno (1)' in md and 'Čeká na data bez Termínu' in md and 'Kontrola boardu: 1 chyb' in md,
          'přehled: obsahuje i defekty, Později, Blokováno, Čeká a stav kontroly')

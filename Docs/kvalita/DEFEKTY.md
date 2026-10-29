@@ -92,6 +92,8 @@ Správu boardu a BACKLOGu pro všechna issues (nejen bug) hlídá druhý skript 
 
 **Proč GraphQL a ne `gh project`.** Skripty čtou board dotazem `gh api graphql` (`user { projectV2 { items } }`, stránkování po 100, pole podle názvu). `gh project item-list` totiž i pro osobní board vyžaduje scopy `read:org` a `read:discussion` (při samotném `read:project` hlásí „unknown owner type“, s `--owner @me` „missing required scopes“). Rozšiřovat token kvůli nástroji nechceme, GraphQL stačí `read:project`.
 
+**Issue s přehledem.** Celý pondělní přehled workflow zapisuje do zavřeného a zamčeného issue „Přehled projektu (automaticky)“ se štítkem `prehled` (telefon job summary nezobrazuje); zápis dělá samostatný job výchozím `GITHUB_TOKEN` s `issues: write`, `BOARD_READ_TOKEN` zůstává jen pro čtení, a `kontrola-boardu.py` i `navrh-session.py` issues s tímto štítkem ignorují.
+
 **Proč je riziko přijatelné.** Token je jen pro čtení, repo i board jsou veřejné a obsah issues je tedy veřejný, takže únik tokenu neprozradí nic, co už není vidět, a nic nejde změnit. Classic token nejde omezit na jedno repo ani jeden projekt, ale na účtu Akimto01 je jediný projekt (Kulturni radar - prace, ověřeno v prohlížeči), takže token nepřečte nic jiného. **Pozor:** nový projekt založený na tomto účtu by byl tímto tokenem také čitelný; při zakládání dalšího boardu zvážit, zda je to v pořádku, případně token zúžit nebo nahradit. Dřívější úvaha, že samostatný secret jen kvůli kontrole nechceme (viz #33, kde se tajné hodnoty dostaly do reportů testů), je splněna jinak: token je jen pro čtení, nepoužívá se nikde jinde a nic z běhu se neukládá.
 
 ## Zpětná klasifikace defektů 26.–28. 10. 2026

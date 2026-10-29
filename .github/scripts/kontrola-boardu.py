@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Kontrola správy boardu a BACKLOGu pro všechna issues (nejen bug). Jen čte, nic nemění.
 
-Spouští se ručně (a na konci session, viz SKILL.md), ne v CI: board je uživatelský projekt
-a výchozí GITHUB_TOKEN ho nepřečte (viz Docs/kvalita/DEFEKTY.md, Kontrola úplnosti):
+Spouští se ručně (a na konci session, viz SKILL.md) i v CI (kontrola-projektu.yml, token
+BOARD_READ_TOKEN; výchozí GITHUB_TOKEN uživatelský board nepřečte, viz Docs/kvalita/DEFEKTY.md):
 
     GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-boardu.py
 
 S přepínačem --json stejné chyby a varování jako JSON (plus souhrn In Progress a termínů na týden).
+S přepínačem --test ověří na vymyšlených datech, že issues se štítkem prehled (automatický přehled
+projektu) se ignorují.
 
 Dvě úrovně:
   CHYBA (exit 1)
@@ -55,6 +57,7 @@ def zkontrolovat(issues, board, backlog_text, dnes=None):
     """Čistá funkce nad načtenými daty. Vrací (chyby, varování) jako seznamy (issue, pravidlo, co)."""
     chyby, varovani = [], []
     dnes = dnes or datetime.date.today()
+    issues = gh_projekt.bez_prehledu(issues)
     stav = {i['number']: i['state'] for i in issues}
     in_progress = []
 
@@ -137,7 +140,7 @@ def vypis(radky, uroven):
 def souhrn(issues, board, dnes=None, dnu=7):
     """Souhrn pro --json: issues In Progress a termíny v příštích `dnu` dnech (včetně dneška)."""
     dnes = dnes or datetime.date.today()
-    otevrena = {i['number']: i for i in issues if i['state'] == 'OPEN'}
+    otevrena = {i['number']: i for i in gh_projekt.bez_prehledu(issues) if i['state'] == 'OPEN'}
     in_progress = [{'issue': n, 'titulek': otevrena[n]['title']} for n in sorted(otevrena)
                    if (board.get(n) or {}).get('status') == 'In Progress']
     terminy = []
@@ -155,10 +158,45 @@ def souhrn(issues, board, dnes=None, dnu=7):
     return {'in_progress': in_progress, 'terminy_tyden': terminy}
 
 
+def vlastni_test():
+    """Ověří ignorování issues se štítkem prehled na vymyšlených datech (bez GitHubu)."""
+    sys.stdout.reconfigure(encoding='utf-8')
+    selhani = 0
+
+    def over(ok, popis):
+        nonlocal selhani
+        selhani += not ok
+        print('%-4s %s' % ('OK' if ok else 'CHYBA', popis))
+
+    dnes = datetime.date(2026, 10, 29)
+
+    def iss(n, labely, stav='OPEN'):
+        return {'number': n, 'title': 'Issue %d' % n, 'state': stav, 'labels': [{'name': l} for l in labely],
+                'body': '', 'createdAt': '2026-10-28T10:00:00Z', 'updatedAt': '2026-10-28T10:00:00Z'}
+
+    over(zkontrolovat([iss(1, ['prehled'])], {}, '', dnes) == ([], []), 'otevřený prehled bez boardu, milníku a Odhadu: bez chyb')
+    over(zkontrolovat([iss(1, ['prehled'], 'CLOSED')], {}, '', dnes) == ([], []), 'zavřený prehled bez Status Done: bez chyb')
+    over(zkontrolovat([iss(1, ['prehled'], 'CLOSED')], {1: {'status': 'Todo'}}, '', dnes) == ([], []), 'prehled na boardu s libovolným Statusem: bez chyb')
+    chyby, _ = zkontrolovat([iss(2, ['docs'])], {}, '', dnes)
+    over({c[1] for c in chyby} == {'board', 'milník'}, 'běžné issue bez boardu a milníku se dál hlásí (%s)' % sorted(c[1] for c in chyby))
+    chyby, _ = zkontrolovat([iss(1, ['prehled']), iss(2, ['docs'])], {}, '', dnes)
+    over(all(c[0] == 2 for c in chyby) and chyby, 'vedle prehledu se hlásí jen běžné issue')
+    chyby, _ = zkontrolovat([iss(3, [])], {3: {'status': 'Backlog'}}, '', dnes)
+    over(any(c[1] == 'štítek' for c in chyby), 'issue bez štítku se hlásí (prehled je výjimka jen pod tímto štítkem)')
+    s = souhrn([iss(1, ['prehled']), iss(2, ['docs'])], {1: {'status': 'In Progress', 'termín': '2026-10-30'},
+                                                          2: {'status': 'In Progress', 'termín': '2026-10-31'}}, dnes)
+    over([x['issue'] for x in s['in_progress']] == [2] and [x['issue'] for x in s['terminy_tyden']] == [2],
+         'souhrn (In Progress, termíny) prehled vynechá')
+    print(chr(10) + ('Test prošel.' if not selhani else 'Test selhal: %d chyb.' % selhani))
+    return 1 if selhani else 0
+
+
 def main():
     sys.stdout.reconfigure(encoding='utf-8')
+    if '--test' in sys.argv[1:]:
+        return vlastni_test()
     json_vystup = '--json' in sys.argv[1:]
-    issues = gh_projekt.nacist_issues()
+    issues = gh_projekt.bez_prehledu(gh_projekt.nacist_issues())
     board = gh_projekt.nacist_board()
     with open(BACKLOG_MD, encoding='utf-8') as f:
         backlog = f.read()

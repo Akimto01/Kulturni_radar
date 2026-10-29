@@ -8,12 +8,21 @@ name: Kontrola projektu (board, defekty, návrh práce)
 #
 # Režimy:
 #   denni    ticho, notifikace jen při chybě kontroly, defektu P1 nebo P2 po lhůtě
-#            nebo termínu dnes či v minulosti
-#   pondeli  vždy souhrn: krátká notifikace na jednu obrazovku, plný přehled v souhrnu běhu
-#            (job summary); klepnutí na notifikaci otevře běh (Click), board je v přehledu
+#            nebo termínu dnes či v minulosti; klepnutí na notifikaci otevře běh (Click)
+#   pondeli  vždy souhrn: krátká notifikace na jednu obrazovku, plný přehled v issue
+#            „Přehled projektu (automaticky)“ (štítek prehled; telefon job summary nezobrazuje)
+#            a jako doplněk v souhrnu běhu; klepnutí na notifikaci otevře to issue
 #            (důvody denního režimu, pokud jsou, jdou na začátek jako „Naléhavé“, s jeho prioritou)
 # Plánovaný běh: denně 6:40 UTC (7:40 SEČ, 8:40 SELČ; mimo celou hodinu, cron je v UTC bez
 # letního času), v pondělí automaticky režim pondeli. Ruční běh: režim se vybírá.
+#
+# Tři joby, protože oprávnění GITHUB_TOKEN se v Actions nastavují na úrovni jobu, ne kroku:
+#   kontrola   čte board (BOARD_READ_TOKEN jen v kroku se skripty), sestaví zprávu; nic nezapisuje
+#   prehled    jen pondělí; jediný job s issues: write, přepíše tělo issue s přehledem
+#   oznameni   odešle ntfy (NTFY_TOPIC jen tady) až po zápisu přehledu, ať je issue aktuální,
+#              než na notifikaci někdo klepne; při selhání zápisu míří Click na běh
+# Issue s přehledem (štítek prehled) je zavřené a zamčené, skripty kontrola-boardu.py
+# a navrh-session.py ho ignorují.
 
 on:
   schedule:
@@ -35,6 +44,14 @@ jobs:
   kontrola:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      rezim: ${{ steps.rezim.outputs.rezim }}
+      odeslat: ${{ steps.zprava.outputs.odeslat }}
+      titulek: ${{ steps.zprava.outputs.titulek }}
+      priorita: ${{ steps.zprava.outputs.priorita }}
+      tagy: ${{ steps.zprava.outputs.tagy }}
+      zprava: ${{ steps.zprava.outputs.zprava }}
+      prehled: ${{ steps.zprava.outputs.prehled }}
     steps:
       - uses: actions/checkout@v5
 
@@ -78,33 +95,81 @@ jobs:
             --board "$RUNNER_TEMP/board.json" --defekty "$RUNNER_TEMP/defekty.json" \
             --navrh "$RUNNER_TEMP/navrh.json" --vystup "$RUNNER_TEMP/zprava.txt" \
             --prehled "$RUNNER_TEMP/prehled.md" > "$RUNNER_TEMP/meta.json"
-          # plný přehled (jen pondělní režim) do souhrnu běhu; notifikace na něj odkazuje přes Click
+          # plný přehled (jen pondělní režim) i do souhrnu běhu, jako doplněk pro desktop
           if [ -s "$RUNNER_TEMP/prehled.md" ]; then cat "$RUNNER_TEMP/prehled.md" >> "$GITHUB_STEP_SUMMARY"; fi
           echo "odeslat=$(jq -r .odeslat "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"
           echo "titulek=$(jq -r .titulek "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"
           echo "priorita=$(jq -r .priorita "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"
           echo "tagy=$(jq -r .tagy "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"
+          # víceřádkové výstupy: text zprávy a přehledu (jen čísla a názvy issues z veřejného repa)
+          vystup() {
+            D="KONEC_$(openssl rand -hex 8)"
+            { echo "$1<<$D"; cat "$2" 2>/dev/null || true; echo; echo "$D"; } >> "$GITHUB_OUTPUT"
+          }
+          vystup zprava "$RUNNER_TEMP/zprava.txt"
+          vystup prehled "$RUNNER_TEMP/prehled.md"
 
+  prehled:
+    needs: kontrola
+    if: needs.kontrola.outputs.rezim == 'pondeli'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # jediný job s právem zápisu: jen issues, nic jiného
+    permissions:
+      issues: write
+    outputs:
+      url: ${{ steps.zapis.outputs.url }}
+    steps:
+      - name: Přepsat issue s přehledem
+        id: zapis
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PREHLED: ${{ needs.kontrola.outputs.prehled }}
+        run: |
+          N=$(gh issue list --repo "$REPO" --label prehled --state all --limit 1 --json number --jq '.[0].number // empty')
+          if [ -z "$N" ]; then
+            echo "Issue se štítkem prehled neexistuje (založit: Přehled projektu (automaticky), zavřené a zamčené)."
+            exit 1
+          fi
+          printf '%s\n' "$PREHLED" > "$RUNNER_TEMP/prehled.md"
+          gh issue edit "$N" --repo "$REPO" --body-file "$RUNNER_TEMP/prehled.md"
+          echo "Přepsáno issue #$N"
+          echo "url=https://github.com/$REPO/issues/$N" >> "$GITHUB_OUTPUT"
+
+  oznameni:
+    needs: [kontrola, prehled]
+    # prehled může být přeskočený (denní režim) nebo selhat; notifikace odejde i tak
+    if: always() && needs.kontrola.result == 'success' && needs.kontrola.outputs.odeslat == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
       - name: Odeslat notifikaci (ntfy)
-        if: steps.zprava.outputs.odeslat == 'true'
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          TITULEK: ${{ steps.zprava.outputs.titulek }}
-          PRIORITA: ${{ steps.zprava.outputs.priorita }}
-          TAGY: ${{ steps.zprava.outputs.tagy }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TITULEK: ${{ needs.kontrola.outputs.titulek }}
+          PRIORITA: ${{ needs.kontrola.outputs.priorita }}
+          TAGY: ${{ needs.kontrola.outputs.tagy }}
+          ZPRAVA: ${{ needs.kontrola.outputs.zprava }}
+          # pondělí: issue s přehledem; jinak (denní režim, selhaný zápis) běh workflow
+          CLICK: ${{ needs.prehled.outputs.url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
         run: |
-          curl -fsS \
+          printf '%s' "$ZPRAVA" | curl -fsS \
             -H "Title: $TITULEK" \
             -H "Priority: $PRIORITA" \
             -H "Tags: $TAGY" \
-            -H "Click: $RUN_URL" \
-            --data-binary "@$RUNNER_TEMP/zprava.txt" \
+            -H "Click: $CLICK" \
+            --data-binary @- \
             "https://ntfy.sh/$NTFY_TOPIC"
 
+  selhani:
+    needs: [kontrola, prehled]
+    # jen plánovaný běh; ruční běh sleduje ten, kdo ho spustil
+    if: always() && github.event_name == 'schedule' && (needs.kontrola.result == 'failure' || needs.prehled.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
       - name: Upozornění na selhání kontroly (ntfy)
-        # jen plánovaný běh; ruční běh sleduje ten, kdo ho spustil
-        if: failure() && github.event_name == 'schedule'
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -114,5 +179,5 @@ jobs:
             -H "Priority: high" \
             -H "Tags: warning" \
             -H "Click: $RUN_URL" \
-            -d "Automaticka kontrola boardu skoncila chybou (casta pricina: vyprseny BOARD_READ_TOKEN, viz issue Obnovit BOARD_READ_TOKEN). Log: $RUN_URL" \
+            -d "Automaticka kontrola projektu skoncila chybou (casta pricina: vyprseny BOARD_READ_TOKEN, viz issue Obnovit BOARD_READ_TOKEN; u pondeli take chybejici issue se stitkem prehled). Log: $RUN_URL" \
             "https://ntfy.sh/$NTFY_TOPIC"

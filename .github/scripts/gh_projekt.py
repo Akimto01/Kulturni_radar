@@ -17,6 +17,7 @@ BACKLOG_MD = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'
 
 # Lhůta pro kontrolu defektu podle Priority ve dnech (Docs/kvalita/DEFEKTY.md, kapitola Priorita);
 # P4 a P5 bez lhůty. Po lhůtě varuje kontrola-boardu.py, polovinu lhůty bere navrh-session.py.
+STITEK_PREHLED = 'prehled'   # issue s automaticky přepisovaným přehledem (kontrola-projektu.yml), není úkol
 LHUTY_DNI = {'P1': 1, 'P2': 3, 'P3': 14}
 WIP_LIMIT = 3          # nejvýš tolik issues najednou In Progress
 
@@ -26,6 +27,11 @@ def gh_json(args):
     if r.returncode != 0:
         sys.exit('gh ' + ' '.join(args[:3]) + ' selhalo: ' + r.stderr.strip())
     return json.loads(r.stdout)
+
+
+def bez_prehledu(issues):
+    """Issues bez těch se štítkem `prehled` (automatický přehled projektu, není úkol)."""
+    return [i for i in issues if STITEK_PREHLED not in {l['name'] for l in i.get('labels', [])}]
 
 
 def nacist_issues(stitek=None):
