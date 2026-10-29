@@ -2533,6 +2533,9 @@ class MemSheet {
   constructor(rows = []) { this.rows = rows.map(r => r.slice()); }
   getLastRow() { return this.rows.length; }
   getRange(row, col, numRows = 1, numCols = 1) {
+    // Skutečné Sheets házejí chybu u prázdného rozsahu (dávka 3a, mutační testování #13).
+    if (numRows < 1) throw new Error('The number of rows in the range must be at least 1.');
+    if (numCols < 1) throw new Error('The number of columns in the range must be at least 1.');
     const self = this;
     return {
       getValues() {
