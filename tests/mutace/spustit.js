@@ -66,7 +66,7 @@ function main(argv) {
   const plugin = path.join(nm, 'tap-runner', 'dist', 'src', 'index.js');
   const r = spawnSync(process.execPath, [stryker, 'run', 'tests/mutace/stryker.config.json',
     '--plugins', plugin, '--mutate', mutate.join(','), ...predat], {
-    cwd: koren, stdio: 'inherit', env: { ...process.env, RADAR_ZDROJ: kopieRel },
+    cwd: koren, stdio: 'inherit', env: { ...process.env, RADAR_ZDROJ: kopieRel, RADAR_LOCALE: 'en-US', LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' },
   });
   return r.status === null ? 1 : r.status;
 }

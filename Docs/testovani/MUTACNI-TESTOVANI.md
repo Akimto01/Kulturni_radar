@@ -33,6 +33,13 @@ i ~3 min 10 s při 8 (Windows, k 29. 10. 2026), tedy ~0,45 s na mutant.
   kód běží ve `vm` a svůj jmenný prostor Strykeru hledá v globálu vm kontextu, ne testovacího procesu, proto
   harness předá do kontextu objekt z hooku Strykeru a zapíše do něj aktivního mutanta. Bez toho jsou všechny
   mutanty `NoCoverage`. Bez `RADAR_ZDROJ` a mimo Stryker se chování harnessu nemění.
+- **Pevné locale `en-US`:** výsledek nesmí záviset na stroji. Výchozí locale určuje ICU podle systému a na
+  Windows ho `LANG`/`LC_ALL` neovlivní (ověřeno 29. 10. 2026: `cs-CZ` i s nastaveným `LC_ALL`). `spustit.js`
+  proto nastaví `LANG`, `LC_ALL` (pro POSIX) a `RADAR_LOCALE=en-US`; `tests/harness.js` podle ní obalí
+  `String.prototype.localeCompare` ve vm kontextu tak, že volání bez locale dostane `en-US`. Důvod: mutant
+  `localeCompare(b, 'cs')` → `localeCompare(b, "")` (#425) přežíval jen proto, že V8 po prvním volání bez locale
+  bere prázdný locale jako výchozí collator stroje; s pevným locale je zabitý a nezávisí na pořadí testů.
+  Ověřeno srovnáním kritické sady před a po: změnil se jen #425. Mimo Stryker (bez `RADAR_LOCALE`) se nic nemění.
 - **Runner:** `@stryker-mutator/tap-runner` nad `tests/unit.test.js` (426 testů, ~1 s na mutant) s měřením
   pokrytí: mutant, který žádný test nespustí, se vůbec neprovádí (`NoCoverage`).
 - **Vlastní TAP reporter** `tests/mutace/tap-reporter.js`: vestavěný reporter Node padá na neplatném `Date`

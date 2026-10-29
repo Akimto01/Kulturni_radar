@@ -169,6 +169,19 @@ function nactiRadar(volby = {}) {
   }
   // filename jako file:// URL, ať node --experimental-test-coverage přiřadí
   // pokrytí ke zdrojovému souboru (holé jméno se v reportu neukáže).
+  // Pevné locale pro mutační testování: výchozí locale procesu určuje stroj (na Windows ho LANG/LC_ALL
+  // neovlivní), a řazení bez locale i prázdný locale se pak liší podle stroje (mutant #425, issue #13).
+  // spustit.js proto nastaví RADAR_LOCALE a localeCompare bez locale ve vm kontextu dostane tohle locale.
+  // Prázdný řetězec jako locale se nechává původnímu chování (RangeError).
+  if (process.env.RADAR_LOCALE) {
+    ctx.__radarLocale = process.env.RADAR_LOCALE;
+    vm.runInContext(`(function () {
+      const puvodni = String.prototype.localeCompare;
+      String.prototype.localeCompare = function (jiny, locales, volby) {
+        return puvodni.call(this, jiny, locales === undefined ? __radarLocale : locales, volby);
+      };
+    })();`, ctx);
+  }
   vm.runInContext(kod, ctx, { filename: pathToFileURL(cestaKGs).href });
 
   ctx.__odeslaneEmaily = odeslane;
