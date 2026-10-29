@@ -40,7 +40,7 @@ i ~3 min 10 s při 8 (Windows, k 29. 10. 2026), tedy ~0,45 s na mutant.
   `localeCompare(b, 'cs')` → `localeCompare(b, "")` (#425) přežíval jen proto, že V8 po prvním volání bez locale
   bere prázdný locale jako výchozí collator stroje; s pevným locale je zabitý a nezávisí na pořadí testů.
   Ověřeno srovnáním kritické sady před a po: změnil se jen #425. Mimo Stryker (bez `RADAR_LOCALE`) se nic nemění.
-- **Runner:** `@stryker-mutator/tap-runner` nad `tests/unit.test.js` (426 testů, ~1 s na mutant) s měřením
+- **Runner:** `@stryker-mutator/tap-runner` nad `tests/unit.test.js` (447 testů, ~1 s na mutant) s měřením
   pokrytí: mutant, který žádný test nespustí, se vůbec neprovádí (`NoCoverage`).
 - **Vlastní TAP reporter** `tests/mutace/tap-reporter.js`: vestavěný reporter Node padá na neplatném `Date`
   v selhané aserci (`RangeError: Invalid time value`), proces skončí dřív, než hook zapíše výsledek, a Stryker

@@ -30,7 +30,7 @@ Kdyby se všech 85 mutantů kategorie (a) zabilo, skóre by bylo 435 z 448 = 97.
 
 Tři čtvrtiny přeživších jsou v `upsertEvents_` (53 z 98) a `digestRange_` (21 z 98). Jsou to funkce s nejmenším ověřením výsledku: testy kontrolují zápis do listu nebo že funkce doběhla, ale ne seznamy názvů ve statistikách, nadpisy bloků ani sloučení duplicit v rámci jednoho běhu.
 
-## (b) Ekvivalentní mutanty (7)
+## (b) Ekvivalentní mutanty (8, po dávce 3)
 
 | # | Funkce, řádek | Mutace | Proč je ekvivalentní |
 |---|---|---|---|
@@ -39,6 +39,7 @@ Tři čtvrtiny přeživších jsou v `upsertEvents_` (53 z 98) a `digestRange_` 
 | #158 | `upsertEvents_`, ř. 1260 | `''` → `"Stryker was here!"` | Stejný důvod jako #157 (sloupec X). |
 | #199 | `upsertEvents_`, ř. 1299 | `rowVals.slice(0, AKCE_WRITE_AV)` → `rowVals` | Stejný důvod jako #153 (větev změny existující akce). |
 | #36 | `runCheck_`, ř. 772 | `'Jiný běh právě probíhá – končím.'` → `""` | Jen text ladicího záznamu `Logger.log`; chování, návratová hodnota ani zápis se nemění a nikdo ho nečte. |
+| #170 | `upsertEvents_`, ř. 1263 | `String(ev.nazev \|\| '')` v indexu fuzzy → `"Stryker was here!"` | Název v indexu čte jen `ruznyDenSerie_` ve spojení `!ruznyDenSerie_(c.nazev, …) && isSameName_(c.tokens, …)`. Pro akci bez názvu jsou `tokens` prázdné, `isSameName_` vrací `false` a název se tak nikdy neuplatní; `denZeSerie_` navíc z „Stryker was here!“ dá `null` stejně jako z `''`. Zařazen do (b) při dávce 3b-5 (dřív v (a), akce bez názvu je nyní pokryta, mutant přežívá). |
 | #323 | `apiNajdiProUzivatele_`, ř. 2395 | `{ osobniFiltry = {}; }` → `{}` | Pokud `JSON.parse` vyhodí výjimku, přiřazení do `osobniFiltry` se nikdy neprovede, proměnná zůstává `{}` z deklarace. Přiřazení `{}` v `catch` je zbytečné. |
 | #458 | `parseCzDate_`, ř. 4270 | `''` → `"Stryker was here!"` | Pro nepravdivé `v` dá původní kód `''`, mutant `'Stryker was here!'`; ani jeden řetězec neobsahuje datum, regulární výraz nenajde nic a funkce vrátí `null` v obou případech. |
 
@@ -101,5 +102,21 @@ Hotovo. Po dávce 2: **389 zabito, 49 přežilo, 10 bez pokrytí, skóre 86,8 %*
 |---|---|---|---|
 | 1 | `parseCzDate_`, `serioveCisloNaDatum_` (hranice 30000 a 80000, mimo kritickou sadu), `apiSetFiltry_`, `apiToggle_`, `runCheck_`, `apiNajdiProUzivatele_` | 18 (+2 u `serioveCisloNaDatum_`) | hotovo, všech 18 (+2) zabito |
 | 2 | `digestRange_` | 21 | hotovo, 20 z 21 zabito; #425 zabit po zavedení pevného locale |
-| 3 | `upsertEvents_` (včetně zpřísnění `MemSheet`) | 45 (z 46, #226 zabila dávka 1) | čeká |
+| 3 | `upsertEvents_` (včetně zpřísnění `MemSheet`) | 45 (z 46, #226 zabila dávka 1) | hotovo, 44 z 45 zabito; #170 je ekvivalentní |
 
+## Stav dávky 3 (29. 10. 2026)
+
+Hotovo: zpřísnění `MemSheet` (3a) a podskupiny 3b-1 až 3b-5. Po dávce 3: **434 zabito, 11 přežilo, 3 bez pokrytí, skóre 96,9 %** (448 mutantů; po dávce 2 a pevném locale: 390, 48, 10, 87,1 %). Bez ekvivalentních mutantů ve jmenovateli 434 z 440 = 98,6 %.
+
+- **Zbývá 14 mutantů, žádný není mezera v testu:** 8 ekvivalentních (b) (#36, #153, #157, #158, #170, #199, #323, #458) a 6 mezer v kódu (c) (#119, #207, #211, #352, #353, #354).
+- **`upsertEvents_`:** 138 ze 146 zabito (dřív 93), zbývá 5 ekvivalentních (#153, #157, #158, #170, #199) a 3 nedosažitelné obrany (#119, #207, #211). Všechny ostatní funkce kritické sady jsou na 100 % kromě `runCheck_` (#36), `apiNajdiProUzivatele_` (#323, #352 až #354) a `parseCzDate_` (#458).
+- **Žádné zhoršení:** žádný dříve zabitý mutant nepřežil.
+- **MemSheet (3a):** `getRange` s 0 řádky nebo 0 sloupci vyhodí chybu jako skutečné Sheets. Všech 635 testů prošlo beze změny, žádný test nespoléhal na nerealistické chování a v `apps-script/` se nic neměnilo. #74 a #76 pak zabil test s listem jen s hlavičkou.
+- **21 nových testů** (backend 426 na 447, celkem 635 na 656), každý zabíjí aspoň jeden mutant (ověřeno test po testu přes `--test-name-pattern` proti jednotlivým rozsahům):
+  - 3b-1, zrušená akce (2): #213, #215 až #218.
+  - 3b-2, změna data a stavu, cizí profil (4): #176, #187, #191, #196, #223.
+  - 3b-3, duplicity v jednom běhu, indexy ID a fuzzy (8): #82, #83, #125, #137, #139, #156, #159, #160, #165 až #169.
+  - 3b-4, prázdný list, list jen s hlavičkou (4): #74, #76, #78, #79.
+  - 3b-5, seznamy názvů ve statistikách (3): #94 až #97, #101 až #110, #114, #221, #223, #224.
+- **Nález v kódu, nic neopraveno:** žádný nový. Jedna poznámka k chování: dvě akce téhož dne a místa s názvy lišícími se jen číslem dne série („13. srpna“, „14. srpna“) se spojí přesnou shodou klíče, protože `normNazev_` číslice maže; `ruznyDenSerie_` chrání jen fuzzy větev. V praxi mají různé dny série různé datum, takže se klíče liší; test proto používá různá místa.
+- **Zůstává mimo `upsertEvents_`:** 4 mutanty (c) v `apiNajdiProUzivatele_` jsou vázané na opravu po neděli, viz [#48](https://github.com/Akimto01/Kulturni_radar/issues/48).

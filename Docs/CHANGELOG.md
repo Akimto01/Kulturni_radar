@@ -1,5 +1,12 @@
 # Changelog
 
+## Testy: dávka 3 mutačního testování (#13), pevné locale a přísnější MemSheet – 29. 10. 2026
+- **Skóre kritických funkcí 87,1 % → 96,9 %** (448 mutantů: 434 zabito, 11 přežilo, 3 bez pokrytí; po dávce 2 a pevném locale: 390, 48, 10). `upsertEvents_`: 138 ze 146 zabito (z 93). Zbývá 14 mutantů, žádný není mezera v testu: 8 ekvivalentních a 6 mezer v kódu (viz [MUTACE-TRIAZ.md](testovani/MUTACE-TRIAZ.md)). Bez ekvivalentních 98,6 %.
+- **Pevné locale (oprava #425):** mutant `localeCompare(b, "")` nebyl ekvivalentní, ale závislý na prostředí (výchozí locale stroje a pořadí testů). `spustit.js` nastaví `RADAR_LOCALE=en-US` (a `LANG`, `LC_ALL` pro POSIX; na Windows je ICU ignoruje, ověřeno), `tests/harness.js` podle toho ve vm kontextu obalí `localeCompare` bez locale. #425 je zabitý, srovnání kritické sady před a po: změnil se jen #425. Mimo Stryker se nic nemění.
+- **MemSheet (3a):** `getRange` s 0 řádky nebo sloupci vyhodí chybu jako skutečné Sheets. Všech 635 testů prošlo beze změny.
+- **Testy (+21, backend 426 na 447, celkem 635 na 656), podskupiny 3b-1 až 3b-5:** zrušená akce, změna data a stavu, sloupec Změna a cizí profil, duplicity v jednom běhu a indexy ID a fuzzy, prázdný list a list s jedním řádkem, seznamy názvů ve statistikách (včetně kategorií a akce bez názvu). Každý nový test zabíjí aspoň jeden mutant (ověřeno test po testu).
+- **Nález:** #170 (název v indexu fuzzy u akce bez názvu) je ekvivalentní, přesun do (b). V `apps-script/` se nic neměnilo.
+
 ## Testy: dávka 2 mutačního testování (#13) – 29. 10. 2026
 - **Skóre kritických funkcí 82,4 % → 86,8 %** (448 mutantů: 389 zabito, 49 přežilo, 10 bez pokrytí; před: 369, 65, 14). `digestRange_`: 52 z 53 mutantů zabito (z 32). Zabito 20 z 21 mutantů dávky 2 z triáže, žádný dříve zabitý nepřežil.
 - **Testy (+5, backend 421 na 426, celkem 630 na 635):** `digestRange_` ořízne profil s mezerami kolem názvu; bez stálých míst blok „Stálá místa“ vůbec není (chybí list i list jen s hlavičkou); `weeklyDigest` spuštěný v neděli bere jako sobotu poslední den okna; blok stálých míst přesně po řádcích: seskupení podle typu, česky řazené typy (`hrad`, `chrám`, `ostatní`, `zoo`), nadpis „· Hrad“, chybějící typ = „Ostatní“, otevírací doba jen když je; u míst počasí na sobotu s obcí, předpověď se stahuje jednou za obec.
