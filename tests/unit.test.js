@@ -113,6 +113,13 @@ test('parseCzDate_: neplatný vstup → null', () => {
   assert.equal(r.parseCzDate_('různé (dle programu)'), null);
 });
 
+test('parseCzDate_: mezera za tečkou může chybět i být jich víc (1.5.2026, 1.  5.  2026), datum se najde i v textu', () => {
+  const ocekavane = new r.__Date(2026, 4, 1).getTime();
+  ['1.5.2026', '1. 5. 2026', '1.  5.  2026', '1.5. 2026', '1. 5.2026', 'od 1.5.2026 do 3.5.2026'].forEach(text => {
+    assert.equal(r.parseCzDate_(text).getTime(), ocekavane, text);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Počasí – převod WMO kódů
 // ---------------------------------------------------------------------------
@@ -3478,6 +3485,13 @@ test('v3.43: serioveCisloNaDatum_ – 46242 → 8. 8. 2026; mimo rozsah a nečí
   assert.equal(r.serioveCisloNaDatum_(null), null);
 });
 
+test('v3.43: serioveCisloNaDatum_ – hranice rozsahu: 30000 a 80000 už datum nejsou, 30001 a 79999 ještě ano', () => {
+  assert.equal(r.serioveCisloNaDatum_(30000), null);
+  assert.equal(r.serioveCisloNaDatum_(80000), null);
+  assert.notEqual(r.serioveCisloNaDatum_(30001), null);
+  assert.notEqual(r.serioveCisloNaDatum_(79999), null);
+});
+
 test('v3.43: parseCzDate_ – sériové číslo dá stejné datum jako český text', () => {
   const zCisla = r.parseCzDate_(46242);
   const zTextu = r.parseCzDate_('8. 8. 2026');
@@ -4417,9 +4431,69 @@ test('#35 runCheck_: chybějící ANTHROPIC_API_KEY nebo žádné zdroje → vý
   assert.equal(bezKlice.ctx.__zamek.uvolneno, 1);
 
   const bezZdroju = pripravKontrolu_({ zdroje: [], fronta: [odpovedAi_([AKCE_RC])] });
-  assert.throws(() => bezZdroju.ctx.runCheck_('denní kontrola'), /nejsou v ZDROJÍCH žádné zdroje/);
+  assert.throws(() => bezZdroju.ctx.runCheck_('denní kontrola'),
+    { message: 'Pro profil "Brno" nejsou v ZDROJÍCH žádné zdroje (ani VŠECHNY).' });
   assert.equal(bezZdroju.volane.length, 0);
   assert.equal(bezZdroju.ctx.__zamek.uvolneno, 1);
+});
+
+test('#35 runCheck_: zaškrtávátko a čas poslední mimořádné kontroly v KRITÉRIÍCH podle typu běhu', () => {
+  const spusteno = (typ, checkbox) => {
+    const f = pripravKontrolu_({ checkbox, fronta: [odpovedAi_([AKCE_RC])] });
+    f.ctx.runCheck_(typ);
+    return f;
+  };
+  // mimořádná kontrola: políčko je nutná podmínka (ochrana proti dvojkliku)
+  const vypnuta = spusteno('mimořádná kontrola', false);
+  assert.equal(vypnuta.volane.length, 0, 'bez zaškrtnutého políčka se nic nespustí');
+  assert.equal(vypnuta.akce.rows.length, 1);
+  assert.equal(vypnuta.krit.cells.B11, false);
+  assert.equal(vypnuta.krit.cells.B12, '');
+  assert.equal(vypnuta.ctx.__zamek.uvolneno, 1, 'zámek se uvolní i při předčasném návratu');
+
+  // se zaškrtnutým políčkem proběhne, zapíše čas a políčko vypne
+  const zapnuta = spusteno('mimořádná kontrola', true);
+  jenAiVolani_(zapnuta.volane, 1);
+  assert.equal(zapnuta.krit.cells.B11, false, 'políčko se po běhu vypne');
+  assert.ok(String(zapnuta.krit.cells.B12).startsWith(dnesCz_()), 'čas poslední mimořádné kontroly = dnes');
+
+  // mimořádná kontrola z menu políčko nevyžaduje, ale čas zapíše a políčko vypne stejně
+  const zMenu = spusteno('mimořádná kontrola (menu)', false);
+  jenAiVolani_(zMenu.volane, 1);
+  assert.equal(zMenu.krit.cells.B11, false);
+  assert.ok(String(zMenu.krit.cells.B12).startsWith(dnesCz_()));
+
+  // denní kontrola políčko nevyžaduje a KRITÉRIA nechá být
+  const denni = spusteno('denní kontrola', false);
+  jenAiVolani_(denni.volane, 1);
+  assert.equal(denni.akce.rows.length, 2);
+  assert.equal(denni.krit.cells.B11, false);
+  assert.equal(denni.krit.cells.B12, '', 'denní kontrola nezapisuje čas poslední mimořádné kontroly');
+  const denniSPolickem = spusteno('denní kontrola', true);
+  assert.equal(denniSPolickem.krit.cells.B11, true, 'denní kontrola políčko nevypíná');
+  assert.equal(denniSPolickem.krit.cells.B12, '');
+});
+
+test('#35 runCheck_: po zápisu akcí se zajistí souřadnice míst z nálezů (až když jsou akce v AKCE)', () => {
+  const f = pripravKontrolu_({ fronta: [odpovedAi_([AKCE_RC])] });
+  const volani = [];
+  const puvodni = f.ctx.zajistitSouradniceProAkce_;
+  f.ctx.zajistitSouradniceProAkce_ = (ss, events) => {
+    volani.push({ ss, nazvy: events.map(e => e.nazev).join('|'), radkuAkce: f.akce.rows.length });
+    return puvodni(ss, events);
+  };
+  f.ctx.runCheck_('denní kontrola');
+  assert.equal(volani.length, 1);
+  assert.equal(volani[0].ss, f.ss);
+  assert.equal(volani[0].nazvy, 'Test');
+  assert.equal(volani[0].radkuAkce, 2, 'AKCE už obsahuje nově nalezenou akci');
+});
+
+test('#35 runCheck_: po zápisu akcí se zneplatní cache apiEvents', () => {
+  const f = pripravKontrolu_({ fronta: [odpovedAi_([AKCE_RC])] });
+  f.ctx.__cacheStore.events_cache_verze = 'puvodni';
+  f.ctx.runCheck_('denní kontrola');
+  assert.match(f.ctx.__cacheStore.events_cache_verze, /^\d+$/);
 });
 
 test('#35 runCheck_: existující akce s datem jako sériové číslo (produkční tvar, #17) se pozná, duplicita nevznikne', () => {
@@ -4672,6 +4746,7 @@ test('#35 apiNajdiProUzivatele_: špatný, chybějící token nebo neznámý už
   assert.equal(f.ctx.apiNajdiProUzivatele_(ss, 'u1', 'spatny').error, 'Neplatný token.');
   assert.equal(f.ctx.apiNajdiProUzivatele_(ss, 'u1', undefined).error, 'Neplatný token.');
   assert.equal(f.ctx.apiNajdiProUzivatele_(ss, 'neznamy', 'tok-ok').error, 'profil nenalezen');
+  assert.equal(f.ctx.apiNajdiProUzivatele_(ss, 'neznamy', 'tok-ok').ok, false);
 
   const bezTokenuVProps = pripravNajdi_({ properties: { ANTHROPIC_API_KEY: 'k' }, fronta: [odpovedAi_([AKCE_RC])] });
   assert.equal(bezTokenuVProps.ctx.apiNajdiProUzivatele_(bezTokenuVProps.ss, 'u1', undefined).error, 'Neplatný token.',
@@ -4721,9 +4796,40 @@ test('#35 apiNajdiProUzivatele_: chyba AI → výjimka, nic se nezapíše, záme
   const g = pripravNajdi_({ zdroje: [], fronta: [odpovedAi_([AKCE_RC])] });
   const odp = g.ctx.apiNajdiProUzivatele_(g.ss, 'u1', 'tok-ok');
   assert.equal(odp.ok, false);
-  assert.match(odp.error, /nejsou v ZDROJÍCH žádné zdroje/);
+  assert.equal(odp.error, 'Pro profil "Brno" nejsou v ZDROJÍCH žádné zdroje (ani VŠECHNY).');
   assert.equal(g.volane.length, 0);
   assert.equal(g.ctx.__zamek.uvolneno, 1);
+});
+
+test('#35 apiNajdiProUzivatele_: osobní filtr jen s dojezdem nepřepíše kategorii z KRITÉRIÍ; prázdné filtry nechají kategorii i dojezd', () => {
+  const f = pripravNajdi_({ fronta: [odpovedAi_([])] });
+  f.ss.getSheetByName('UŽIVATELÉ').rows[1][3] = '{"dojezd":"30 min"}';
+  f.ctx.apiNajdiProUzivatele_(f.ss, 'u1', 'tok-ok');
+  const zprava = f.volane[0].payload.messages[0].content;
+  assert.match(zprava, /Kategorie: vše/, 'kategorie zůstala z KRITÉRIÍ');
+  assert.doesNotMatch(zprava, /undefined/);
+  assert.match(zprava, /Maximální dojezd autem \(1 cesta\): 30 min/);
+
+  const g = pripravNajdi_({ fronta: [odpovedAi_([])] });
+  g.ss.getSheetByName('UŽIVATELÉ').rows[1][3] = '';
+  g.ctx.apiNajdiProUzivatele_(g.ss, 'u1', 'tok-ok');
+  assert.match(g.volane[0].payload.messages[0].content, /Kategorie: vše/);
+  assert.match(g.volane[0].payload.messages[0].content, /Maximální dojezd autem \(1 cesta\): 90 min/);
+});
+
+test('#35 apiNajdiProUzivatele_: po zápisu akcí se zajistí souřadnice míst z nálezů (až když jsou akce v AKCE)', () => {
+  const f = pripravNajdi_({ fronta: [odpovedAi_([AKCE_RC])] });
+  const volani = [];
+  const puvodni = f.ctx.zajistitSouradniceProAkce_;
+  f.ctx.zajistitSouradniceProAkce_ = (ss, events) => {
+    volani.push({ ss, nazvy: events.map(e => e.nazev).join('|'), radkuAkce: f.akce.rows.length });
+    return puvodni(ss, events);
+  };
+  f.ctx.apiNajdiProUzivatele_(f.ss, 'u1', 'tok-ok');
+  assert.equal(volani.length, 1);
+  assert.equal(volani[0].ss, f.ss);
+  assert.equal(volani[0].nazvy, 'Test');
+  assert.equal(volani[0].radkuAkce, 2, 'AKCE už obsahuje nově nalezenou akci');
 });
 
 test('#35 apiNajdiProUzivatele_: poškozené filtry uživatele (neplatný JSON) se ignorují, hledání běží s kritérii domácího profilu', () => {
@@ -4850,8 +4956,10 @@ test('#35 apiSetFiltry_: chybějící nebo neznámý uživatel → chyba bez zá
   const ctx = nactiRadar({ ss });
   const pred = JSON.stringify(ss.getSheetByName('UŽIVATELÉ').rows);
   assert.equal(ctx.apiSetFiltry_(ss, '', { kategorie: 'x' }).error, 'chybí uživatelský profil');
+  assert.equal(ctx.apiSetFiltry_(ss, '', { kategorie: 'x' }).ok, false);
   assert.equal(ctx.apiSetFiltry_(ss, undefined, { kategorie: 'x' }).ok, false);
   assert.equal(ctx.apiSetFiltry_(ss, 'neznamy', { kategorie: 'x' }).error, 'profil nenalezen');
+  assert.equal(ctx.apiSetFiltry_(ss, 'neznamy', { kategorie: 'x' }).ok, false);
   assert.equal(JSON.stringify(ss.getSheetByName('UŽIVATELÉ').rows), pred, 'nic se nezapsalo (ani do hlavičky)');
 
   assert.equal(ctx.apiSetFiltry_(ss, 'u1', null).ok, true);
@@ -4874,9 +4982,22 @@ test('#35 apiToggle_: neplatný typ, chybějící ID nebo uživatel a neexistuj�
   assert.equal(ctx.apiToggle_(ss, 'a1', 'hodnoceni', 'u1').error, 'neplatný typ označení');
   assert.equal(ctx.apiToggle_(ss, 'a1', undefined, 'u1').ok, false);
   assert.equal(ctx.apiToggle_(ss, '', 'oblibene', 'u1').error, 'chybí ID akce');
+  assert.equal(ctx.apiToggle_(ss, '', 'oblibene', 'u1').ok, false);
   assert.match(ctx.apiToggle_(ss, 'a1', 'oblibene', '').error, /chybí uživatelský profil/);
+  assert.equal(ctx.apiToggle_(ss, 'a1', 'oblibene', '').ok, false);
   assert.equal(ctx.apiToggle_(ss, 'neexistuje', 'oblibene', 'u1').error, 'akce s tímto ID nebyla nalezena');
+  assert.equal(ctx.apiToggle_(ss, 'neexistuje', 'oblibene', 'u1').ok, false);
   assert.equal(ss.getSheetByName('OZNAČENÍ').rows.length, 1);
+});
+
+test('#35 apiToggle_: po přepnutí se zneplatní cache apiEvents (jinak by web ukazoval staré ★ a ✓), chybné volání cache nemění', () => {
+  const ss = ssToggle_();
+  const ctx = nactiRadar({ ss });
+  ctx.__cacheStore.events_cache_verze = 'puvodni';
+  ctx.apiToggle_(ss, 'neexistuje', 'oblibene', 'u1');
+  assert.equal(ctx.__cacheStore.events_cache_verze, 'puvodni');
+  ctx.apiToggle_(ss, 'a1', 'oblibene', 'u1');
+  assert.match(ctx.__cacheStore.events_cache_verze, /^\d+$/, 'nová verze cache (časová značka)');
 });
 
 test('#35 apiToggle_: označení a odznačení (oblíbené i navštívené nezávisle), řádek má název a místo akce', () => {

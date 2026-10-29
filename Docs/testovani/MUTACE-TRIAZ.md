@@ -10,7 +10,7 @@ Každý z 98 mutantů je zařazen do jedné kategorie:
 - **(b) ekvivalentní mutant:** změna nemění pozorovatelné chování, žádný test ho zabít nemůže. Zdůvodnění je v tabulce níže.
 - **(c) mezera v kódu, kterou testem neopravíš:** nedosažitelná obrana nebo chyba v kódu; nejdřív se musí změnit kód.
 
-## Souhrn po funkcích
+## Souhrn po funkcích (výchozí stav před dávkou 1)
 
 | Funkce | Mutantů | Zabito | Přežilo | NoCoverage | (a) test | (b) ekviv. | (c) kód |
 |---|---|---|---|---|---|---|---|
@@ -71,15 +71,24 @@ Seskupeno podle toho, co má doplněný test ověřit. Pořadí odpovídá plán
 | `upsertEvents_` | #176, #187, #191, #196 | shoda s řádkem cizího profilu ho nezmění; změna data začátku a stavu se pozná a označí sloupec Změna `ANO` |
 | `upsertEvents_` | #213, #215, #216, #217, #218 | zrušená akce se počítá jako zrušená, ne jako změněná, a zapíše se do `zruseneNazvy` (dnes nepokryto žádným testem) |
 | `upsertEvents_` | #94 až #97, #101 až #110, #114, #221, #223, #224 | seznamy názvů ve statistikách (`noveNazvy`, `zmeneneNazvy`, `zruseneNazvy`, `bezZmenyNazvy`): obsah, první kategorie ořezaná, `ostatní` při chybějící kategorii; po aktualizaci bez změny se zapíše jen Poslední kontrola |
-| `upsertEvents_` | #226 | po zápisu se zneplatní cache `apiEvents` |
+| `upsertEvents_` | #226 | po zápisu se zneplatní cache `apiEvents` (hotovo v dávce 1) |
 
 Pozn.: kategorie (a) obsahuje i mutanty, jejichž oprava je kosmetická (text chybové hlášky, akce bez názvu). Zabírají málo úsilí a v souhrnu je nelze vynechat, jen mají nižší prioritu než chování se zápisem do listu.
 
+## Stav dávky 1 (29. 10. 2026)
+
+Hotovo. Po dávce 1: **369 zabito, 65 přežilo, 14 bez pokrytí, skóre 82,4 %** (před: 350 včetně jednoho timeoutu, 84, 14, 78,1 %).
+
+- **Zabito všech 18 mutantů dávky 1:** `parseCzDate_` #461, #465; `apiSetFiltry_` #292; `apiToggle_` #244, #256, #259; `runCheck_` #37, #40, #45, #46, #47, #59, #61, #64; `apiNajdiProUzivatele_` #320, #331, #341, #345. `serioveCisloNaDatum_` (mimo kritickou sadu) má 19 z 19 zabito, hranice 30000 a 80000 zabily oba přeživší.
+- **Bonus:** #226 (`upsertEvents_`, zneplatnění cache po zápisu) zabil test zneplatnění cache v `runCheck_`; je odškrtnutý z dávky 3 (zbývá 45 mutantů). Jeden dřívější timeout (#252, `apiToggle_`) je teď zabitý; timeouty závisí na zátěži stroje.
+- **Žádné zhoršení:** žádný dříve zabitý mutant nepřežil.
+- **8 nových testů** (backend 413 na 421), každý zabíjí aspoň jeden mutant: `parseCzDate_` bez mezer za tečkou (#461, #465), `apiToggle_` zneplatnění cache (#259), `runCheck_` zaškrtávátko a čas v KRITÉRIÍCH (#37, #40, #45, #46, #47, #64), `runCheck_` souřadnice po zápisu (#61), `runCheck_` zneplatnění cache (#226), `apiNajdiProUzivatele_` filtr bez kategorie (#331), souřadnice po zápisu (#345), hranice `serioveCisloNaDatum_` (#12, #15). Zbylé mutanty dávky (#292, #244, #256, #59, #320, #341) zabily doplněné aserce v existujících testech (`ok: false`, přesný text chyby).
+
 ## Plán dávek testů
 
-| Dávka | Funkce | Mutantů (a) |
-|---|---|---|
-| 1 | `parseCzDate_`, `serioveCisloNaDatum_` (hranice 30000 a 80000, mimo kritickou sadu), `apiSetFiltry_`, `apiToggle_`, `runCheck_`, `apiNajdiProUzivatele_` | 18 (+2 u `serioveCisloNaDatum_`) |
-| 2 | `digestRange_` | 21 |
-| 3 | `upsertEvents_` (včetně zpřísnění `MemSheet`) | 46 |
+| Dávka | Funkce | Mutantů (a) | Stav |
+|---|---|---|---|
+| 1 | `parseCzDate_`, `serioveCisloNaDatum_` (hranice 30000 a 80000, mimo kritickou sadu), `apiSetFiltry_`, `apiToggle_`, `runCheck_`, `apiNajdiProUzivatele_` | 18 (+2 u `serioveCisloNaDatum_`) | hotovo, všech 18 (+2) zabito |
+| 2 | `digestRange_` | 21 | čeká |
+| 3 | `upsertEvents_` (včetně zpřísnění `MemSheet`) | 45 (z 46, #226 zabila dávka 1) | čeká |
 

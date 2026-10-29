@@ -236,7 +236,7 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
 
 | Sada | Obsah | Spouštění | Blokuje | Kdo sleduje |
 |---|---|---|---|---|
-| Jednotkové testy | 622 testů backendu a frontendu (Node) | každý push a PR | nasazení (pravidlo vlastníka: nenasazuje se s červenou) | vlastník, odznak v README |
+| Jednotkové testy | 630 testů backendu a frontendu (Node) | každý push a PR | nasazení (pravidlo vlastníka: nenasazuje se s červenou) | vlastník, odznak v README |
 | Statická kontrola testů | `robot --dryrun` celé RF sady (syntaxe, existence klíčových slov, argumenty) | každý push a PR | nasazení | vlastník |
 | Pojistka souladu s architekturou | počty porušení pravidel B4, B5 a C3 proti baseline (`.github/scripts/kontrola-architektury-testu.py`); selže, když porušení přibude | každý push a PR | push s novým porušením | vlastník |
 | Kontrola počtů testů v README | porovná tabulku „Testy v číslech“ se skutečností (Node, RF přes robot.api, worker) | každý push a PR | push s rozdílem | vlastník |
@@ -360,7 +360,7 @@ Hodnoty k 28. 10. 2026, spočítané z historie GitHub Actions, gitu a DEFEKTY.m
 | Pokrytí kódu frontendu | 98,9 % řádků ve vykrojených funkcích (57 ze 113, 440 z 445 řádků), 25,3 % celého skriptu `Index.html` (440 z 1736 řádků); Node, `tests/pokryti-frontendu.js` | neklesat, zvyšovat podíl vykrojených funkcí | zbytek skriptu (vykreslování, mapa, kalendář, obsluha událostí) pokrývá jen E2E; tabulka z `--experimental-test-coverage` u `Index.html` nesedí, proto vlastní skript |
 | Soulad s architekturou | baseline porušení 11 / 9 / 11 / 61 / 0 / 11 / 6 / 12 (pojistka v CI) | klesat k nule po dávkách issue #34 | |
 | Síla testů | mutační ověření nových testů ručně (12 záznamů v CHANGELOGu) | průběžně, doplňuje ho metrika níže | ruční mutace zůstávají u nových testů, Stryker pokrývá vybrané funkce |
-| Mutační skóre kritických funkcí | 78,1 % (448 mutantů v 10 kritických funkcích z [POKRYTI.md](POKRYTI.md): 349 zabito + 1 timeout, 84 přežilo, 14 bez pokrytí; Stryker, 29. 10. 2026) | neklesat, zvyšovat po dávkách testů z #13; práh se stanoví po triáži přeživších (ekvivalentní mutanty se odečtou) | ručně, zatím ne v CI; postup a výklad v [MUTACNI-TESTOVANI.md](MUTACNI-TESTOVANI.md) |
+| Mutační skóre kritických funkcí | 82,4 % (448 mutantů v 10 kritických funkcích z [POKRYTI.md](POKRYTI.md): 369 zabito, 65 přežilo, 14 bez pokrytí; Stryker, 29. 10. 2026, po dávce 1 z #13; výchozí hodnota 78,1 %) | neklesat, zvyšovat po dávkách testů z #13; práh se stanoví po triáži přeživších (ekvivalentní mutanty se odečtou) | ručně, zatím ne v CI; postup a výklad v [MUTACNI-TESTOVANI.md](MUTACNI-TESTOVANI.md) |
 
 **Co se zatím měřit nedá:** mutační skóre celého backendu průběžně (kritická sada se měří ručně),
 nestabilita po jednotlivých testech (artefakty expirují po 30 dnech) a cena běhu
@@ -456,4 +456,5 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | 29. 10. 2026 | D3: pokrytí backendu 92,0 % řádků a 85,0 % větví po dávce 4 z #35 (`apiSetFiltry_`, `apiToggle_`, `nastavPin_`, přehledy a `notifyFail_` 100 % řádků); mezi funkcemi pod 70 % žádná kritická nezůstává |
 | 29. 10. 2026 | C1: řádek Kontrola boardu a defektů (ruční skripty při konci session, ne v CI) |
 | 29. 10. 2026 | C1 a D3: mutační testování Strykerem (řádek v C1, metrika mutační skóre kritických funkcí 78,1 %), [MUTACNI-TESTOVANI.md](MUTACNI-TESTOVANI.md) |
+| 29. 10. 2026 | D3: mutační skóre kritických funkcí 82,4 % po dávce 1 z #13 (`parseCzDate_`, `apiSetFiltry_`, `apiToggle_`, `runCheck_`, `apiNajdiProUzivatele_`; 18 mutantů zabito, bonusem #226 v `upsertEvents_`; `serioveCisloNaDatum_` 100 %), backend 413 na 421 testů |
 | 29. 10. 2026 | C1: kontrola boardu a defektů běží automaticky (workflow `kontrola-projektu.yml`, token jen pro čtení) |
