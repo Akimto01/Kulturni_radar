@@ -33,6 +33,7 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 
 **Fáze 2 – zpevnění základu (po 2. 11.):**
 5. **Sjednocení testů s architekturou, dávka 1** (~1,5–2 h): suite-level teardown a `Close Page`. Pak dávky 2 (~45 min), 3 (~1 h) a 5 (~1–1,5 h). Audit `Docs/audity/AUDIT-SOULADU-TESTU.md`. → issue #34
+5a. **Opravit #48 tichá selhání** (~30 min, po nedělním samotestu 1. 11.): samotest hlídá všechny triggery ze setupTriggers, sendUserNotifications hlásí chybu přes notifyFail_, pole aktualizovano v odpovědi apiNajdiProUzivatele_; testy podle scénáře v #35, nasazení backendu. → issue #48
 
 **Fáze 3 – pokrytí kritických funkcí:**
 6. **Pokrytí kritických funkcí backendu** (~5 h): nejdřív stub tabulky (`SpreadsheetApp`) a triggerů (`ScriptApp`) v harnessu, pak platba AI, triggery a hlídač. → issue #35
