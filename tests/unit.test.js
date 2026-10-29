@@ -5467,3 +5467,49 @@ test('3b-3: upsertEvents_ – různé dny denní série („13. srpna“ a „14
   assert.equal(stats.nove, 2);
   assert.equal(sh.getLastRow(), 3);
 });
+
+// ---------------------------------------------------------------------------
+// #13 dávka 3b-4: upsertEvents_ – prázdný list a list s jedním řádkem (#74 až #79, MemSheet od dávky 3a
+// hází u prázdného rozsahu jako skutečné Sheets)
+// ---------------------------------------------------------------------------
+
+test('3b-4: upsertEvents_ – list úplně bez řádků: akce se zapíše bez chyby', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([]) });
+  const stats = nactiRadar().upsertEvents_(ss, { profil: 'Brno' }, [novaAkceUpsert_()]);
+
+  assert.equal(stats.nove, 1);
+  assert.equal(ss.getSheetByName('AKCE').getLastRow(), 1);
+  assert.equal(ss.getSheetByName('AKCE').rows[0][0], 'u-1');
+});
+
+test('3b-4: upsertEvents_ – list jen s hlavičkou: nová akce na řádku 2, profil ve sloupci Y', () => {
+  const { stats, sh } = upsertBeh_([], [novaAkceUpsert_()]);
+
+  assert.equal(stats.nove, 1);
+  assert.equal(sh.getLastRow(), 2);
+  assert.equal(sh.rows[1][0], 'u-1');
+  assert.equal(sh.rows[1][14], 'ANO', 'Novinka');
+  assert.equal(sh.rows[1][24], 'Brno');
+});
+
+test('3b-4: upsertEvents_ – list jen s hlavičkou: akce přidaná v běhu a pak změněná se aktualizuje na řádku 2', () => {
+  const { stats, sh } = upsertBeh_([], [novaAkceUpsert_(), novaAkceUpsert_({ stav: 'zrušeno' })]);
+
+  assert.equal(stats.nove, 1);
+  assert.equal(stats.zrusene, 1);
+  assert.equal(sh.getLastRow(), 2, 'žádný řádek navíc');
+  assert.equal(sh.rows[1][13], 'zrušeno');
+});
+
+test('3b-4: upsertEvents_ – list s jedním řádkem: akce přidaná v běhu a pak změněná se aktualizuje na svém řádku', () => {
+  const { stats, sh } = upsertBeh_([existujiciUpsert_()], [
+    novaAkceUpsert_({ id: 'u-9', nazev: 'Výstava fotografií', misto: 'Galerie' }),
+    novaAkceUpsert_({ id: 'u-9', nazev: 'Výstava fotografií', misto: 'Galerie', stav: 'zrušeno' }),
+  ]);
+
+  assert.equal(stats.nove, 1);
+  assert.equal(stats.zrusene, 1);
+  assert.equal(sh.getLastRow(), 3, 'žádný řádek navíc');
+  assert.equal(sh.rows[2][13], 'zrušeno', 'aktualizace přišla na řádek 3, kde akce leží');
+  assert.equal(sh.rows[1][13], 'potvrzeno');
+});
