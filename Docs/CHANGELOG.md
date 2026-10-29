@@ -5,8 +5,13 @@
 - **Ověření:** 558/558 prochází s `TZ=UTC`, `TZ=Europe/Prague`, `TZ=Pacific/Auckland` i `TZ=America/Los_Angeles`, seznam výsledků po jednotlivých testech je pro UTC a Europe/Prague shodný. Žádný test se tedy podle zóny nechová jinak. Stub `Utilities.formatDate` v harnessu formátuje podle zóny procesu, nastavení `TZ` ho proto přibližuje skutečnému skriptu.
 - `ARCHITEKTURA-TESTU.md` A4: část o časové zóně přepnuta z „navrženo“ na zavedeno, zbývá řazení podle češtiny, přechod letního času a stálá místa s diakritikou. Closes #37.
 
+## Docs: defekt Tichá selhání (#48) – 29. 10. 2026
+- **Issue #48** (první defekt založený formulářem `defekt.yml`, ne zpětně): `runSelfTest` nehlídá existenci triggerů `sendUserNotifications` a `zpracovatSledovanaMesta` a `sendUserNotifications` nemá `try/catch` ani `notifyFail_`. Závažnost S3, priorita P3, jak nalezeno Analýza nebo review (při psaní tabulky triggerů pro #47), stav Potvrzený, board Backlog, milník Cíl 1. Oprava spolu s testy v #35.
+- `DEFEKTY.md`: řádek v tabulce klasifikace s poznámkou o prvním defektu z formuláře. BACKLOG: položka v Testovacím dluhu, → issue #48.
+- Oprava záznamu k #47 níže: tabulka triggerů vychází z 10 triggerů (9 funkcí, `zpracovatSledovanaMesta` dvakrát), ne z 11.
+
 ## Docs: PROVOZ.md, tabulka triggerů (#47) – 29. 10. 2026
-- **`Docs/aplikace/PROVOZ.md`:** tabulka triggerů je kompletní podle `setupTriggers()` v `kulturni_radar.gs` (11 triggerů, `zpracovatSledovanaMesta` dvakrát): doplněny `sendUserNotifications`, `runSelfTest`, `watchdogDailyCheck` a `zpracovatSledovanaMesta`, nový sloupec „Jak poznat selhání“, vše z kódu. Přidán řádek o týdenním RF běhu v GitHub Actions (`20 20 * * 0`, 21:20 SEČ) a upozornění na UTC a letní čas.
+- **`Docs/aplikace/PROVOZ.md`:** tabulka triggerů je kompletní podle `setupTriggers()` v `kulturni_radar.gs` (10 triggerů, `zpracovatSledovanaMesta` dvakrát): doplněny `sendUserNotifications`, `runSelfTest`, `watchdogDailyCheck` a `zpracovatSledovanaMesta`, nový sloupec „Jak poznat selhání“, vše z kódu. Přidán řádek o týdenním RF běhu v GitHub Actions (`20 20 * * 0`, 21:20 SEČ) a upozornění na UTC a letní čas.
 - Z kódu vyplynulo: `runSelfTest` nehlídá existenci triggerů `sendUserNotifications` a `zpracovatSledovanaMesta` a `sendUserNotifications` nemá vlastní notifikaci o selhání. Closes #47.
 
 ## Docs: board se sloupcem Backlog, issues pro fázi 5, pravidlo v SKILL – 28. 10. 2026

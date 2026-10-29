@@ -168,6 +168,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
 - **Práh pokrytí backendu v CI (ratchet)** (~30 min, až po issue #35): selže při poklesu pokrytí řádků `kulturni_radar.gs` pod uloženou hodnotu. → issue #38
 - **Měření pokrytí frontendu** (~1 h): harness `Index.html` doplní prázdné řádky podle pozice funkce, ať jde změřit pokrytí. → issue #39
 - **Pokrytí kritických funkcí backendu** (~5 h): platba AI (`runCheck_`, `dailyCheck`, `callAnthropicPlaces_`, `updateMista`, `apiNajdiProUzivatele_`), `apiSetFiltry_`, `setupTriggers`, `watchdogDailyCheck`, `notifyFail_` a přehledy, větve `apiToggle_`, `nastavPin_`. Předpoklad: stub tabulky (`SpreadsheetApp`) a `ScriptApp` v harnessu. Měření z 28. 10. 2026 viz `Docs/testovani/POKRYTI.md`. → issue #35
+- **Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu** (defekt S3, P3; oprava spolu s testy watchdogu a notifikací v #35). → issue #48
 - **Katalog testů na GitHub Pages** (~30 min): `publikovat-report.yml` vygeneruje `python -m robot.testdoc tests/robot/` a zveřejní ho vedle reportu a logu (přidat na seznam povolených souborů webu, odkaz z index.html, projde stejnou kontrolou úniku). Tím se podloží tvrzení v TESTY.md §9, že testdoc nahrazuje Test Case Specification podle ISO 29119. → issue #44
 
 ## Probíhající měření

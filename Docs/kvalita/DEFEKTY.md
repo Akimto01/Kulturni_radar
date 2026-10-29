@@ -72,6 +72,9 @@ Počítá se aktivita, která defekt odhalila poprvé.
 | [#23](https://github.com/Akimto01/Kulturni_radar/issues/23) | Akce s datem „neuvedeno“ | S3 | P3 | Živá kontrola | Uzavřený |
 | [#21](https://github.com/Akimto01/Kulturni_radar/issues/21) | Duplicity stálých míst | S3 | P3 | Analýza nebo review | Uzavřený |
 | [#27](https://github.com/Akimto01/Kulturni_radar/issues/27) | Hláška prázdného stavu s časem jiného města | S4 | P3 | Automatický test (E2E nebo API) | Uzavřený |
+| [#48](https://github.com/Akimto01/Kulturni_radar/issues/48) | Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu | S3 | P3 | Analýza nebo review | Potvrzený |
+
+#48 (29. 10. 2026) je první defekt založený formulářem `defekt.yml`, ne zpětnou klasifikací: nalezen čtením kódu při psaní tabulky triggerů v `PROVOZ.md` (#47), oprava spolu s testy v #35.
 
 #18 zůstává ve stavu *Ověřuje se* a issue je proto otevřená: oprava počasí
 a souřadnic čeká na ověření v datech po čtvrtečním běhu sledovaných měst (issue #6).
