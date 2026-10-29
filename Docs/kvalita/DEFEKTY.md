@@ -74,10 +74,13 @@ Počítá se aktivita, která defekt odhalila poprvé.
 | [#27](https://github.com/Akimto01/Kulturni_radar/issues/27) | Hláška prázdného stavu s časem jiného města | S4 | P3 | Automatický test (E2E nebo API) | Uzavřený |
 | [#48](https://github.com/Akimto01/Kulturni_radar/issues/48) | Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu | S3 | P3 | Analýza nebo review | Potvrzený |
 | [#49](https://github.com/Akimto01/Kulturni_radar/issues/49) | Sledovaná města: běh narazí na limit 6 min, přepočet počasí se nespustí a selhání se nenahlásí | S3 | P2 | Živá kontrola | Ověřuje se |
+| [#50](https://github.com/Akimto01/Kulturni_radar/issues/50) | Server neověřuje identitu uživatele u zápisových akcí: stačí veřejné `uzivatelId` | S2 | P3 | Analýza nebo review | Potvrzený |
 
 #48 (29. 10. 2026) je první defekt založený formulářem `defekt.yml`, ne zpětnou klasifikací: nalezen čtením kódu při psaní tabulky triggerů v `PROVOZ.md` (#47), oprava spolu s testy v #35.
 
 #49 (29. 10. 2026) našla živá kontrola při ověřovačce #6: čtvrteční běh `zpracovatSledovanaMesta` skončil na časovém limitu 6 minut (361 s) uprostřed volání AI třetího města a přepočet počasí se vůbec nespustil. Čtení kódu potvrdilo, že rozpočet 4,5 minuty se kontroluje jen před městem (město trvá kolem 2 minut), počasí běží až za smyčkou a přerušení na limitu se nikam nezapíše. Hypotéza, že datum na hraně předpovědi (dnes + 7) skončí jako CHYBA místo NA, se nepotvrdila: `vyhodnotPocasiUdalosti_` vrací CHYBA jen tehdy, když neodpověděl Open-Meteo ani met.no; tři záznamy CHYBA s datem 5. 11. jsou nejspíš starší stav, který se kvůli #49 nepřepsal. Samostatný defekt proto nevznikl.
+
+#50 (29. 10. 2026) našlo čtení kódu při psaní testů #35 dávky 4: akce `toggle`, `toggle-misto`, `filtry`, `set-notifikace` a `vygenerovat-ntfy-tema` berou jen veřejné `uzivatelId` (seznam profilů vrací `api=uzivatele` bez přihlášení), takže jde měnit cizí data a přesměrovat cizí notifikace na libovolný e-mail. Závažnost S2, priorita P3, protože dnes appku používá jen rodina; musí se vyřešit před otevřením přátelům (Cíl 2), souvisí s #16.
 
 #18 zůstává ve stavu *Ověřuje se* a issue je proto otevřená: oprava počasí
 a souřadnic čeká na ověření v datech po čtvrtečním běhu sledovaných měst (issue #6).
@@ -99,6 +102,7 @@ změnilo, aby se to neopakovalo.
 | #23 | Validace vstupu při zápisu, samotest | Výstup AI se bral jako spolehlivě ve správném formátu | Akce bez data se nezapíše, samotest ji nahlásí, 6 jednotkových testů |
 | #21 | Samotest (kontrola duplicit) | Kontrola duplicit existovala jen pro akce, ne pro stálá místa | Párování míst podle klíče názvu, 8 jednotkových testů |
 | #27 | E2E test | Předchozí oprava (v3.59) se ověřovala přes URL parametr, ne přepnutím města, jak to dělá uživatel | Přepracovaný E2E test přepnutí profilu, 4 jednotkové testy |
+| #50 | Jednotkový test zápisových API nebo review API | E2E testy běží vždy přihlášené (Suite Setup se přihlašuje PINem), takže chybějící ověření u zápisů neuvidí; jednotkové testy zápisových API autorizaci neměly v zadání a ověřovaly jen správnost zápisu | otevřeno; po opravě test odmítnutí zápisu bez ověření |
 
 ### Co z toho plyne
 

@@ -4820,3 +4820,272 @@ test('#35 zpracovatSledovanaMesta: zámek obsazený → žádné volání AI ani
   assert.equal(f.ctx.__odeslaneEmaily.length, 0);
   assert.equal(f.ctx.__zamek.uvolneno, 0);
 });
+
+// ---------------------------------------------------------------------------
+// #35 dávka 4: apiSetFiltry_, přehledy (weeklyDigest, weekendDigest, notifyFail_),
+// apiToggle_ a nastavPin_
+// ---------------------------------------------------------------------------
+
+const UZIVATELE_H4 = ['ID', 'Jméno', 'PIN_hash', 'Filtry', 'Vytvořeno', 'Notifikace'];
+const uzivateleListy_ = () => ({ 'UŽIVATELÉ': [UZIVATELE_H4,
+  ['u1', 'Vojta', 'sul1$hash1', '{"kategorie":"koncerty"}', '', '{}'],
+  ['u2', 'Monika', 'sul2$hash2', '{"kategorie":"divadlo"}', '', '{}']] });
+
+// --- apiSetFiltry_ ---
+
+test('#35 apiSetFiltry_: uložení přes routePost_ (akce filtry) zapíše JSON do sloupce Filtry správného uživatele, ostatní beze změny', () => {
+  const ss = fakeSpreadsheet(uzivateleListy_());
+  const ctx = nactiRadar({ ss });
+  const odp = ctx.routePost_({ akce: 'filtry', uzivatelId: 'u2', filtry: { kategorie: 'hudba', dojezd: '45 min' } }, ss);
+  assert.equal(odp.ok, true);
+  const rows = ss.getSheetByName('UŽIVATELÉ').rows;
+  assert.equal(rows[2][3], '{"kategorie":"hudba","dojezd":"45 min"}');
+  assert.equal(rows[1][3], '{"kategorie":"koncerty"}', 'filtry jiného uživatele se nezměnily');
+  assert.equal(rows[2][2], 'sul2$hash2', 'PIN hash sousedního sloupce nedotčen');
+  assert.equal(rows[2][1], 'Monika');
+});
+
+test('#35 apiSetFiltry_: chybějící nebo neznámý uživatel → chyba bez zápisu; prázdné filtry se uloží jako {}', () => {
+  const ss = fakeSpreadsheet(uzivateleListy_());
+  const ctx = nactiRadar({ ss });
+  const pred = JSON.stringify(ss.getSheetByName('UŽIVATELÉ').rows);
+  assert.equal(ctx.apiSetFiltry_(ss, '', { kategorie: 'x' }).error, 'chybí uživatelský profil');
+  assert.equal(ctx.apiSetFiltry_(ss, undefined, { kategorie: 'x' }).ok, false);
+  assert.equal(ctx.apiSetFiltry_(ss, 'neznamy', { kategorie: 'x' }).error, 'profil nenalezen');
+  assert.equal(JSON.stringify(ss.getSheetByName('UŽIVATELÉ').rows), pred, 'nic se nezapsalo (ani do hlavičky)');
+
+  assert.equal(ctx.apiSetFiltry_(ss, 'u1', null).ok, true);
+  assert.equal(ss.getSheetByName('UŽIVATELÉ').rows[1][3], '{}');
+  assert.equal(ctx.apiSetFiltry_(ss, 'u1', undefined).ok, true);
+  assert.equal(ss.getSheetByName('UŽIVATELÉ').rows[1][3], '{}');
+});
+
+// --- apiToggle_ ---
+
+const AKCE_LIST_T = () => [Array.from({ length: 25 }, (_, i) => 'sl' + i),
+  Object.assign(Array(25).fill(''), { 0: 'a1', 1: '6. 8. 2026', 4: 'Koncert', 5: 'Sál', 6: 'Brno', 24: 'Brno' }),
+  Object.assign(Array(25).fill(''), { 0: 'a2', 1: '7. 8. 2026', 4: 'Výstava', 5: 'Galerie', 6: 'Brno', 24: 'Brno' })];
+const OZNACENI_H = ['ID akce', 'Typ', 'Datum označení', 'Název', 'Místo', 'Uživatel'];
+const ssToggle_ = () => fakeSpreadsheet({ AKCE: AKCE_LIST_T(), 'OZNAČENÍ': [OZNACENI_H] });
+
+test('#35 apiToggle_: neplatný typ, chybějící ID nebo uživatel a neexistující akce → chyba a OZNAČENÍ beze změny', () => {
+  const ss = ssToggle_();
+  const ctx = nactiRadar({ ss });
+  assert.equal(ctx.apiToggle_(ss, 'a1', 'hodnoceni', 'u1').error, 'neplatný typ označení');
+  assert.equal(ctx.apiToggle_(ss, 'a1', undefined, 'u1').ok, false);
+  assert.equal(ctx.apiToggle_(ss, '', 'oblibene', 'u1').error, 'chybí ID akce');
+  assert.match(ctx.apiToggle_(ss, 'a1', 'oblibene', '').error, /chybí uživatelský profil/);
+  assert.equal(ctx.apiToggle_(ss, 'neexistuje', 'oblibene', 'u1').error, 'akce s tímto ID nebyla nalezena');
+  assert.equal(ss.getSheetByName('OZNAČENÍ').rows.length, 1);
+});
+
+test('#35 apiToggle_: označení a odznačení (oblíbené i navštívené nezávisle), řádek má název a místo akce', () => {
+  const ss = ssToggle_();
+  const ctx = nactiRadar({ ss });
+  const zap = ctx.apiToggle_(ss, 'a1', 'oblibene', 'u1');
+  assert.equal(zap.ok, true);
+  assert.equal(zap.oblibene, true);
+  assert.equal(zap.navstivenoDne, '');
+  const rows = ss.getSheetByName('OZNAČENÍ').rows;
+  assert.equal(rows.length, 2);
+  assert.equal([rows[1][0], rows[1][1], rows[1][3], rows[1][4], rows[1][5]].join('|'), 'a1|oblibene|Koncert|Sál|u1');
+
+  const nav = ctx.apiToggle_(ss, 'a1', 'navstiveno', 'u1');
+  assert.equal(nav.oblibene, true, 'oblíbené zůstalo');
+  assert.equal(nav.navstivenoDne, dnesCz_(), 'navštívené nese dnešní datum');
+  assert.equal(ss.getSheetByName('OZNAČENÍ').rows.length, 3);
+
+  const odz = ctx.apiToggle_(ss, 'a1', 'oblibene', 'u1');
+  assert.equal(odz.oblibene, false, 'odznačení');
+  assert.equal(odz.navstivenoDne, dnesCz_(), 'navštívené zůstalo');
+  const zbyle = ss.getSheetByName('OZNAČENÍ').rows.filter(r => r[0]);
+  assert.equal(zbyle.length, 2, 'hlavička + jen navštívené');
+  assert.equal(zbyle[1][1], 'navstiveno');
+});
+
+test('#35 apiToggle_: izolace uživatelů – označení u1 nevidí a neruší u2, odznačení u2 nesmaže řádek u1', () => {
+  const ss = ssToggle_();
+  const ctx = nactiRadar({ ss });
+  ctx.apiToggle_(ss, 'a1', 'oblibene', 'u1');
+  const u2 = ctx.apiToggle_(ss, 'a1', 'oblibene', 'u2');
+  assert.equal(u2.oblibene, true, 'u2 má vlastní označení téže akce');
+  assert.equal(ss.getSheetByName('OZNAČENÍ').rows.filter(r => r[0]).length, 3, 'hlavička + řádek u1 + řádek u2');
+
+  const u2Zpet = ctx.apiToggle_(ss, 'a1', 'oblibene', 'u2');
+  assert.equal(u2Zpet.oblibene, false);
+  const zbyle = ss.getSheetByName('OZNAČENÍ').rows.filter(r => r[0]);
+  assert.equal(zbyle.length, 2);
+  assert.equal(zbyle[1][5], 'u1', 'řádek u1 zůstal');
+
+  const u3 = ctx.apiToggle_(ss, 'a2', 'navstiveno', 'u3');
+  assert.equal(u3.oblibene, false);
+  const u1Stav = ctx.apiToggle_(ss, 'a2', 'oblibene', 'u1');
+  assert.equal(u1Stav.navstivenoDne, '', 'navštívení u3 se u1 neprojeví');
+});
+
+// --- nastavPin_ ---
+
+test('#35 nastavPin_: PIN se uloží jako „sůl$hash“, round trip s overitPin_, ostatní řádky beze změny', () => {
+  const ss = fakeSpreadsheet(uzivateleListy_());
+  const ctx = nactiRadar({ ss });
+  ctx.nastavPin_('u1', '4321');
+  const rows = ss.getSheetByName('UŽIVATELÉ').rows;
+  assert.match(rows[1][2], /^[0-9a-f-]{36}\$[0-9a-f]{64}$/);
+  assert.equal(ctx.overitPin_('4321', rows[1][2]), true);
+  assert.equal(ctx.overitPin_('4322', rows[1][2]), false);
+  assert.equal(ctx.overitPin_('', rows[1][2]), false);
+  assert.equal(rows[2][2], 'sul2$hash2', 'PIN druhého uživatele nedotčen');
+  assert.equal(rows[1][1], 'Vojta');
+  assert.equal(rows[1][3], '{"kategorie":"koncerty"}', 'filtry nedotčeny');
+  assert.equal(rows[0][2], 'PIN_hash', 'hlavička nedotčena');
+  assert.ok(!JSON.stringify(rows).includes('4321'), 'PIN v čitelné podobě se nikam nezapsal');
+});
+
+test('#35 nastavPin_: nová sůl při každém nastavení (stejný PIN dává jiný hash), oba hashe platí jen pro svůj záznam', () => {
+  const ss = fakeSpreadsheet(uzivateleListy_());
+  const ctx = nactiRadar({ ss });
+  ctx.nastavPin_('u1', '1234');
+  const prvni = ss.getSheetByName('UŽIVATELÉ').rows[1][2];
+  ctx.nastavPin_('u1', '1234');
+  const druhy = ss.getSheetByName('UŽIVATELÉ').rows[1][2];
+  assert.notEqual(prvni.split('$')[0], druhy.split('$')[0], 'jiná sůl');
+  assert.notEqual(prvni, druhy, 'jiný hash téhož PINu');
+  assert.equal(ctx.overitPin_('1234', druhy), true);
+  assert.equal(ctx.overitPin_('1234', prvni), true, 'starý hash dál ověřuje svůj PIN');
+  ctx.nastavPin_('u2', '1234');
+  assert.notEqual(ss.getSheetByName('UŽIVATELÉ').rows[2][2].split('$')[1], druhy.split('$')[1], 'stejný PIN u dvou uživatelů nemá stejný hash');
+});
+
+test('#35 nastavPin_: neznámý profil → výjimka a nic se nezapíše', () => {
+  const ss = fakeSpreadsheet(uzivateleListy_());
+  const ctx = nactiRadar({ ss });
+  const pred = JSON.stringify(ss.getSheetByName('UŽIVATELÉ').rows);
+  assert.throws(() => ctx.nastavPin_('neznamy', '1234'), /profil "neznamy" nenalezen/);
+  assert.equal(JSON.stringify(ss.getSheetByName('UŽIVATELÉ').rows), pred);
+});
+
+// --- notifyFail_, weeklyDigest, weekendDigest ---
+
+test('#35 notifyFail_: předmět = titulek, tělo „Chyba: zpráva“ (Error i prostý text)', () => {
+  const ctx = nactiRadar({ properties: { NTFY_TOPIC: 't' } });
+  ctx.notifyFail_('Něco selhalo', new Error('detail chyby'));
+  ctx.notifyFail_('Jiné selhání', 'jen text');
+  assert.equal(ctx.__odeslaneEmaily.length, 2);
+  assert.equal(ctx.__odeslaneEmaily[0].predmet, 'Něco selhalo');
+  assert.equal(ctx.__odeslaneEmaily[0].telo, 'Chyba: detail chyby');
+  assert.equal(ctx.__odeslaneEmaily[1].telo, 'Chyba: jen text');
+});
+
+/** Akce v listu AKCE (25 sloupců) pro přehledy; profil Brno. */
+const akcePrehled_ = (nazev, od, doD = '') => Object.assign(Array(25).fill(''),
+  { 0: nazev, 1: od, 2: doD, 4: nazev, 6: 'Brno', 8: 'koncerty', 13: 'potvrzeno', 24: 'Brno' });
+
+/** Kontext s pevným „dnes“ (new Date() bez argumentů = daný okamžik) a tabulkou pro přehledy. */
+function ctxPrehled_(dnes, v = {}) {
+  const ss = fakeSpreadsheet(Object.assign({
+    'KRITÉRIA': fakeKriteria_({ B2: 'Brno' }),
+    AKCE: [Array.from({ length: 25 }, (_, i) => 'sl' + i)].concat(v.akce || []),
+  }, v.listy || {}));
+  const ctx = nactiRadar({ ss, urlFetch: v.urlFetch,
+    properties: Object.assign({ NTFY_TOPIC: 't', NOTIFY_EMAIL: 'rodina@example.com' }, v.properties || {}) });
+  const Puvodni = ctx.__Date;
+  const pevny = new Puvodni(dnes[0], dnes[1], dnes[2], 10, 30).getTime();
+  ctx.Date = class extends Puvodni {
+    constructor(...a) { if (a.length === 0) super(pevny); else super(...a); }
+    static now() { return pevny; }
+  };
+  return { ctx, ss };
+}
+
+test('#35 weeklyDigest: okno 7 dní (dnes až dnes + 6), vícedenní akce probíhající v okně se zahrne, předmět a hlavička', () => {
+  const { ctx } = ctxPrehled_([2026, 10, 4], { akce: [   // středa 4. 11. 2026
+    akcePrehled_('Včerejší', '3. 11. 2026'),
+    akcePrehled_('Dnešní', '4. 11. 2026'),
+    akcePrehled_('Posledni-den', '10. 11. 2026'),
+    akcePrehled_('Osmy-den', '11. 11. 2026'),
+    akcePrehled_('Vicedenni', '1. 11. 2026', '5. 11. 2026'),
+  ] });
+  ctx.weeklyDigest();
+  const ntfy = ctx.__odeslaneEmaily.find(m => m.komu === 'ntfy-t@ntfy.sh');
+  const mail = ctx.__odeslaneEmaily.find(m => m.komu === 'rodina@example.com');
+  assert.equal(ntfy.predmet, 'Týdenní přehled');
+  assert.equal(mail.predmet, '[Kulturní radar] Týdenní přehled');
+  assert.match(ntfy.telo, /^Brno · 4\. 11\. 2026–10\. 11\. 2026/);
+  assert.match(ntfy.telo, /Dnešní/);
+  assert.match(ntfy.telo, /Posledni-den/);
+  assert.match(ntfy.telo, /Vicedenni/);
+  assert.doesNotMatch(ntfy.telo, /Včerejší/);
+  assert.doesNotMatch(ntfy.telo, /Osmy-den/);
+});
+
+test('#35 weeklyDigest: prázdné okno, zrušené a cizí akce → hláška o prázdném období', () => {
+  const zrusena = akcePrehled_('Zrusena', '5. 11. 2026'); zrusena[13] = 'zrušeno';
+  const cizi = akcePrehled_('Cizi', '5. 11. 2026'); cizi[24] = 'Praha';
+  const { ctx } = ctxPrehled_([2026, 10, 4], { akce: [zrusena, cizi] });
+  ctx.weeklyDigest();
+  const telo = ctx.__odeslaneEmaily[0].telo;
+  assert.match(telo, /Na toto období nejsou v databázi žádné akce\./);
+  assert.doesNotMatch(telo, /Zrusena|Cizi/);
+});
+
+test('#35 weekendDigest: nejbližší pátek až neděle pro každý den v týdnu (po–čt a pá: tento pátek, so a ne: příští)', () => {
+  // 2. 11. 2026 = pondělí … 8. 11. = neděle; očekávaný pátek: 6. 11. do pátku včetně, jinak 13. 11.
+  const ocekavanyPatek = { 2: 6, 3: 6, 4: 6, 5: 6, 6: 6, 7: 13, 8: 13 };
+  Object.keys(ocekavanyPatek).forEach(den => {
+    const { ctx } = ctxPrehled_([2026, 10, Number(den)]);
+    ctx.weekendDigest();
+    const p = ocekavanyPatek[den];
+    assert.match(ctx.__odeslaneEmaily[0].telo, new RegExp('^Brno · ' + p + '\\. 11\\. 2026–' + (p + 2) + '\\. 11\\. 2026'),
+      'dnes ' + den + '. 11. → víkend od ' + p + '. 11.');
+  });
+});
+
+test('#35 weekendDigest: akce jen pátek až neděle, předmět „Víkendové tipy“, extra příjemce NOTIFY_EMAIL_VIKEND jen u víkendového přehledu', () => {
+  const akce = [akcePrehled_('Ctvrtek', '5. 11. 2026'), akcePrehled_('Patek', '6. 11. 2026'),
+    akcePrehled_('Nedele', '8. 11. 2026'), akcePrehled_('Pondeli', '9. 11. 2026')];
+  const v = { akce, properties: { NOTIFY_EMAIL_VIKEND: 'babicka@example.com' } };
+  const { ctx } = ctxPrehled_([2026, 10, 5], v);   // čtvrtek
+  ctx.weekendDigest();
+  const telo = ctx.__odeslaneEmaily[0].telo;
+  assert.match(telo, /Patek/);
+  assert.match(telo, /Nedele/);
+  assert.doesNotMatch(telo, /Ctvrtek|Pondeli/);
+  const mail = ctx.__odeslaneEmaily.find(m => m.komu !== 'ntfy-t@ntfy.sh');
+  assert.equal(mail.komu, 'rodina@example.com,babicka@example.com');
+  assert.equal(mail.predmet, '[Kulturní radar] Víkendové tipy');
+
+  const tyden = ctxPrehled_([2026, 10, 5], v);
+  tyden.ctx.weeklyDigest();
+  const mailTyden = tyden.ctx.__odeslaneEmaily.find(m => m.komu !== 'ntfy-t@ntfy.sh');
+  assert.equal(mailTyden.komu, 'rodina@example.com', 'týdenní přehled extra příjemce nemá');
+});
+
+test('#35 weekendDigest: stálá místa (aktivní, top 5 podle skóre) v sekci s datem soboty, počasí při výpadku se vynechá', () => {
+  const misto = (nazev, skore, stav = 'aktivní') => ['id-' + nazev, nazev, 'zoo', 'Brno', '', '8–18', '', '', '', skore, stav, '', '', '', 'Brno'];
+  const mista = [['ID', 'Název', 'Typ', 'Obec']].concat([misto('Zoo-A', 9), misto('Zoo-B', 7), misto('Zoo-C', 6), misto('Zoo-D', 5), misto('Zoo-E', 4), misto('Zoo-F', 3),
+    misto('Zavrene', 10, 'zavřeno')]);
+  const volane = [];
+  const { ctx } = ctxPrehled_([2026, 10, 5], { listy: { 'MÍSTA': mista }, urlFetch: frontaFetchu(['throw', 'throw'], volane) });
+  ctx.weekendDigest();
+  const telo = ctx.__odeslaneEmaily[0].telo;
+  assert.match(telo, /Stálá místa \(7\. 11\. 2026\)/, 'sobota víkendu 6.–8. 11.');
+  assert.match(telo, /Zoo-A[\s\S]*Zoo-B/, 'řazeno podle skóre');
+  assert.match(telo, /otevřeno: 8–18/);
+  assert.doesNotMatch(telo, /Zavrene/);
+  assert.match(telo, /Zoo-E/);
+  assert.doesNotMatch(telo, /Zoo-F/, 'jen top 5 podle skóre');
+  assert.doesNotMatch(telo, /počasí \(/);
+  assert.ok(volane.every(u => /open-meteo/.test(u)), 'jen pokus o počasí, nic jiného');
+});
+
+test('#35 weeklyDigest a weekendDigest: selhání → notifyFail_ s příslušným předmětem a výjimka se propustí', () => {
+  const t = nactiRadar({ ss: fakeSpreadsheet({}), properties: { NTFY_TOPIC: 't' } });
+  assert.throws(() => t.weeklyDigest());
+  assert.equal(t.__odeslaneEmaily.length, 1);
+  assert.equal(t.__odeslaneEmaily[0].predmet, 'Týdenní přehled selhal');
+  assert.match(t.__odeslaneEmaily[0].telo, /^Chyba: /);
+
+  const v = nactiRadar({ ss: fakeSpreadsheet({}), properties: { NTFY_TOPIC: 't' } });
+  assert.throws(() => v.weekendDigest());
+  assert.equal(v.__odeslaneEmaily[0].predmet, 'Víkendové tipy selhaly');
+});
