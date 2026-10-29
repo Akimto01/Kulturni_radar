@@ -5513,3 +5513,58 @@ test('3b-4: upsertEvents_ – list s jedním řádkem: akce přidaná v běhu a 
   assert.equal(sh.rows[2][13], 'zrušeno', 'aktualizace přišla na řádek 3, kde akce leží');
   assert.equal(sh.rows[1][13], 'potvrzeno');
 });
+
+// ---------------------------------------------------------------------------
+// #13 dávka 3b-5: upsertEvents_ – seznamy názvů ve statistikách (#94 až #110, #114, #221, #223, #224)
+// ---------------------------------------------------------------------------
+
+test('3b-5: upsertEvents_ – seznamy názvů ve statistikách: každá akce jen ve svém seznamu, po aktualizaci beze změny jen Poslední kontrola', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([
+    existujiciUpsert_(),
+    existujiciUpsert_({ id: 'u-2', nazev: 'Divadlo v parku', datumOd: '20. 6. 2026', datumDo: '20. 6. 2026' }),
+    existujiciUpsert_({ id: 'u-3', nazev: 'Výstava fotografií', datumOd: '25. 6. 2026', datumDo: '25. 6. 2026' }),
+  ])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [
+    novaAkceUpsert_(),                                                                                         // beze změny
+    novaAkceUpsert_({ id: 'u-2', nazev: 'Divadlo v parku', datum_od: '21. 6. 2026', datum_do: '21. 6. 2026', kategorie: 'divadlo' }),   // změna
+    novaAkceUpsert_({ id: 'u-3', nazev: 'Výstava fotografií', datum_od: '25. 6. 2026', datum_do: '25. 6. 2026', kategorie: 'výstavy', stav: 'zrušeno' }),
+    novaAkceUpsert_({ id: 'u-4', nazev: 'Festival jazzu', datum_od: '30. 6. 2026', datum_do: '30. 6. 2026', kategorie: 'festival' }),  // nová
+  ]);
+
+  const j = x => JSON.stringify(x);
+  assert.equal(j(stats.noveNazvy), j([{ d: '2026-06-30', kat: 'festival', t: 'Festival jazzu (30. 6. 2026)' }]));
+  assert.equal(j(stats.zmeneneNazvy), j([{ d: '2026-06-21', kat: 'divadlo', t: 'Divadlo v parku (21. 6. 2026)' }]));
+  assert.equal(j(stats.zruseneNazvy), j([{ d: '2026-06-25', kat: 'výstavy', t: 'Výstava fotografií (25. 6. 2026)' }]));
+  assert.equal(j(stats.bezZmenyNazvy), j([{ d: '2026-06-15', kat: 'koncert', t: 'Koncert na nábřeží (15. 6. 2026)' }]));
+  assert.equal(stats.nove + stats.zmenene + stats.zrusene + stats.bezZmeny, 4);
+
+  const sh = ss.getSheetByName('AKCE');
+  const bezZmeny = sh.rows[1];
+  assert.equal(bezZmeny[17], ctx.formatDateOnly_(new Date()), 'Poslední kontrola = dnes');
+  assert.equal(bezZmeny[15], 'NE');
+  assert.equal(bezZmeny[4], 'Koncert na nábřeží', 'ostatní pole beze změny');
+});
+
+test('3b-5: upsertEvents_ – kategorie v seznamu názvů: první z více, ořezaná, jinak „ostatní“', () => {
+  const { stats } = upsertBeh_([], [
+    novaAkceUpsert_({ id: 'k-1', nazev: 'Akce jedna', misto: 'M1', kategorie: ' Koncert ; hudba' }),
+    novaAkceUpsert_({ id: 'k-2', nazev: 'Akce dvě', misto: 'M2', kategorie: '' }),
+    novaAkceUpsert_({ id: 'k-3', nazev: 'Akce tři', misto: 'M3', kategorie: undefined }),
+    novaAkceUpsert_({ id: 'k-4', nazev: 'Akce čtyři', misto: 'M4', kategorie: ' ;výstavy' }),
+  ]);
+
+  assert.equal(stats.noveNazvy.length, 4);
+  assert.equal(stats.noveNazvy[0].kat, 'Koncert');
+  assert.equal(stats.noveNazvy[1].kat, 'ostatní');
+  assert.equal(stats.noveNazvy[2].kat, 'ostatní');
+  assert.equal(stats.noveNazvy[3].kat, 'ostatní', 'první kategorie je prázdná, druhá se nepoužije');
+});
+
+test('3b-5: upsertEvents_ – akce bez názvu se zapíše a v seznamu má název prázdný, jen s datem', () => {
+  const { stats, sh } = upsertBeh_([], [novaAkceUpsert_({ id: 'bn-1', nazev: undefined })]);
+
+  assert.equal(stats.nove, 1);
+  assert.equal(stats.noveNazvy[0].t, ' (15. 6. 2026)');
+  assert.equal(sh.rows[1][4], '');
+});
