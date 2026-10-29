@@ -65,3 +65,12 @@ jobs:
       # se skutečností (Node, RF přes robot.api, worker). Při rozdílu selže.
       - name: Kontrola počtů testů v README
         run: python .github/scripts/kontrola-poctu-testu.py
+
+      # README obsahuje soupis nástrojů a technologií: každý nástroj, který repo používá
+      # (balíčky z package.json a requirements.txt, knihovny RF, akce třetích stran, clasp,
+      # wrangler, api-tests/, unpkg), musí mít v tabulce řádek. Nejdřív samotest skriptu
+      # (včetně negativních zkoušek), pak ostrá kontrola. Jen čtou, stačí standardní knihovna.
+      - name: Kontrola soupisu nástrojů v README
+        run: |
+          python .github/scripts/kontrola-nastroju.py --test
+          python .github/scripts/kontrola-nastroju.py

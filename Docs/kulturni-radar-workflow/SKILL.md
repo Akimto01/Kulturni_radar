@@ -239,6 +239,11 @@ ověření: nesrovnalosti vypsat, neopravovat sám.
 jedno místo, ostatní dokumenty na něj odkazují. Mapa dokumentace je v
 `Docs/README.md`.
 
+Soupis nástrojů a technologií je v README (sekce „Nástroje a technologie“):
+**nový nástroj nebo závislost = řádek v README ve stejném commitu**, hlídá
+`.github/scripts/kontrola-nastroju.py` (job `rf-dryrun`, identifikátor v prvním
+sloupci v zpětných apostrofech; `--test` ověří i negativní zkoušky).
+
 ## 4. Konec pracovní session
 
 Na konci každé pracovní session (rozloučení, „jdu spát", „končím na dnešek",

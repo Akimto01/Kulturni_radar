@@ -95,6 +95,67 @@ Pokrytí řádků backendu jednotkovými testy: 92,0 % (k 29. 10. 2026, měří 
 Podrobně viz [Docs/aplikace/ARCHITEKTURA-APLIKACE.md](Docs/aplikace/ARCHITEKTURA-APLIKACE.md), provoz a řešení
 potíží viz [Docs/aplikace/PROVOZ.md](Docs/aplikace/PROVOZ.md).
 
+## Nástroje a technologie
+
+Soupis toho, co projekt používá. První sloupec obsahuje identifikátor v zpětných apostrofech; skript `.github/scripts/kontrola-nastroju.py` (job `rf-dryrun` v CI) selže, když repo používá nástroj, který tu nemá řádek. Hlídá balíčky z `package.json` a `requirements.txt`, knihovny Robot Frameworku, akce třetích stran ve workflow, knihovny z unpkg, `clasp`, `wrangler` a podsložky `api-tests/`. Verze je uvedená jen tam, kde je v repu pevně daná. Pravidlo: nový nástroj nebo závislost = řádek tady ve stejném commitu.
+
+### Platforma a provoz
+
+| Nástroj | K čemu | Kde v repu | Verze |
+|---|---|---|---|
+| Google Apps Script (`apps-script`) | backend a API `/exec`: hledání akcí, triggery, notifikace, zápis do tabulky | `apps-script/kulturni_radar.gs`, `apps-script/appsscript.json` | běhové prostředí V8 |
+| Google Sheets (`google-sheets`) | databáze (listy AKCE, MÍSTA, KONTROLY a další), přístup přes `SpreadsheetApp` | `apps-script/kulturni_radar.gs` | |
+| Služby Apps Scriptu (`apps-script-sluzby`) | `UrlFetchApp` (HTTP volání), `MailApp` (e-maily), `PropertiesService` (tajné hodnoty), `ScriptApp` (triggery), `CacheService`, `LockService` | `apps-script/kulturni_radar.gs` | |
+| Cloudflare Pages (`cloudflare-pages`) | hosting frontendu na kulturniradar.cz, nasazuje `git push` | `apps-script/Index.html` (jeden soubor pro oba nasazovací kanály); konfigurace v repu není | |
+| Cloudflare Workers (`cloudflare-workers`) | e-mailový Worker: tip na akci přepošle dál a pošle ho jako webhook do appky | `cloudflare-worker/email-webhook.js`, `cloudflare-worker/wrangler.toml` | `compatibility_date` 2024-09-23 |
+| `wrangler` | nasazení a vývoj Workeru | `cloudflare-worker/package.json` (devDependencies) | ^4.0.0 |
+| `postal-mime` | čtení příchozího e-mailu ve Workeru | `cloudflare-worker/package.json` (dependencies) | ^3.0.0 |
+| `clasp` | nasazení backendu do Apps Scriptu (`clasp push`, `clasp deploy -i`) | `.clasp.json` | |
+
+### Externí služby a API
+
+| Nástroj | K čemu | Kde v repu | Verze |
+|---|---|---|---|
+| Anthropic Claude API (`anthropic-api`) | hledání kulturních akcí s webovým vyhledáváním (`web_search_20250305`) | `apps-script/kulturni_radar.gs` (`ANTHROPIC_MODEL`, `ANTHROPIC_URL`) | model `claude-sonnet-5-5`, API `2023-06-01` |
+| Open-Meteo (`open-meteo`) | předpověď počasí a geokódování obcí | `apps-script/kulturni_radar.gs`, `apps-script/Index.html` | |
+| MET Norway (`met-no`) | záložní zdroj předpovědi, když Open-Meteo pro den nic nemá | `apps-script/kulturni_radar.gs` | |
+| Nominatim (`nominatim`) | geokódování míst akcí (souřadnice pro mapu) | `apps-script/kulturni_radar.gs` | |
+| ntfy (`ntfy`) | push notifikace na telefon: zprávy appky i vývojové zprávy z GitHub Actions | `apps-script/kulturni_radar.gs`, `.github/workflows/kontrola-projektu.yml`, `.github/workflows/rf-tests.yml` | |
+| Leaflet (`leaflet`) | mapa akcí a míst ve frontendu | `apps-script/Index.html` (načítá se z unpkg) | 1.9.4 |
+| OpenStreetMap (`openstreetmap`) | dlaždice mapy pod Leafletem | `apps-script/Index.html` | |
+| Odkazy Google (`google-odkazy`) | „Přidat do kalendáře“ a otevření místa v mapách, jen odkazy bez API | `apps-script/Index.html` | |
+| Schema.org (`schema-org`) | strukturovaná data Event (JSON-LD) u sdílených akcí | `apps-script/Index.html` | |
+
+### Testování
+
+| Nástroj | K čemu | Kde v repu | Verze |
+|---|---|---|---|
+| `node:test` | jednotkové testy backendu (přes vlastní harness bez Googlu), frontendu a Workeru | `tests/unit.test.js`, `tests/frontend.test.js`, `tests/harness.js`, `cloudflare-worker/email-webhook.test.mjs` | Node 22 (CI) |
+| Robot Framework (`robotframework`) | E2E a API testy proti produkci, dry run v každém pushi; standardní knihovny (Collections, OperatingSystem, String) jsou jeho součástí | `tests/robot/` | 7.5 |
+| Browser Library (`robotframework-browser`) | E2E testy frontendu v prohlížeči (Playwright, Chromium) | `tests/robot/frontend.robot`, `tests/robot/requirements.txt` | 20.6.0 |
+| RequestsLibrary (`robotframework-requests`) | testy kontraktu API | `tests/robot/api.robot`, `tests/robot/requirements.txt` | 0.9.7 |
+| SoapUI (`soapui`) | cvičné API testy (8 test cases) | `api-tests/soapui/` | 5.10.0 (z projektového souboru) |
+| Bruno (`bruno`) | stejná sada cvičných API testů jako textová kolekce | `api-tests/bruno/` | formát kolekce 1 |
+| JMeter (`jmeter`) | cvičný zátěžový scénář (`?api=meta`, `?api=events`) | `api-tests/jmeter/` | 5.6.3 (z projektového souboru) |
+
+### CI a automatizace
+
+| Nástroj | K čemu | Kde v repu | Verze |
+|---|---|---|---|
+| GitHub Actions (`github-actions`) | Node testy, RF dry run a kontroly, týdenní E2E, testy Workeru, publikace reportu, denní kontrola projektu | `.github/workflows/` | `actions/checkout` v5, `setup-node` v6 (Node 22), `setup-python` v6 (Python 3.12), `upload-artifact` v6, `download-artifact` v8, `upload-pages-artifact` v5, `deploy-pages` v5 |
+| GitHub Pages (`github-pages`) | veřejný report E2E testů | `.github/workflows/publikovat-report.yml`, `.github/scripts/generovat-index-reportu.py` | |
+| GitHub Projects a Issues (`github-projects`) | board, issues, formulář defektu, automaticky přepisovaný přehled projektu | `.github/ISSUE_TEMPLATE/defekt.yml`, `.github/workflows/kontrola-projektu.yml` | |
+| Python skripty (`python`) | kontroly projektu a testů, návrh práce, sestavení notifikací; jen standardní knihovna, kontroly testů navíc `robot.api` | `.github/scripts/` | Python 3.12 (CI) |
+| GitHub CLI (`gh`) | čtení boardu a issues, zápis přehledu; předinstalované na runnerech | `.github/scripts/gh_projekt.py`, `.github/workflows/` | |
+| `curl` a `jq` | odeslání zpráv do ntfy a zpracování JSON ve workflow | `.github/workflows/` | |
+
+### Vývoj
+
+| Nástroj | K čemu | Kde v repu | Verze |
+|---|---|---|---|
+| Claude Code (`claude-code`) | vývoj, nasazení přes `clasp`, údržba dokumentace podle projektového skillu | `.claude/skills/kulturni-radar-workflow/SKILL.md` (kopie v `Docs/kulturni-radar-workflow/`) | |
+| claude-in-chrome (`claude-in-chrome`) | živé ověření produkce v prohlížeči (diagnostika, měření rozložení) | popsáno v `SKILL.md`, sekce 7 | |
+
 ## Struktura repozitáře
 
 | Cesta | Obsah |
