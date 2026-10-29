@@ -1,5 +1,11 @@
 # Changelog
 
+## Docs: defekt časový limit sledovaných měst (#49), ověřovačka #6 posunuta – 29. 10. 2026
+- **Nález (živá kontrola při ověřovačce #6):** `zpracovatSledovanaMesta` 29. 10. 10:31:51 skončil po 361 s na časovém limitu (25. 10.: 338,7 s, dokončeno). KONTROLY: Třinec 10:34, Olomouc 10:36, žádný další řádek ani řádek „aktualizace počasí“. Budoucí akce: souřadnice 43 z 86, počasí do 7 dní OK 10, NA 20, CHYBA 3 (všechny s datem 5. 11.).
+- **Analýza kódu (backend v3.50, bez změn v `apps-script/`):** (a) potvrzeno, rozpočet 4,5 min se kontroluje jen před městem a nebere v úvahu délku města (~2 min) ani čas na `aktualizujPocasi_`; (b) potvrzeno, limit nejde zachytit, `logKontrola_` se volá až po zápisu a nic se nehlásí, hláška o přerušení je jen v Loggeru a jen při vlastním přerušení; (c) potvrzeno, volání AI se ukončí před `upsertEvents_`, nic se nezapíše a město zůstane nejstarší na řadě; (d) nepotvrzeno, CHYBA vzniká jen když neodpoví Open-Meteo ani met.no, datum na hraně předpovědi dává NA, tři záznamy CHYBA jsou starý stav nepřepsaný kvůli (b).
+- **Issue #49** (defekt, formulář): S3, P2, Živá kontrola, štítek bug, Cíl 3, board Todo, Stav defektu Potvrzený, odhad 4 h. Varianty opravy a doporučení jsou v komentáři issue. Samostatný defekt k bodu (d) nevznikl.
+- **Ověřovačka #6:** komentář v #6 a #18, termín #6 posunut na 2. 11. (nedělní běh 1. 11.), #18 zůstává In Progress. `DEFEKTY.md`: řádek #49 a poznámka. BACKLOG: fáze 1, bod 1 posunut, nový bod 1a. Rozhodnutí 29. 10.: minimální oprava části 1 (A + B + zápis přerušení, backend v3.51) před nedělním během 1. 11., část 2 (C + D) po 2. 11.
+
 ## CI: TZ=Europe/Prague pro jednotkové testy (#37) – 29. 10. 2026
 - **`node-tests.yml`:** krok Spustit testy má `env: TZ: Europe/Prague`, takže jednotkové testy v CI běží ve stejné zóně jako backend (`Europe/Prague`) a lokálně na stroji v SEČ/SELČ.
 - **Ověření:** 558/558 prochází s `TZ=UTC`, `TZ=Europe/Prague`, `TZ=Pacific/Auckland` i `TZ=America/Los_Angeles`, seznam výsledků po jednotlivých testech je pro UTC a Europe/Prague shodný. Žádný test se tedy podle zóny nechová jinak. Stub `Utilities.formatDate` v harnessu formátuje podle zóny procesu, nastavení `TZ` ho proto přibližuje skutečnému skriptu.

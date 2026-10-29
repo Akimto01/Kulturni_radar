@@ -73,8 +73,11 @@ Počítá se aktivita, která defekt odhalila poprvé.
 | [#21](https://github.com/Akimto01/Kulturni_radar/issues/21) | Duplicity stálých míst | S3 | P3 | Analýza nebo review | Uzavřený |
 | [#27](https://github.com/Akimto01/Kulturni_radar/issues/27) | Hláška prázdného stavu s časem jiného města | S4 | P3 | Automatický test (E2E nebo API) | Uzavřený |
 | [#48](https://github.com/Akimto01/Kulturni_radar/issues/48) | Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu | S3 | P3 | Analýza nebo review | Potvrzený |
+| [#49](https://github.com/Akimto01/Kulturni_radar/issues/49) | Sledovaná města: běh narazí na limit 6 min, přepočet počasí se nespustí a selhání se nenahlásí | S3 | P2 | Živá kontrola | V opravě |
 
 #48 (29. 10. 2026) je první defekt založený formulářem `defekt.yml`, ne zpětnou klasifikací: nalezen čtením kódu při psaní tabulky triggerů v `PROVOZ.md` (#47), oprava spolu s testy v #35.
+
+#49 (29. 10. 2026) našla živá kontrola při ověřovačce #6: čtvrteční běh `zpracovatSledovanaMesta` skončil na časovém limitu 6 minut (361 s) uprostřed volání AI třetího města a přepočet počasí se vůbec nespustil. Čtení kódu potvrdilo, že rozpočet 4,5 minuty se kontroluje jen před městem (město trvá kolem 2 minut), počasí běží až za smyčkou a přerušení na limitu se nikam nezapíše. Hypotéza, že datum na hraně předpovědi (dnes + 7) skončí jako CHYBA místo NA, se nepotvrdila: `vyhodnotPocasiUdalosti_` vrací CHYBA jen tehdy, když neodpověděl Open-Meteo ani met.no; tři záznamy CHYBA s datem 5. 11. jsou nejspíš starší stav, který se kvůli #49 nepřepsal. Samostatný defekt proto nevznikl.
 
 #18 zůstává ve stavu *Ověřuje se* a issue je proto otevřená: oprava počasí
 a souřadnic čeká na ověření v datech po čtvrtečním běhu sledovaných měst (issue #6).

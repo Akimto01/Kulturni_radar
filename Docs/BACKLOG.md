@@ -25,7 +25,8 @@ Kulturní radar má být appka pro rodinu a přátele, která zároveň slouží
 Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpevnit základ, potom pokrýt kritické funkce, změřit a rozšířit do šířky. Hotové body z 26.–27. 10. 2026 (v3.43–v3.50, Index.html v3.60–v3.65) jsou v CHANGELOG.md.
 
 **Fáze 1 – ověření (do 2. 11.):**
-1. **Ověřit v3.44 v datech** (~15 min, po čtvrtečním běhu sledovaných měst 29. 10. 10:00) – podíl akcí se souřadnicemi a počasím OK, první HTTP kódy selhání Open-Meteo v KONTROLY; pak přeškrtnout body v „Nálezy ze živé kontroly“. → issue #6
+1. **Ověřit v3.44 v datech** (~15 min; **posunuto na 2. 11.**: čtvrteční běh 29. 10. skončil na časovém limitu a počasí nepřepočetl, viz #49, ověřovačka se opakuje po opravě a nedělním běhu 1. 11.) – podíl akcí se souřadnicemi a počasím OK, první HTTP kódy selhání Open-Meteo v KONTROLY; pak přeškrtnout body v „Nálezy ze živé kontroly“. → issue #6
+1a. **Opravit #49, část 1 před nedělí** (~1,5 h): rozpočet podle naměřené délky města (A), přepočet počasí před smyčkou měst (B), zápis přerušení rozpočtem do KONTROL. Část 2 po neděli: počasí jako samostatný trigger (C) a záznam o tvrdém ukončení (D). Analýza a varianty v issue #49. → issue #49
 2. **První týdenní report kvality** (~10 min, po samotestu 1. 11. 18:00) – sekce „Kvalita hledání“ včetně řádku fuzzy sloučení (v3.50); zapojení do runSelfTest není pokryté testem. → issue #7
 3. **Ověřit první plánovaný běh CI 1. 11. 2026** (~30 min, 2. 11.; běh startuje v neděli ve 20:20 UTC) – délka, zpoždění fronty, kontrola úniku, report na Pages, notifikace jen při selhání, rozhodnutí o „Timeouty v CI“, „Proměnlivá nestabilita RF sady“ a chip testech (`0 != N`). → issue #36
 4. ~~Volitelně **`TZ=Europe/Prague` pro jednotkové testy v CI** (~15 min, netýká se RF běhu).~~ **HOTOVO 29. 10. 2026** (viz CHANGELOG). → issue #37
