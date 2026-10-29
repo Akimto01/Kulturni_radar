@@ -9,7 +9,8 @@ name: Kontrola projektu (board, defekty, návrh práce)
 # Režimy:
 #   denni    ticho, notifikace jen při chybě kontroly, defektu P1 nebo P2 po lhůtě
 #            nebo termínu dnes či v minulosti
-#   pondeli  vždy souhrn (počty, defekty podle priority, In Progress, termíny, návrh práce)
+#   pondeli  vždy souhrn: krátká notifikace na jednu obrazovku, plný přehled v souhrnu běhu
+#            (job summary); klepnutí na notifikaci otevře běh (Click), board je v přehledu
 #            (důvody denního režimu, pokud jsou, jdou na začátek jako „Naléhavé“, s jeho prioritou)
 # Plánovaný běh: denně 6:40 UTC (7:40 SEČ, 8:40 SELČ; mimo celou hodinu, cron je v UTC bez
 # letního času), v pondělí automaticky režim pondeli. Ruční běh: režim se vybírá.
@@ -75,7 +76,10 @@ jobs:
         run: |
           python .github/scripts/sestav-notifikaci.py --rezim "$REZIM" \
             --board "$RUNNER_TEMP/board.json" --defekty "$RUNNER_TEMP/defekty.json" \
-            --navrh "$RUNNER_TEMP/navrh.json" --vystup "$RUNNER_TEMP/zprava.txt" > "$RUNNER_TEMP/meta.json"
+            --navrh "$RUNNER_TEMP/navrh.json" --vystup "$RUNNER_TEMP/zprava.txt" \
+            --prehled "$RUNNER_TEMP/prehled.md" > "$RUNNER_TEMP/meta.json"
+          # plný přehled (jen pondělní režim) do souhrnu běhu; notifikace na něj odkazuje přes Click
+          if [ -s "$RUNNER_TEMP/prehled.md" ]; then cat "$RUNNER_TEMP/prehled.md" >> "$GITHUB_STEP_SUMMARY"; fi
           echo "odeslat=$(jq -r .odeslat "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"
           echo "titulek=$(jq -r .titulek "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"
           echo "priorita=$(jq -r .priorita "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"
@@ -88,12 +92,13 @@ jobs:
           TITULEK: ${{ steps.zprava.outputs.titulek }}
           PRIORITA: ${{ steps.zprava.outputs.priorita }}
           TAGY: ${{ steps.zprava.outputs.tagy }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           curl -fsS \
             -H "Title: $TITULEK" \
             -H "Priority: $PRIORITA" \
             -H "Tags: $TAGY" \
-            -H "Click: https://github.com/users/Akimto01/projects/1" \
+            -H "Click: $RUN_URL" \
             --data-binary "@$RUNNER_TEMP/zprava.txt" \
             "https://ntfy.sh/$NTFY_TOPIC"
 
