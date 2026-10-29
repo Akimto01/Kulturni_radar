@@ -774,6 +774,8 @@ pro tenhle projekt) a `prehled` (jen issue #52 „Vývoj: stav projektu
 a `navrh-session.py` ho ignorují, není úkol). Automatická kontrola
 (`kontrola-projektu.yml`) běží denně 6:40 UTC (7:40 SEČ, 8:40 SELČ), v pondělí
 s týdenním souhrnem a přepsáním #52, jinak notifikace jen při nálezu.
+Vývojové zprávy z Actions jdou do secretu `NTFY_TOPIC_DEV` (fallback `NTFY_TOPIC`);
+`NTFY_TOPIC` je kanál appky a RF test jeho živosti (popis v `PROVOZ.md`).
 
 **BACKLOG.md zůstává hlavní znalostní bází, Kanban je jen doplněk pro
 aktuálně rozpracované/vybrané úkoly:**

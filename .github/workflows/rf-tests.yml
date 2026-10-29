@@ -92,11 +92,12 @@ jobs:
         # jen plánovaný běh; ruční běh sleduje ten, kdo ho spustil
         if: failure() && github.event_name == 'schedule'
         env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          # vývojové upozornění: téma NTFY_TOPIC_DEV, dokud neexistuje, NTFY_TOPIC (RF test živosti kanálu appky zůstává na NTFY_TOPIC)
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC_DEV || secrets.NTFY_TOPIC }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           curl -fsS \
-            -H "Title: Kulturni radar: tydenni RF testy selhaly" \
+            -H "Title: Kulturni radar - vyvoj: tydenni RF testy selhaly" \
             -H "Priority: high" \
             -H "Tags: warning" \
             -H "Click: $RUN_URL" \

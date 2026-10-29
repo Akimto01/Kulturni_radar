@@ -10,6 +10,15 @@
 
 Bez `NTFY_TOPIC`/`NOTIFY_EMAIL` běhy jen zapisují do tabulky.
 
+### Dvě témata ntfy (od 29. 10. 2026)
+
+Název tématu funguje jako heslo, proto jsou témata jen v Script Properties a v GitHub Secrets, nikdy v repu ani v logu.
+
+| Název | Kde | K čemu |
+|-------|-----|--------|
+| `NTFY_TOPIC` | Script Property appky a GitHub Secret | kanál appky (přehledy akcí, osobní notifikace); RF test „Notifikační kanál ntfy je živý“ čte tento kanál a čeká v něm zprávy appky |
+| `NTFY_TOPIC_DEV` | jen GitHub Secret | jen vývojové zprávy z GitHub Actions (`kontrola-projektu.yml`, upozornění na selhání v `rf-tests.yml`); dokud neexistuje, workflow použijí `NTFY_TOPIC` |
+
 ## Triggery (vytváří `setupTriggers()` — spustit po každé změně jejich sestavy)
 
 | Funkce | Kdy | Co dělá | Jak poznat selhání |

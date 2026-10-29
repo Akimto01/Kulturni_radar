@@ -19,7 +19,7 @@ name: Kontrola projektu (board, defekty, návrh práce)
 # Tři joby, protože oprávnění GITHUB_TOKEN se v Actions nastavují na úrovni jobu, ne kroku:
 #   kontrola   čte board (BOARD_READ_TOKEN jen v kroku se skripty), sestaví zprávu; nic nezapisuje
 #   prehled    jen pondělí; jediný job s issues: write, přepíše tělo issue s přehledem
-#   oznameni   odešle ntfy (NTFY_TOPIC jen tady) až po zápisu přehledu, ať je issue aktuální,
+#   oznameni   odešle ntfy (téma NTFY_TOPIC_DEV, dokud neexistuje, NTFY_TOPIC) až po zápisu přehledu, ať je issue aktuální,
 #              než na notifikaci někdo klepne; při selhání zápisu míří Click na běh
 # Issue s přehledem (štítek prehled) je zavřené a zamčené, skripty kontrola-boardu.py
 # a navrh-session.py ho ignorují.
@@ -146,7 +146,7 @@ jobs:
     steps:
       - name: Odeslat notifikaci (ntfy)
         env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC_DEV || secrets.NTFY_TOPIC }}
           TITULEK: ${{ needs.kontrola.outputs.titulek }}
           PRIORITA: ${{ needs.kontrola.outputs.priorita }}
           TAGY: ${{ needs.kontrola.outputs.tagy }}
@@ -171,11 +171,11 @@ jobs:
     steps:
       - name: Upozornění na selhání kontroly (ntfy)
         env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC_DEV || secrets.NTFY_TOPIC }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           curl -fsS \
-            -H "Title: Kulturni radar: kontrola projektu selhala" \
+            -H "Title: Kulturni radar - vyvoj: kontrola projektu selhala" \
             -H "Priority: high" \
             -H "Tags: warning" \
             -H "Click: $RUN_URL" \

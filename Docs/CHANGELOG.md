@@ -1,5 +1,9 @@
 # Changelog
 
+## CI: vývojové notifikace do vlastního tématu NTFY_TOPIC_DEV – 29. 10. 2026
+- **Důvod:** vývojové zprávy z GitHub Actions (denní kontrola projektu, pondělní souhrn, upozornění na selhání) chodily do stejného tématu jako zprávy appky. RF test „Notifikační kanál ntfy je živý“ počítá jakékoli zprávy v tématu za 48 h, takže mohl projít jen díky vývojovým zprávám, i kdyby byl kanál appky mrtvý. Zprávy se navíc mísily s přehledy akcí.
+- **Změna:** `kontrola-projektu.yml` (job `oznameni` a `selhani`) a upozornění na selhání v `rf-tests.yml` berou `secrets.NTFY_TOPIC_DEV || secrets.NTFY_TOPIC` (fallback na starý secret, dokud nový neexistuje); upozornění na selhání mají titulek „Kulturni radar - vyvoj: …“. RF běh, test živosti kanálu appky a kontrola úniku zůstávají na `NTFY_TOPIC`. Popis obou témat je v `PROVOZ.md` a v `SKILL.md` (sekce 9).
+
 ## Board: opravy přehledu v issue #52, vývojové titulky – 29. 10. 2026
 - **Přehled v #52:** položky „- 1. 11. #7 …“ se v Markdownu vykreslily jako číslovaný seznam a datum se rozpadlo (ověřeno přes GitHub Markdown API: 10× `<ol>`). Tečka za číslem na začátku položky se escapuje („1\. 11.“), po opravě 0× `<ol>`; `--test` hlídá, že žádná položka seznamu nezačíná vzorem „číslo. “. Řádek „Otevřené defekty: P1 0, …“ nahrazen slovním „Otevřené chyby: 2 vysoké, 2 střední, 1 nízká“ (společná funkce s krátkou notifikací).
 - **Titulky notifikací vývoje**, ať se nepletou s přehledy akcí z appky: pondělní „Kulturni radar - vyvoj: stav projektu“, denní „Kulturni radar - vyvoj: kontrola hlasi nalez“ (ASCII, jdou do HTTP hlavičky). Titulek issue #52 je „Vývoj: stav projektu (automaticky)“.
