@@ -21,7 +21,7 @@ const { pathToFileURL } = require('node:url');
 
 /** Stub ScriptApp pro volby.triggery: builder newTrigger(...) zaznamenává každý
  *  vytvořený trigger jako { funkce, typ, udalost, den, hodina, denVMesici,
- *  kazdychDni, tabulka }. */
+ *  kazdychDni, zaMs (after), tabulka }. */
 function stubScriptApp(existujici, zaznam) {
   return {
     WeekDay: { MONDAY: 'MONDAY', TUESDAY: 'TUESDAY', WEDNESDAY: 'WEDNESDAY', THURSDAY: 'THURSDAY',
@@ -30,11 +30,12 @@ function stubScriptApp(existujici, zaznam) {
     deleteTrigger: (t) => { zaznam.smazane.push(t); },
     newTrigger: (funkce) => {
       const z = { funkce, typ: null, udalost: null, den: null, hodina: null,
-                  denVMesici: null, kazdychDni: null, tabulka: null };
+                  denVMesici: null, kazdychDni: null, zaMs: null, tabulka: null };
       const b = {
         forSpreadsheet: (ss) => { z.typ = 'tabulka'; z.tabulka = ss; return b; },
         onEdit: () => { z.udalost = 'onEdit'; return b; },
         timeBased: () => { z.typ = 'cas'; return b; },
+        after: (ms) => { z.zaMs = ms; return b; },
         atHour: (h) => { z.hodina = h; return b; },
         everyDays: (n) => { z.kazdychDni = n; return b; },
         onWeekDay: (d) => { z.den = d; return b; },

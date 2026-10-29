@@ -4336,6 +4336,7 @@ function pripravKontrolu_(v = {}) {
     'SOUŘADNICE': [['Klíč', 'Lat', 'Lng', 'Zdrojový text', 'Zjištěno'], ['sál|brno', 49.19, 16.61, 'Sál, Brno', '']],
   };
   if (v.emailTipy) listy.EMAIL_TIPY = [['ID', 'Přijato', 'Odesílatel', 'Předmět', 'Text', 'Stav', 'ID akce', 'Zpracováno kdy', 'Poznámka']].concat(v.emailTipy);
+  Object.assign(listy, v.extraListy || {});   // další listy (MÍSTA, UŽIVATELÉ…)
   const ss = fakeSpreadsheet(listy);
   const ctx = nactiRadar({
     ss, zamek: v.zamek === undefined ? true : v.zamek,
@@ -4531,4 +4532,291 @@ test('#35 dailyCheck: zámek obsazený → bez AI a bez notifikace, ostatní kro
   assert.equal(f.volane.length, 0);
   assert.equal(f.ctx.__odeslaneEmaily.length, 0, 'obsazený zámek se nehlásí');
   assert.equal(f.akce.rows[1][13], 'proběhlo');
+});
+
+// ---------------------------------------------------------------------------
+// #35 dávka 3: zbylé placené cesty – updateMista / callAnthropicPlaces_ (stálá
+// místa) a apiNajdiProUzivatele_ (hledání na žádost uživatele). Fixture a stub
+// fetchů z dávky 2 (pripravKontrolu_, fetchSZaznamem_, jenAiVolani_).
+// ---------------------------------------------------------------------------
+
+const MISTA_HLAVICKA_T = ['ID', 'Název', 'Typ', 'Obec', 'Dojezd', 'Otevírací doba', 'Sezónní poznámka', 'Vstupné',
+  'Vhodné pro děti', 'Skóre', 'Stav', 'URL', 'Poznámka', 'Poslední aktualizace', 'Profil lokality'];
+const odpovedMista_ = (places) => anthropicResp({
+  stop_reason: 'tool_use',
+  content: [{ type: 'tool_use', name: 'report_places', input: { places } }],
+  usage: USAGE_AI,
+});
+/** Existující stálé místo (případ z #21: AI mu příště dá jiné ID a mírně jiný název). */
+const radekMistaVida_ = () => ['old-vida', 'VIDA! science centrum', 'science centrum', 'Brno', '', '', '', '', '', 8,
+  'aktivní', '', '', '1. 1. 2026 8:00', 'Brno'];
+const MISTA_AI = [
+  { id: 'vida-sc', nazev: 'VIDA! Science Centrum Brno', typ: 'science centrum', obec: 'Brno', skore: 9, stav: 'aktivní' },
+  { id: 'hvezdarna', nazev: 'Hvězdárna a planetárium Brno', typ: 'hvězdárna/planetárium', obec: 'Brno', skore: 7 },
+];
+const pripravMista_ = (v = {}) => pripravKontrolu_(Object.assign({}, v, {
+  extraListy: { 'MÍSTA': [MISTA_HLAVICKA_T, radekMistaVida_()] },
+}));
+
+// --- updateMista ---
+
+test('#35 updateMista: zámek obsazený → AI se nezavolá, MÍSTA beze změny', () => {
+  const f = pripravMista_({ zamek: false, fronta: [odpovedMista_(MISTA_AI)] });
+  f.ctx.updateMista();
+  assert.equal(f.volane.length, 0);
+  assert.equal(f.ss.getSheetByName('MÍSTA').rows.length, 2);
+  assert.equal(f.ss.getSheetByName('MÍSTA').rows[1][0], 'old-vida');
+  assert.equal(f.kontroly.rows.length, 1);
+  assert.equal(f.ctx.__odeslaneEmaily.length, 0);
+});
+
+test('#35 updateMista: úspěch → nové místo zapsáno, existující (jiné ID a název, stejný klíč) aktualizováno bez duplicity, LOKALITY, KONTROLY M–O, notifikace, zámek uvolněn', () => {
+  const f = pripravMista_({ fronta: [odpovedMista_(MISTA_AI)] });
+  f.ctx.updateMista();
+
+  jenAiVolani_(f.volane, 1);
+  const mista = f.ss.getSheetByName('MÍSTA').rows;
+  assert.equal(mista.length, 3, 'hlavička + aktualizované + nové, žádný duplikát');
+  assert.equal(mista[1][0], 'vida-sc', 'řádek se stejným klíčem přepsán novými daty');
+  assert.equal(mista[1][1], 'VIDA! Science Centrum Brno');
+  assert.ok(String(mista[1][13]).startsWith(dnesCz_()), 'poslední aktualizace = dnes');
+  assert.equal(mista[2][1], 'Hvězdárna a planetárium Brno');
+  assert.equal(mista[2][14], 'Brno');
+
+  const k = f.kontroly.rows[1];
+  assert.equal(k[1], 'aktualizace stálých míst');
+  assert.equal(k[2], 'Brno; do 90 min');
+  assert.equal([k[3], k[4], k[5], k[9]].join('|'), '2|1|1|2', 'nalezeno|nová|aktualizovaná|počet míst');
+  assert.match(k[10], /claude-sonnet-5-5/);
+  assert.equal([k[12], k[13], k[14]].join('|'), '1000|200|3', 'tokeny M–O');
+
+  const lok = f.ss.getSheetByName('LOKALITY').rows[1];
+  assert.ok(String(lok[7]).startsWith(dnesCz_()));
+
+  assert.equal(f.ctx.__odeslaneEmaily.length, 1);
+  assert.equal(f.ctx.__odeslaneEmaily[0].predmet, 'Stálá místa aktualizována');
+  assert.match(f.ctx.__odeslaneEmaily[0].telo, /Nalezeno míst: 2 \| Nová: 1 \| Aktualizovaná: 1/);
+  assert.equal(f.ctx.__zamek.tryLock[0], 5000);
+  assert.equal(f.ctx.__zamek.uvolneno, 1);
+});
+
+test('#35 updateMista: chyba AI → MÍSTA beze změny, notifikace „Aktualizace stálých míst selhala“, výjimka propuštěna, zámek uvolněn', () => {
+  const f = pripravMista_({ fronta: [anthropicResp({ error: 'boom' }, 500)] });
+  assert.throws(() => f.ctx.updateMista(), /Anthropic API vrátilo 500/);
+  assert.equal(f.ss.getSheetByName('MÍSTA').rows.length, 2);
+  assert.equal(f.ss.getSheetByName('MÍSTA').rows[1][0], 'old-vida');
+  assert.equal(f.kontroly.rows.length, 1);
+  assert.equal(f.ctx.__odeslaneEmaily.length, 1);
+  assert.equal(f.ctx.__odeslaneEmaily[0].predmet, 'Aktualizace stálých míst selhala');
+  assert.match(f.ctx.__odeslaneEmaily[0].telo, /^Chyba: Anthropic API vrátilo 500/);
+  assert.equal(f.ctx.__zamek.uvolneno, 1);
+});
+
+// --- callAnthropicPlaces_ ---
+
+test('#35 callAnthropicPlaces_: payload s modelem, nástroji a profilem; chybějící klíč bez volání sítě', () => {
+  const volane = [];
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'test-key' }, urlFetch: fetchSZaznamem_([odpovedMista_([])], volane) });
+  shodneNapricRealmy(ctx.callAnthropicPlaces_(CFG_TEST), []);
+  jenAiVolani_(volane, 1);
+  const p = volane[0].payload;
+  assert.equal(p.model, 'claude-sonnet-5-5');
+  assert.deepEqual(p.tools.map(t => t.name), ['web_search', 'report_places']);
+  assert.match(p.messages[0].content, /v okolí lokality: Brno/);
+  assert.match(p.messages[0].content, /Maximální dojezd: 90 min/);
+
+  const bez = [];
+  const ctx2 = nactiRadar({ properties: {}, urlFetch: fetchSZaznamem_([odpovedMista_([])], bez) });
+  assert.throws(() => ctx2.callAnthropicPlaces_(CFG_TEST), /ANTHROPIC_API_KEY/);
+  assert.equal(bez.length, 0);
+});
+
+test('#35 callAnthropicPlaces_: odpověď bez nástroje → model je vyzván k odevzdání, pak vrátí místa; pause_turn pokračuje', () => {
+  const volane = [];
+  const textOdp = anthropicResp({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Něco jsem našel.' }], usage: USAGE_AI });
+  const pauza = anthropicResp({ stop_reason: 'pause_turn', content: [{ type: 'text', text: '…' }], usage: USAGE_AI });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' },
+    urlFetch: fetchSZaznamem_([pauza, textOdp, odpovedMista_(MISTA_AI)], volane) });
+  const places = ctx.callAnthropicPlaces_(CFG_TEST);
+  assert.equal(places.length, 2);
+  jenAiVolani_(volane, 3);
+  assert.match(JSON.stringify(volane[2].payload.messages), /Nyní odevzdej nalezená místa/);
+});
+
+test('#35 callAnthropicPlaces_: poškozená odpověď (nástroj bez pole places, nevalidní JSON, HTTP chyba) → výjimka', () => {
+  const bezPole = anthropicResp({ stop_reason: 'max_tokens', content: [{ type: 'tool_use', name: 'report_places', input: { places: 'x' } }], usage: USAGE_AI });
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: fetchSZaznamem_([bezPole], []) });
+  assert.throws(() => ctx.callAnthropicPlaces_(CFG_TEST), /neodevzdal stálá místa/);
+
+  const ctx2 = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' },
+    urlFetch: () => ({ getResponseCode: () => 200, getContentText: () => '{nevalidní' }) });
+  assert.throws(() => ctx2.callAnthropicPlaces_(CFG_TEST));
+
+  const ctx3 = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' },
+    urlFetch: fetchSZaznamem_([anthropicResp({ error: 'x' }, 429)], []) });
+  assert.throws(() => ctx3.callAnthropicPlaces_(CFG_TEST), /vrátilo 429/);
+});
+
+// --- apiNajdiProUzivatele_ ---
+
+const UZIVATELE_HL = ['ID', 'Jméno', 'PIN_hash', 'Filtry', 'Vytvořeno', 'Notifikace'];
+const FILTRY_U1 = '{"kategorie":"divadlo","dojezd":"30 min"}';
+const pripravNajdi_ = (v = {}) => pripravKontrolu_(Object.assign({}, v, {
+  properties: v.properties || { ANTHROPIC_API_KEY: 'test-key', NTFY_TOPIC: 't', WEB_TOKEN: 'tok-ok' },
+  extraListy: { 'UŽIVATELÉ': [UZIVATELE_HL, ['u1', 'Vojta', 'hash', FILTRY_U1, '', '{}']] },
+}));
+
+test('#35 apiNajdiProUzivatele_: špatný, chybějící token nebo neznámý uživatel → žádné volání AI, žádný zápis', () => {
+  const f = pripravNajdi_({ fronta: [odpovedAi_([AKCE_RC])] });
+  const ss = f.ss;
+  assert.equal(f.ctx.apiNajdiProUzivatele_(ss, 'u1', 'spatny').error, 'Neplatný token.');
+  assert.equal(f.ctx.apiNajdiProUzivatele_(ss, 'u1', undefined).error, 'Neplatný token.');
+  assert.equal(f.ctx.apiNajdiProUzivatele_(ss, 'neznamy', 'tok-ok').error, 'profil nenalezen');
+
+  const bezTokenuVProps = pripravNajdi_({ properties: { ANTHROPIC_API_KEY: 'k' }, fronta: [odpovedAi_([AKCE_RC])] });
+  assert.equal(bezTokenuVProps.ctx.apiNajdiProUzivatele_(bezTokenuVProps.ss, 'u1', undefined).error, 'Neplatný token.',
+    'bez WEB_TOKEN ve Script Properties neprojde ani prázdný token');
+
+  assert.equal(f.volane.length, 0);
+  assert.equal(bezTokenuVProps.volane.length, 0);
+  assert.equal(f.akce.rows.length, 1);
+  assert.equal(f.ctx.__zamek.tryLock.length, 0, 'zámek se ani nezkouší');
+});
+
+test('#35 apiNajdiProUzivatele_: zámek obsazený → srozumitelná odpověď, AI se nezavolá (cooldown tahle cesta nemá, je jen ve spustKontroluCore_)', () => {
+  const f = pripravNajdi_({ zamek: false, fronta: [odpovedAi_([AKCE_RC])] });
+  const odp = f.ctx.apiNajdiProUzivatele_(f.ss, 'u1', 'tok-ok');
+  assert.equal(odp.ok, false);
+  assert.match(odp.error, /Jiná kontrola právě probíhá/);
+  assert.equal(f.volane.length, 0);
+  assert.equal(f.akce.rows.length, 1);
+});
+
+test('#35 apiNajdiProUzivatele_: úspěch → osobní filtry v payloadu, akce zapsané, KONTROLY s typem hledání, tvar odpovědi pro frontend, zámek uvolněn', () => {
+  const f = pripravNajdi_({ fronta: [odpovedAi_([AKCE_RC])] });
+  const odp = f.ctx.routePost_({ akce: 'najdi', uzivatelId: 'u1', token: 'tok-ok' }, f.ss);
+
+  assert.equal(odp.ok, true);
+  assert.equal(odp.jmeno, 'Vojta');
+  assert.equal(odp.nove, 1, 'frontend zobrazí „Nalezeno: N nových“ z pole nove');
+  jenAiVolani_(f.volane, 1);
+  const zprava = f.volane[0].payload.messages[0].content;
+  assert.match(zprava, /Kategorie: divadlo/, 'filtr kategorie uživatele přepsal kritéria');
+  assert.match(zprava, /Maximální dojezd autem \(1 cesta\): 30 min z města Brno/, 'filtr dojezdu uživatele');
+  assert.match(zprava, /Typ běhu: osobní hledání \(Vojta\)/);
+
+  assert.equal(f.akce.rows.length, 2);
+  assert.equal(f.akce.rows[1][4], 'Test');
+  assert.equal(f.kontroly.rows[1][1], 'osobní hledání (Vojta)');
+  assert.equal(f.ctx.__zamek.uvolneno, 1);
+});
+
+test('#35 apiNajdiProUzivatele_: chyba AI → výjimka, nic se nezapíše, zámek uvolněn; prázdné zdroje → odpověď bez volání AI', () => {
+  const f = pripravNajdi_({ fronta: [anthropicResp({ error: 'boom' }, 500)] });
+  assert.throws(() => f.ctx.apiNajdiProUzivatele_(f.ss, 'u1', 'tok-ok'), /Anthropic API vrátilo 500/);
+  assert.equal(f.akce.rows.length, 1);
+  assert.equal(f.kontroly.rows.length, 1);
+  assert.equal(f.ctx.__zamek.uvolneno, 1);
+
+  const g = pripravNajdi_({ zdroje: [], fronta: [odpovedAi_([AKCE_RC])] });
+  const odp = g.ctx.apiNajdiProUzivatele_(g.ss, 'u1', 'tok-ok');
+  assert.equal(odp.ok, false);
+  assert.match(odp.error, /nejsou v ZDROJÍCH žádné zdroje/);
+  assert.equal(g.volane.length, 0);
+  assert.equal(g.ctx.__zamek.uvolneno, 1);
+});
+
+test('#35 apiNajdiProUzivatele_: poškozené filtry uživatele (neplatný JSON) se ignorují, hledání běží s kritérii domácího profilu', () => {
+  const f = pripravNajdi_({ fronta: [odpovedAi_([])] });
+  f.ss.getSheetByName('UŽIVATELÉ').rows[1][3] = '{rozbitý';
+  const odp = f.ctx.apiNajdiProUzivatele_(f.ss, 'u1', 'tok-ok');
+  assert.equal(odp.ok, true);
+  assert.match(f.volane[0].payload.messages[0].content, /Maximální dojezd autem \(1 cesta\): 90 min/);
+});
+
+// ---------------------------------------------------------------------------
+// #35 dávka 3b: webové spuštění (spustKontroluCore_ → menuRunNow) a obsazený
+// zámek ve zpracovatSledovanaMesta
+// ---------------------------------------------------------------------------
+
+const COOLDOWN_WEB_MS = 10 * 60 * 1000;   // WEB_COOLDOWN_MS v kódu
+
+/** ctx pro spustKontroluCore_: Script Properties s tokenem, stub ScriptApp, řízené hodiny. */
+function ctxWebSpusteni_(props, ted) {
+  const ctx = nactiRadar({ triggery: [], properties: Object.assign({ ANTHROPIC_API_KEY: 'k' }, props) });
+  ctx.__Date.now = () => ted;
+  return ctx;
+}
+const NYNI_T = 1800000000000;
+
+test('#35 spustKontroluCore_: chybějící nebo špatný WEB_TOKEN → žádný trigger a WEB_LAST_RUN se nezmění', () => {
+  const bezTokenu = ctxWebSpusteni_({ WEB_LAST_RUN: '123' }, NYNI_T);
+  assert.equal(bezTokenu.spustKontroluCore_('cokoliv').error, 'Neplatný token.');
+  assert.equal(bezTokenu.spustKontroluCore_(undefined).error, 'Neplatný token.');
+
+  const spatny = ctxWebSpusteni_({ WEB_TOKEN: 'tok-ok', WEB_LAST_RUN: '123' }, NYNI_T);
+  const odp = spatny.spustKontroluCore_('spatny');
+  assert.equal(odp.ok, false);
+  assert.equal(odp.error, 'Neplatný token.');
+
+  [bezTokenu, spatny].forEach(c => {
+    assert.equal(c.__triggery.vytvorene.length, 0);
+    assert.equal(c.__props.WEB_LAST_RUN, '123');
+  });
+});
+
+test('#35 spustKontroluCore_: cooldown (poslední spuštění před méně než WEB_COOLDOWN_MS) → žádný trigger, WEB_LAST_RUN beze změny', () => {
+  const posledni = String(NYNI_T - COOLDOWN_WEB_MS + 1000);   // o 1 s před koncem cooldownu
+  const ctx = ctxWebSpusteni_({ WEB_TOKEN: 'tok-ok', WEB_LAST_RUN: posledni }, NYNI_T);
+  const odp = ctx.spustKontroluCore_('tok-ok');
+  assert.equal(odp.ok, false);
+  assert.match(odp.error, /Kontrola právě proběhla/);
+  assert.equal(ctx.__triggery.vytvorene.length, 0);
+  assert.equal(ctx.__props.WEB_LAST_RUN, posledni);
+});
+
+test('#35 spustKontroluCore_: úspěch → právě jeden jednorázový trigger menuRunNow a nastavený WEB_LAST_RUN; přesně po cooldownu už projde', () => {
+  const ctx = ctxWebSpusteni_({ WEB_TOKEN: 'tok-ok', WEB_LAST_RUN: String(NYNI_T - COOLDOWN_WEB_MS) }, NYNI_T);
+  const odp = ctx.spustKontroluCore_('tok-ok');
+  assert.equal(odp.ok, true);
+  assert.match(odp.zprava, /Kontrola spuštěna/);
+  assert.equal(ctx.__triggery.vytvorene.length, 1);
+  const t = ctx.__triggery.vytvorene[0];
+  assert.equal(`${t.funkce}|${t.typ}|${t.zaMs}`, 'menuRunNow|cas|1000');
+  assert.equal(ctx.__props.WEB_LAST_RUN, String(NYNI_T));
+
+  // hned další pokus už naráží na cooldown (a nezaloží druhý trigger)
+  assert.equal(ctx.spustKontroluCore_('tok-ok').ok, false);
+  assert.equal(ctx.__triggery.vytvorene.length, 1);
+});
+
+test('#35 spustKontroluCore_: první spuštění (WEB_LAST_RUN chybí) projde', () => {
+  const ctx = ctxWebSpusteni_({ WEB_TOKEN: 'tok-ok' }, NYNI_T);
+  assert.equal(ctx.spustKontroluCore_('tok-ok').ok, true);
+  assert.equal(ctx.__triggery.vytvorene.length, 1);
+});
+
+test('#35 menuRunNow: spustí runCheck_ s typem „mimořádná kontrola (menu)“ (platba AI přes stejnou cestu jako ostatní běhy)', () => {
+  const f = pripravKontrolu_({ fronta: [odpovedAi_([AKCE_RC])] });
+  f.ctx.menuRunNow();
+  jenAiVolani_(f.volane, 1);
+  assert.match(f.volane[0].payload.messages[0].content, /Typ běhu: mimořádná kontrola \(menu\)/);
+  assert.equal(f.kontroly.rows[1][1], 'mimořádná kontrola (menu)');
+  assert.equal(f.akce.rows.length, 2);
+  assert.equal(f.ctx.__zamek.uvolneno, 1);
+});
+
+test('#35 zpracovatSledovanaMesta: zámek obsazený → žádné volání AI ani přepočet počasí, nic se nezapíše', () => {
+  const f = pripravKontrolu_({ zamek: false, fronta: [odpovedAi_([AKCE_RC])],
+    extraListy: { 'SLEDOVANÁ MĚSTA': [['Město'], ['Praha'], ['Ostrava']] } });
+  const volanePocasi = [];
+  f.ctx.aktualizujPocasi_ = () => { volanePocasi.push(1); };
+  f.ctx.zpracovatSledovanaMesta();
+  assert.equal(f.volane.length, 0);
+  assert.equal(volanePocasi.length, 0, 'počasí se nepřepočítává');
+  assert.equal(f.akce.rows.length, 1);
+  assert.equal(f.kontroly.rows.length, 1);
+  assert.equal(f.ss.getSheetByName('LOKALITY').rows[1][7], '', 'poslední kontrola profilu beze změny');
+  assert.equal(f.ctx.__odeslaneEmaily.length, 0);
+  assert.equal(f.ctx.__zamek.uvolneno, 0);
 });
