@@ -29,6 +29,7 @@ Documentation is in Czech.*
 | Správa defektů: stupnice závažnosti a priority, životní cyklus, analýza úniků | [Docs/kvalita/DEFEKTY.md](Docs/kvalita/DEFEKTY.md) |
 | Historie změn včetně diagnózy každé chyby | [Docs/CHANGELOG.md](Docs/CHANGELOG.md) |
 | Cíle projektu a doporučené pořadí práce | [Docs/BACKLOG.md](Docs/BACKLOG.md) |
+| Rozcestník podle rolí (PM, QA lead, vývojář, bezpečnost a další) | [Docs/README.md](Docs/README.md#podle-rolí) |
 
 ## Testy v číslech
 

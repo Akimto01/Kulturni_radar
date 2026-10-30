@@ -1,5 +1,11 @@
 # Changelog
 
+## Docs: rozcestník podle rolí (#55) – 30. 10. 2026
+- **Sekce „Podle rolí“ v `Docs/README.md`:** 11 rolí (PM, CEO, partner, QA lead, hodnotitel, vývojář a AI agent, bezpečnost, provoz, AI specialista, právník, UX), sloupce role, co hledá, kam jít, stav (máme / základ / plánováno #N). Odkazy vedou jen na existující dokumenty, u plánovaného na issue; kdo nemá dokument (právník), má „zatím žádný dokument“.
+- **Stav podle skutečnosti v repu, ne podle výchozího odhadu z issue:** vývojář a AI agent je **máme** (od #53 je AGENTS.md, výchozí odhad říkal „základ“); provoz a QA lead zůstávají máme.
+- **README:** jeden řádek v „Pro hodnotitele“ s odkazem na rozcestník.
+- **Údržba:** při zavření příslušného issue přepsat stav; kontrolu úplnosti a odkazů přidá #56.
+
 ## Docs: AGENTS.md a CLAUDE.md (#53) – 30. 10. 2026
 - **`AGENTS.md` v kořeni repa** je hlavní, nástrojově neutrální vstupní soubor: co je projekt, struktura repa, hlavní příkazy (jednotkové testy, smoke, mutační testy, kontroly), pravidla (nikdy nenasazovat s červenou CI, tajné hodnoty nikdy do repa ani logu, nové testy = počty v README ve stejném commitu, nový nástroj = řádek v README, změna kritické funkce = počkat na mutační CI, verze a dva nasazovací kanály) a odkazy na `Docs/README.md`, README, ARCHITEKTURA-TESTU a skill. Obsah skillu se nekopíruje, jen se na něj odkazuje.
 - **`CLAUDE.md`** má několik řádků: odkaz na AGENTS.md a na skill.

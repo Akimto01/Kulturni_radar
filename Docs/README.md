@@ -6,6 +6,24 @@ hodnotitele je určená tabulka „Pro hodnotitele“ v [hlavním README](../REA
 Každý fakt má v dokumentaci jedno místo, ostatní dokumenty na něj odkazují.
 Počty testů jsou jen v hlavním README (tabulka „Testy v číslech“).
 
+## Podle rolí
+
+Čtenář obvykle přichází s rolí, ne s tématem. Stav oblasti: **máme** (dokument existuje a je aktuální), **základ** (část je pokrytá, ale není to ucelený dokument), **plánováno #N** (zatím nic, odkaz na issue). Stav se přepisuje při zavření příslušného issue.
+
+| Role | Co hledá | Kam jít | Stav |
+|---|---|---|---|
+| PM | co se dělá, v jakém pořadí a jak to jde | [BACKLOG.md](BACKLOG.md), [CHANGELOG.md](CHANGELOG.md), [GitHub Projects board](https://github.com/users/Akimto01/projects/1), přehled v issue [#52](https://github.com/Akimto01/Kulturni_radar/issues/52) | máme |
+| CEO | k čemu appka je a co stojí | [README.md](../README.md) (Co appka umí, Náklady) | základ, plánováno [#57](https://github.com/Akimto01/Kulturni_radar/issues/57) |
+| Partner | co appka umí a jak spolehlivá je | [README.md](../README.md), [kulturniradar.cz](https://kulturniradar.cz) | základ, plánováno [#57](https://github.com/Akimto01/Kulturni_radar/issues/57) |
+| QA lead | jak se testuje, co je pokryté a co ne | [testovani/TESTY.md](testovani/TESTY.md), [testovani/ARCHITEKTURA-TESTU.md](testovani/ARCHITEKTURA-TESTU.md), [testovani/POKRYTI.md](testovani/POKRYTI.md), [testovani/MUTACNI-TESTOVANI.md](testovani/MUTACNI-TESTOVANI.md) | máme, katalog testů plánováno [#44](https://github.com/Akimto01/Kulturni_radar/issues/44) |
+| Hodnotitel | důkaz postupu a práce s chybami | [README.md](../README.md) (Pro hodnotitele), [kvalita/PRIBEHY-CHYB.md](kvalita/PRIBEHY-CHYB.md), [kvalita/DEFEKTY.md](kvalita/DEFEKTY.md), [testovani/TESTOVACI-ANALYZA.md](testovani/TESTOVACI-ANALYZA.md) | máme, případová studie plánováno [#57](https://github.com/Akimto01/Kulturni_radar/issues/57) |
+| Vývojář a AI agent | jak je appka postavená a jak se v repu pracuje | [../AGENTS.md](../AGENTS.md), [aplikace/ARCHITEKTURA-APLIKACE.md](aplikace/ARCHITEKTURA-APLIKACE.md), [kulturni-radar-workflow/SKILL.md](kulturni-radar-workflow/SKILL.md) | máme, specifikace API plánováno [#59](https://github.com/Akimto01/Kulturni_radar/issues/59) |
+| Bezpečnost | ochrana tajných hodnot, hesel a dat | [aplikace/PROVOZ.md](aplikace/PROVOZ.md) (Bezpečnost), [aplikace/ARCHITEKTURA-APLIKACE.md](aplikace/ARCHITEKTURA-APLIKACE.md) (Uživatelské profily, hash PINu), [kvalita/PRIBEHY-CHYB.md](kvalita/PRIBEHY-CHYB.md) (únik tajných hodnot v reportech) | základ, plánováno [#65](https://github.com/Akimto01/Kulturni_radar/issues/65) |
+| Provoz | triggery, nasazení, co dělat při výpadku | [aplikace/PROVOZ.md](aplikace/PROVOZ.md) | máme, denní smoke plánováno [#54](https://github.com/Akimto01/Kulturni_radar/issues/54), historie incidentů [#61](https://github.com/Akimto01/Kulturni_radar/issues/61) |
+| AI specialista | jak appka používá AI, kvalita a náklady | [aplikace/ARCHITEKTURA-APLIKACE.md](aplikace/ARCHITEKTURA-APLIKACE.md) (`callAnthropic_`), [README.md](../README.md) (Samokontrola, Náklady) | základ, plánováno [#64](https://github.com/Akimto01/Kulturni_radar/issues/64) |
+| Právník | osobní údaje a licence zdrojů | zatím žádný dokument | plánováno [#66](https://github.com/Akimto01/Kulturni_radar/issues/66) |
+| UX | vzhled, přístupnost, uživatelská příručka | [audity/AUDIT-SELEKTORU.md](audity/AUDIT-SELEKTORU.md), [audity/AUDIT-INDEXACE.md](audity/AUDIT-INDEXACE.md), [aplikace/design/](aplikace/design/) | základ, plánováno [#67](https://github.com/Akimto01/Kulturni_radar/issues/67) a [#68](https://github.com/Akimto01/Kulturni_radar/issues/68) |
+
 ## Projekt
 
 | Dokument | K čemu |
