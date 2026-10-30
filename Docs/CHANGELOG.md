@@ -2,7 +2,7 @@
 
 ## Docs: počty testů jen v README a Dependabot alerts – 30. 10. 2026
 - **ARCHITEKTURA-TESTU, C1:** počty testů (656, 11 smoke, API 9 a E2E 52, worker 7) nahrazeny odkazem na README, tabulku „Testy v číslech“ (jediný zdroj počtů). `kontrola-poctu-testu.py` a `kontrola-dokumentace.py` prošly.
-- **Dependabot alerts zapnuté** (`gh api -X PUT repos/Akimto01/Kulturni_radar/vulnerability-alerts`, odpověď 204, ověřeno dalším čtením: 204). V tu chvíli 0 otevřených alertů (první vyhodnocení závislostí z `requirements.txt` a `package.json` může chvíli trvat). **Security updates zůstávají vypnuté** (`dependabot_security_updates: disabled`), `.github/dependabot.yml` neexistuje. Stav zapsán do TESTY.md (krok „Zapnout Dependabot alerts“ hotový) a BACKLOGu.
+- **Dependabot alerts zapnuté** (`gh api -X PUT repos/Akimto01/Kulturni_radar/vulnerability-alerts`, odpověď 204, ověřeno dalším čtením: 204). Hned po zapnutí 0 otevřených alertů, po prvním vyhodnocení závislostí (několik minut) **16**: 16 otevřených alertů ve 4 balíčcích: `undici` 11, `sharp` 2 a `postal-mime` 1 (všechny v `cloudflare-worker/package-lock.json`) a `qs` 2 (`tests/mutace/package-lock.json`). Projití alertů zatím neproběhlo (jen počet a balíčky, žádné detaily zranitelností). **Security updates zůstávají vypnuté** (`dependabot_security_updates: disabled`), `.github/dependabot.yml` neexistuje. Stav zapsán do TESTY.md (krok „Zapnout Dependabot alerts“ hotový) a BACKLOGu.
 - **Issues:** #36 má v checklistu bod přepsat „ověří běh 1. 11.“ (POKRYTI.md R11, ARCHITEKTURA-TESTU D1 a D3, PRIBEHY-CHYB.md příběh 2) po ověření plánovaného běhu; #34 má bod ověřit při dávce 1, co znamená „20 porušení“ proti 121 v baseline pojistky.
 
 ## CI: úklid nálezů ruffu a zastaralých tvrzení v dokumentaci – 30. 10. 2026

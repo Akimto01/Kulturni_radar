@@ -281,7 +281,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
       Free tier: 120 core-hodin/měsíc (= 60 hodin na 2jádrovém stroji) + 15 GB úložiště zdarma.
       Klíčová omezení: automatické vypnutí po ~30 min nečinnosti (nastavitelné, ale ne donekonečna zdarma) — riziko pro déle běžící úkoly bez zásahu; nutná ruční instalace Claude Code při prvním otevření (jednorázové); 60 hodin měsíčně může být těsné při častém používání na delší session.
       **Doporučení:** vyzkoušet jako ALTERNATIVU pro situace, kdy Vojta nemá notebook vůbec po ruce (ne jako náhradu za dnešní řešení remote control ve VS Code + mobilní appka, které už řeší většinu případů). Zvážit hlavně kvůli časovému limitu nečinnosti u delších úkolů.
-  - Dependabot: alerts **zapnuté 30. 10. 2026** (viz CHANGELOG); bezpečnostní aktualizace (automatické pull requesty) zůstávají vypnuté, zvážit později
+  - Dependabot: alerts **zapnuté 30. 10. 2026**, otevřených 16 (`undici`, `sharp`, `postal-mime` ve workeru, `qs` v `tests/mutace`; projít a rozhodnout, viz CHANGELOG); bezpečnostní aktualizace (automatické pull requesty) zůstávají vypnuté, zvážit později
   - Milestones (seskupení issues podle verze/fáze, např. „Notifikace A–F")
   - GitHub Wiki (zvažováno, ale `Docs/*.md` verzovaný v repu je pravděpodobně lepší volba pro tenhle projekt)
   - ~~**Kontrola defektů a boardu v CI s read-only tokenem** (nápad 29. 10. 2026)~~ **REALIZOVÁNO 29. 10. 2026:** workflow `.github/workflows/kontrola-projektu.yml` (denně 6:40 UTC, v pondělí souhrn), classic token `BOARD_READ_TOKEN` jen se scope `read:project` (fine-grained token uživatelský projekt číst neumí), platnost do 27. 1. 2027, obnova issue #51 (viz CHANGELOG a `Docs/kvalita/DEFEKTY.md`, Kontrola úplnosti).

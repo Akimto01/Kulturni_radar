@@ -237,8 +237,8 @@ Repo je od 8. 10. 2026 veřejné. Před zveřejněním jsem zapnul GitHub
 Secret scanning, který prošel celou historii bez nálezu, a push
 protection, která zablokuje push obsahující rozpoznaný tajný klíč.
 Dependabot alerts pro závislosti (`requirements.txt`, `package.json` workeru) jsou
-od 30. 10. 2026 zapnuté (krok „Zapnout Dependabot alerts“ je hotový; v tu chvíli 0
-otevřených alertů). Automatické security updates (pull requesty s opravami) jsou
+od 30. 10. 2026 zapnuté (krok „Zapnout Dependabot alerts“ je hotový). Po prvním
+vyhodnocení: 16 otevřených alertů ve 4 balíčcích: `undici` 11, `sharp` 2 a `postal-mime` 1 (všechny v `cloudflare-worker/package-lock.json`) a `qs` 2 (`tests/mutace/package-lock.json`). Automatické security updates (pull requesty s opravami) jsou
 záměrně vypnuté.
 
 Samotné repo ale tajné hodnoty nezaručí: 28. 10. 2026 se ukázalo, že PIN
@@ -473,8 +473,8 @@ mezery), plán oprav stávajících testů v
 
 1. Browser matrix (Chromium, Firefox, WebKit) v `rf-tests.yml`.
 2. Spouštění RF v Dockeru pro shodné prostředí lokálně i v CI.
-3. ~~Dependabot alerts~~ zapnuto 30. 10. 2026; zbývá projít zranitelnosti, až se
-   nějaký alert objeví (security updates jsou vypnuté), viz BACKLOG, sekce „Nápady
+3. ~~Dependabot alerts~~ zapnuto 30. 10. 2026; zbývá projít 16 otevřených alertů
+   (zranitelnosti v balíčcích `undici`, `sharp`, `postal-mime`, `qs`; security updates jsou vypnuté), viz BACKLOG, sekce „Nápady
    k budoucímu zvážení“.
 4. Základní kontrola přístupnosti (axe-core přes Browser Library), nízká
    priorita.
