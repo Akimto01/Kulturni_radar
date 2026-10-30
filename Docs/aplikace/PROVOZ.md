@@ -17,7 +17,7 @@ Název tématu funguje jako heslo, proto jsou témata jen v Script Properties a 
 | Název | Kde | K čemu |
 |-------|-----|--------|
 | `NTFY_TOPIC` | Script Property appky a GitHub Secret | kanál appky (přehledy akcí, osobní notifikace); RF test „Notifikační kanál ntfy je živý“ čte tento kanál a čeká v něm zprávy appky |
-| `NTFY_TOPIC_DEV` | jen GitHub Secret | jen vývojové zprávy z GitHub Actions (`kontrola-projektu.yml`, upozornění na selhání v `rf-tests.yml`); dokud neexistuje, workflow použijí `NTFY_TOPIC` |
+| `NTFY_TOPIC_DEV` | jen GitHub Secret | jen vývojové zprávy z GitHub Actions (`kontrola-projektu.yml`, upozornění na selhání v `rf-tests.yml` a `mutacni-testy.yml`); dokud neexistuje, workflow použijí `NTFY_TOPIC` |
 
 ## Triggery (vytváří `setupTriggers()` — spustit po každé změně jejich sestavy)
 
@@ -33,6 +33,8 @@ Název tématu funguje jako heslo, proto jsou témata jen v Script Properties a 
 | `watchdogDailyCheck` | denně ~20:00 | ohlásí, pokud v KONTROLÁCH chybí dnešní záznam denní kontroly | notifikace „Watchdog: denní kontrola dnes neproběhla“; sám při chybě jen zapíše do logu („Watchdog selhal“), bez notifikace |
 | `zpracovatSledovanaMesta` | neděle ~20:00 a čtvrtek ~10:00 | tiché doplnění dat sledovaných měst (nejstarší kontrola první, časový rozpočet 4,5 min, město už dnes zpracované se přeskočí), pak přepočet POČASÍ u budoucích akcí; bez notifikace | jen v logu: „Sledované město „X“ selhalo“ a „hotovo, zpracováno N z M měst“; stav v KONTROLÁCH (typ „sledované město“) |
 | RF testy v GitHub Actions (`rf-tests.yml`) | neděle 20:20 UTC (cron `20 20 * * 0`), tedy 21:20 SEČ, v létě 22:20 SELČ | API a frontend testy proti produkci | červený běh a při plánovaném běhu notifikace ntfy; GitHub e-maily o selhání plánovaných běhů neposílá |
+| Kontrola projektu (`kontrola-projektu.yml`) | denně 6:40 UTC (cron `40 6 * * *`), tedy 7:40 SEČ, 8:40 SELČ; v pondělí týdenní souhrn | čte board, defekty a návrh práce, v pondělí přepíše přehled v issue #52 | notifikace ntfy jen při nálezu (v pondělí vždy); při selhání samotné kontroly (typicky vypršelý `BOARD_READ_TOKEN`) upozornění ntfy |
+| Mutační testy (`mutacni-testy.yml`) | sobota 3:40 UTC (cron `40 3 * * 6`), tedy 4:40 SEČ, 5:40 SELČ; kritická sada navíc při změně backendu nebo jeho testů | celý backend bez prahu (~41 min); kritická sada s prahem 95 % | červený běh a u plánovaného běhu notifikace ntfy |
 
 **Čas v GitHub Actions je v UTC a nepřechází na letní čas.** Triggery Apps Scriptu běží v místním čase projektu, takže po změně času (březen, říjen) se jejich souběh s RF během posune o hodinu. Kontrolovat zejména nedělní `zpracovatSledovanaMesta` (okno 20–21 místního času): RF běh má startovat až po něm.
 

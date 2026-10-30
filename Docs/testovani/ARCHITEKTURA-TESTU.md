@@ -136,6 +136,8 @@ tests/
   frontend-harness.js     # frontend: vytáhne funkce z Index.html, bez DOM
   unit.test.js            # jednotkové testy backendu (node:test)
   frontend.test.js        # jednotkové testy frontendu
+  pokryti-frontendu.js    # měření pokrytí vykrojených funkcí Index.html
+  mutace/                 # mutační testování Strykerem (vlastní package.json, spustit.js)
   robot/
     resources.robot       # sdílené proměnné: URL, testovací profil, timeouty, DATUM_RE
     api.robot             # API kontrakt (RequestsLibrary)
@@ -143,8 +145,9 @@ tests/
     requirements.txt      # připnuté verze RF knihoven
 cloudflare-worker/*.test.mjs   # testy workeru, samostatná sada
 api-tests/                # cvičné sady SoapUI, Bruno, JMeter (výuka nástrojů, mimo CI)
-.github/workflows/        # pipeline: node-tests, rf-tests, publikovat-report, worker
-.github/scripts/          # generátor veřejného reportu, pojistka souladu testů s architekturou
+.github/workflows/        # pipeline: node-tests, rf-tests, publikovat-report, mutacni-testy, kontrola-projektu, worker
+.github/scripts/          # kontroly CI (kontrola-*.py), baseliny, mapa kód -> dokument, notifikace, generátor veřejného reportu
+.github/                  # robocop.toml, ruff.toml, requirements-lint.txt (lint)
 ```
 
 Odpovědnosti: **harness** odděluje testy od platformy (Google Apps Script), takže

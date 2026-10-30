@@ -122,7 +122,7 @@ Soupis toho, co projekt používá. První sloupec obsahuje identifikátor v zp�
 | Open-Meteo (`open-meteo`) | předpověď počasí a geokódování obcí | `apps-script/kulturni_radar.gs`, `apps-script/Index.html` | |
 | MET Norway (`met-no`) | záložní zdroj předpovědi, když Open-Meteo pro den nic nemá | `apps-script/kulturni_radar.gs` | |
 | Nominatim (`nominatim`) | geokódování míst akcí (souřadnice pro mapu) | `apps-script/kulturni_radar.gs` | |
-| ntfy (`ntfy`) | push notifikace na telefon: zprávy appky i vývojové zprávy z GitHub Actions | `apps-script/kulturni_radar.gs`, `.github/workflows/kontrola-projektu.yml`, `.github/workflows/rf-tests.yml` | |
+| ntfy (`ntfy`) | push notifikace na telefon: zprávy appky i vývojové zprávy z GitHub Actions | `apps-script/kulturni_radar.gs`, `.github/workflows/kontrola-projektu.yml`, `.github/workflows/rf-tests.yml`, `.github/workflows/mutacni-testy.yml` | |
 | Leaflet (`leaflet`) | mapa akcí a míst ve frontendu | `apps-script/Index.html` (načítá se z unpkg) | 1.9.4 |
 | OpenStreetMap (`openstreetmap`) | dlaždice mapy pod Leafletem | `apps-script/Index.html` | |
 | Odkazy Google (`google-odkazy`) | „Přidat do kalendáře“ a otevření místa v mapách, jen odkazy bez API | `apps-script/Index.html` | |
@@ -133,7 +133,7 @@ Soupis toho, co projekt používá. První sloupec obsahuje identifikátor v zp�
 | Nástroj | K čemu | Kde v repu | Verze |
 |---|---|---|---|
 | `node:test` | jednotkové testy backendu (přes vlastní harness bez Googlu), frontendu a Workeru | `tests/unit.test.js`, `tests/frontend.test.js`, `tests/harness.js`, `cloudflare-worker/email-webhook.test.mjs` | Node 22 (CI) |
-| StrykerJS (`@stryker-mutator/core`, `@stryker-mutator/tap-runner`) | mutační testování backendu: mutuje kopii `kulturni_radar.gs` a ověřuje, že jednotkové testy mutaci zachytí; spouští se ručně (`node tests/mutace/spustit.js --kriticke`), zatím ne v CI, postup v [MUTACNI-TESTOVANI.md](Docs/testovani/MUTACNI-TESTOVANI.md) | `tests/mutace/package.json` (devDependencies), `tests/mutace/stryker.config.json`, `tests/mutace/spustit.js` | 10.0.0 |
+| StrykerJS (`@stryker-mutator/core`, `@stryker-mutator/tap-runner`) | mutační testování backendu: mutuje kopii `kulturni_radar.gs` a ověřuje, že jednotkové testy mutaci zachytí; lokálně `node tests/mutace/spustit.js --kriticke`, v CI (`mutacni-testy.yml`) kritická sada s prahem 95 % při změně backendu a celý backend týdně v sobotu, postup v [MUTACNI-TESTOVANI.md](Docs/testovani/MUTACNI-TESTOVANI.md) | `tests/mutace/package.json` (devDependencies), `tests/mutace/stryker.config.json`, `tests/mutace/spustit.js` | 10.0.0 |
 | Robot Framework (`robotframework`) | E2E a API testy proti produkci, dry run v každém pushi; standardní knihovny (Collections, OperatingSystem, String) jsou jeho součástí | `tests/robot/` | 7.5 |
 | Browser Library (`robotframework-browser`) | E2E testy frontendu v prohlížeči (Playwright, Chromium) | `tests/robot/frontend.robot`, `tests/robot/requirements.txt` | 20.6.0 |
 | RequestsLibrary (`robotframework-requests`) | testy kontraktu API | `tests/robot/api.robot`, `tests/robot/requirements.txt` | 0.9.7 |
@@ -147,10 +147,10 @@ Soupis toho, co projekt používá. První sloupec obsahuje identifikátor v zp�
 
 | Nástroj | K čemu | Kde v repu | Verze |
 |---|---|---|---|
-| GitHub Actions (`github-actions`) | Node testy, RF dry run a kontroly, týdenní E2E, testy Workeru, publikace reportu, denní kontrola projektu | `.github/workflows/` | `actions/checkout` v5, `setup-node` v6 (Node 22), `setup-python` v6 (Python 3.12), `upload-artifact` v6, `download-artifact` v8, `upload-pages-artifact` v5, `deploy-pages` v5 |
+| GitHub Actions (`github-actions`) | Node testy, RF dry run a kontroly (počty testů, nástroje, odkazy, soulad s architekturou, lint), mutační testy, týdenní E2E, testy Workeru, publikace reportu, denní kontrola projektu | `.github/workflows/` | `actions/checkout` v5, `setup-node` v6 (Node 22), `setup-python` v6 (Python 3.12), `upload-artifact` v6, `download-artifact` v8, `upload-pages-artifact` v5, `deploy-pages` v5 |
 | GitHub Pages (`github-pages`) | veřejný report E2E testů | `.github/workflows/publikovat-report.yml`, `.github/scripts/generovat-index-reportu.py` | |
 | GitHub Projects a Issues (`github-projects`) | board, issues, formulář defektu, automaticky přepisovaný přehled projektu | `.github/ISSUE_TEMPLATE/defekt.yml`, `.github/workflows/kontrola-projektu.yml` | |
-| Python skripty (`python`) | kontroly projektu a testů, návrh práce, sestavení notifikací; jen standardní knihovna, kontroly testů navíc `robot.api` | `.github/scripts/` | Python 3.12 (CI) |
+| Python skripty (`python`) | kontroly projektu, testů, dokumentace a lintu, návrh práce, sestavení notifikací; jen standardní knihovna, kontroly testů navíc `robot.api`, lint volá Robocop a ruff z `.github/requirements-lint.txt` | `.github/scripts/` | Python 3.12 (CI) |
 | GitHub CLI (`gh`) | čtení boardu a issues, zápis přehledu; předinstalované na runnerech | `.github/scripts/gh_projekt.py`, `.github/workflows/` | |
 | `curl` a `jq` | odeslání zpráv do ntfy a zpracování JSON ve workflow | `.github/workflows/` | |
 
@@ -166,12 +166,13 @@ Soupis toho, co projekt používá. První sloupec obsahuje identifikátor v zp�
 | Cesta | Obsah |
 |---|---|
 | `apps-script/` | backend (`kulturni_radar.gs`) a frontend (`Index.html`, jeden soubor pro oba nasazovací kanály) |
-| `tests/` | Node testy a harness pro Apps Script, `tests/robot/` E2E a API testy v Robot Frameworku |
+| `tests/` | Node testy a harness pro Apps Script, `tests/robot/` E2E a API testy v Robot Frameworku, `tests/mutace/` mutační testy (Stryker) |
 | `cloudflare-worker/` | Worker pro e-mailové tipy a jeho testy |
 | `api-tests/` | cvičné API testy (SoapUI, Bruno, JMeter) |
 | `AGENTS.md`, `CLAUDE.md` | vstupní pokyny pro AI agenty a nové vývojáře (CLAUDE.md jen odkazuje) |
 | `Docs/` | testovací dokumentace, architektura, provoz, CHANGELOG, BACKLOG |
-| `.github/workflows/` | CI: Node testy, RF dry run a pojistka souladu testů s architekturou, týdenní E2E, testy Workeru, publikace reportu na GitHub Pages |
+| `.github/workflows/` | CI: Node testy a kontroly (RF dry run, soulad testů s architekturou, počty testů, soupis nástrojů, odkazy v dokumentaci, lint), mutační testy, týdenní E2E, testy Workeru, publikace reportu na GitHub Pages, denní kontrola projektu |
+| `.github/scripts/` | kontrolní skripty CI (`kontrola-*.py`), návrh práce a sestavení notifikací, generátor veřejného reportu, mapa kód → dokument, baseline lintu a konfigurace Robocopu a ruffu v `.github/` |
 
 ## Zprovoznění a provoz
 
