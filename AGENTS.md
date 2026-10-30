@@ -23,8 +23,8 @@ Kulturní radar je rodinná appka, která pomocí AI s webovým vyhledáváním 
 # jednotkové testy backendu a frontendu (vždy vyjmenovat soubory, ne celý adresář)
 node --test tests/unit.test.js tests/frontend.test.js
 
-# rychlá kontrola produkce po nasazení
-robot --include smoke --outputdir vysledky tests/robot/
+# rychlá kontrola produkce po nasazení (<adresa /exec> viz poznámka pod příkazy)
+robot --variable BASE_URL:<adresa /exec> --include smoke --outputdir vysledky tests/robot/
 
 # mutační testy kritické sady (práh 95 %)
 node tests/mutace/spustit.js --kriticke
@@ -34,6 +34,8 @@ python .github/scripts/kontrola-poctu-testu.py
 python .github/scripts/kontrola-nastroju.py
 python .github/scripts/kontrola-architektury-testu.py
 ```
+
+Adresu `/exec` do dokumentace ani příkazů nepsat: CI ji bere z GitHub Secretu `RADAR_URL`, lokálně ji doplní výchozí hodnota v `tests/robot/resources.robot`, takže `--variable BASE_URL` stačí vynechat. Prázdná proměnná `$URL` by výchozí hodnotu přepsala prázdným řetězcem.
 
 Kontroly boardu a defektů (`kontrola-boardu.py`, `kontrola-defektu.py`) a návrh práce (`navrh-session.py`) potřebují token GitHubu, postup je ve skillu. Spouštění Robot Frameworku, diagnostika pádů a tagy testů: skill, sekce 2. Počty testů jsou jen v README, tabulka „Testy v číslech“.
 
@@ -46,7 +48,9 @@ Kontroly boardu a defektů (`kontrola-boardu.py`, `kontrola-defektu.py`) a návr
 - **Změna kritické funkce backendu = počkat na mutační CI** (`mutacni-testy.yml`). Při pádu pod práh doplnit testy, práh nesnižovat.
 - **Každá změna kódu zvyšuje verzi** (backend na dvou místech v `kulturni_radar.gs`, `Index.html` má vlastní číslo) a zapisuje se do CHANGELOGu.
 - **Dva nezávislé nasazovací kanály:** backend přes `clasp` (Apps Script), frontend i přes `git push` (Cloudflare Pages). Při změně `Index.html` nasadit oba.
-- **Testy před commitem** a změna dokumentu patří do stejného commitu jako změna kódu, který popisuje.
+- **Před commitem celá sada jednotkových testů** (příkaz výše).
+- **Změna dokumentace ve stejném commitu jako kód, který popisuje.**
+- **Defekty se zakládají formulářem `defekt.yml`, práce se plánuje přes board** (Backlog → In Progress → Done, WIP limit 3); při zavření issue odškrtnout checklist. Pravidla jsou ve skillu.
 
 ## Kam dál
 
