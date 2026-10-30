@@ -1,5 +1,10 @@
 # Changelog
 
+## Docs: počty testů jen v README a Dependabot alerts – 30. 10. 2026
+- **ARCHITEKTURA-TESTU, C1:** počty testů (656, 11 smoke, API 9 a E2E 52, worker 7) nahrazeny odkazem na README, tabulku „Testy v číslech“ (jediný zdroj počtů). `kontrola-poctu-testu.py` a `kontrola-dokumentace.py` prošly.
+- **Dependabot alerts zapnuté** (`gh api -X PUT repos/Akimto01/Kulturni_radar/vulnerability-alerts`, odpověď 204, ověřeno dalším čtením: 204). V tu chvíli 0 otevřených alertů (první vyhodnocení závislostí z `requirements.txt` a `package.json` může chvíli trvat). **Security updates zůstávají vypnuté** (`dependabot_security_updates: disabled`), `.github/dependabot.yml` neexistuje. Stav zapsán do TESTY.md (krok „Zapnout Dependabot alerts“ hotový) a BACKLOGu.
+- **Issues:** #36 má v checklistu bod přepsat „ověří běh 1. 11.“ (POKRYTI.md R11, ARCHITEKTURA-TESTU D1 a D3, PRIBEHY-CHYB.md příběh 2) po ověření plánovaného běhu; #34 má bod ověřit při dávce 1, co znamená „20 porušení“ proti 121 v baseline pojistky.
+
 ## CI: úklid nálezů ruffu a zastaralých tvrzení v dokumentaci – 30. 10. 2026
 - **Ruff 17 → 2 nálezy:** opraveno 12× E741 (nejednoznačný název `l` přejmenován na `stitek` a `radek` v `gh_projekt.py`, `kontrola-boardu.py`, `navrh-session.py`, `sestav-notifikaci.py`), 2× B904 (`raise … from e` v `kontrola-dokumentace-kodu.py` a `sestav-notifikaci.py`) a 1× B034 (`re.split(..., maxsplit=1)` v `navrh-session.py`). Zbývají 2× B905 v `generovat-index-reportu.py`, které se do neděle 1. 11. 2026 nemění (BACKLOG, Testovací dluh). Baseline přepsána (`--zapsat-baseline`): Robocop 120 beze změny, ruff 2. Chování skriptů se nezměnilo: samotesty všech dotčených skriptů a ostré běhy kontrol prošly.
 - **Zastaralá tvrzení v dokumentaci (ověřeno proti repu):** README (Stryker už běží v CI, výčet GitHub Actions a struktura repa včetně `.github/scripts/` a `tests/mutace/`, ntfy ve `mutacni-testy.yml`, popis Python skriptů), ARCHITEKTURA-TESTU (B1: strom projektu s `mutace/`, `pokryti-frontendu.js` a aktuálními workflow a skripty), PROVOZ.md (plánované běhy `kontrola-projektu.yml` a `mutacni-testy.yml` v tabulce, `NTFY_TOPIC_DEV` i u `mutacni-testy.yml`).
