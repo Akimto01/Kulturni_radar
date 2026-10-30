@@ -244,15 +244,16 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
 | Kontrola soupisu nástrojů v README | `.github/scripts/kontrola-nastroju.py` (jen čte): nástroje ze zdrojů v repu (`package.json`, `requirements.txt`, knihovny v `.robot`, akce třetích stran, `clasp`, `wrangler`, `api-tests/`, unpkg) musí mít řádek s identifikátorem v tabulkách sekce „Nástroje a technologie“; samotest vč. negativních zkoušek | každý push a PR (job `rf-dryrun`) | push s nástrojem bez řádku | vlastník |
 | Kontrola odkazů a rozcestníku dokumentace | `.github/scripts/kontrola-dokumentace.py` (jen čte): relativní odkazy a kotvy (`#nadpis` podle pravidel GitHubu) v README, AGENTS.md, CLAUDE.md a `Docs/**` vedou na existující cíl (archiv a CHANGELOG jako zdroje mimo kontrolu), každý `.md` v `Docs/` je v `Docs/README.md`, všech 11 rolí má řádek, „plánováno #N“ ukazuje na otevřené issue (zavřené je varování); samotest vč. negativních zkoušek | každý push a PR (job `rf-dryrun`) | push s rozbitým odkazem nebo dokumentem mimo rozcestník | vlastník |
 | Varování „kód změněn, dokument ne“ | `.github/scripts/kontrola-dokumentace-kodu.py` (jen čte git, jen varování, exit 0) s mapou v `.github/scripts/mapa-kod-dokumentace.json` (soubor nebo vzor, případně funkce z `apps-script/`, dokument, důvod): v období (výchozích 7 dní, `--od` datum nebo git ref) varuje, když se změnil kód z mapy a příslušný dokument v období vůbec ne; commit se značkou `[bez-dokumentace]` se nepočítá; samotest na dočasném repu vč. negativních zkoušek a kontroly, že mapa v repu je celá | samotest při každém pushi a PR (job `rf-dryrun`); varování při „End“ a v plném pondělním přehledu #52 (sekce „Dokumentace k revizi“) | nic (jen upozornění) | vlastník |
+| Lint s baseline (ratchet) | `.github/scripts/kontrola-lintu.py`: Robocop nad `tests/robot/` (konfigurace `.github/robocop.toml`) a ruff nad `.github/scripts/` (`.github/ruff.toml`), nástroje s pevnými verzemi v `.github/requirements-lint.txt` (ne v `tests/robot/requirements.txt`, ten instaluje týdenní běh); počty nálezů podle pravidla v `.github/scripts/baseline-lint.json`, CI selže jen při nárůstu, pokles vypíše a vyzve ke snížení baseline; pravidla odporující konvencím projektu (délka řádků v dokumentaci testů, české názvy ve větném tvaru, verze s tečkou v názvu testu, pořadí [Tags] a [Documentation]) jsou vypnutá nebo nastavená v konfiguraci se zdůvodněním; samotest s negativní zkouškou | každý push a PR (job `rf-dryrun`) | nárůst nálezů u kteréhokoli pravidla | vlastník |
 | Kontrola boardu a defektů | `.github/scripts/kontrola-boardu.py` a `kontrola-defektu.py` (jen čtou): pole boardu, stavy, WIP limit, Odhad u Todo, lhůty defektů, checklisty, soulad BACKLOG.md a DEFEKTY.md s issues, řádek v HISTORIE-INCIDENTU.md u každého uzavřeného defektu S1 a S2 (`kontrola-defektu.py --test` ověří i negativní zkoušky); `navrh-session.py` navrhuje práci podle času | automaticky denně 6:40 UTC workflow `kontrola-projektu.yml` (v pondělí týdenní souhrn, jinak notifikace ntfy jen při nálezu), ručně při „Start“ a „End“ | nic (nálezy se opraví před další prací) | vlastník (ntfy); token `BOARD_READ_TOKEN` je classic jen se scope `read:project`, protože fine-grained token uživatelský projekt číst neumí; riziko je přijatelné (jen čtení, veřejný obsah, na účtu jediný projekt, platnost do 27. 1. 2027 s připomínkou #51), viz [DEFEKTY.md](../kvalita/DEFEKTY.md), Kontrola úplnosti |
 | Testy workeru | 7 testů e-mailového webhooku | push se změnou `cloudflare-worker/**` | nasazení workeru | vlastník |
 | Smoke po nasazení | 11 E2E a API testů s tagem `smoke` | ručně po každém nasazení | další práci, dokud neprojde | vlastník |
 | Týdenní regrese | API (9) a E2E (52) proti produkci | plán, neděle 20:20 UTC (21:20 SEČ, 22:20 SELČ; od 28. 10. 2026, dřív 19:00 UTC; GitHub plánované běhy zdržuje, dřívější skutečný start byl zhruba 2 až 4 h po plánu); ručně | nic automaticky; selhání = úkol na další session | notifikace na telefon (jen plánované běhy), veřejný report |
 | Publikace reportu | stažení artefaktu, kontrola úniku, nasazení na GitHub Pages | po dokončení týdenní regrese (automatické spuštění ověří běh 1. 11.; ručně ověřeno) | nic | veřejné, hodnotitelé |
 
-Obecný linter (ESLint, Robocop) ani kontrola typů zavedené nejsou; konvence
-specifické pro tento projekt hlídá pojistka souladu. Zavedení Robocopu je
-**navrženo** jako levný další krok.
+Obecný lint hlídá Robocop (testy) a ruff (skripty) s baseline, konvence
+specifické pro tento projekt pojistka souladu. ESLint pro `.gs` a kontrola typů
+zavedené nejsou.
 
 ### C2. Umístění testů a pipeline
 
@@ -433,7 +434,7 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 
 | Mezera | Návrh |
 |---|---|
-| Chybí obecný linter testů (pojistka souladu hlídá jen konvence projektu) | zavést Robocop v pipeline jednotkových testů |
+| Lint zavedený (Robocop, ruff) drží jen baseline: 120 a 17 nálezů k 30. 10. 2026 se nesnižuje samo; chybí ESLint pro `.gs` a kontrola typů | snižovat baseline po dávkách (nejčetnější: dlouhé testy LEN04, DEPR05, LEN06), ESLint pro `.gs` až bude potřeba |
 | Lokalizační mezery (A4) | řazení podle češtiny, přechod letního času, stálá místa s diakritikou |
 | Počty testů se v dokumentech rozcházely | jediný zdroj je tabulka „Testy v číslech“ v README; od 29. 10. 2026 ji hlídá CI skriptem `.github/scripts/kontrola-poctu-testu.py` (issue #45) |
 | Tag `krehky` u 12 testů z doby před pravidlem | revize: ponechat jen u prokázané vnější příčiny |

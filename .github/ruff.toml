@@ -1,0 +1,19 @@
+# Konfigurace ruffu pro .github/scripts/ (issue #58). Spouští ji .github/scripts/kontrola-lintu.py
+# s --config .github/ruff.toml; v kořeni repa žádný pyproject.toml ani ruff.toml být nemá
+# (Cloudflare Pages by kořen s konfigurací mohl zpracovávat). Pravidla odporující konvencím
+# projektu jsou vypnutá tady se zdůvodněním, ne v baseline (.github/scripts/baseline-lint.json).
+
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "B"]
+ignore = [
+    # Délka řádku: skripty mají dlouhé řádky s českými hláškami a vzory regulárních výrazů, zalamování
+    # by zhoršilo čitelnost textů, které jdou do notifikací a testů.
+    "E501",
+    # Víc příkazů na řádku a lambda přiřazená proměnné: krátké pomocné funkce v samotestech
+    # (over(...), zkoušky) jsou záměrně v jednom řádku.
+    "E701",
+    "E702",
+    "E731",
+]

@@ -377,6 +377,10 @@ Frontend (`tests/frontend-harness.js`, `nactiFrontendFunkce(['fn1','fn2'])`):
 - **Před commitem testu dvě otázky:** zvolil jsem aspoň dvě třídy vstupů
   (s diakritikou i bez, prázdné město, jiný profil než výchozí)? Splní toto
   čekání i starý stav stránky?
+- **Lint (od 30. 10. 2026):** `python .github/scripts/kontrola-lintu.py` (Robocop nad `tests/robot/`, ruff nad `.github/scripts/`, počty podle
+  pravidla v `.github/scripts/baseline-lint.json`) selže jen při nárůstu nálezů; nástroje jsou v `.github/requirements-lint.txt`, ne v
+  `tests/robot/requirements.txt` (ten instaluje týdenní běh). Nový nález opravit, pokles zapsat přes `--zapsat-baseline`. Pravidlo
+  odporující konvenci projektu se vypíná v `.github/robocop.toml` nebo `.github/ruff.toml` se zdůvodněním, ne v baseline.
 - Pojistka v CI (`python .github/scripts/kontrola-architektury-testu.py`, job
   `rf-dryrun`) nesmí hlásit růst porušení. Při opravě porušení spustit skript
   s `--zapsat-baseline` a commitnout sníženou baseline.

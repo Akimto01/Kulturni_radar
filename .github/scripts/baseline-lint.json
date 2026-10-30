@@ -1,0 +1,38 @@
+{
+  "_popis": "Počty nálezů lintu podle nástroje a pravidla (kontrola-lintu.py, issue #58). CI selže jen při nárůstu; po poklesu snížit přes --zapsat-baseline. Pravidla odporující konvencím projektu jsou vypnutá v .github/robocop.toml a .github/ruff.toml, ne tady.",
+  "verze": {
+    "robocop": "9.1.0",
+    "ruff": "0.17.1"
+  },
+  "robocop": {
+    "COM02": 8,
+    "DEPR05": 21,
+    "DEPR09": 1,
+    "DOC01": 2,
+    "DOC02": 7,
+    "IMP01": 3,
+    "IMP02": 1,
+    "LEN01": 1,
+    "LEN04": 19,
+    "LEN06": 15,
+    "LEN27": 1,
+    "LEN28": 1,
+    "MISC06": 1,
+    "MISC09": 2,
+    "ORD02": 3,
+    "SPC01": 10,
+    "SPC03": 6,
+    "SPC04": 1,
+    "SPC11": 2,
+    "SPC17": 10,
+    "TAG05": 1,
+    "VAR02": 1,
+    "VAR03": 3
+  },
+  "ruff": {
+    "B034": 1,
+    "B904": 2,
+    "B905": 2,
+    "E741": 12
+  }
+}

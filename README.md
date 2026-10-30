@@ -137,6 +137,8 @@ Soupis toho, co projekt používá. První sloupec obsahuje identifikátor v zp�
 | Robot Framework (`robotframework`) | E2E a API testy proti produkci, dry run v každém pushi; standardní knihovny (Collections, OperatingSystem, String) jsou jeho součástí | `tests/robot/` | 7.5 |
 | Browser Library (`robotframework-browser`) | E2E testy frontendu v prohlížeči (Playwright, Chromium) | `tests/robot/frontend.robot`, `tests/robot/requirements.txt` | 20.6.0 |
 | RequestsLibrary (`robotframework-requests`) | testy kontraktu API | `tests/robot/api.robot`, `tests/robot/requirements.txt` | 0.9.7 |
+| Robocop (`robotframework-robocop`) | lint Robot Framework souborů s baseline (CI selže jen při nárůstu nálezů); konfigurace vypíná pravidla odporující konvencím projektu | `tests/robot/`, `.github/robocop.toml`, `.github/requirements-lint.txt`, `.github/scripts/kontrola-lintu.py` | 9.1.0 |
+| ruff (`ruff`) | lint Python skriptů v `.github/scripts/` s baseline (ratchet) | `.github/scripts/`, `.github/ruff.toml`, `.github/requirements-lint.txt`, `.github/scripts/kontrola-lintu.py` | 0.17.1 |
 | SoapUI (`soapui`) | cvičné API testy (8 test cases) | `api-tests/soapui/` | 5.10.0 (z projektového souboru) |
 | Bruno (`bruno`) | stejná sada cvičných API testů jako textová kolekce | `api-tests/bruno/` | formát kolekce 1 |
 | JMeter (`jmeter`) | cvičný zátěžový scénář (`?api=meta`, `?api=events`) | `api-tests/jmeter/` | 5.6.3 (z projektového souboru) |

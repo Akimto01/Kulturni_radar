@@ -1,0 +1,7 @@
+# Nástroje pro lint (issue #58): Robocop nad tests/robot/ a ruff nad .github/scripts/, spouští je
+# .github/scripts/kontrola-lintu.py (job rf-dryrun). Záměrně ne v tests/robot/requirements.txt: ten
+# instaluje týdenní běh rf-tests.yml. Verze jsou pevné a každá byla při zavedení starší než 14 dní.
+# Instalace s omezením, aby se robotframework nezměnil:
+#   pip install -r .github/requirements-lint.txt -c tests/robot/requirements.txt
+robotframework-robocop==9.1.0
+ruff==0.17.1

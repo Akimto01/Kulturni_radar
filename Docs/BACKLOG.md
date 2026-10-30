@@ -61,7 +61,7 @@ Pořadí: AGENTS.md, smoke, rozcestník, katalog, kontrola odkazů, případová
 19. **Katalog testů na GitHub Pages** (~1 h) a odkazy z POKRYTI.md na scénáře v katalogu (riziko, test). Přesunuto z bodu 13. → issue #44
 20. ~~**Kontrola odkazů a úplnosti rozcestníku v CI** (~1 h, až po #55), s negativní zkouškou.~~ **HOTOVO 30. 10. 2026** (viz CHANGELOG). → issue #56
 21. ~~**Případová studie na jednu stránku** (~1,5 h), čísla jen odkazem na README a D3; revize čtvrtletně.~~ **HOTOVO 30. 10. 2026** (viz CHANGELOG); revize čtvrtletně je issue #69 (Termín 30. 1. 2027). → issue #57
-22. **Robocop (RF) a ruff (Python) v CI s baseline** (~1,5 h); ESLint pro `.gs` jen jako poznámka na později. → issue #58
+22. ~~**Robocop (RF) a ruff (Python) v CI s baseline** (~1,5 h)~~; ESLint pro `.gs` jen jako poznámka na později. **HOTOVO 30. 10. 2026** (Robocop a ruff, viz CHANGELOG; ESLint zůstává nápad). → issue #58
 23. **OpenAPI 3.1** (~3,5 h): specifikace se Spectralem a Redocem na Pages (~2 h) a po ní kontrola odpovědí proti schématu v API testech (~1,5 h); Swagger UI ne (Try it out proti produkci a otevřené #50), Schemathesis jen jako pozdější nápad pro čtecí dotazy. → issue #59, #60
 24. ~~**Historie incidentů** (~45 min): tabulka a rozšíření kontroly defektů (uzavřený S1 nebo S2 bez řádku je nález).~~ **HOTOVO 30. 10. 2026** (viz CHANGELOG). → issue #61
 25. ~~**Varování „kód změněn, dokument ne“** (~1,5 h), při End a v pondělním přehledu, s negativní zkouškou.~~ **HOTOVO 30. 10. 2026** (viz CHANGELOG). → issue #62
@@ -215,6 +215,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
   **Závěr/doporučení**: POKRAČOVAT s Haiku pro `dailyCheck` (úspora nákladů bez viditelného zhoršení). **Omezení vyhodnocení**: vzorek malý (jen 3 dny čistého Sonnet baseline, přirozené kolísání den ode dne), obsahová kvalita nalezených akcí (ne jen počty) nebyla kontrolována — jen kvantitativní metriky a chybovost. Sloupec K logování zůstává aktivní pro průběžnou kontrolu do budoucna. Přehodnoceno 26. 10. 2026: závěr byl chybný, viz CHANGELOG v3.47.
 
 ## Větší témata
+- Mapování kód → dokument (#62) je na úrovni dokumentů: změna jiné části velkého dokumentu varování zruší. Zpřesnit na sekce (kotvy), až se ukáže potřeba.
 - ~~Plnohodnotná interaktivní mapa akcí (víc pinů najednou)~~ — **HOTOVO 17.–18. 8. 2026** (fáze 3 redesignu, Index.html v3.35–v3.38, viz CHANGELOG.md): vestavěná Leaflet mapa se všemi piny najednou, akce na stejném místě seskupené do jednoho pinu, popup s odkazem zpět do seznamu. Odkaz „📍 Mapa" na kartě (v3.10, jedna akce, garantovaný pin díky souřadnicím z Nominatim) zůstává beze změny vedle ní — dvě různé věci.
 - ~~Klik na akci → přidat na mapu jako „vybranou"~~ — **HOTOVO 18. 8. 2026** (Index.html v3.41, viz CHANGELOG.md): klik na titulek akce v seznamu i řádek nového seznamu míst pod mapou přepíná výběr pinu (sdílený mechanismus `vybranePiny_`/`prepnoutVyberPinu_`), vybraný pin dostane odlišnou ikonu a mapa se na něj přiblíží. Otevřená otázka z nápadu (nahradí auto-zobrazení, nebo poběží vedle něj) vyřešena: běží vedle něj – výběr je čistě vizuální zvýraznění nad existujícím auto-zobrazením podle filtru, nefiltruje piny.
 - Strukturované časy `cas_od`/`cas_do` — přesnější „Do kalendáře" (dnes celodenní), řazení akcí v rámci dne.

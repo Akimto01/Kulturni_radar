@@ -1,0 +1,27 @@
+# Konfigurace Robocopu pro tests/robot/ (issue #58). Spouští ji .github/scripts/kontrola-lintu.py
+# s --config .github/robocop.toml; v kořeni repa žádný konfigurační soubor být nemá (Cloudflare Pages).
+# Pravidla, která odporují konvencím projektu, jsou vypnutá tady se zdůvodněním, ne v baseline
+# (.github/scripts/baseline-lint.json drží jen skutečné nálezy, které se mají postupně snižovat).
+
+[lint]
+ignore = [
+    # Délka řádku (výchozí 120): dokumentace testů ([Documentation]) je psaná souvislými českými
+    # větami a odkazy na dokumenty a datumy; zalamování na 120 znaků by zhoršilo čitelnost.
+    "LEN08",
+    # Názvy klíčových slov: projekt píše české názvy ve větném tvaru („Přihlásit se do radaru“),
+    # ne Title Case; pravidla NAME02 a NAME18 vyžadují velká písmena na začátku každého slova.
+    "NAME02",
+    "NAME18",
+    # Názvy testů: obsahují odkaz na verzi s tečkou („regrese v3.65“), aby šlo test dohledat
+    # v CHANGELOGu; pravidlo zakazuje tečku v názvu testu.
+    "NAME01",
+]
+
+# Pořadí v testu: projekt dává všechna nastavení nahoru, [Tags] před [Documentation] a [Teardown]
+# před tělo testu (tagy zavedeny 29. 8. 2026; teardown je vidět hned u názvu), Robocop ve výchozím
+# pořadí chce tagy za dokumentací a teardown na konci. Pravidlo zůstává zapnuté, jen s pořadím
+# projektu. Pořadí v klíčových slovech (ORD02) se nemění: tři klíčová slova s [Arguments] před
+# [Documentation] jsou skutečná nejednotnost a patří do baseline.
+configure = [
+    "test-case-section-out-of-order.sections_order=tags,documentation,metadata,timeout,setup,template,teardown,keyword",
+]
