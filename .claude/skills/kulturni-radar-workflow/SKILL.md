@@ -281,8 +281,9 @@ informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
   (varování „kód změněn, dokument ne“ podle mapy `.github/scripts/mapa-kod-dokumentace.json`; jen čte git, vždy exit 0)
   a varování ukázat ve shrnutí. Vědomé rozhodnutí bez dokumentace = značka `[bez-dokumentace]` ve zprávě commitu.
   **Čistý refaktor bez změny chování** (přejmenování proměnných, úprava stylu podle lintu) má značku `[bez-dokumentace]`
-  ve zprávě commitu vždy. Varování z `ff7545b` (úklid ruffu, `sestav-notifikaci.py` změněn bez DEFEKTY.md) v prvním
-  pondělním souhrnu #52 (2. 11.) je tento případ: commit vznikl před pravidlem, takže značku nemá; nejde o chybu dokumentace.
+  ve zprávě commitu vždy. Příklad: `ff7545b` (úklid ruffu, `sestav-notifikaci.py` změněn bez DEFEKTY.md) vznikl před
+  pravidlem a značku nemá; varování se ukázalo jen při úzkém rozsahu (`--od 1907e9a`), v týdenním okně ho překryly jiné
+  změny DEFEKTY.md (mapování je na úrovni dokumentů, viz BACKLOG, Větší témata), takže v pondělním souhrnu #52 nebude.
   Nový dokument nebo nová závislost kód -> dokument = řádek v mapě; exit 2 znamená rozbitou mapu (neexistující dokument nebo funkce).
   V pondělí běh totéž za 7 dní zapíše do plného přehledu #52 (sekce „Dokumentace k revizi“).
 - Defekt se zakládá vždy formulářem `defekt.yml` a po založení se vyplní všechna pole boardu (Závažnost, Priorita, Jak nalezeno, Stav defektu, milník).
