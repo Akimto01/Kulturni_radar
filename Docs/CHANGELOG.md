@@ -1,5 +1,11 @@
 # Changelog
 
+## CI: sklonování počtů a duplicita v pondělním přehledu – 30. 10. 2026
+- **Sklonování (`sestav-notifikaci.py`):** jedna funkce `pocet(n, slovo, pad)` s tabulkou tvarů `TVARY` pro všechna místa s počty v notifikaci i přehledu: „1 chyba“, „2 chyby“, „5 chyb“, „0 chyb“ (4. pád „hlásí 1 chybu“), „nález“, „varování“ (ve všech tvarech stejné) a „termín“. Dřív byly „1 chyb“ a „0 nálezů“ natvrdo v textu, jen krátká notifikace skloňovala.
+- **Duplicita v #52:** chyba kontroly boardu, nález kontroly defektů, defekt P1 nebo P2 po lhůtě a termín dnes či v minulosti se vypsaly v „Naléhavé“ a znovu pod řádkem s počty. Pod počty zůstává jen to, co v „Naléhavé“ není (třeba varování o WIP limitu nebo chyby nad limit 8 řádků, aby se nic neztratilo).
+- **Samotest:** +22 zkoušek (sklonování 0, 1, 2, 5 a hranice 4 a 21 pro chybu, varování, nález, termín; denní režim „hlásí 1 chybu“; duplicita v textu i v Markdownu, nad limit, bez nálezů); celkem 126.
+- **Postup:** SKILL.md (obě kopie) a AGENTS.md: issue s přeškrtnutím v BACKLOGu zavřít hned po pushi a CI, kontroly i ruční běh `kontrola-projektu.yml` spouštět až po zavření (falešný nález z #57 a #63).
+
 ## CI: průběh milníků v pondělním přehledu (#63) – 30. 10. 2026
 - **Sekce „Milníky“ v plném přehledu (issue #52):** pro každý otevřený milník řádek „Cíl N: X z Y issues hotovo, Z In Progress, zbývá odhadem H h“. Hotovo = zavřená issues, odhad = součet Odhadu (h) otevřených; u otevřených issues bez Odhadu se připojí „(u N bez Odhadu)“ (odhad je pak dolní mez), milník bez issues říká „zatím žádné issues“. Issues se štítkem `prehled` se nepočítají. Sekce stojí za otevřenými chybami a před In Progress.
 - **Data:** `kontrola-boardu.py --json` má v souhrnu nový klíč `milniky` (funkce `milniky()`), spočtený z issues a boardu, které skript už načítá. Seznam otevřených milníků se čte jedním voláním `gh api repos/…/milestones` stejným tokenem (kvůli prázdným milníkům, které na boardu nejsou vidět); při selhání se odvodí z otevřených issues. Žádný nový token ani scope. `sestav-notifikaci.py` starší JSON bez klíče `milniky` zpracuje bez sekce.

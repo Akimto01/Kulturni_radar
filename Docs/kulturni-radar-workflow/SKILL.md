@@ -281,6 +281,10 @@ informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
 - Při zavírání defektu uzavírací komentář podle šablony v `Docs/kvalita/DEFEKTY.md` (Kořenová příčina, Oprava, Regresní test, Analýza úniku),
   pak Stav defektu Uzavřený. U S1 a S2 před zavřením přidat řádek do `Docs/kvalita/HISTORIE-INCIDENTU.md`
   (datum, co se stalo, dopad, doba, odkaz na issue v posledním sloupci), jinak `kontrola-defektu.py` hlásí nález (pravidlo f).
+- **Pořadí při zavírání issue:** BACKLOG se přeškrtává v commitu dřív, než je issue zavřené, a kontrola boardu
+  to do zavření hlásí jako chybu („přeškrtnutá, ale otevřené“). Proto issue zavřít hned po pushi a CI (odškrtnout
+  checklist, komentář, `gh issue close`); `kontrola-boardu.py`, `kontrola-defektu.py` i ruční běh `kontrola-projektu.yml`
+  spouštět až po zavření, jinak se falešný nález zapíše do #52 a odejde v notifikaci (stalo se u #57 a #63).
 - **WIP limit:** nejvýš 3 issues najednou In Progress (konstanta `WIP_LIMIT` v `kontrola-boardu.py`); víc je varování.
 - **Odhad u Todo:** issue ve stavu Todo nebo In Progress musí mít vyplněný Odhad (h), bez něj kontrola hlásí chybu. Todo jen pro vybrané na nejbližší práci
   (Doporučené pořadí, fáze 1 a 2), ostatní Backlog.

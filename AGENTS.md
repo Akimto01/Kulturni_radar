@@ -51,6 +51,7 @@ Kontroly boardu a defektů (`kontrola-boardu.py`, `kontrola-defektu.py`) a návr
 - **Dva nezávislé nasazovací kanály:** backend přes `clasp` (Apps Script), frontend i přes `git push` (Cloudflare Pages). Při změně `Index.html` nasadit oba.
 - **Před commitem celá sada jednotkových testů** (příkaz výše).
 - **Změna dokumentace ve stejném commitu jako kód, který popisuje.**
+- **Pořadí při zavírání issue:** issue s přeškrtnutím v BACKLOGu zavřít hned po pushi a CI; kontroly (`kontrola-boardu.py`, `kontrola-defektu.py`) i ruční běh `kontrola-projektu.yml` spouštět až po zavření, jinak hlásí falešný nález.
 - **Defekty se zakládají formulářem `defekt.yml`, práce se plánuje přes board** (Backlog → In Progress → Done, WIP limit 3); při zavření issue odškrtnout checklist. Pravidla jsou ve skillu.
 
 ## Kam dál
