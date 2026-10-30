@@ -1,5 +1,11 @@
 # Changelog
 
+## Docs: AGENTS.md a CLAUDE.md (#53) – 30. 10. 2026
+- **`AGENTS.md` v kořeni repa** je hlavní, nástrojově neutrální vstupní soubor: co je projekt, struktura repa, hlavní příkazy (jednotkové testy, smoke, mutační testy, kontroly), pravidla (nikdy nenasazovat s červenou CI, tajné hodnoty nikdy do repa ani logu, nové testy = počty v README ve stejném commitu, nový nástroj = řádek v README, změna kritické funkce = počkat na mutační CI, verze a dva nasazovací kanály) a odkazy na `Docs/README.md`, README, ARCHITEKTURA-TESTU a skill. Obsah skillu se nekopíruje, jen se na něj odkazuje.
+- **`CLAUDE.md`** má několik řádků: odkaz na AGENTS.md a na skill.
+- **Ověření souladu:** příkazy a pravidla proti SKILL.md a README (počty testů se v AGENTS.md neopakují, jsou jen v README); `kontrola-poctu-testu.py` a `kontrola-nastroju.py` bez nálezů.
+- **Dokumentace:** `Docs/README.md` (mapa, sekce Nástroje), README (struktura repozitáře), BACKLOG (bod 16 přeškrtnut). V `apps-script/`, `tests/robot/` ani ve workflow se nic neměnilo.
+
 ## CI: mutační testy (kritická sada s prahem 95 %, týdně celý backend), #13 uzavřeno – 29. 10. 2026
 - **Workflow `mutacni-testy.yml`:** kritická sada při `push` a `pull_request` se změnou backendu, `tests/unit.test.js`, `tests/harness.js` nebo `tests/mutace/**`; práh `thresholds.break` 95 (`high` 97) v `stryker.config.json`. Celý backend v sobotu 3:40 UTC a ručně (`workflow_dispatch`, volba `kriticke` nebo `vse`), bez prahu, `timeout-minutes: 90`; selhání plánovaného běhu ohlásí ntfy (`NTFY_TOPIC_DEV` s fallbackem). Reporty (`mutation.json`, `mutation.html`) jako artefakt na 14 dní, `permissions: contents: read`, žádné secrets mimo ntfy. `kontrola-nastroju.py` nic nového nehlásí (jen `actions/*`).
 - **`spustit.js --prah N`:** Stryker nemá argument pro práh, skript proto zapíše přepsanou kopii konfigurace do `.stryker-src/` (0 = bez prahu).

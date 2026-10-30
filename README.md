@@ -165,6 +165,7 @@ Soupis toho, co projekt používá. První sloupec obsahuje identifikátor v zp�
 | `tests/` | Node testy a harness pro Apps Script, `tests/robot/` E2E a API testy v Robot Frameworku |
 | `cloudflare-worker/` | Worker pro e-mailové tipy a jeho testy |
 | `api-tests/` | cvičné API testy (SoapUI, Bruno, JMeter) |
+| `AGENTS.md`, `CLAUDE.md` | vstupní pokyny pro AI agenty a nové vývojáře (CLAUDE.md jen odkazuje) |
 | `Docs/` | testovací dokumentace, architektura, provoz, CHANGELOG, BACKLOG |
 | `.github/workflows/` | CI: Node testy, RF dry run a pojistka souladu testů s architekturou, týdenní E2E, testy Workeru, publikace reportu na GitHub Pages |
 

@@ -60,4 +60,5 @@ je uvedeno, zda je hotový, nebo se podle něj ještě pracuje.
 
 | Dokument | K čemu |
 |---|---|
+| [../AGENTS.md](../AGENTS.md) | vstupní bod pro AI agenty a nové vývojáře: účel, struktura repa, hlavní příkazy, pravidla; [../CLAUDE.md](../CLAUDE.md) jen odkazuje na něj a na skill |
 | [kulturni-radar-workflow/SKILL.md](kulturni-radar-workflow/SKILL.md) | pracovní postupy pro Claude Code (nasazení, testy, dokumentace); zdroj pravdy, nainstalovaná kopie je v `.claude/skills/` |

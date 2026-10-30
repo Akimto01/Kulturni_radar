@@ -55,7 +55,7 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 
 **Fáze 6 – dokumentace a přehled projektu (Cíl 1):**
 Pořadí: AGENTS.md, smoke, rozcestník, katalog, kontrola odkazů, případová studie, linter, OpenAPI, ostatní. Revizní issues (model hrozeb, osobní údaje, případová studie, čtvrtletně) se zakládají až s prvním vytvořením dokumentu.
-16. **AGENTS.md a tenký CLAUDE.md** (~0,5 h): hlavní nástrojově neutrální soubor, CLAUDE.md jen odkazuje. → issue #53
+16. ~~**AGENTS.md a tenký CLAUDE.md** (~0,5 h): hlavní nástrojově neutrální soubor, CLAUDE.md jen odkazuje.~~ **HOTOVO 30. 10. 2026** (viz CHANGELOG). → issue #53
 17. **Denní API smoke test v GitHub Actions** (~1 h): čtecí dotazy, notifikace jen při selhání, metrika dostupnosti do D3 a přehledu #52. → issue #54
 18. **Rozcestník podle rolí v Docs/README.md** (~1 h): 11 rolí, stav oblastí máme, základ, plánováno #N. → issue #55
 19. **Katalog testů na GitHub Pages** (~1 h) a odkazy z POKRYTI.md na scénáře v katalogu (riziko, test). Přesunuto z bodu 13. → issue #44
