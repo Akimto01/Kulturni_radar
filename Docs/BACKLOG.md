@@ -36,6 +36,7 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 **Fáze 2 – zpevnění základu (po 2. 11.):**
 5. **Sjednocení testů s architekturou, dávka 1** (~1,5–2 h): suite-level teardown a `Close Page`. Pak dávky 2 (~45 min), 3 (~1 h) a 5 (~1–1,5 h). Audit `Docs/audity/AUDIT-SOULADU-TESTU.md`. → issue #34
 5a. **Opravit #48 tichá selhání** (~30 min, po nedělním samotestu 1. 11.): samotest hlídá všechny triggery ze setupTriggers, sendUserNotifications hlásí chybu přes notifyFail_, pole aktualizovano v odpovědi apiNajdiProUzivatele_; testy podle scénáře v #35, nasazení backendu. → issue #48
+5b. **Triáž Dependabot alertů (16)** (~1 h, do 3. 11.): po balíčcích (`undici` 11, `sharp` 2 a `postal-mime` 1 ve workeru, `qs` 2 v `tests/mutace`), rozlišit runtime a vývojové závislosti, u každého alertu závažnost a opravitelnost bez porušení pravidla o verzích starších 14 dní; `postal-mime` první (runtime Workeru, parsuje nedůvěryhodné e-maily), potvrzená dosažitelná zranitelnost = defekt formulářem. → issue #70
 
 **Fáze 3 – pokrytí kritických funkcí:**
 6. **Pokrytí kritických funkcí backendu** (zbývá jen scénář #48, ~0,5 h; hotové: stub tabulky a triggerů v harnessu, platba AI, triggery a hlídač). → issue #35

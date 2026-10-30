@@ -1,5 +1,10 @@
 # Changelog
 
+## Docs: triáž Dependabot alertů a značka pro refaktor – 30. 10. 2026
+- **Issue #70 „Triáž Dependabot alertů (16)“** (štítek testing, Cíl 1, Todo, Termín 3. 11. 2026, Odhad 1 h): alerty po balíčcích (`undici` 11, `sharp` 2, `postal-mime` 1 v `cloudflare-worker/package-lock.json`, `qs` 2 v `tests/mutace/package-lock.json`), úkol rozlišit runtime a vývojové závislosti, u každého alertu zjistit závažnost a opravitelnost bez porušení pravidla o verzích starších 14 dní, `postal-mime` první (runtime Workeru, parsuje nedůvěryhodné e-maily); potvrzená dosažitelná zranitelnost = defekt formulářem. Podrobnosti zranitelností se do veřejného issue záměrně nepíšou. BACKLOG: bod 5b ve Fázi 2.
+- **Značka `[bez-dokumentace]` pro čistý refaktor** (SKILL.md obě kopie, AGENTS.md): přejmenování a úprava stylu podle lintu mají značku ve zprávě commitu. Varování z `ff7545b` v prvním pondělním souhrnu #52 je tento případ (commit vznikl před pravidlem).
+- CI pro `5e7500f` (stav Dependabot alertů v TESTY.md, CHANGELOGu a BACKLOGu) prošla.
+
 ## Docs: počty testů jen v README a Dependabot alerts – 30. 10. 2026
 - **ARCHITEKTURA-TESTU, C1:** počty testů (656, 11 smoke, API 9 a E2E 52, worker 7) nahrazeny odkazem na README, tabulku „Testy v číslech“ (jediný zdroj počtů). `kontrola-poctu-testu.py` a `kontrola-dokumentace.py` prošly.
 - **Dependabot alerts zapnuté** (`gh api -X PUT repos/Akimto01/Kulturni_radar/vulnerability-alerts`, odpověď 204, ověřeno dalším čtením: 204). Hned po zapnutí 0 otevřených alertů, po prvním vyhodnocení závislostí (několik minut) **16**: 16 otevřených alertů ve 4 balíčcích: `undici` 11, `sharp` 2 a `postal-mime` 1 (všechny v `cloudflare-worker/package-lock.json`) a `qs` 2 (`tests/mutace/package-lock.json`). Projití alertů zatím neproběhlo (jen počet a balíčky, žádné detaily zranitelností). **Security updates zůstávají vypnuté** (`dependabot_security_updates: disabled`), `.github/dependabot.yml` neexistuje. Stav zapsán do TESTY.md (krok „Zapnout Dependabot alerts“ hotový) a BACKLOGu.
