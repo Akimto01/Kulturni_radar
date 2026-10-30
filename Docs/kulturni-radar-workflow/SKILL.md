@@ -198,6 +198,14 @@ o selhání plánovaných běhů (ověřeno v Gmailu), proto notifikace přes nt
   bezpečnostní kontrola Claude Code příkaz zablokuje (a prázdná proměnná by
   smazala víc, než má).
 
+- Opravné skripty a úpravy souborů se zpětnými lomítky (regulární výrazy, `\n` v řetězcích) psát nástrojem
+  Write nebo Edit, ne přes shell nebo heredoc: shell zpětná lomítka mění (30. 10. 2026 se rozbil regex i testovací
+  text, oprava přes shell opakovaně selhala).
+- Lokální lint: virtuální prostředí a `pip install -r .github/requirements-lint.txt -c tests/robot/requirements.txt`,
+  pak `python -m robocop` a `python -m ruff` (nebo `python .github/scripts/kontrola-lintu.py` z tohoto prostředí).
+  Výstup na Windows číst ze souboru nebo přes `--reports json_report`: rich při přesměrování do roury (`| head`)
+  padá na `OSError`.
+
 ## 3. Sync CHANGELOG.md ↔ BACKLOG.md
 
 Po **každém** zápisu do `Docs/CHANGELOG.md` zkontrolovat, jestli
@@ -277,6 +285,8 @@ informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
   `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-defektu.py` (defekty: pole boardu, formulář, stavy, uzavírací komentář, DEFEKTY.md)
   a `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-boardu.py` (všechna issues: Status, milník, štítek, Odhad, checklisty, BACKLOG.md).
   Nálezy (chyby i varování) uvést ve shrnutí; neopravovat automaticky, navrhnout opravu.
+  Nejdřív zavřít hotová issues (viz „Pořadí při zavírání issue“ níže): pravidlo „zavřít hned po pushi a CI, kontroly
+  až potom“ platí i pro ruční běh `kontrola-projektu.yml`, jinak se falešný nález zapíše do #52 a odejde v notifikaci.
 - Při „End“ navíc spustit `python .github/scripts/kontrola-dokumentace-kodu.py --od <datum nebo commit před začátkem session>`
   (varování „kód změněn, dokument ne“ podle mapy `.github/scripts/mapa-kod-dokumentace.json`; jen čte git, vždy exit 0)
   a varování ukázat ve shrnutí. Vědomé rozhodnutí bez dokumentace = značka `[bez-dokumentace]` ve zprávě commitu.
@@ -843,6 +853,9 @@ aktuálně rozpracované/vybrané úkoly:**
   (stupnice a cyklus v `Docs/kvalita/DEFEKTY.md`). Při zavření defektu
   nastavit ručně pole Stav defektu na Uzavřený: vestavěná automatika
   mění jen Status. Defekt se uzavírá až po ověření v produkci.
+- **Bezpečnostní nálezy (Dependabot a podobně) ve veřejných issues a komentářích** jen jako balíčky, počty a rozhodnutí
+  (opraveno, odloženo s důvodem, zamítnuto), bez závažnosti a verzí oprav, dokud nejsou opravené: repo je veřejné, alerty
+  vidí jen správce a zveřejněná závažnost neopravené zranitelnosti ukazuje okno k zneužití (vzor: issue #70).
 - **Konvence pro `navrh-session.py` (psát záměrně):**
   - **Závislost:** „až po #N“ (i „(až po #N)“, „až po dokončení [#N]“) v řádku BACKLOG.md nebo v těle issue znamená, že issue čeká na #N;
     dokud je #N otevřené, návrh session issue nenavrhne a vypíše ho v seznamu „Blokováno“. Pro čekání na termín závislost nepoužívat.
