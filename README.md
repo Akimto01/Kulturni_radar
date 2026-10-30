@@ -18,6 +18,7 @@ Documentation is in Czech.*
 
 | Co | Kde |
 |---|---|
+| Projekt na jedné stránce (situace, výzvy, přístup, výsledky, co bych udělal jinak) | [Docs/PRIPADOVA-STUDIE.md](Docs/PRIPADOVA-STUDIE.md) |
 | Plán, průběh a hotová práce (Kanban, přehled podle cílů, časový plán) | [GitHub Projects board](https://github.com/users/Akimto01/projects/1) |
 | Poslední výsledky E2E testů (report a log Robot Frameworku) | [GitHub Pages](https://akimto01.github.io/Kulturni_radar/) |
 | Testovací plán a strategie (rizika, úrovně, kritéria, mezery) | [Docs/testovani/TESTY.md](Docs/testovani/TESTY.md) |

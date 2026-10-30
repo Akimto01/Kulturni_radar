@@ -13,10 +13,10 @@ Počty testů jsou jen v hlavním README (tabulka „Testy v číslech“).
 | Role | Co hledá | Kam jít | Stav |
 |---|---|---|---|
 | PM | co se dělá, v jakém pořadí a jak to jde | [BACKLOG.md](BACKLOG.md), [CHANGELOG.md](CHANGELOG.md), [GitHub Projects board](https://github.com/users/Akimto01/projects/1), přehled v issue [#52](https://github.com/Akimto01/Kulturni_radar/issues/52) | máme |
-| CEO | k čemu appka je a co stojí | [README.md](../README.md) (Co appka umí, Náklady) | základ, plánováno [#57](https://github.com/Akimto01/Kulturni_radar/issues/57) |
-| Partner | co appka umí a jak spolehlivá je | [README.md](../README.md), [kulturniradar.cz](https://kulturniradar.cz) | základ, plánováno [#57](https://github.com/Akimto01/Kulturni_radar/issues/57) |
+| CEO | k čemu appka je a co stojí | [PRIPADOVA-STUDIE.md](PRIPADOVA-STUDIE.md), [README.md](../README.md) (Co appka umí, Náklady) | máme |
+| Partner | co appka umí a jak spolehlivá je | [PRIPADOVA-STUDIE.md](PRIPADOVA-STUDIE.md), [README.md](../README.md), [kulturniradar.cz](https://kulturniradar.cz) | máme |
 | QA lead | jak se testuje, co je pokryté a co ne | [testovani/TESTY.md](testovani/TESTY.md), [testovani/ARCHITEKTURA-TESTU.md](testovani/ARCHITEKTURA-TESTU.md), [testovani/POKRYTI.md](testovani/POKRYTI.md), [testovani/MUTACNI-TESTOVANI.md](testovani/MUTACNI-TESTOVANI.md) | máme, katalog testů plánováno [#44](https://github.com/Akimto01/Kulturni_radar/issues/44) |
-| Hodnotitel | důkaz postupu a práce s chybami | [README.md](../README.md) (Pro hodnotitele), [kvalita/PRIBEHY-CHYB.md](kvalita/PRIBEHY-CHYB.md), [kvalita/DEFEKTY.md](kvalita/DEFEKTY.md), [testovani/TESTOVACI-ANALYZA.md](testovani/TESTOVACI-ANALYZA.md) | máme, případová studie plánováno [#57](https://github.com/Akimto01/Kulturni_radar/issues/57) |
+| Hodnotitel | důkaz postupu a práce s chybami | [PRIPADOVA-STUDIE.md](PRIPADOVA-STUDIE.md), [README.md](../README.md) (Pro hodnotitele), [kvalita/PRIBEHY-CHYB.md](kvalita/PRIBEHY-CHYB.md), [kvalita/DEFEKTY.md](kvalita/DEFEKTY.md), [testovani/TESTOVACI-ANALYZA.md](testovani/TESTOVACI-ANALYZA.md) | máme |
 | Vývojář a AI agent | jak je appka postavená a jak se v repu pracuje | [../AGENTS.md](../AGENTS.md), [aplikace/ARCHITEKTURA-APLIKACE.md](aplikace/ARCHITEKTURA-APLIKACE.md), [kulturni-radar-workflow/SKILL.md](kulturni-radar-workflow/SKILL.md) | máme, specifikace API plánováno [#59](https://github.com/Akimto01/Kulturni_radar/issues/59) |
 | Bezpečnost | ochrana tajných hodnot, hesel a dat | [aplikace/PROVOZ.md](aplikace/PROVOZ.md) (Bezpečnost), [aplikace/ARCHITEKTURA-APLIKACE.md](aplikace/ARCHITEKTURA-APLIKACE.md) (Uživatelské profily, hash PINu), [kvalita/PRIBEHY-CHYB.md](kvalita/PRIBEHY-CHYB.md) (únik tajných hodnot v reportech), [kvalita/HISTORIE-INCIDENTU.md](kvalita/HISTORIE-INCIDENTU.md) (incident #33) | základ, plánováno [#65](https://github.com/Akimto01/Kulturni_radar/issues/65) |
 | Provoz | triggery, nasazení, co dělat při výpadku, co se už stalo | [aplikace/PROVOZ.md](aplikace/PROVOZ.md), [kvalita/HISTORIE-INCIDENTU.md](kvalita/HISTORIE-INCIDENTU.md) | máme, denní smoke plánováno [#54](https://github.com/Akimto01/Kulturni_radar/issues/54) |
@@ -28,6 +28,7 @@ Počty testů jsou jen v hlavním README (tabulka „Testy v číslech“).
 
 | Dokument | K čemu |
 |---|---|
+| [PRIPADOVA-STUDIE.md](PRIPADOVA-STUDIE.md) | projekt na jedné stránce pro hodnotitele a manažery: situace, výzvy, přístup, výsledky, co bych udělal jinak |
 | [BACKLOG.md](BACKLOG.md) | cíle, doporučené pořadí práce, testovací dluh a nápady |
 | [CHANGELOG.md](CHANGELOG.md) | historie změn včetně diagnózy každé chyby |
 

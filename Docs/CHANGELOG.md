@@ -1,5 +1,11 @@
 # Changelog
 
+## Docs: případová studie na jednu stránku (#57) – 30. 10. 2026
+- **`Docs/PRIPADOVA-STUDIE.md`:** čtenář je hodnotitel nebo manažer se třemi minutami. EN abstrakt (2 věty ve stylu README) a sekce Výchozí situace, Výzvy (AI, platby za běh, limity Apps Scriptu, veřejné repo), Přístup (rizika, pyramida, CI s pojistkami, správa defektů, mutační testování, kontroly projektu), Výsledky, Co bych příště udělal jinak (notifikace CI od začátku, třídy ekvivalence, tajné hodnoty v artefaktech před zveřejněním), Kam dál.
+- **Pravidlo pro čísla:** čísla s datem jsou historické fakty a v textu zůstávají; aktuální stav (počty testů, pokrytí, skóre) je jen odkazem na README a D3. Každé číslo ověřeno proti CHANGELOGu, D3, DEFEKTY.md a historii běhů: 20 testů (2. 8.) a 656 (29. 10.), mutační skóre 78,1 → 96,9 % (29. 10.), pokrytí backendu 82,2 % (28. 10.) → 92,0 % (29. 10.), 231 z 232 běhů rychlé sady, 7 z 22 týdenních běhů zelených, 2 z 8 defektů z automatizace, 66 dní, 80 dní u #31, 20 dní od zveřejnění repa u #33, 0,12 USD za běh hledání, 361 s u #49.
+- **Zařazení:** README (první řádek „Pro hodnotitele“), `Docs/README.md` (mapa a rozcestník: CEO, Partner a Hodnotitel mají stav „máme“, „plánováno #57“ zmizelo).
+- **Revize:** issue #69 „Revize případové studie“ (štítek docs, Cíl 1, Backlog, Termín 30. 1. 2027, Odhad 0,25 h) s tím, co ověřit: čísla s datem beze změny, odkazy, nové významné výsledky.
+
 ## Docs: historie incidentů a kontrola (#61) – 30. 10. 2026
 - **`Docs/kvalita/HISTORIE-INCIDENTU.md`:** úvod (co je incident: dopad na uživatele nebo provoz, ne každá chyba, doba = od vzniku do opravy) a tabulka datum, co se stalo, dopad, doba, odkaz. Šest řádků: uzavřené defekty S1 a S2 (#17, #26, #31, #33), 66 dní nesledované CI a #49 (S3, ověřuje se, zapsáno na žádost jako provozní incident).
 - **Ověření dat:** proti gitu (data commitů, `git log -S`), CHANGELOGu, issues a PRIBEHY-CHYB.md; 66 dní = 23. 8. až 28. 10. (první červený plánovaný běh, `gh run list`) potvrzeno, shoduje se s ARCHITEKTURA-TESTU (D3). Nesrovnalosti byly vypsány uživateli, v jiných dokumentech se neopravovaly.
