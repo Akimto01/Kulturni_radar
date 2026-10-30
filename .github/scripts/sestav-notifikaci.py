@@ -18,7 +18,9 @@ Režimy:
   pondeli   souhrn vždy, ve dvou podobách: krátká srozumitelná notifikace na jednu obrazovku
             telefonu, bez kódů (stav kontrol, rozpracováno, otevřené chyby slovy podle priority,
             termíny tento týden, „Na řadě“) a plný přehled v Markdownu (počty chyb a varování,
-            defekty, In Progress, termíny na tento týden, návrh práce z navrh-session.py) s odkazy
+            defekty, milníky (Cíl N: hotovo z celkem, In Progress, odhad zbývající práce; v krátké
+            notifikaci nejsou, ta má 6 řádků obsazeno), In Progress, termíny na tento týden, návrh
+            práce z navrh-session.py) s odkazy
             na issues, který workflow zapíše do issue „Přehled projektu (automaticky)“; pokud by
             denní režim ten den hlásil důvody, jsou na začátku obou v sekci „Naléhavé“ (v notifikaci
             celá) a priorita se přebírá z denního režimu (chyba nebo P1 = high)
@@ -151,6 +153,27 @@ def duvody_denni(board, defekty, dnes):
     return duvody, vazne
 
 
+def radky_milniku(board):
+    """Řádky sekce „Milníky“ pro plný přehled: pro každý otevřený milník kolik issues je hotovo,
+    kolik In Progress a odhad zbývající práce (součet Odhadu (h) otevřených). Starší JSON bez klíče
+    `milniky` dá prázdný seznam (sekce se vynechá). Do krátké notifikace se nedává: ta má všech
+    6 řádků obsazených."""
+    radky = []
+    for m in board['souhrn'].get('milniky', []):
+        jmeno = re.match(r'Cíl \d+', m['nazev'])
+        jmeno = jmeno.group(0) if jmeno else m['nazev']
+        if not m['celkem']:
+            radky.append('- %s: zatím žádné issues' % jmeno)
+            continue
+        text = '- %s: %d z %d issues hotovo, %d In Progress' % (jmeno, m['hotovo'], m['celkem'], m['in_progress'])
+        if m['hotovo'] < m['celkem']:
+            text += ', zbývá odhadem %s h' % _hodiny(m['odhad_h'])
+            if m['bez_odhadu']:
+                text += ' (u %d bez Odhadu)' % m['bez_odhadu']
+        radky.append(text)
+    return radky
+
+
 def zprava_pondeli(board, defekty, navrh, dnes):
     """Text týdenního souhrnu (pondělí)."""
     r = ['Týdenní souhrn projektu, %s' % dnes.strftime('%d. %m. %Y'), '']
@@ -163,6 +186,9 @@ def zprava_pondeli(board, defekty, navrh, dnes):
     for x in defekty['chyby']:
         r.append('- %s %s: %s' % (_issue(x['issue']), x['pravidlo'], x['co']))
     r += ['', 'Otevřené chyby: ' + otevrene_chyby(defekty)]
+    radky_m = radky_milniku(board)
+    if radky_m:
+        r += ['', 'Milníky:'] + radky_m
     # každé issue jednou: In Progress má přednost, pak Termíny, v Později už jen zbytek
     ip = board['souhrn']['in_progress']
     videno = set(x['issue'] for x in ip)
@@ -233,7 +259,7 @@ def _escapovat_md(text):
 def na_markdown(text):
     """Plný přehled (prostý text ze zprava_pondeli) jako Markdown pro job summary: nadpisy sekcí,
     odstavce oddělené prázdným řádkem, čísla issues jako odkazy, odkaz na board."""
-    nadpis = re.compile(r'^(Naléhavé|In Progress \(\d+\)|Termíny do 7 dní \(\d+\)|Návrh práce na [\d,]+ h):$')
+    nadpis = re.compile(r'^(Naléhavé|Milníky|In Progress \(\d+\)|Termíny do 7 dní \(\d+\)|Návrh práce na [\d,]+ h):$')
     vystup, predchozi = [], None      # predchozi: druh posledního řádku (nadpis, polozka, odstavec)
     for i, radek in enumerate(text.split(chr(10))):
         if not radek:
@@ -351,9 +377,12 @@ def vlastni_test():
     dnes = datetime.date(2026, 11, 2)
     iso = dnes.isoformat()
 
-    def board(chyby=(), varovani=(), terminy=(), in_progress=()):
-        return {'skript': 'kontrola-boardu', 'chyby': list(chyby), 'varovani': list(varovani),
-                'souhrn': {'in_progress': list(in_progress), 'terminy_tyden': list(terminy)}}
+    def board(chyby=(), varovani=(), terminy=(), in_progress=(), milniky=None):
+        b = {'skript': 'kontrola-boardu', 'chyby': list(chyby), 'varovani': list(varovani),
+             'souhrn': {'in_progress': list(in_progress), 'terminy_tyden': list(terminy)}}
+        if milniky is not None:      # bez argumentu starší tvar JSON bez klíče milniky
+            b['souhrn']['milniky'] = list(milniky)
+        return b
 
     def defekty(chyby=(), p2=2):
         return {'skript': 'kontrola-defektu', 'chyby': list(chyby),
@@ -553,6 +582,28 @@ def vlastni_test():
     over(any('10. ročník' in l for l in polozky), 'přehled: tečka uvnitř názvu se nemění')
     meta, _, plny_text, md = sestavit_pondeli(board(), pri(), nic, dnes)
     over('Otevřené chyby: žádné' in md and 'P1' not in md, 'přehled: bez otevřených chyb řekne „žádné“')
+    # milníky v plném přehledu (v krátké notifikaci nejsou: všech 6 řádků je obsazeno)
+    def mil(nazev, hotovo, celkem, ip=0, odhad=0.0, bez=0):
+        return {'nazev': nazev, 'hotovo': hotovo, 'celkem': celkem, 'in_progress': ip, 'odhad_h': odhad, 'bez_odhadu': bez}
+    mm = [mil('Cíl 1 – Testy a kvalita kódu jako ukázka', 22, 44, 1, 33.55), mil('Cíl 2 – Otevření přátelům (design, Android)', 5, 14, 0, 3.75, 6),
+          mil('Cíl 4 – Víc měst a profilů', 0, 0), mil('Cíl 5 – Hotový', 3, 3)]
+    meta, text = plny(board(milniky=mm), defekty(), nic, dnes)
+    sek = text.split('Milníky:', 1)[1].split(chr(10) + chr(10), 1)[0].split(chr(10))[1:]
+    over(text.index('Otevřené chyby:') < text.index('Milníky:') < text.index('In Progress ('), 'milníky: sekce je za otevřenými chybami a před In Progress')
+    over(sek[0] == '- Cíl 1: 22 z 44 issues hotovo, 1 In Progress, zbývá odhadem 33,55 h', 'milníky: řádek Cíl N, hotovo z celkem, In Progress, odhad (%r)' % sek[0])
+    over(sek[1] == '- Cíl 2: 5 z 14 issues hotovo, 0 In Progress, zbývá odhadem 3,75 h (u 6 bez Odhadu)', 'milníky: issues bez Odhadu se přiznají (%r)' % sek[1])
+    over(sek[2] == '- Cíl 4: zatím žádné issues', 'milníky: milník bez issues řekne „zatím žádné issues“, bez dělení nulou')
+    over(sek[3] == '- Cíl 5: 3 z 3 issues hotovo, 0 In Progress', 'milníky: hotový milník bez odhadu zbývající práce')
+    over(len(sek) == 4 and 'Cíl 1 –' not in text, 'milníky: jeden řádek na milník, dlouhý název se nepíše')
+    meta, text = plny(board(milniky=[]), defekty(), nic, dnes)
+    over('Milníky' not in text, 'milníky: prázdný seznam sekci vynechá')
+    meta, text = plny(board(), defekty(), nic, dnes)
+    over('Milníky' not in text and 'Týdenní souhrn projektu' in text, 'milníky: starší JSON bez klíče milniky se zpracuje bez pádu a bez sekce')
+    meta, kratka, _, md = sestavit_pondeli(board(in_progress=ip1, terminy=ter1, milniky=mm), defekty(), nav1, dnes)
+    over(len(kratka.split(chr(10))) == 6 and 'Cíl' not in kratka and 'Milník' not in kratka, 'milníky: krátká notifikace zůstává na 6 řádcích bez milníků')
+    over('### Milníky' in md and '- Cíl 1: 22 z 44 issues hotovo' in md, 'milníky: v Markdownu je nadpis sekce a řádky položek')
+    over(md.index('### Milníky') < md.index('### In Progress'), 'milníky: v Markdownu před In Progress')
+
     # titulky notifikací vývoje
     meta, _ = sestavit('denni', board(chyby=[chyba]), defekty(), nic, dnes)
     over(meta['titulek'] == 'Kulturni radar - vyvoj: kontrola hlasi nalez' and meta['titulek'].isascii(), 'titulek denní: vývoj, ASCII')

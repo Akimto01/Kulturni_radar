@@ -6,7 +6,8 @@ BOARD_READ_TOKEN; výchozí GITHUB_TOKEN uživatelský board nepřečte, viz Doc
 
     GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-boardu.py
 
-S přepínačem --json stejné chyby a varování jako JSON (plus souhrn In Progress a termínů na týden).
+S přepínačem --json stejné chyby a varování jako JSON (plus souhrn In Progress, termínů na týden a
+postupu k otevřeným milníkům: hotovo, celkem, In Progress, Odhad (h) zbývající práce).
 S přepínačem --test ověří na vymyšlených datech, že issues se štítkem prehled (automatický přehled
 projektu) se ignorují.
 
@@ -137,8 +138,46 @@ def vypis(radky, uroven):
         print('%-7s %-12s %-9s %s' % ('#' + str(cislo) if cislo else '-', pravidlo, uroven, co))
 
 
-def souhrn(issues, board, dnes=None, dnu=7):
-    """Souhrn pro --json: issues In Progress a termíny v příštích `dnu` dnech (včetně dneška)."""
+def nacist_otevrene_milniky():
+    """Názvy otevřených milníků repa (i prázdných, ty na boardu nejsou vidět). Stejný token i čtení
+    veřejného repa jako načtení issues; při selhání None a milníky se odvodí z issues."""
+    try:
+        return [m['title'] for m in gh_projekt.gh_json(['api', 'repos/%s/milestones?state=open&per_page=100' % gh_projekt.REPO])]
+    except (SystemExit, KeyError, TypeError):
+        return None
+
+
+def milniky(issues, board, nazvy=None):
+    """Postup k cílům: pro každý otevřený milník (`nazvy`, jinak milníky otevřených issues) počet
+    hotových (zavřených) a všech issues, kolik je In Progress a součet Odhadu (h) otevřených.
+    Issues se štítkem prehled se nepočítají. Otevřené issue bez Odhadu se přičte do `bez_odhadu`."""
+    issues = gh_projekt.bez_prehledu(issues)
+    podle = {}
+    for i in issues:
+        nazev = (i.get('milestone') or {}).get('title')
+        if nazev:
+            podle.setdefault(nazev, []).append(i)
+    if nazvy is None:
+        nazvy = [n for n, seznam in podle.items() if any(i['state'] == 'OPEN' for i in seznam)]
+    vysledek = []
+    for nazev in sorted(nazvy):
+        seznam = podle.get(nazev, [])
+        otevrena = [i for i in seznam if i['state'] == 'OPEN']
+        odhady = [(board.get(i['number']) or {}).get('odhad (h)') for i in otevrena]
+        vysledek.append({
+            'nazev': nazev,
+            'hotovo': len(seznam) - len(otevrena),
+            'celkem': len(seznam),
+            'in_progress': sum(1 for i in otevrena if (board.get(i['number']) or {}).get('status') == 'In Progress'),
+            'odhad_h': round(sum(o for o in odhady if o), 2),
+            'bez_odhadu': sum(1 for o in odhady if not o),
+        })
+    return vysledek
+
+
+def souhrn(issues, board, dnes=None, dnu=7, nazvy_milniku=None):
+    """Souhrn pro --json: issues In Progress, termíny v příštích `dnu` dnech (včetně dneška)
+    a postup k otevřeným milníkům."""
     dnes = dnes or datetime.date.today()
     otevrena = {i['number']: i for i in gh_projekt.bez_prehledu(issues) if i['state'] == 'OPEN'}
     in_progress = [{'issue': n, 'titulek': otevrena[n]['title']} for n in sorted(otevrena)
@@ -155,7 +194,7 @@ def souhrn(issues, board, dnes=None, dnu=7):
         if dnes <= datum <= dnes + datetime.timedelta(days=dnu):
             terminy.append({'issue': n, 'titulek': otevrena[n]['title'], 'datum': datum.isoformat()})
     terminy.sort(key=lambda x: (x['datum'], x['issue']))
-    return {'in_progress': in_progress, 'terminy_tyden': terminy}
+    return {'in_progress': in_progress, 'terminy_tyden': terminy, 'milniky': milniky(issues, board, nazvy_milniku)}
 
 
 def vlastni_test():
@@ -187,6 +226,25 @@ def vlastni_test():
                                                           2: {'status': 'In Progress', 'termín': '2026-10-31'}}, dnes)
     over([x['issue'] for x in s['in_progress']] == [2] and [x['issue'] for x in s['terminy_tyden']] == [2],
          'souhrn (In Progress, termíny) prehled vynechá')
+
+    # postup k milníkům: vymyšlená data, prehled se nepočítá, prázdný milník a issue bez Odhadu
+    def mil(n, milnik, stav='OPEN', labely=('docs',)):
+        i = iss(n, list(labely), stav)
+        i['milestone'] = {'title': milnik} if milnik else None
+        return i
+
+    data = [mil(1, 'Cíl 1'), mil(2, 'Cíl 1', 'CLOSED'), mil(3, 'Cíl 1'), mil(4, 'Cíl 1'), mil(5, 'Cíl 1', 'CLOSED', ('prehled',)),
+            mil(6, 'Cíl 2'), mil(7, None)]
+    brd = {1: {'status': 'In Progress', 'odhad (h)': 1.5}, 2: {'status': 'Done', 'odhad (h)': 9},
+           3: {'status': 'Backlog', 'odhad (h)': 0.25}, 4: {'status': 'Backlog'}, 6: {'status': 'Backlog'}}
+    m = {x['nazev']: x for x in milniky(data, brd, ['Cíl 1', 'Cíl 2', 'Cíl 3'])}
+    over((m['Cíl 1']['hotovo'], m['Cíl 1']['celkem']) == (1, 4), 'milník: hotovo 1 ze 4, prehled se nepočítá (%s)' % ((m['Cíl 1']['hotovo'], m['Cíl 1']['celkem']),))
+    over(m['Cíl 1']['in_progress'] == 1 and m['Cíl 1']['odhad_h'] == 1.75, 'milník: In Progress 1, odhad jen otevřených (1,5 + 0,25; zavřené 9 h ne)')
+    over(m['Cíl 1']['bez_odhadu'] == 1, 'milník: otevřené issue bez Odhadu se spočítá zvlášť')
+    over(m['Cíl 3'] == {'nazev': 'Cíl 3', 'hotovo': 0, 'celkem': 0, 'in_progress': 0, 'odhad_h': 0, 'bez_odhadu': 0}, 'milník bez issues: samé nuly, bez pádu')
+    over((m['Cíl 2']['celkem'], m['Cíl 2']['bez_odhadu']) == (1, 1), 'milník: issue bez Odhadu se spočítá a issue bez milníku se nepřipíše nikam')
+    over([x['nazev'] for x in milniky(data, brd)] == ['Cíl 1', 'Cíl 2'], 'bez seznamu milníků se odvodí z otevřených issues')
+    over(milniky([mil(8, 'Cíl 9', 'CLOSED')], {}) == [], 'odvozeně se zavřený milník bez otevřených issues neukáže')
     print(chr(10) + ('Test prošel.' if not selhani else 'Test selhal: %d chyb.' % selhani))
     return 1 if selhani else 0
 
@@ -210,7 +268,7 @@ def main():
             'zkontrolovano': {'issues': len(issues), 'otevrenych': otevrena, 'polozek_boardu': len(board)},
             'chyby': [{'issue': c, 'pravidlo': p, 'co': co} for c, p, co in chyby],
             'varovani': [{'issue': c, 'pravidlo': p, 'co': co} for c, p, co in varovani],
-            'souhrn': souhrn(issues, board),
+            'souhrn': souhrn(issues, board, nazvy_milniku=nacist_otevrene_milniky()),
         }, ensure_ascii=False, indent=2))
         return 1 if chyby else 0
     print('Zkontrolováno issues: %d (otevřených %d), položek boardu: %d' % (len(issues), otevrena, len(board)))
