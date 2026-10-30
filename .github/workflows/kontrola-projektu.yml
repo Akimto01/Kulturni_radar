@@ -12,7 +12,8 @@ name: Kontrola projektu (board, defekty, návrh práce)
 #   pondeli  vždy souhrn: krátká notifikace na jednu obrazovku, plný přehled v issue
 #            „Přehled projektu (automaticky)“ (štítek prehled; telefon job summary nezobrazuje)
 #            a jako doplněk v souhrnu běhu; klepnutí na notifikaci otevře to issue
-#            (důvody denního režimu, pokud jsou, jdou na začátek jako „Naléhavé“, s jeho prioritou)
+#            (důvody denního režimu, pokud jsou, jdou na začátek jako „Naléhavé“, s jeho prioritou;
+#            plný přehled má navíc „Milníky“ a „Dokumentace k revizi“, krátká notifikace ne)
 # Plánovaný běh: denně 6:40 UTC (7:40 SEČ, 8:40 SELČ; mimo celou hodinu, cron je v UTC bez
 # letního času), v pondělí automaticky režim pondeli. Ruční běh: režim se vybírá.
 #
@@ -53,7 +54,10 @@ jobs:
       zprava: ${{ steps.zprava.outputs.zprava }}
       prehled: ${{ steps.zprava.outputs.prehled }}
     steps:
+      # plná historie (fetch-depth: 0): kontrola-dokumentace-kodu.py čte git za posledních 7 dní
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v6
         with:
@@ -86,6 +90,12 @@ jobs:
           python .github/scripts/kontrola-defektu.py --json > "$RUNNER_TEMP/defekty.json" || true
           python .github/scripts/navrh-session.py --cas 3h --json > "$RUNNER_TEMP/navrh.json" || true
 
+      # Varování „kód změněn, dokument ne“ za posledních 7 dní: čte jen git, bez tokenu. Jen varování
+      # (exit 0), jen v plném přehledu pondělního režimu; chyba skriptu se v přehledu řekne hláškou.
+      - name: Zkontrolovat dokumentaci kódu (git, bez tokenu)
+        if: steps.rezim.outputs.rezim == 'pondeli'
+        run: python .github/scripts/kontrola-dokumentace-kodu.py --json > "$RUNNER_TEMP/dokumentace.json" || true
+
       - name: Sestavit zprávu
         id: zprava
         env:
@@ -94,7 +104,7 @@ jobs:
           python .github/scripts/sestav-notifikaci.py --rezim "$REZIM" \
             --board "$RUNNER_TEMP/board.json" --defekty "$RUNNER_TEMP/defekty.json" \
             --navrh "$RUNNER_TEMP/navrh.json" --vystup "$RUNNER_TEMP/zprava.txt" \
-            --prehled "$RUNNER_TEMP/prehled.md" > "$RUNNER_TEMP/meta.json"
+            --prehled "$RUNNER_TEMP/prehled.md" --dokumentace "$RUNNER_TEMP/dokumentace.json" > "$RUNNER_TEMP/meta.json"
           # plný přehled (jen pondělní režim) i do souhrnu běhu, jako doplněk pro desktop
           if [ -s "$RUNNER_TEMP/prehled.md" ]; then cat "$RUNNER_TEMP/prehled.md" >> "$GITHUB_STEP_SUMMARY"; fi
           echo "odeslat=$(jq -r .odeslat "$RUNNER_TEMP/meta.json")" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,29 @@
+{
+  "_popis": "Mapování kód -> dokument pro kontrola-dokumentace-kodu.py (issue #62). Položka: kod (cesta nebo vzor, ** = i podsložky, * = bez lomítka), volitelně funkce (názvy z apps-script, bere se jen změna uvnitř těchto funkcí), dokument (musí existovat), duvod. Položka s typ nova-slozka-v-koreni se spustí, když commit přidá soubor do nové složky v kořeni repa. Seznam držet krátký; po #59 doplnit openapi.yaml.",
+  "mapa": [
+    {"kod": "apps-script/kulturni_radar.gs", "funkce": ["setupTriggers"],
+     "dokument": "Docs/aplikace/PROVOZ.md", "duvod": "tabulka triggerů"},
+    {"kod": "apps-script/kulturni_radar.gs", "funkce": ["doGet", "doPost", "routePost_"],
+     "dokument": "Docs/aplikace/ARCHITEKTURA-APLIKACE.md", "duvod": "rozhraní API (po #59 i OpenAPI)"},
+    {"kod": ".github/workflows/*.yml",
+     "dokument": "Docs/testovani/ARCHITEKTURA-TESTU.md", "duvod": "CI a testovací sady (C1, C2)"},
+    {"kod": ".github/scripts/kontrola-*.py",
+     "dokument": "Docs/testovani/ARCHITEKTURA-TESTU.md", "duvod": "popis kontrol (C1)"},
+    {"kod": ".github/scripts/sestav-notifikaci.py",
+     "dokument": "Docs/kvalita/DEFEKTY.md", "duvod": "popis pondělního souhrnu a notifikací"},
+    {"kod": ".github/scripts/navrh-session.py",
+     "dokument": "Docs/kvalita/DEFEKTY.md", "duvod": "popis automatických kontrol projektu"},
+    {"kod": ".github/ISSUE_TEMPLATE/defekt.yml",
+     "dokument": "Docs/kvalita/DEFEKTY.md", "duvod": "formulář defektu a jeho pole"},
+    {"kod": "tests/mutace/**",
+     "dokument": "Docs/testovani/MUTACNI-TESTOVANI.md", "duvod": "postup a výklad mutačního testování"},
+    {"kod": "tests/mutace/stryker.config.json",
+     "dokument": "Docs/testovani/MUTACNI-TESTOVANI.md", "duvod": "práh a nastavení Strykeru"},
+    {"kod": "tests/mutace/package.json",
+     "dokument": "AGENTS.md", "duvod": "hlavní příkazy"},
+    {"kod": "cloudflare-worker/**",
+     "dokument": "Docs/aplikace/ARCHITEKTURA-APLIKACE.md", "duvod": "e-mailové tipy (Worker)"},
+    {"typ": "nova-slozka-v-koreni",
+     "dokument": "AGENTS.md", "duvod": "struktura repa"}
+  ]
+}

@@ -277,6 +277,11 @@ informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
   `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-defektu.py` (defekty: pole boardu, formulář, stavy, uzavírací komentář, DEFEKTY.md)
   a `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-boardu.py` (všechna issues: Status, milník, štítek, Odhad, checklisty, BACKLOG.md).
   Nálezy (chyby i varování) uvést ve shrnutí; neopravovat automaticky, navrhnout opravu.
+- Při „End“ navíc spustit `python .github/scripts/kontrola-dokumentace-kodu.py --od <datum nebo commit před začátkem session>`
+  (varování „kód změněn, dokument ne“ podle mapy `.github/scripts/mapa-kod-dokumentace.json`; jen čte git, vždy exit 0)
+  a varování ukázat ve shrnutí. Vědomé rozhodnutí bez dokumentace = značka `[bez-dokumentace]` ve zprávě commitu.
+  Nový dokument nebo nová závislost kód -> dokument = řádek v mapě; exit 2 znamená rozbitou mapu (neexistující dokument nebo funkce).
+  V pondělí běh totéž za 7 dní zapíše do plného přehledu #52 (sekce „Dokumentace k revizi“).
 - Defekt se zakládá vždy formulářem `defekt.yml` a po založení se vyplní všechna pole boardu (Závažnost, Priorita, Jak nalezeno, Stav defektu, milník).
 - Při zavírání defektu uzavírací komentář podle šablony v `Docs/kvalita/DEFEKTY.md` (Kořenová příčina, Oprava, Regresní test, Analýza úniku),
   pak Stav defektu Uzavřený. U S1 a S2 před zavřením přidat řádek do `Docs/kvalita/HISTORIE-INCIDENTU.md`

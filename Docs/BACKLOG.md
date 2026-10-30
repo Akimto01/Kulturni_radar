@@ -64,7 +64,7 @@ Pořadí: AGENTS.md, smoke, rozcestník, katalog, kontrola odkazů, případová
 22. **Robocop (RF) a ruff (Python) v CI s baseline** (~1,5 h); ESLint pro `.gs` jen jako poznámka na později. → issue #58
 23. **OpenAPI 3.1** (~3,5 h): specifikace se Spectralem a Redocem na Pages (~2 h) a po ní kontrola odpovědí proti schématu v API testech (~1,5 h); Swagger UI ne (Try it out proti produkci a otevřené #50), Schemathesis jen jako pozdější nápad pro čtecí dotazy. → issue #59, #60
 24. ~~**Historie incidentů** (~45 min): tabulka a rozšíření kontroly defektů (uzavřený S1 nebo S2 bez řádku je nález).~~ **HOTOVO 30. 10. 2026** (viz CHANGELOG). → issue #61
-25. **Varování „kód změněn, dokument ne“** (~1,5 h), při End a v pondělním přehledu, s negativní zkouškou. → issue #62
+25. ~~**Varování „kód změněn, dokument ne“** (~1,5 h), při End a v pondělním přehledu, s negativní zkouškou.~~ **HOTOVO 30. 10. 2026** (viz CHANGELOG). → issue #62
 26. ~~**Průběh milníků v pondělním přehledu #52** (~0,5 h), generuje se.~~ **HOTOVO 30. 10. 2026** (viz CHANGELOG). → issue #63
 27. **Náklady AI v čase v týdenním reportu kvality** (~1 h), generuje se. → issue #64
 

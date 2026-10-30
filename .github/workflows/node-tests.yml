@@ -84,6 +84,12 @@ jobs:
       - name: Samotest kontroly defektů
         run: python .github/scripts/kontrola-defektu.py --test
 
+      # Samotest varování „kód změněn, dokument ne“ (dočasné git repo, jen varování, bez sítě) a
+      # kontrola, že mapa kód -> dokument v repu je celá (dokumenty a funkce existují). Samotest
+      # ověřuje mapu v repu i sám (poslední zkouška), takže při rozbité mapě selže.
+      - name: Samotest varování kód změněn, dokument ne
+        run: python .github/scripts/kontrola-dokumentace-kodu.py --test
+
       - name: Kontrola odkazů a rozcestníku dokumentace
         env:
           GH_TOKEN: ${{ github.token }}

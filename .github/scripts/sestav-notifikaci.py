@@ -200,8 +200,9 @@ def radky_milniku(board):
     return radky
 
 
-def zprava_pondeli(board, defekty, navrh, dnes):
-    """Text týdenního souhrnu (pondělí)."""
+def zprava_pondeli(board, defekty, navrh, dnes, dokumentace=None):
+    """Text týdenního souhrnu (pondělí). `dokumentace` (výstup kontrola-dokumentace-kodu.py --json) je
+    nepovinná: bez ní sekce „Dokumentace k revizi“ není."""
     r = ['Týdenní souhrn projektu, %s' % dnes.strftime('%d. %m. %Y'), '']
     r.append('Kontrola boardu: %s, %s. Kontrola defektů: %s.' % (
         pocet(len(board['chyby']), 'chyba'), pocet(len(board['varovani']), 'varování'), pocet(len(defekty['chyby']), 'nález')))
@@ -238,8 +239,22 @@ def zprava_pondeli(board, defekty, navrh, dnes):
         r.append('Blokováno (%d): ' % len(navrh['blokovano']) + ', '.join('#%d (%s)' % (x['n'], x['duvod'].replace(' (otevřené)', '')) for x in navrh['blokovano'][:MAX_RADKU_SEZNAMU]))
     if navrh['ceka']:
         r.append('Čeká na data bez Termínu: ' + ', '.join('#%d' % x['n'] for x in navrh['ceka']))
+    if dokumentace is not None:
+        r += ['', 'Dokumentace k revizi (%d):' % len(dokumentace.get('varovani', []))] + radky_dokumentace(dokumentace)
     r += ['', 'Board: ' + BOARD_URL]
     return r
+
+
+def radky_dokumentace(dokumentace):
+    """Řádky sekce „Dokumentace k revizi“ (jen plný přehled): dokument, změněný kód (funkce) a krátké hashe
+    commitů z kontrola-dokumentace-kodu.py. Chyba skriptu (rozbitá mapa, mělký clone) se řekne místo seznamu."""
+    if dokumentace.get('chyba'):
+        return ['- kontrola se nespustila: %s' % dokumentace['chyba']]
+    def radek(v):
+        shay = [c['sha'] for c in v['commity']]
+        return '%s: změněno %s%s, commity %s' % (v['dokument'], v['kod'], ' (%s)' % v['funkce'] if v['funkce'] else '',
+                                                 ', '.join(shay[:3]) + (', …' if len(shay) > 3 else ''))
+    return _seznam(dokumentace.get('varovani', []), radek) or ['- žádné']
 
 
 def _hodiny(h):
@@ -287,7 +302,7 @@ def _escapovat_md(text):
 def na_markdown(text):
     """Plný přehled (prostý text ze zprava_pondeli) jako Markdown pro job summary: nadpisy sekcí,
     odstavce oddělené prázdným řádkem, čísla issues jako odkazy, odkaz na board."""
-    nadpis = re.compile(r'^(Naléhavé|Milníky|In Progress \(\d+\)|Termíny do 7 dní \(\d+\)|Návrh práce na [\d,]+ h):$')
+    nadpis = re.compile(r'^(Naléhavé|Milníky|Dokumentace k revizi \(\d+\)|In Progress \(\d+\)|Termíny do 7 dní \(\d+\)|Návrh práce na [\d,]+ h):$')
     vystup, predchozi = [], None      # predchozi: druh posledního řádku (nadpis, polozka, odstavec)
     for i, radek in enumerate(text.split(chr(10))):
         if not radek:
@@ -344,9 +359,10 @@ def sestavit(rezim, board, defekty, navrh, dnes):
     return meta, kratka
 
 
-def sestavit_pondeli(board, defekty, navrh, dnes):
-    """Vrací (meta, krátká notifikace, plný přehled jako prostý text, plný přehled jako Markdown)."""
-    text = zprava_pondeli(board, defekty, navrh, dnes)
+def sestavit_pondeli(board, defekty, navrh, dnes, dokumentace=None):
+    """Vrací (meta, krátká notifikace, plný přehled jako prostý text, plný přehled jako Markdown).
+    Sekce „Dokumentace k revizi“ je jen v plném přehledu, v krátké notifikaci ne."""
+    text = zprava_pondeli(board, defekty, navrh, dnes, dokumentace)
     duvody, vazne = duvody_denni(board, defekty, dnes)
     if duvody:
         # důvody, které by ten den hlásil denní režim, jdou na začátek (v notifikaci i v přehledu)
@@ -369,6 +385,8 @@ def main():
     ap.add_argument('--navrh')
     ap.add_argument('--vystup', help='soubor pro text zprávy')
     ap.add_argument('--prehled', help='soubor pro plný přehled v Markdownu (jen pondělní režim)')
+    ap.add_argument('--dokumentace', help='JSON z kontrola-dokumentace-kodu.py --json (jen pondělní režim, plný přehled); '
+                                          'chybějící nebo neplatný soubor sekci nahradí hláškou, přehled kvůli tomu nespadne')
     ap.add_argument('--dnes', help='datum RRRR-MM-DD (výchozí dnešek v UTC)')
     ap.add_argument('--test', action='store_true')
     args = ap.parse_args()
@@ -380,7 +398,16 @@ def main():
     dnes = datetime.date.fromisoformat(args.dnes) if args.dnes else datetime.datetime.now(datetime.timezone.utc).date()
     board, defekty, navrh = nacist_json(args.board), nacist_json(args.defekty), nacist_json(args.navrh)
     if args.rezim == 'pondeli':
-        meta, text, _, prehled = sestavit_pondeli(board, defekty, navrh, dnes)
+        dokumentace = None
+        if args.dokumentace:
+            try:
+                with open(args.dokumentace, encoding='utf-8') as f:
+                    dokumentace = json.load(f)
+                if not isinstance(dokumentace, dict):
+                    raise ValueError('neočekávaný tvar')
+            except (OSError, ValueError) as e:
+                dokumentace = {'chyba': 'výstup kontroly dokumentace nejde načíst (%s)' % e, 'varovani': []}
+        meta, text, _, prehled = sestavit_pondeli(board, defekty, navrh, dnes, dokumentace)
         if args.prehled:
             with open(args.prehled, 'w', encoding='utf-8') as f:
                 f.write(prehled)
@@ -675,6 +702,49 @@ def vlastni_test():
          'duplicita: chyby, které se do Naléhavé nevešly (nad 8), se pod počty vypíšou, nic se neztratí')
     meta, text = plny(board(), defekty(), nic, dnes)
     over('Kontrola boardu: 0 chyb, 0 varování.' in text and 'Naléhavé' not in text, 'duplicita: bez nálezů žádná sekce a žádné položky')
+
+    # sekce „Dokumentace k revizi“: jen v plném přehledu, nikdy v krátké notifikaci
+    def dok_var(dokument, kod, funkce, sha):
+        return {'kod': kod, 'funkce': funkce, 'dokument': dokument, 'duvod': 'x', 'commity': [{'sha': s, 'predmet': 'T'} for s in sha]}
+    dok = {'skript': 'kontrola-dokumentace-kodu', 'varovani': [
+        dok_var('Docs/aplikace/PROVOZ.md', 'apps-script/kulturni_radar.gs', 'setupTriggers', ['abc1234']),
+        dok_var('Docs/testovani/ARCHITEKTURA-TESTU.md', '.github/workflows/a.yml', None, ['1111111', '2222222', '3333333', '4444444'])]}
+    meta, text = plny(board(), defekty(), nic, dnes, dok)
+    over('Dokumentace k revizi (2):' in text and '- Docs/aplikace/PROVOZ: změněno apps-script/kulturni_radar (setupTriggers), commity abc1234' in text,
+         'dokumentace: sekce s počtem, dokumentem, kódem, funkcí a commity (přípony souborů pryč)')
+    over('změněno .github/workflows/a, commity 1111111, 2222222, 3333333, …' in text, 'dokumentace: víc než 3 commity se zkrátí na tři a „…“')
+    over(text.index('Dokumentace k revizi') < text.index('Board: '), 'dokumentace: sekce je před odkazem na board')
+    meta, text = plny(board(), defekty(), nic, dnes)
+    over('Dokumentace k revizi' not in text, 'dokumentace: bez vstupu žádná sekce')
+    meta, text = plny(board(), defekty(), nic, dnes, {'varovani': []})
+    over('Dokumentace k revizi (0):' in text and '- žádné' in text.split('Dokumentace k revizi (0):', 1)[1].split(chr(10), 2)[1], 'dokumentace: bez varování sekce řekne žádné')
+    meta, text = plny(board(), defekty(), nic, dnes, {'chyba': 'mapa je rozbitá', 'varovani': []})
+    over('- kontrola se nespustila: mapa je rozbitá' in text, 'dokumentace: chyba skriptu se v přehledu řekne')
+    mnoho_dok = {'varovani': [dok_var('Docs/D%d.md' % i, 'k%d.gs' % i, None, ['abcdef%d' % i]) for i in range(10)]}
+    meta, text = plny(board(), defekty(), nic, dnes, mnoho_dok)
+    over('Dokumentace k revizi (10):' in text and '… a dalších 2' in text.split('Dokumentace k revizi (10):', 1)[1], 'dokumentace: seznam se zkrátí na 8 položek')
+    meta, kratka, _, md = sestavit_pondeli(board(in_progress=ip1, terminy=ter1), defekty(), nav1, dnes, dok)
+    over('Dokumentace' not in kratka and 'dokumentace' not in kratka and len(kratka.split(chr(10))) == 6, 'dokumentace: krátká notifikace beze změny, bez sekce')
+    over('### Dokumentace k revizi (2)' in md and md.index('### Dokumentace k revizi') < md.index('[Board]('), 'dokumentace: v Markdownu nadpis sekce před odkazem na board')
+    over('commity abc1234' in md and 'kulturni\\_radar' in md, 'dokumentace: v Markdownu se podtržítka v názvech escapují')
+    # příkazový řádek: chybějící nebo neplatný soubor kontroly dokumentace přehled nezboří
+    import subprocess
+    import tempfile
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        soubory = {}
+        for klic, obsah in [('board', board()), ('defekty', defekty()), ('navrh', nic)]:
+            soubory[klic] = os.path.join(tmp, klic + '.json')
+            with open(soubory[klic], 'w', encoding='utf-8') as f:
+                json.dump(obsah, f)
+        for popis, dok_cesta in [('chybějící soubor', os.path.join(tmp, 'neni.json'))]:
+            vystup = os.path.join(tmp, 'zprava.txt')
+            prehled = os.path.join(tmp, 'prehled.md')
+            r = subprocess.run([sys.executable, os.path.abspath(__file__), '--rezim', 'pondeli', '--board', soubory['board'], '--defekty', soubory['defekty'],
+                                '--navrh', soubory['navrh'], '--vystup', vystup, '--prehled', prehled, '--dokumentace', dok_cesta, '--dnes', '2026-11-02'],
+                               capture_output=True, text=True, encoding='utf-8')
+            with open(prehled, encoding='utf-8') as f:
+                md_cli = f.read()
+            over(r.returncode == 0 and 'kontrola se nespustila' in md_cli, 'dokumentace: %s v příkazovém řádku nezboří přehled (kód %d)' % (popis, r.returncode))
 
     # titulky notifikací vývoje
     meta, _ = sestavit('denni', board(chyby=[chyba]), defekty(), nic, dnes)
