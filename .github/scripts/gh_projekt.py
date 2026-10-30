@@ -31,7 +31,7 @@ def gh_json(args):
 
 def bez_prehledu(issues):
     """Issues bez těch se štítkem `prehled` (automatický přehled projektu, není úkol)."""
-    return [i for i in issues if STITEK_PREHLED not in {l['name'] for l in i.get('labels', [])}]
+    return [i for i in issues if STITEK_PREHLED not in {stitek['name'] for stitek in i.get('labels', [])}]
 
 
 def nacist_issues(stitek=None):
@@ -79,7 +79,7 @@ def _polozka_boardu(uzel):
                     'url': c['url'], 'repository': c['repository']['nameWithOwner']},
         'title': c['title'],
         'repository': c['repository']['url'],
-        'labels': [l['name'] for l in c['labels']['nodes']],
+        'labels': [stitek['name'] for stitek in c['labels']['nodes']],
     }
     if c['milestone']:
         polozka['milestone'] = c['milestone']

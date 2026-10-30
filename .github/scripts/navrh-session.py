@@ -114,7 +114,7 @@ def nazev_polozky(text):
     m = re.match(r'\*\*(\d+)\.\s*(.+?)\*\*', text)
     if m:
         return 'dávka %s: %s' % (m.group(1), m.group(2).strip())
-    return re.split(r'\s*\(', text.replace('**', ''), 1)[0].strip()[:60]
+    return re.split(r'\s*\(', text.replace('**', ''), maxsplit=1)[0].strip()[:60]
 
 
 def _hodnota_odhadu(polozka):
@@ -204,7 +204,7 @@ def sestavit_kandidaty(issues, board, backlog_text, dnes, lhuty=None):
         kandidati.append({'n': n, 'titulek': titulek, 'duvod': duvod, 'odhad': odhad, 'kategorie': kategorie})
 
     def je_bug(n):
-        return 'bug' in {l['name'] for l in otevrena[n].get('labels', [])}
+        return 'bug' in {stitek['name'] for stitek in otevrena[n].get('labels', [])}
 
     def priorita(n):
         return ((board.get(n) or {}).get('priorita') or '').split(' ')[0]
@@ -408,7 +408,7 @@ def vlastni_test():
     dnes = datetime.date(2026, 10, 29)
 
     def iss(n, titulek, labely=('testing',), vytvoreno='2026-10-28T10:00:00Z', stav='OPEN', body=''):
-        return {'number': n, 'title': titulek, 'state': stav, 'labels': [{'name': l} for l in labely],
+        return {'number': n, 'title': titulek, 'state': stav, 'labels': [{'name': stitek} for stitek in labely],
                 'createdAt': vytvoreno, 'updatedAt': vytvoreno, 'milestone': {'title': 'M'}, 'body': body}
 
     # --- základní výběr a pořadí

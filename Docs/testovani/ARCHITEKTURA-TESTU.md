@@ -437,7 +437,7 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 
 | Mezera | Návrh |
 |---|---|
-| Lint zavedený (Robocop, ruff) drží jen baseline: 120 a 17 nálezů k 30. 10. 2026 se nesnižuje samo; chybí ESLint pro `.gs` a kontrola typů | snižovat baseline po dávkách (nejčetnější: dlouhé testy LEN04, DEPR05, LEN06), ESLint pro `.gs` až bude potřeba |
+| Lint zavedený (Robocop, ruff) drží jen baseline: 120 a 2 nálezy k 30. 10. 2026 (ruff po úklidu E741, B904 a B034 zbývá B905 v `generovat-index-reportu.py`, po neděli 1. 11.) se nesnižuje samo; chybí ESLint pro `.gs` a kontrola typů | snižovat baseline po dávkách (nejčetnější: dlouhé testy LEN04, DEPR05, LEN06), ESLint pro `.gs` až bude potřeba |
 | Lokalizační mezery (A4) | řazení podle češtiny, přechod letního času, stálá místa s diakritikou |
 | Počty testů se v dokumentech rozcházely | jediný zdroj je tabulka „Testy v číslech“ v README; od 29. 10. 2026 ji hlídá CI skriptem `.github/scripts/kontrola-poctu-testu.py` (issue #45) |
 | Tag `krehky` u 12 testů z doby před pravidlem | revize: ponechat jen u prokázané vnější příčiny |

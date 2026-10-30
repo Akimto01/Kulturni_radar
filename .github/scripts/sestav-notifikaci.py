@@ -58,7 +58,7 @@ def nacist_json(cesta):
         with open(cesta, encoding='utf-8') as f:
             data = json.load(f)
     except (OSError, ValueError) as e:
-        raise SystemExit('Vstup %s není platný JSON (%s); skript pravděpodobně selhal, např. kvůli tokenu.' % (cesta, e))
+        raise SystemExit('Vstup %s není platný JSON (%s); skript pravděpodobně selhal, např. kvůli tokenu.' % (cesta, e)) from e
     if not isinstance(data, dict) or 'skript' not in data:
         raise SystemExit('Vstup %s nemá očekávaný tvar (chybí klíč skript).' % cesta)
     return data
@@ -631,10 +631,10 @@ def vlastni_test():
     over('a\\_b \\*c\\* \\[d\\] \\<e>' in md, 'přehled: Markdown znaky v názvech se escapují')
     # Markdown: žádná položka seznamu nezačíná „číslo. “ (vykreslila by se jako číslovaný seznam)
     meta, _, _, md = sestavit_pondeli(board(in_progress=ip1, terminy=ter1 + [{'issue': 30, 'titulek': '10. ročník', 'datum': '2026-11-10'}]), defekty(), nav1, dnes)
-    polozky = [l for l in md.split(chr(10)) if l.startswith('- ')]
-    over(polozky and not any(re.match(r'- \d+\. ', l) for l in polozky), 'přehled: žádná položka seznamu nezačíná vzorem „číslo. “ (%d položek)' % len(polozky))
-    over(any(l.startswith('- 3\\. 11. [#6](') for l in polozky) and any(l.startswith('- 10\\. 11. [#30](') for l in polozky), 'přehled: datum v položce má escapovanou tečku („3\\. 11.“)')
-    over(any('10. ročník' in l for l in polozky), 'přehled: tečka uvnitř názvu se nemění')
+    polozky = [radek for radek in md.split(chr(10)) if radek.startswith('- ')]
+    over(polozky and not any(re.match(r'- \d+\. ', radek) for radek in polozky), 'přehled: žádná položka seznamu nezačíná vzorem „číslo. “ (%d položek)' % len(polozky))
+    over(any(radek.startswith('- 3\\. 11. [#6](') for radek in polozky) and any(radek.startswith('- 10\\. 11. [#30](') for radek in polozky), 'přehled: datum v položce má escapovanou tečku („3\\. 11.“)')
+    over(any('10. ročník' in radek for radek in polozky), 'přehled: tečka uvnitř názvu se nemění')
     meta, _, plny_text, md = sestavit_pondeli(board(), pri(), nic, dnes)
     over('Otevřené chyby: žádné' in md and 'P1' not in md, 'přehled: bez otevřených chyb řekne „žádné“')
     # milníky v plném přehledu (v krátké notifikaci nejsou: všech 6 řádků je obsazeno)

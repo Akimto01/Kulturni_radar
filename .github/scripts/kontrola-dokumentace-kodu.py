@@ -71,7 +71,7 @@ def nacist_mapu(koren, cesta):
         data = json.loads(Path(cesta).read_text(encoding='utf-8'))
         mapa = data['mapa']
     except (OSError, ValueError, KeyError) as e:
-        raise ChybaSkriptu('mapa %s se nedá načíst: %s' % (cesta, e))
+        raise ChybaSkriptu('mapa %s se nedá načíst: %s' % (cesta, e)) from e
     for i, p in enumerate(mapa, 1):
         misto = 'položka %d mapy' % i
         if not p.get('dokument') or not p.get('duvod'):

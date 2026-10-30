@@ -75,7 +75,7 @@ def zkontrolovat(issues, board, backlog_text, dnes=None):
                 chyby.append((n, 'board', 'chybí Status'))
             if not i.get('milestone'):
                 chyby.append((n, 'milník', 'otevřené issue nemá milník'))
-            if not {l['name'] for l in i.get('labels', [])} & STITKY:
+            if not {stitek['name'] for stitek in i.get('labels', [])} & STITKY:
                 chyby.append((n, 'štítek', 'žádný z ' + ', '.join(sorted(STITKY))))
             if status == 'Done':
                 chyby.append((n, 'stavy', 'otevřené issue má Status Done'))
@@ -89,7 +89,7 @@ def zkontrolovat(issues, board, backlog_text, dnes=None):
                 except ValueError:
                     chyby.append((n, 'termín', 'neplatné datum Termínu „' + termin + '“'))
             priorita = ((polozka or {}).get('priorita') or '').split(' ')[0]
-            if ('bug' in {l['name'] for l in i.get('labels', [])} and priorita in LHUTY_DNI
+            if ('bug' in {stitek['name'] for stitek in i.get('labels', [])} and priorita in LHUTY_DNI
                     and (polozka or {}).get('stav defektu') != STAV_CEKA_NA_DATA and i.get('createdAt')):
                 stari = (dnes - datetime.date.fromisoformat(i['createdAt'][:10])).days
                 if stari > LHUTY_DNI[priorita]:
@@ -210,7 +210,7 @@ def vlastni_test():
     dnes = datetime.date(2026, 10, 29)
 
     def iss(n, labely, stav='OPEN'):
-        return {'number': n, 'title': 'Issue %d' % n, 'state': stav, 'labels': [{'name': l} for l in labely],
+        return {'number': n, 'title': 'Issue %d' % n, 'state': stav, 'labels': [{'name': stitek} for stitek in labely],
                 'body': '', 'createdAt': '2026-10-28T10:00:00Z', 'updatedAt': '2026-10-28T10:00:00Z'}
 
     over(zkontrolovat([iss(1, ['prehled'])], {}, '', dnes) == ([], []), 'otevřený prehled bez boardu, milníku a Odhadu: bez chyb')
