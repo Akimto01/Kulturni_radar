@@ -23,7 +23,7 @@ Kulturní radar je rodinná appka, která pomocí AI s webovým vyhledáváním 
 # jednotkové testy backendu a frontendu (vždy vyjmenovat soubory, ne celý adresář)
 node --test tests/unit.test.js tests/frontend.test.js
 
-# rychlá kontrola produkce po nasazení (<adresa /exec> viz poznámka pod příkazy)
+# rychlá kontrola produkce po nasazení (adresa API viz poznámka pod příkazy)
 robot --variable BASE_URL:<adresa /exec> --include smoke --outputdir vysledky tests/robot/
 
 # mutační testy kritické sady (práh 95 %)
@@ -35,7 +35,7 @@ python .github/scripts/kontrola-nastroju.py
 python .github/scripts/kontrola-architektury-testu.py
 ```
 
-Adresu `/exec` do dokumentace ani příkazů nepsat: CI ji bere z GitHub Secretu `RADAR_URL`, lokálně ji doplní výchozí hodnota v `tests/robot/resources.robot`, takže `--variable BASE_URL` stačí vynechat. Prázdná proměnná `$URL` by výchozí hodnotu přepsala prázdným řetězcem.
+Adresa `/exec` je veřejná adresa API (volá ji frontend v prohlížeči), není tajná. Výchozí hodnotu má `tests/robot/resources.robot`, proto jde `--variable BASE_URL` vynechat (CI ji předává ze Secretu `RADAR_URL`). Pozor: prázdná proměnná `$URL` výchozí hodnotu přepíše prázdným řetězcem.
 
 Kontroly boardu a defektů (`kontrola-boardu.py`, `kontrola-defektu.py`) a návrh práce (`navrh-session.py`) potřebují token GitHubu, postup je ve skillu. Spouštění Robot Frameworku, diagnostika pádů a tagy testů: skill, sekce 2. Počty testů jsou jen v README, tabulka „Testy v číslech“.
 
