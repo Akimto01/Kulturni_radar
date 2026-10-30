@@ -79,6 +79,11 @@ jobs:
       # je v rozcestníku Docs/README.md, všech 11 rolí má řádek a „plánováno #N“ ukazuje na otevřené
       # issue (zavřené je jen varování). Nejdřív samotest s negativními zkouškami, pak ostrá kontrola.
       # Jen čte, stačí standardní knihovna; issues čte gh s výchozím tokenem.
+      # Samotest pravidla „uzavřený defekt S1 nebo S2 má řádek v HISTORIE-INCIDENTU.md“ (vymyšlená
+      # data, bez sítě a tokenu). Ostrou kontrolu defektů dělá kontrola-projektu.yml s BOARD_READ_TOKEN.
+      - name: Samotest kontroly defektů
+        run: python .github/scripts/kontrola-defektu.py --test
+
       - name: Kontrola odkazů a rozcestníku dokumentace
         env:
           GH_TOKEN: ${{ github.token }}

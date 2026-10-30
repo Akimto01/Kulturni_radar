@@ -1,0 +1,22 @@
+# Historie incidentů – Kulturní radar
+
+Přehled incidentů na jednom místě: co se stalo, jak velký byl dopad a jak dlouho trval. Podrobnosti jsou v příbězích chyb, defektech a CHANGELOGu, tady je jen tabulka a odkazy.
+
+**Co je incident.** Událost s dopadem na uživatele nebo provoz: appka ukazovala chybná nebo žádná data, unikla tajná hodnota, nebo přestala fungovat kontrola, na kterou se spoléháme. Není to každá chyba: drobné defekty bez dopadu (S3 a méně) a chyby zachycené testem před nasazením se sem nezapisují. Každý uzavřený defekt se závažností S1 nebo S2 sem patří vždy a hlídá to `.github/scripts/kontrola-defektu.py` (pravidlo f). Stupnice závažnosti je v [DEFEKTY.md](DEFEKTY.md).
+
+**Doba** je čas od vzniku chyby (podle kódu a gitu) do opravy. Kde vznik nejde určit, je uvedena doba od odhalení do opravy. Počítá se v kalendářních dnech, datum v prvním sloupci je den odhalení.
+
+| Datum | Co se stalo | Dopad | Doba | Odkaz |
+|---|---|---|---|---|
+| 26. 10. 2026 | API a web vracely dávno proběhlé akce: `parseCzDate_` neuměla sériové číslo data ze Sheets | Proběhlé akce v seznamu (Brno 2, Praha 4, Znojmo 5; kontrolováno 6 měst), stejně tak v digestech, stavu „proběhlo“ a deduplikaci | 78 až 86 dní: řádky se sériovým číslem vznikly 1.–9. 8., opravené 26. 10. (v3.43) | [#17](https://github.com/Akimto01/Kulturni_radar/issues/17), [CHANGELOG](../CHANGELOG.md#backend-v343--parseczdate_-rozpozná-sériové-číslo-data--26-10-2026) |
+| 26. 10. 2026 | Závod pozdních odpovědí: při přepnutí města mohla zpožděná odpověď přepsat aktuální data | Pod Brnem 0 akcí a 0 míst, jen při pomalé odpovědi serveru (bez zpoždění se nereprodukovalo) | vznik se nezjišťoval, odhaleno a opraveno 26. 10. (Index v3.61) | [#26](https://github.com/Akimto01/Kulturni_radar/issues/26), [CHANGELOG](../CHANGELOG.md#indexhtml-v361--zahodit-pozdní-odpověď-při-přepínání-profilu--26-10-2026) |
+| 27. 10. 2026 | Města s diakritikou bez akcí: profil se kódoval dvakrát, server hledal neexistující město | Plzeň, Zlín a všechna další města s diakritikou: 0 akcí a 0 míst na kulturniradar.cz (Brno fungovalo) | 80 dní na webu (od 8. 8.), podle kódu 86 dní od 2. 8., opraveno 27. 10. (Index v3.65) | [#31](https://github.com/Akimto01/Kulturni_radar/issues/31), [příběh 1](PRIBEHY-CHYB.md#1-města-s-diakritikou-bez-akcí) |
+| 28. 10. 2026 | Týdenní E2E běh proti produkci byl desetkrát za sebou červený a nikdo o tom nevěděl: selhání plánovaného běhu nikam nehlásilo | Deset týdnů bez kontroly produkce; skutečné chyby by se v šumu přehlédly. Na uživatele přímý dopad nezjištěn | 66 dní: od prvního červeného plánovaného běhu 23. 8. do odhalení a oprav 28. 10. | [příběh 2](PRIBEHY-CHYB.md#2-ci-deset-týdnů-červená-a-nikdo-to-neviděl), [CHANGELOG](../CHANGELOG.md#ci-týdenní-rf-běh-byl-10-týdnů-červený--28-10-2026) |
+| 28. 10. 2026 | Únik tajných hodnot (PIN testovacího profilu, téma ntfy) do artefaktů CI veřejného repa | Hodnoty mohl stáhnout kdokoli přihlášený na GitHubu; rozsah nejde zpětně ověřit (retence artefaktů 14 dní, dochovány 4). Hodnoty vyměněny, artefakty smazány | v kódu od 2. 8. (téma) a 8. 8. (PIN), repo veřejné od 8. 10., opraveno 28. 10. | [#33](https://github.com/Akimto01/Kulturni_radar/issues/33), [příběh 3](PRIBEHY-CHYB.md#3-únik-tajných-hodnot-v-reportech-testů), [CHANGELOG](../CHANGELOG.md#bezpečnost-únik-tajných-hodnot-v-artefaktech-ci--28-10-2026) |
+| 29. 10. 2026 | Sledovaná města: běh `zpracovatSledovanaMesta` narazil na limit 6 min (361 s), počasí se nepřepočetlo a nikdo to nehlásil | Zmařené zaplacené volání AI, nic se nezapsalo, počasí zastaralé; jeden čtvrteční běh | zjištěno 29. 10.; část 1 opravena týž den (v3.51), ověření 2. 11., část 2 (samostatný trigger počasí, záznam o tvrdém ukončení) otevřená | [#49](https://github.com/Akimto01/Kulturni_radar/issues/49), [CHANGELOG](../CHANGELOG.md#backend-v351-rozpočet-sledovaných-měst-podle-délky-města-počasí-před-smyčkou-49-část-1--29-10-2026) |
+
+## Jak se udržuje
+
+- Při zavření defektu se závažností S1 nebo S2 se řádek přidá před zavřením (krok uzavírací šablony v [DEFEKTY.md](DEFEKTY.md)). Bez řádku hlásí kontrola defektů nález.
+- Ostatní incidenty (třeba výpadek kontroly) se zapisují při uzavření příslušného příběhu nebo issue. Datum, dopad a dobu před zápisem ověřit proti gitu, CHANGELOGu a issues.
+- Řádek hledá kontrola v posledním sloupci podle odkazu na issue (`[#N](…/issues/N)`), zmínka o issue v jiném sloupci nestačí.

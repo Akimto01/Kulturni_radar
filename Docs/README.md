@@ -18,8 +18,8 @@ Počty testů jsou jen v hlavním README (tabulka „Testy v číslech“).
 | QA lead | jak se testuje, co je pokryté a co ne | [testovani/TESTY.md](testovani/TESTY.md), [testovani/ARCHITEKTURA-TESTU.md](testovani/ARCHITEKTURA-TESTU.md), [testovani/POKRYTI.md](testovani/POKRYTI.md), [testovani/MUTACNI-TESTOVANI.md](testovani/MUTACNI-TESTOVANI.md) | máme, katalog testů plánováno [#44](https://github.com/Akimto01/Kulturni_radar/issues/44) |
 | Hodnotitel | důkaz postupu a práce s chybami | [README.md](../README.md) (Pro hodnotitele), [kvalita/PRIBEHY-CHYB.md](kvalita/PRIBEHY-CHYB.md), [kvalita/DEFEKTY.md](kvalita/DEFEKTY.md), [testovani/TESTOVACI-ANALYZA.md](testovani/TESTOVACI-ANALYZA.md) | máme, případová studie plánováno [#57](https://github.com/Akimto01/Kulturni_radar/issues/57) |
 | Vývojář a AI agent | jak je appka postavená a jak se v repu pracuje | [../AGENTS.md](../AGENTS.md), [aplikace/ARCHITEKTURA-APLIKACE.md](aplikace/ARCHITEKTURA-APLIKACE.md), [kulturni-radar-workflow/SKILL.md](kulturni-radar-workflow/SKILL.md) | máme, specifikace API plánováno [#59](https://github.com/Akimto01/Kulturni_radar/issues/59) |
-| Bezpečnost | ochrana tajných hodnot, hesel a dat | [aplikace/PROVOZ.md](aplikace/PROVOZ.md) (Bezpečnost), [aplikace/ARCHITEKTURA-APLIKACE.md](aplikace/ARCHITEKTURA-APLIKACE.md) (Uživatelské profily, hash PINu), [kvalita/PRIBEHY-CHYB.md](kvalita/PRIBEHY-CHYB.md) (únik tajných hodnot v reportech) | základ, plánováno [#65](https://github.com/Akimto01/Kulturni_radar/issues/65) |
-| Provoz | triggery, nasazení, co dělat při výpadku | [aplikace/PROVOZ.md](aplikace/PROVOZ.md) | máme, denní smoke plánováno [#54](https://github.com/Akimto01/Kulturni_radar/issues/54), historie incidentů [#61](https://github.com/Akimto01/Kulturni_radar/issues/61) |
+| Bezpečnost | ochrana tajných hodnot, hesel a dat | [aplikace/PROVOZ.md](aplikace/PROVOZ.md) (Bezpečnost), [aplikace/ARCHITEKTURA-APLIKACE.md](aplikace/ARCHITEKTURA-APLIKACE.md) (Uživatelské profily, hash PINu), [kvalita/PRIBEHY-CHYB.md](kvalita/PRIBEHY-CHYB.md) (únik tajných hodnot v reportech), [kvalita/HISTORIE-INCIDENTU.md](kvalita/HISTORIE-INCIDENTU.md) (incident #33) | základ, plánováno [#65](https://github.com/Akimto01/Kulturni_radar/issues/65) |
+| Provoz | triggery, nasazení, co dělat při výpadku, co se už stalo | [aplikace/PROVOZ.md](aplikace/PROVOZ.md), [kvalita/HISTORIE-INCIDENTU.md](kvalita/HISTORIE-INCIDENTU.md) | máme, denní smoke plánováno [#54](https://github.com/Akimto01/Kulturni_radar/issues/54) |
 | AI specialista | jak appka používá AI, kvalita a náklady | [aplikace/ARCHITEKTURA-APLIKACE.md](aplikace/ARCHITEKTURA-APLIKACE.md) (`callAnthropic_`), [README.md](../README.md) (Samokontrola, Náklady) | základ, plánováno [#64](https://github.com/Akimto01/Kulturni_radar/issues/64) |
 | Právník | osobní údaje a licence zdrojů | zatím žádný dokument | plánováno [#66](https://github.com/Akimto01/Kulturni_radar/issues/66) |
 | UX | vzhled, přístupnost, uživatelská příručka | [audity/AUDIT-SELEKTORU.md](audity/AUDIT-SELEKTORU.md), [audity/AUDIT-INDEXACE.md](audity/AUDIT-INDEXACE.md), [aplikace/design/](aplikace/design/) | základ, plánováno [#67](https://github.com/Akimto01/Kulturni_radar/issues/67) a [#68](https://github.com/Akimto01/Kulturni_radar/issues/68) |
@@ -56,6 +56,7 @@ Počty testů jsou jen v hlavním README (tabulka „Testy v číslech“).
 |---|---|
 | [kvalita/DEFEKTY.md](kvalita/DEFEKTY.md) | správa defektů: stupnice závažnosti a priority, životní cyklus, analýza úniků |
 | [kvalita/PRIBEHY-CHYB.md](kvalita/PRIBEHY-CHYB.md) | tři případové studie chyb od příznaku po pojistku |
+| [kvalita/HISTORIE-INCIDENTU.md](kvalita/HISTORIE-INCIDENTU.md) | tabulka incidentů: co se stalo, dopad, doba, odkaz; každý uzavřený defekt S1 a S2 má řádek |
 
 ## Audity
 

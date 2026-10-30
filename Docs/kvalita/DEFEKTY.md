@@ -56,7 +56,7 @@ projektu závisí na datech, která přinese až další běh (týdenní kontrol
 
 ### Uzavírací komentář
 
-Při zavření defektu se přidá komentář s těmito čtyřmi sekcemi (vzor ke zkopírování; kontrola úplnosti hledá všechny čtyři názvy). Pak se na boardu nastaví Stav defektu Uzavřený (Status Done se nastaví sám).
+Při zavření defektu se přidá komentář s těmito čtyřmi sekcemi (vzor ke zkopírování; kontrola úplnosti hledá všechny čtyři názvy). Pak se na boardu nastaví Stav defektu Uzavřený (Status Done se nastaví sám). **U defektu se závažností S1 nebo S2 se před zavřením přidá řádek do [HISTORIE-INCIDENTU.md](HISTORIE-INCIDENTU.md)** (datum, co se stalo, dopad, doba, odkaz na issue), jinak kontrola úplnosti hlásí nález.
 
 ```markdown
 ### Kořenová příčina
@@ -82,7 +82,7 @@ Počítá se aktivita, která defekt odhalila poprvé.
 
 ## Kontrola úplnosti
 
-Skript `.github/scripts/kontrola-defektu.py` projde všechny issues se štítkem bug a jen čte (nic neopravuje): hlídá (a) vyplněná pole boardu a milník, (b) sekce formuláře `defekt.yml` a titulek „Defekt: “ (výjimka pro issues do #33, které vznikly před formulářem), (c) soulad stavů (zavřené = Uzavřený, Zamítnutý nebo Nereprodukovatelný a Status Done, otevřené = jiný stav), (d) uzavírací komentář se čtyřmi sekcemi u zavřených defektů (u starších stačí komentář „Zpětná klasifikace“ s analýzou úniku) a (e) shodu tabulky klasifikace v tomto souboru s boardem. Výstup je tabulka nálezů, při nálezu exit 1.
+Skript `.github/scripts/kontrola-defektu.py` projde všechny issues se štítkem bug a jen čte (nic neopravuje): hlídá (a) vyplněná pole boardu a milník, (b) sekce formuláře `defekt.yml` a titulek „Defekt: “ (výjimka pro issues do #33, které vznikly před formulářem), (c) soulad stavů (zavřené = Uzavřený, Zamítnutý nebo Nereprodukovatelný a Status Done, otevřené = jiný stav), (d) uzavírací komentář se čtyřmi sekcemi u zavřených defektů (u starších stačí komentář „Zpětná klasifikace“ s analýzou úniku) (e) shodu tabulky klasifikace v tomto souboru s boardem a (f) řádek v [HISTORIE-INCIDENTU.md](HISTORIE-INCIDENTU.md) u každého uzavřeného defektu S1 nebo S2 (hledá odkaz na issue v posledním sloupci tabulky). Pravidlo f) ověří `python .github/scripts/kontrola-defektu.py --test`. Výstup je tabulka nálezů, při nálezu exit 1.
 
 Správu boardu a BACKLOGu pro všechna issues (nejen bug) hlídá druhý skript `kontrola-boardu.py` (chyby a varování, viz jeho hlavička) a `navrh-session.py` navrhuje práci podle času; všechny tři mají přepínač `--json` a sdílejí načítání z GitHubu v `gh_projekt.py`.
 

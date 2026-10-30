@@ -279,7 +279,8 @@ informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
   Nálezy (chyby i varování) uvést ve shrnutí; neopravovat automaticky, navrhnout opravu.
 - Defekt se zakládá vždy formulářem `defekt.yml` a po založení se vyplní všechna pole boardu (Závažnost, Priorita, Jak nalezeno, Stav defektu, milník).
 - Při zavírání defektu uzavírací komentář podle šablony v `Docs/kvalita/DEFEKTY.md` (Kořenová příčina, Oprava, Regresní test, Analýza úniku),
-  pak Stav defektu Uzavřený.
+  pak Stav defektu Uzavřený. U S1 a S2 před zavřením přidat řádek do `Docs/kvalita/HISTORIE-INCIDENTU.md`
+  (datum, co se stalo, dopad, doba, odkaz na issue v posledním sloupci), jinak `kontrola-defektu.py` hlásí nález (pravidlo f).
 - **WIP limit:** nejvýš 3 issues najednou In Progress (konstanta `WIP_LIMIT` v `kontrola-boardu.py`); víc je varování.
 - **Odhad u Todo:** issue ve stavu Todo nebo In Progress musí mít vyplněný Odhad (h), bez něj kontrola hlásí chybu. Todo jen pro vybrané na nejbližší práci
   (Doporučené pořadí, fáze 1 a 2), ostatní Backlog.
