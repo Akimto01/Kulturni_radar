@@ -33,6 +33,7 @@ node tests/mutace/spustit.js --kriticke
 python .github/scripts/kontrola-poctu-testu.py
 python .github/scripts/kontrola-nastroju.py
 python .github/scripts/kontrola-architektury-testu.py
+python .github/scripts/kontrola-dokumentace.py
 ```
 
 Adresa `/exec` je veřejná adresa API (volá ji frontend v prohlížeči), není tajná. Výchozí hodnotu má `tests/robot/resources.robot`, proto jde `--variable BASE_URL` vynechat (CI ji předává ze Secretu `RADAR_URL`). Pozor: prázdná proměnná `$URL` výchozí hodnotu přepíše prázdným řetězcem.

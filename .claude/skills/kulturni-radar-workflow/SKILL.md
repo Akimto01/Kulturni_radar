@@ -244,6 +244,13 @@ Soupis nástrojů a technologií je v README (sekce „Nástroje a technologie�
 `.github/scripts/kontrola-nastroju.py` (job `rf-dryrun`, identifikátor v prvním
 sloupci v zpětných apostrofech; `--test` ověří i negativní zkoušky).
 
+Odkazy v dokumentaci hlídá `.github/scripts/kontrola-dokumentace.py` (job `rf-dryrun`):
+relativní odkazy a kotvy v README, AGENTS.md, CLAUDE.md a `Docs/**` musí vést na existující
+cíl, každý `.md` v `Docs/` musí být v `Docs/README.md`, tabulka „Podle rolí“ musí mít všech
+11 rolí a „plánováno #N“ musí ukazovat na otevřené issue (po zavření issue je to varování:
+přepsat stav na „máme“). **Nový dokument v `Docs/` = řádek v rozcestníku ve stejném commitu.**
+Archiv a CHANGELOG se jako zdroje odkazů nekontrolují (historické cesty).
+
 ## 4. Konec pracovní session
 
 Na konci každé pracovní session (rozloučení, „jdu spát", „končím na dnešek",

@@ -59,7 +59,7 @@ Pořadí: AGENTS.md, smoke, rozcestník, katalog, kontrola odkazů, případová
 17. **Denní API smoke test v GitHub Actions** (~1 h): čtecí dotazy, notifikace jen při selhání, metrika dostupnosti do D3 a přehledu #52. → issue #54
 18. ~~**Rozcestník podle rolí v Docs/README.md** (~1 h): 11 rolí, stav oblastí máme, základ, plánováno #N.~~ **HOTOVO 30. 10. 2026** (viz CHANGELOG). → issue #55
 19. **Katalog testů na GitHub Pages** (~1 h) a odkazy z POKRYTI.md na scénáře v katalogu (riziko, test). Přesunuto z bodu 13. → issue #44
-20. **Kontrola odkazů a úplnosti rozcestníku v CI** (~1 h, až po #55), s negativní zkouškou. → issue #56
+20. ~~**Kontrola odkazů a úplnosti rozcestníku v CI** (~1 h, až po #55), s negativní zkouškou.~~ **HOTOVO 30. 10. 2026** (viz CHANGELOG). → issue #56
 21. **Případová studie na jednu stránku** (~1,5 h), čísla jen odkazem na README a D3; revize čtvrtletně. → issue #57
 22. **Robocop (RF) a ruff (Python) v CI s baseline** (~1,5 h); ESLint pro `.gs` jen jako poznámka na později. → issue #58
 23. **OpenAPI 3.1** (~3,5 h): specifikace se Spectralem a Redocem na Pages (~2 h) a po ní kontrola odpovědí proti schématu v API testech (~1,5 h); Swagger UI ne (Try it out proti produkci a otevřené #50), Schemathesis jen jako pozdější nápad pro čtecí dotazy. → issue #59, #60

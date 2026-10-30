@@ -1,5 +1,12 @@
 # Changelog
 
+## CI: kontrola odkazů a úplnosti rozcestníku (#56) – 30. 10. 2026
+- **Skript `.github/scripts/kontrola-dokumentace.py`** (standardní knihovna, jen čte, `--test`), krok v jobu `rf-dryrun` workflow `node-tests.yml` vedle kontroly počtů testů a nástrojů, každý push a PR. Kontroluje: (1) relativní odkazy v README, AGENTS.md, CLAUDE.md a `Docs/**` vedou na existující soubor se stejnou velikostí písmen jako na Linuxu, kotvy `#nadpis` na existující nadpis podle pravidel GitHubu (malá písmena, mezery na pomlčky, interpunkce pryč, diakritika zůstává, opakovaný nadpis dostane `-1`); odkazy v blocích kódu a v inline kódu se přeskočí; (2) každý `.md` v `Docs/` je v `Docs/README.md` a všech 11 rolí má řádek v „Podle rolí“; (3) „plánováno #N“ ukazuje na otevřené issue, zavřené je varování (stav čte `gh` s `GITHUB_TOKEN`, bez tokenu se bod přeskočí s výpisem).
+- **Výjimky:** `Docs/archiv/` a `Docs/CHANGELOG.md` se jako zdroje odkazů nekontrolují (historické cesty), odkazy na ně z ostatních dokumentů ano. Konstanta `VYNECHAT_ZDROJE` s odůvodněním ve skriptu.
+- **Samotest (13 zkoušek):** čistá data projdou; rozbitý odkaz, neexistující kotva, jiná velikost písmen v cestě, nezařazený dokument a chybějící role skončí chybou; zavřené issue a nezjištěný stav jsou jen varování; pět nadpisů dá správnou kotvu.
+- **Ostrý běh na repu:** 19 souborů, 0 chyb, 0 varování.
+- **Dokumentace:** ARCHITEKTURA-TESTU (C1), SKILL.md (obě kopie, nový dokument v `Docs/` = řádek v rozcestníku), AGENTS.md (příkaz mezi kontrolami repa), BACKLOG (bod 20). Workflow `rf-tests.yml` ani `publikovat-report.yml` se neměnily.
+
 ## Docs: rozcestník podle rolí (#55) – 30. 10. 2026
 - **Sekce „Podle rolí“ v `Docs/README.md`:** 11 rolí (PM, CEO, partner, QA lead, hodnotitel, vývojář a AI agent, bezpečnost, provoz, AI specialista, právník, UX), sloupce role, co hledá, kam jít, stav (máme / základ / plánováno #N). Odkazy vedou jen na existující dokumenty, u plánovaného na issue; kdo nemá dokument (právník), má „zatím žádný dokument“.
 - **Stav podle skutečnosti v repu, ne podle výchozího odhadu z issue:** vývojář a AI agent je **máme** (od #53 je AGENTS.md, výchozí odhad říkal „základ“); provoz a QA lead zůstávají máme.
