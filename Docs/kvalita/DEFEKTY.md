@@ -112,6 +112,9 @@ Správu boardu a BACKLOGu pro všechna issues (nejen bug) hlídá druhý skript 
 | [#49](https://github.com/Akimto01/Kulturni_radar/issues/49) | Sledovaná města: běh narazí na limit 6 min, přepočet počasí se nespustí a selhání se nenahlásí | S3 | P2 | Živá kontrola | Ověřuje se |
 | [#50](https://github.com/Akimto01/Kulturni_radar/issues/50) | Server neověřuje identitu uživatele u zápisových akcí: stačí veřejné `uzivatelId` | S2 | P3 | Analýza nebo review | Potvrzený |
 | [#4](https://github.com/Akimto01/Kulturni_radar/issues/4) | Cloudflare: crawlery GPTBot a ClaudeBot blokované, `robots.txt`, `sitemap.xml` a `favicon.svg` se na kulturniradar.cz neservírují (doplněno 29. 10. při kontrole úplnosti) | S4 | P4 | Živá kontrola | Potvrzený |
+| [#71](https://github.com/Akimto01/Kulturni_radar/issues/71) | Fuzzy slučování nechytí duplicity akcí se shodným nebo podobným názvem | S3 | P3 | Živá kontrola | Potvrzený |
+| [#72](https://github.com/Akimto01/Kulturni_radar/issues/72) | Stálá místa mají zastaralou sezónní otevírací dobu | S3 | P3 | Živá kontrola | Potvrzený |
+| [#73](https://github.com/Akimto01/Kulturni_radar/issues/73) | Akce hlášená jako změněná v po sobě jdoucích dnech bez skutečné změny | S4 | P4 | Živá kontrola | Potvrzený |
 
 #48 (29. 10. 2026) je první defekt založený formulářem `defekt.yml`, ne zpětnou klasifikací: nalezen čtením kódu při psaní tabulky triggerů v `PROVOZ.md` (#47). Opraveno v backendu v3.52 (3. 11. 2026) se třemi Node testy a uzavřeno po nasazení (`?api=meta` 3.52, smoke 11/11).
 
@@ -120,6 +123,8 @@ Správu boardu a BACKLOGu pro všechna issues (nejen bug) hlídá druhý skript 
 #4 (založeno 31. 8. 2026 z BACKLOGu) bylo při kontrole úplnosti 29. 10. 2026 klasifikováno zpětně: S4 (appka funguje, jen není dohledatelná pro AI crawlery a chybí soubory pro indexaci), P4 (bez časové tísně, vyžaduje práci v Cloudflare dashboardu), Živá kontrola (po nasazení v3.58 se `curl` na `robots.txt` a `sitemap.xml` vrátil SPA fallback; blokaci crawlerů Cloudflare podle dokumentace přidává do `robots.txt` automaticky).
 
 #50 (29. 10. 2026) našlo čtení kódu při psaní testů #35 dávky 4: akce `toggle`, `toggle-misto`, `filtry`, `set-notifikace` a `vygenerovat-ntfy-tema` berou jen veřejné `uzivatelId` (seznam profilů vrací `api=uzivatele` bez přihlášení), takže jde měnit cizí data a přesměrovat cizí notifikace na libovolný e-mail. Závažnost S2, priorita P3, protože dnes appku používá jen rodina; musí se vyřešit před otevřením přátelům (Cíl 2), souvisí s #16.
+
+#71 až #73 (3. 11. 2026) našla živá kontrola týdenního přehledu z 2. 11. a denních kontrol z 1. a 2. 11.: #71 duplicity akcí, které fuzzy slučování nechytí (Festival Janáček Brno ve třech podobách, Brnohraní 2026 dvakrát; samotest 1. 11. hlásil 11 duplicit), #72 zastaralá sezónní otevírací doba stálých míst (Lednice a Punkevní jeskyně s textem „Říjen“ v listopadu) a #73 falešně hlášená změna akce dva dny po sobě (podezření na kmitající pole). Všechny jsou ve stavu Potvrzený, příčiny se teprve analyzují. U #73 je S4 a P4: board má i S5 a P5, ale S5 je jen pro kosmetické vady a P5 pro „sledovat, opravit jen při zhoršení“.
 
 #18 zůstává ve stavu *Ověřuje se* a issue je proto otevřená: oprava počasí
 a souřadnic čeká na ověření v datech po čtvrtečním běhu sledovaných měst (issue #6).
