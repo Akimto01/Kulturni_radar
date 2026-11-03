@@ -1,5 +1,10 @@
 # Changelog
 
+## Docs: dokončení #35 (pokrytí kritických funkcí backendu), R4 na plné pokrytí – 3. 11. 2026
+- **Měření (`node --test --experimental-test-coverage`, 659 testů):** `kulturni_radar.gs` **92,10 % řádků, 86,08 % větví, 91,52 % funkcí** (29. 10.: 92,0 %, 85,0 %). Řádky obálky `sendUserNotifications` (2154 až 2168) nejsou mezi nepokrytými; nepokryté jsou jen `runSelfTest` a další funkce mimo seznam z #35. Hrubý přepočet nepokrytých rozsahů na funkce: všechny funkce ze seznamu z #35 jsou nad 90 % řádků (`sendUserNotifications_` 92 %, `zpracovatSledovanaMesta` 97 %, ostatní 100 %).
+- **POKRYTI.md:** R4 ◐ → ● (obálka `sendUserNotifications` 100 % řádků, selhání hlásí `notifyFail_`, samotest hlídá trigger; testy z #48), odstavec o hodnocení ◐ upraven, řádek v historii. Mutační ověření tří nových testů z #48 neproběhlo, řádek to uvádí.
+- **ARCHITEKTURA-TESTU (D3) a README:** pokrytí backendu 92,1 % řádků a 86,1 % větví k 3. 11. 2026. BACKLOG: bod 6 a téma „Pokrytí kritických funkcí backendu“ přeškrtnuté, blokace #38 na #35 padla.
+
 ## Backend v3.52 – samotest hlídá všechny triggery, selhání sendUserNotifications se hlásí (#48) – 3. 11. 2026
 ### Chyba
 - Seznam triggerů v `runSelfTest` byl ruční kopie, která se při přidání `sendUserNotifications` a `zpracovatSledovanaMesta` do `setupTriggers` nedoplnila, takže samotest chybějící trigger nenahlásil. `sendUserNotifications` byl navíc jediný trigger bez `try/catch` s `notifyFail_`, chyba byla vidět jen ve Spuštění Apps Scriptu. Nalezeno čtením kódu při psaní tabulky triggerů v `PROVOZ.md` (#47), ne za běhu.
