@@ -423,7 +423,7 @@ GitHub maskuje secrets jen v konzoli, ne v souborech z testů (`output.xml`,
 ### Měření pokrytí kódu (od 28. 10. 2026)
 
 `node --test --experimental-test-coverage tests/unit.test.js tests/frontend.test.js`
-(CI zatím jen vypisuje). Funguje jen proto, že `tests/harness.js` předává
+(CI od 3. 11. 2026 hlídá práh řádků backendu přes `kontrola-pokryti.py` a `baseline-pokryti.json`, #38; po zlepšení baseline zvýšit). Funguje jen proto, že `tests/harness.js` předává
 `vm.runInContext` jako `filename` URL souboru (`pathToFileURL`); holé jméno se
 v reportu neukáže. Aktuální hodnoty v README (Testy v číslech) a
 ARCHITEKTURA-TESTU.md, D3. Matice pokrytí podle názvů testů nadhodnocuje,

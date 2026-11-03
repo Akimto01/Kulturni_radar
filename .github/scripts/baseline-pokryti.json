@@ -1,0 +1,4 @@
+{
+  "_popis": "Pokrytí řádků apps-script/kulturni_radar.gs jednotkovými testy (kontrola-pokryti.py, issue #38). CI selže při poklesu pod hodnotu `radky`; po zlepšení zvýšit přes --zapsat-baseline.",
+  "radky": 92.1
+}

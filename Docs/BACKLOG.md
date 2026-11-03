@@ -40,7 +40,7 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 
 **Fáze 3 – pokrytí kritických funkcí:**
 6. ~~**Pokrytí kritických funkcí backendu** (hotové: stub tabulky a triggerů v harnessu, platba AI, triggery a hlídač, scénář #48 v backendu v3.52).~~ **HOTOVO 3. 11. 2026** (backend 92,1 % řádků a 86,1 % větví, viz POKRYTI.md a CHANGELOG). → issue #35
-7. **Práh pokrytí backendu v CI jako ratchet** (~30 min; blokace na #35 padla 3. 11. 2026). → issue #38
+7. ~~**Práh pokrytí backendu v CI jako ratchet** (~30 min; blokace na #35 padla 3. 11. 2026).~~ **HOTOVO 3. 11. 2026** (`kontrola-pokryti.py`, baseline 92,1 %, viz CHANGELOG). → issue #38
 
 **Fáze 4 – měření:**
 8. ~~**Měření pokrytí frontendu** (~1 h): harness doplní prázdné řádky podle pozice funkce.~~ **HOTOVO 29. 10. 2026** (viz CHANGELOG). → issue #39
@@ -191,7 +191,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
 - **Lokalizační testy podle `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola A4** (~4–6 h, odhad nejistý; `TZ=Europe/Prague` v CI je samostatná položka níže): test českého řazení, datum přes půlnoc a přechod letního času, E2E a API pro stálá místa s diakritikou. → issue #40
 - **Revize tagu `krehky` u 12 testů:** viz dávka 10 issue #34 (`Docs/audity/AUDIT-SOULADU-TESTU.md`) a `Docs/testovani/ARCHITEKTURA-TESTU.md`, kapitola C3. Bez vlastního odhadu. → issue #34
 - ~~**TZ pro jednotkové testy v CI** (~15 min): `TZ=Europe/Prague` v kroku Spustit testy v `node-tests.yml`, ať testy běží stejně lokálně i v CI (součást A4).~~ **HOTOVO 29. 10. 2026** (viz CHANGELOG). → issue #37
-- **Práh pokrytí backendu v CI (ratchet)** (~30 min; blokace na issue #35 padla 3. 11. 2026): selže při poklesu pokrytí řádků `kulturni_radar.gs` pod uloženou hodnotu. → issue #38
+- ~~**Práh pokrytí backendu v CI (ratchet)** (~30 min; blokace na issue #35 padla 3. 11. 2026): selže při poklesu pokrytí řádků `kulturni_radar.gs` pod uloženou hodnotu.~~ **HOTOVO 3. 11. 2026**. → issue #38
 - ~~**Měření pokrytí frontendu** (~1 h): harness `Index.html` doplní prázdné řádky podle pozice funkce, ať jde změřit pokrytí.~~ **HOTOVO 29. 10. 2026** (viz CHANGELOG). → issue #39
 - ~~**Pokrytí kritických funkcí backendu** (~5 h): platba AI (`runCheck_`, `dailyCheck`, `callAnthropicPlaces_`, `updateMista`, `apiNajdiProUzivatele_`), `apiSetFiltry_`, `setupTriggers`, `watchdogDailyCheck`, `notifyFail_` a přehledy, větve `apiToggle_`, `nastavPin_`. Předpoklad: stub tabulky (`SpreadsheetApp`) a `ScriptApp` v harnessu. Měření z 28. 10. 2026 viz `Docs/testovani/POKRYTI.md`. Dávka 1 hotová 29. 10. 2026 (harness, `setupTriggers`, `watchdogDailyCheck`), dávka 2 hotová 29. 10. 2026 (`runCheck_`, `dailyCheck`), dávka 3 hotová 29. 10. 2026 (`updateMista`, `callAnthropicPlaces_`, `apiNajdiProUzivatele_`, webové spuštění, obsazený zámek sledovaných měst), dávka 4 hotová 29. 10. 2026 (`apiSetFiltry_`, přehledy, `apiToggle_`, `nastavPin_`); scénář #48 dokončen 3. 11. 2026 (backend v3.52).~~ **HOTOVO 3. 11. 2026**. → issue #35
 - ~~**Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu** (defekt S3, P3; oprava spolu s testy watchdogu a notifikací v #35).~~ **HOTOVO 3. 11. 2026** (backend v3.52, viz CHANGELOG). → issue #48

@@ -15,11 +15,19 @@ jobs:
         with:
           node-version: '22'
 
-      # Pokrytí řádků backendu (kulturni_radar.gs) se zatím jen vypisuje, bez prahu.
+      # Spustí všechny testy a vypíše tabulku pokrytí; práh hlídá až následující krok.
       - name: Spustit testy
         env:
           TZ: Europe/Prague
         run: node --test --experimental-test-coverage tests/unit.test.js tests/frontend.test.js
+
+      # Práh pokrytí řádků backendu (ratchet, issue #38): selže, když pokrytí kulturni_radar.gs
+      # klesne pod .github/scripts/baseline-pokryti.json; po zlepšení vyzve ke zvýšení baseline.
+      # Nejdřív samotest na vymyšlených výstupech, pak ostré měření (testy backendu znovu, ~2 s).
+      - name: Práh pokrytí backendu (ratchet)
+        run: |
+          python3 .github/scripts/kontrola-pokryti.py --test
+          python3 .github/scripts/kontrola-pokryti.py
 
       # Tabulka výše u Index.html není spolehlivá (víc skriptů téhož souboru), skutečné
       # pokrytí frontendu počítá tento skript ze syrových dat V8. Zatím jen výpis.

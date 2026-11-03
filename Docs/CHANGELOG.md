@@ -1,5 +1,11 @@
 # Changelog
 
+## CI: práh pokrytí backendu (ratchet) (#38) – 3. 11. 2026
+- **Skript `.github/scripts/kontrola-pokryti.py`** (standardní knihovna): spustí `node --test --experimental-test-coverage` nad `tests/unit.test.js` (jen soubor `kulturni_radar.gs`, `TZ=Europe/Prague` si nastaví sám), přečte pokrytí řádků a větví a porovná pokrytí řádků s `.github/scripts/baseline-pokryti.json`. Exit 1 při poklesu pod baseline, 2 při chybě měření (testy selhaly, výstup bez řádku pokrytí). Při zlepšení o 0,1 procentního bodu a víc vyzve ke zvýšení baseline (`--zapsat-baseline`). Pokrytí větví se jen vypisuje.
+- **Baseline:** 92,1 % řádků (naměřeno 92,10 %, 86,08 % větví, 3. 11. 2026, po dokončení #35). Baseline se nesnižuje ručně kvůli projití CI: pokles znamená doplnit testy, nebo vědomé rozhodnutí zdůvodněné tady.
+- **Zapojení:** krok „Práh pokrytí backendu (ratchet)“ v jobu `node-testy` (`node-tests.yml`) za krokem „Spustit testy“: samotest `--test` (7 zkoušek na vymyšlených výstupech, bez Node) a ostré měření (testy backendu podruhé, ~2 s). Lint se neměnil: ruff 2 nálezy, Robocop 120, jako před skriptem.
+- **Dokumentace:** ARCHITEKTURA-TESTU (C1 nový řádek „Práh pokrytí backendu (ratchet)“, D3 u pokrytí kódu backendu), README (věta o pokrytí), SKILL.md (obě kopie, poznámka o měření pokrytí), BACKLOG (bod 7 a téma přeškrtnuté).
+
 ## Docs: dokončení #35 (pokrytí kritických funkcí backendu), R4 na plné pokrytí – 3. 11. 2026
 - **Měření (`node --test --experimental-test-coverage`, 659 testů):** `kulturni_radar.gs` **92,10 % řádků, 86,08 % větví, 91,52 % funkcí** (29. 10.: 92,0 %, 85,0 %). Řádky obálky `sendUserNotifications` (2154 až 2168) nejsou mezi nepokrytými; nepokryté jsou jen `runSelfTest` a další funkce mimo seznam z #35. Hrubý přepočet nepokrytých rozsahů na funkce: všechny funkce ze seznamu z #35 jsou nad 90 % řádků (`sendUserNotifications_` 92 %, `zpracovatSledovanaMesta` 97 %, ostatní 100 %).
 - **POKRYTI.md:** R4 ◐ → ● (obálka `sendUserNotifications` 100 % řádků, selhání hlásí `notifyFail_`, samotest hlídá trigger; testy z #48), odstavec o hodnocení ◐ upraven, řádek v historii. Mutační ověření tří nových testů z #48 neproběhlo, řádek to uvádí.
