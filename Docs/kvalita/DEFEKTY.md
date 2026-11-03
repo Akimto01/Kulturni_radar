@@ -108,12 +108,12 @@ Správu boardu a BACKLOGu pro všechna issues (nejen bug) hlídá druhý skript 
 | [#23](https://github.com/Akimto01/Kulturni_radar/issues/23) | Akce s datem „neuvedeno“ | S3 | P3 | Živá kontrola | Uzavřený |
 | [#21](https://github.com/Akimto01/Kulturni_radar/issues/21) | Duplicity stálých míst | S3 | P3 | Analýza nebo review | Uzavřený |
 | [#27](https://github.com/Akimto01/Kulturni_radar/issues/27) | Hláška prázdného stavu s časem jiného města | S4 | P3 | Automatický test (E2E nebo API) | Uzavřený |
-| [#48](https://github.com/Akimto01/Kulturni_radar/issues/48) | Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu | S3 | P3 | Analýza nebo review | Potvrzený |
+| [#48](https://github.com/Akimto01/Kulturni_radar/issues/48) | Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu | S3 | P3 | Analýza nebo review | Uzavřený |
 | [#49](https://github.com/Akimto01/Kulturni_radar/issues/49) | Sledovaná města: běh narazí na limit 6 min, přepočet počasí se nespustí a selhání se nenahlásí | S3 | P2 | Živá kontrola | Ověřuje se |
 | [#50](https://github.com/Akimto01/Kulturni_radar/issues/50) | Server neověřuje identitu uživatele u zápisových akcí: stačí veřejné `uzivatelId` | S2 | P3 | Analýza nebo review | Potvrzený |
 | [#4](https://github.com/Akimto01/Kulturni_radar/issues/4) | Cloudflare: crawlery GPTBot a ClaudeBot blokované, `robots.txt`, `sitemap.xml` a `favicon.svg` se na kulturniradar.cz neservírují (doplněno 29. 10. při kontrole úplnosti) | S4 | P4 | Živá kontrola | Potvrzený |
 
-#48 (29. 10. 2026) je první defekt založený formulářem `defekt.yml`, ne zpětnou klasifikací: nalezen čtením kódu při psaní tabulky triggerů v `PROVOZ.md` (#47), oprava spolu s testy v #35.
+#48 (29. 10. 2026) je první defekt založený formulářem `defekt.yml`, ne zpětnou klasifikací: nalezen čtením kódu při psaní tabulky triggerů v `PROVOZ.md` (#47). Opraveno v backendu v3.52 (3. 11. 2026) se třemi Node testy a uzavřeno po nasazení (`?api=meta` 3.52, smoke 11/11).
 
 #49 (29. 10. 2026) našla živá kontrola při ověřovačce #6: čtvrteční běh `zpracovatSledovanaMesta` skončil na časovém limitu 6 minut (361 s) uprostřed volání AI třetího města a přepočet počasí se vůbec nespustil. Čtení kódu potvrdilo, že rozpočet 4,5 minuty se kontroluje jen před městem (město trvá kolem 2 minut), počasí běží až za smyčkou a přerušení na limitu se nikam nezapíše. Hypotéza, že datum na hraně předpovědi (dnes + 7) skončí jako CHYBA místo NA, se nepotvrdila: `vyhodnotPocasiUdalosti_` vrací CHYBA jen tehdy, když neodpověděl Open-Meteo ani met.no; tři záznamy CHYBA s datem 5. 11. jsou nejspíš starší stav, který se kvůli #49 nepřepsal. Samostatný defekt proto nevznikl.
 

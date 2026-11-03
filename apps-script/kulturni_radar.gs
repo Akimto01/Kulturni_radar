@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.51 (29. 10. 2026) – sledovaná města: rozpočet běhu podle délky města, počasí před smyčkou měst, záznam přerušení do KONTROL (#49)
- * (předchozí: 3.50 – týdenní report kvality uvádí i počet fuzzy sloučení v AKCE (sloupec Z))
+ * Verze: 3.52 (3. 11. 2026) – samotest hlídá všechny triggery ze setupTriggers, selhání sendUserNotifications pošle notifikaci, apiNajdiProUzivatele_ vrací skutečný počet aktualizovaných (#48)
+ * (předchozí: 3.51 – sledovaná města: rozpočet běhu podle délky města, počasí před smyčkou měst, záznam přerušení do KONTROL (#49))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.51';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.52';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -2152,7 +2152,13 @@ function sendUserNotifications_(dryRun) {
 /** Trigger cíl (time-based, viz setupTriggers) – no-arg wrapper, stejný
  *  vzor jako menuRunNow/dailyCheck. */
 function sendUserNotifications() {
-  sendUserNotifications_(false);
+  try {
+    sendUserNotifications_(false);
+  } catch (err) {
+    // #48: dřív bez try/catch – chyba byla vidět jen ve Spuštění Apps Scriptu
+    notifyFail_('Notifikace uživatelům selhaly', err);
+    throw err;
+  }
 }
 
 /** Ruční suchý běh z menu Sheets – nic neodešle, jen zaloguje a zobrazí
@@ -2414,7 +2420,7 @@ function apiNajdiProUzivatele_(ss, uzivatelId, tok) {
     zajistitSouradniceProAkce_(ss, events);
     logKontrola_(ss, typKontroly, cfg, stats, zdroje.length, vyberModelProKontrolu_(typKontroly));
 
-    return { ok: true, jmeno: uzivatel.jmeno, nove: stats.nove || 0, aktualizovano: stats.aktualizovano || 0 };
+    return { ok: true, jmeno: uzivatel.jmeno, nove: stats.nove || 0, aktualizovano: stats.zmenene || 0 };
   } finally {
     lock.releaseLock();
   }
@@ -3333,6 +3339,18 @@ function auditDat_(ss) {
   return out;
 }
 
+/** #48: obslužné funkce všech triggerů ze setupTriggers (každá jednou).
+ *  Samotest hlídá, že žádný nechybí; test v unit.test.js ověřuje, že seznam
+ *  odpovídá tomu, co setupTriggers skutečně zakládá (ochrana proti rozjetí). */
+const POTREBNE_TRIGGERY = ['onEditInstallable', 'dailyCheck', 'sendUserNotifications',
+  'weeklyDigest', 'weekendDigest', 'updateMista', 'runSelfTest', 'watchdogDailyCheck',
+  'zpracovatSledovanaMesta'];
+
+/** PURE: které obslužné funkce z POTREBNE_TRIGGERY chybí mezi existujícími triggery. */
+function chybejiciTriggery_(mame) {
+  return POTREBNE_TRIGGERY.filter(f => (mame || []).indexOf(f) < 0);
+}
+
 /** Týdenní samotest prostředí + hygiena dat; výsledek jde notifikací. */
 function runSelfTest() {
   const problemy = [];
@@ -3355,10 +3373,10 @@ function runSelfTest() {
   if (props.getProperty('NTFY_TOPIC') || props.getProperty('NOTIFY_EMAIL')) ok();
   else problemy.push('není nastaven žádný notifikační kanál');
 
-  const potrebne = ['onEditInstallable', 'dailyCheck', 'weeklyDigest', 'weekendDigest',
-    'updateMista', 'runSelfTest', 'watchdogDailyCheck'];
   const mame = ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction());
-  potrebne.forEach(f => { if (mame.indexOf(f) >= 0) ok(); else problemy.push('chybí trigger ' + f); });
+  const chybi = chybejiciTriggery_(mame);
+  POTREBNE_TRIGGERY.forEach(f => { if (chybi.indexOf(f) < 0) ok(); });
+  chybi.forEach(f => problemy.push('chybí trigger ' + f));
 
   try {
     const p = ss.getSheetByName(SHEET.PREHLED);

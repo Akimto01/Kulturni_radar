@@ -5568,3 +5568,33 @@ test('3b-5: upsertEvents_ – akce bez názvu se zapíše a v seznamu má název
   assert.equal(stats.noveNazvy[0].t, ' (15. 6. 2026)');
   assert.equal(sh.rows[1][4], '');
 });
+
+// ---------------------------------------------------------------------------
+// #48: samotest hlídá všechny triggery, sendUserNotifications hlásí selhání
+// ---------------------------------------------------------------------------
+
+test('#48 POTREBNE_TRIGGERY odpovídá obslužným funkcím, které zakládá setupTriggers (ochrana proti rozjetí)', () => {
+  const ctx = nactiRadar({ ss: fakeSpreadsheet({}), triggery: [] });
+  ctx.setupTriggers();
+  const zalozene = [...new Set(ctx.__triggery.vytvorene.map(z => z.funkce))].sort();
+  // chybejiciTriggery_([]) vrací celý seznam POTREBNE_TRIGGERY (const není vlastností vm kontextu)
+  assert.deepEqual([...ctx.chybejiciTriggery_([])].sort(), zalozene);
+});
+
+test('#48 chybejiciTriggery_: hlásí sendUserNotifications a zpracovatSledovanaMesta, když chybí', () => {
+  const ctx = nactiRadar();
+  const vsechny = [...ctx.chybejiciTriggery_([])];
+  const bezDvou = vsechny.filter(f => f !== 'sendUserNotifications' && f !== 'zpracovatSledovanaMesta');
+  assert.deepEqual([...ctx.chybejiciTriggery_(bezDvou)], ['sendUserNotifications', 'zpracovatSledovanaMesta']);
+  assert.deepEqual([...ctx.chybejiciTriggery_(vsechny.concat(['jinyTrigger']))], []);
+  assert.equal(ctx.chybejiciTriggery_(undefined).length, 9);
+});
+
+test('#48 sendUserNotifications: selhání → notifyFail_ „Notifikace uživatelům selhaly“ a výjimka se propustí', () => {
+  const rozbita = { getSheetByName: () => { throw new Error('list nečitelný'); } };
+  const t = nactiRadar({ ss: rozbita, properties: { NTFY_TOPIC: 't' } });
+  assert.throws(() => t.sendUserNotifications(), /list nečitelný/);
+  assert.equal(t.__odeslaneEmaily.length, 1);
+  assert.equal(t.__odeslaneEmaily[0].predmet, 'Notifikace uživatelům selhaly');
+  assert.equal(t.__odeslaneEmaily[0].telo, 'Chyba: list nečitelný');
+});

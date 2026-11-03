@@ -35,11 +35,11 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 
 **Fáze 2 – zpevnění základu (po 2. 11.):**
 5. **Sjednocení testů s architekturou, dávka 1** (~1,5–2 h): suite-level teardown a `Close Page`. Pak dávky 2 (~45 min), 3 (~1 h) a 5 (~1–1,5 h). Audit `Docs/audity/AUDIT-SOULADU-TESTU.md`. → issue #34
-5a. **Opravit #48 tichá selhání** (~30 min, po nedělním samotestu 1. 11.): samotest hlídá všechny triggery ze setupTriggers, sendUserNotifications hlásí chybu přes notifyFail_, pole aktualizovano v odpovědi apiNajdiProUzivatele_; testy podle scénáře v #35, nasazení backendu. → issue #48
+5a. ~~**Opravit #48 tichá selhání** (~30 min, po nedělním samotestu 1. 11.): samotest hlídá všechny triggery ze setupTriggers, sendUserNotifications hlásí chybu přes notifyFail_, pole aktualizovano v odpovědi apiNajdiProUzivatele_; testy podle scénáře v #35, nasazení backendu.~~ **HOTOVO 3. 11. 2026** (backend v3.52, viz CHANGELOG). → issue #48
 5b. **Triáž Dependabot alertů (16)** (~1 h, do 3. 11.): po balíčcích (`undici` 11, `sharp` 2 a `postal-mime` 1 ve workeru, `qs` 2 v `tests/mutace`), rozlišit runtime a vývojové závislosti, u každého alertu závažnost a opravitelnost bez porušení pravidla o verzích starších 14 dní; `postal-mime` první (runtime Workeru, parsuje nedůvěryhodné e-maily), potvrzená dosažitelná zranitelnost = defekt formulářem. → issue #70
 
 **Fáze 3 – pokrytí kritických funkcí:**
-6. **Pokrytí kritických funkcí backendu** (zbývá jen scénář #48, ~0,5 h; hotové: stub tabulky a triggerů v harnessu, platba AI, triggery a hlídač). → issue #35
+6. **Pokrytí kritických funkcí backendu** (scénář #48 hotový 3. 11. 2026 v backendu v3.52, zbývá ověřit, zda je tím #35 dokončené; hotové: stub tabulky a triggerů v harnessu, platba AI, triggery a hlídač). → issue #35
 7. **Práh pokrytí backendu v CI jako ratchet** (~30 min, až po #35). → issue #38
 
 **Fáze 4 – měření:**
@@ -194,7 +194,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
 - **Práh pokrytí backendu v CI (ratchet)** (~30 min, až po issue #35): selže při poklesu pokrytí řádků `kulturni_radar.gs` pod uloženou hodnotu. → issue #38
 - ~~**Měření pokrytí frontendu** (~1 h): harness `Index.html` doplní prázdné řádky podle pozice funkce, ať jde změřit pokrytí.~~ **HOTOVO 29. 10. 2026** (viz CHANGELOG). → issue #39
 - **Pokrytí kritických funkcí backendu** (~5 h): platba AI (`runCheck_`, `dailyCheck`, `callAnthropicPlaces_`, `updateMista`, `apiNajdiProUzivatele_`), `apiSetFiltry_`, `setupTriggers`, `watchdogDailyCheck`, `notifyFail_` a přehledy, větve `apiToggle_`, `nastavPin_`. Předpoklad: stub tabulky (`SpreadsheetApp`) a `ScriptApp` v harnessu. Měření z 28. 10. 2026 viz `Docs/testovani/POKRYTI.md`. Dávka 1 hotová 29. 10. 2026 (harness, `setupTriggers`, `watchdogDailyCheck`), dávka 2 hotová 29. 10. 2026 (`runCheck_`, `dailyCheck`), dávka 3 hotová 29. 10. 2026 (`updateMista`, `callAnthropicPlaces_`, `apiNajdiProUzivatele_`, webové spuštění, obsazený zámek sledovaných měst), dávka 4 hotová 29. 10. 2026 (`apiSetFiltry_`, přehledy, `apiToggle_`, `nastavPin_`); z #35 zbývá jen scénář #48. → issue #35
-- **Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu** (defekt S3, P3; oprava spolu s testy watchdogu a notifikací v #35). → issue #48
+- ~~**Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu** (defekt S3, P3; oprava spolu s testy watchdogu a notifikací v #35).~~ **HOTOVO 3. 11. 2026** (backend v3.52, viz CHANGELOG). → issue #48
 - **Katalog testů na GitHub Pages** (~30 min): `publikovat-report.yml` vygeneruje `python -m robot.testdoc tests/robot/` a zveřejní ho vedle reportu a logu (přidat na seznam povolených souborů webu, odkaz z index.html, projde stejnou kontrolou úniku). Tím se podloží tvrzení v TESTY.md §9, že testdoc nahrazuje Test Case Specification podle ISO 29119. → issue #44
 
 ## Probíhající měření
