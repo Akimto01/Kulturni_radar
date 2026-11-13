@@ -214,6 +214,18 @@ den, pondělní souhrn čekat až odpoledne.
   pak `python -m robocop` a `python -m ruff` (nebo `python .github/scripts/kontrola-lintu.py` z tohoto prostředí).
   Výstup na Windows číst ze souboru nebo přes `--reports json_report`: rich při přesměrování do roury (`| head`)
   padá na `OSError`.
+- **RF proměnné s JavaScriptem** (13. 11. 2026): `separator=SPACE` jako první hodnotu RF nebere jako značku
+  a nechá ho v textu (JavaScript pak začínal `separator=SPACE (mapa) => …` a `Evaluate JavaScript` padal na syntaxi).
+  Hodnoty víceřádkové proměnné RF spojí mezerou sám, značka není potřeba. Uvnitř JS žádné komentáře `//`.
+  Dry run JavaScript nespouští: proměnnou ověřit přes `robot.running.TestSuiteBuilder` (hodnoty spojit mezerou)
+  a `node -e "new Function('return ' + kod)"`, pak mapové testy proti produkci.
+- **Lokální RF běhy:** pro každý běh nový `--outputdir`. Lokální běh (Windows) umí viset na Suite Teardown
+  (`Close Browser`); po zastavení zůstane `output.xml` smíchaný se staršími daty a plete rozbor pádu
+  (13. 11. 2026 třikrát). V CI se to neděje.
+- **Testy mapy** nesmí počítat se stavem mapy z předchozího testu: po `flyTo` může být pin `nth=0` mimo viditelnou
+  část a klik zachytí hlavička. Klikat přes klíčové slovo „Kliknout na pin ve viditelné části mapy“. Na konec pohybu
+  mapy čekat přes klid podpisu (transform panelu a pozice pinů), ne přes třídu `leaflet-zoom-anim`, kterou `flyTo`
+  nedrží (#77).
 
 ## 3. Sync CHANGELOG.md ↔ BACKLOG.md
 
@@ -322,6 +334,8 @@ informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
   to do zavření hlásí jako chybu („přeškrtnutá, ale otevřené“). Proto issue zavřít hned po pushi a CI (odškrtnout
   checklist, komentář, `gh issue close`); `kontrola-boardu.py`, `kontrola-defektu.py` i ruční běh `kontrola-projektu.yml`
   spouštět až po zavření, jinak se falešný nález zapíše do #52 a odejde v notifikaci (stalo se u #57 a #63).
+  V zadání zavření vždy uvést i odškrtnutí všech bodů checklistu v těle issue, jinak `kontrola-boardu.py` hlásí chybu
+  (13. 11. 2026 u #76).
 - **WIP limit:** nejvýš 3 issues najednou In Progress (konstanta `WIP_LIMIT` v `kontrola-boardu.py`); víc je varování.
 - **Odhad u Todo:** issue ve stavu Todo nebo In Progress musí mít vyplněný Odhad (h), bez něj kontrola hlásí chybu. Todo jen pro vybrané na nejbližší práci
   (Doporučené pořadí, fáze 1 a 2), ostatní Backlog.
@@ -757,6 +771,8 @@ fungují spolehlivě.
   gid listu se zjistí kliknutím na záložku (URL se změní). NIKDY nepsat
   do Sheetu přes pole názvu buňky ani klávesnicí – snadno se přepíše
   buňka v aktuálním listu (typicky KRITÉRIA, kde B2 řídí automatiku).
+- Rozbor dat z tabulky (od 13. 11. 2026): Vojta stáhne list jako CSV (Soubor → Stáhnout → .csv) a rozbor dělá
+  hlavní chat. Do veřejných issues jen počty a závěry, nikdy obsah e-mailů ani adresy.
 
 ### Sondy po přepnutí profilu
 Po přepnutí profilu v dropdownu nikdy nečekat na „nějakou“ kartu – podmínku splní ještě karty předchozího profilu a sonda změří starý stav (27. 10. 2026: všechna města hlásila 17 karet Brna). Buď přejít přes město „nikdy neprohledáno“ (0 karet, pak čekat na nové karty), nebo počkat pevnou dobu (~8 s) a ověřit obsah (např. název první karty). Stejná past jako u RF testu „Opakované přepnutí profilu“ (opraveno v Index.html v3.62).

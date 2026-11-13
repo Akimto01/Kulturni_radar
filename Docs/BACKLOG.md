@@ -147,6 +147,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
 - Zvážit hlídání zůstatku kreditu nebo stavu auto-reloadu Anthropic (13. 11. 2026 auto-reload vypnutý po selhání platby, zjištěno náhodou v konzoli)
 
 ## Testovací dluh
+- Sledovat: lokální RF běh visí po posledním testu na Suite Teardown (13. 11. 2026 třikrát, Windows, Browser Library); v CI se neděje. Zjistit příčinu (Close Browser, otevřené procesy node/chrome).
 - Sledovat: test „Sekce stálých míst existuje“ spadl 13. 11. 2026 v ručním CI běhu 43514270130 (TimeoutError 15 s na `#mista-sekce .misto-karta`), jednorázově po večeru s mnoha nasazeními a běhy; při opakování ve 2 ze 3 běhů vyšetřit.
 - ~~Sledovat: nestabilní test mapy „Tlačítko Zobrazit v seznamu v popupu“ (1. 11. pád: element not stable / detached, 8. 11. prošel); opravit (čekat na ustálení popupu) při druhém pádu ve 3 bězích.~~ **VYŘEŠENO 13. 11. 2026**: příčina byla chyba aplikace #77.
 - ~~Ruff B905 (`zip()` bez `strict=`) na dvou místech `generovat-index-reportu.py` (2 nálezy v baseline lintu): opravit **po neděli 1. 11. 2026**, soubor se do té doby nemění (první plánovaný běh publikace reportu). Souvisí s #34 (úklid nálezů lintu po dávkách) a s issue #58 (baseline).~~ **HOTOVO 13. 11. 2026**: oba `zip()` mají `strict=True`, ruff 0 nálezů, baseline přepsaná (viz CHANGELOG).
