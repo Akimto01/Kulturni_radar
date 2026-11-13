@@ -114,7 +114,7 @@ def sestav_stranku(meta, repo, sady):
     beh_url = str(meta.get('html_url', ''))
     beh = (f'<a href="{e(beh_url)}">běh č. {e(meta.get("run_number", "?"))} v GitHub Actions</a>'
            if beh_url.startswith(f'https://github.com/{repo}/actions/runs/') else 'neznámý')
-    karty = ''.join(karta_sady(k, n, p, st, ex) for (k, n, p), (st, ex) in zip(SADY, sady))
+    karty = ''.join(karta_sady(k, n, p, st, ex) for (k, n, p), (st, ex) in zip(SADY, sady, strict=True))
     return f"""<!doctype html>
 <html lang="cs">
 <head>
@@ -168,7 +168,7 @@ def main():
         sady.append((nacti_statistiky(vysledky / klic / 'output.xml'), existuji))
 
     (vystup / 'index.html').write_text(sestav_stranku(meta, a.repo, sady), encoding='utf-8')
-    for klic, (stat, existuji) in zip((s[0] for s in SADY), sady):
+    for klic, (stat, existuji) in zip((s[0] for s in SADY), sady, strict=True):
         print(klic, stat, existuji)
     return 0
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Lint: ruff B905 v generovat-index-reportu.py, baseline ruff 0; prověření #76 – 13. 11. 2026
+- **Ruff B905:** oba `zip()` v `.github/scripts/generovat-index-reportu.py` (karty sad a souhrn) mají `strict=True`: `SADY` a `sady` vznikají jedna k jedné, rozdílná délka by byla chyba. Ověřeno spuštěním generátoru nad artefaktem `rf-reporty` z běhu 43514270130 (výstup do scratchpadu, index i report a log obou sad vygenerované, API 8/9, frontend 52/53).
+- **Baseline lintu:** ruff 2 → 0 (`--zapsat-baseline`), Robocop beze změny 120. ARCHITEKTURA-TESTU (tabulka slabin) a BACKLOG (Testovací dluh, B905 přeškrtnuté) aktualizované.
+- **#76 bez defektu:** na exportu AKCE z 13. 11. 2026 má 5 akcí bez rozpoznatelného data v „Datum od“ text „neuvedeno“ (všechny podle ID proběhly v srpnu až říjnu; známý ruční úklid z BACKLOGu, kód je od v3.48 nevytváří, #23). Výlov rybníka Olšovec 2026 (7.–8. 11.) je dvoudenní akce, v okně 8. 11. byl oprávněně. BACKLOG: položka přeškrtnutá s „PROVĚŘENO 13. 11. 2026“.
+
 ## Index.html v3.66 – popup pinu u okraje mapy (#77), okno testu ntfy (#78) – 13. 11. 2026
 ### Chyba #77 (S3, P2)
 - Handler `mapaLeaflet.on('movestart zoomstart', closePopup)` zavíral popup i při automatickém posunu mapy: Leaflet autoPan otevíraného popupu posouvá mapu přes `panBy`, což vyvolá `movestart`, takže popup pinu u okraje se hned po otevření zavřel. Živě ověřeno 13. 11. v prohlížeči (pin 40 px od okraje: popup zmizel; s `dragstart zoomstart` zůstal, zoom ho dál zavírá).
