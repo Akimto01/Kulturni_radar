@@ -53,7 +53,7 @@
 | SOUŘADNICE | *(v3.14)* cache geokódovaných míst (Nominatim/OpenStreetMap) klíčovaná `misto|obec` — jen se přidává, nikdy nemaže/netogluje |
 | POČASÍ | *(v3.22)* předpověď pro budoucí AKCE (id akce → stav/kód/teplota), přepočítává se 2× týdně (viz níže), oddělený list bez zásahu do AKCE |
 | SLEDOVANÁ MĚSTA | *(v3.16)* seznam profilů (musí přesně sedět s LOKALITY, sloupec B) k tichému doplňování dat na pozadí, bez notifikace |
-| EMAIL_TIPY | *(v3.29)* fronta tipů z e-mailového webhooku (Cloudflare Worker) — stav nové → zpracováno-ok/zpracováno-chyba/nelze-ověřit |
+| EMAIL_TIPY | *(v3.29)* fronta tipů z e-mailového webhooku (Cloudflare Worker) – stav nové → zpracováno-ok/zpracováno-chyba/nelze-ověřit/test-ignorováno |
 
 ## Hlavní datový tok (mimořádná/denní kontrola)
 
@@ -171,7 +171,10 @@ Frontu zpracovává `zpracovatEmailTipy_` jednou denně (součást `dailyCheck`,
 před běžnou kontrolou, časově rozpočtováno 2 min): AI ověří obsah webem
 (`callAnthropicEmailTip_`), obec se mapuje na profil přesnou shodou proti
 LOKALITY; bez shody se akce nezapíše (raději nic než nespolehlivá data) a
-řádek dostane stav „nelze-ověřit“ k ruční kontrole.
+řádek dostane stav „nelze-ověřit“ k ruční kontrole. Zpráva z testovacího
+profilu (řádek „Uživatelský profil: rf-…“, posílá ji RF test kontaktního
+formuláře) dostane od v3.53 stav „test-ignorováno“ bez AI ověření a nezapočítá
+se do denní notifikace, aby každý běh RF nestál jedno AI volání a nedělal šum (#79).
 
 ## Notifikace (sendNotification_)
 

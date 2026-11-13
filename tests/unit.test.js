@@ -5598,3 +5598,44 @@ test('#48 sendUserNotifications: selhání → notifyFail_ „Notifikace uživat
   assert.equal(t.__odeslaneEmaily[0].predmet, 'Notifikace uživatelům selhaly');
   assert.equal(t.__odeslaneEmaily[0].telo, 'Chyba: list nečitelný');
 });
+
+// ---------------------------------------------------------------------------
+// #79: zprávy z testovacího profilu se ve frontě EMAIL_TIPY neověřují přes AI
+// ---------------------------------------------------------------------------
+
+const TELO_RF_TEST = 'Jméno: RF Test\\nEmail pro odpověď: (neuveden)\\nUživatelský profil: rf-test\\nOdesláno: 9. 11. 2026 0:49\\n\\nAutomaticky RF test (E2E)';
+
+test('#79 jeTestovaciEmailTip_: profil rf- s doslovným i skutečným koncem řádku → true, jiný profil a bez řádku → false', () => {
+  const ctx = nactiRadar();
+  assert.equal(ctx.jeTestovaciEmailTip_(TELO_RF_TEST), true);
+  assert.equal(ctx.jeTestovaciEmailTip_('Jméno: X\nUživatelský profil: rf-test\nOdesláno: dnes'), true);
+  assert.equal(ctx.jeTestovaciEmailTip_('Jméno: Vojta\\nUživatelský profil: vojta\\nOdesláno: dnes'), false);
+  assert.equal(ctx.jeTestovaciEmailTip_('Uživatelský profil: (anonymní)'), false);
+  assert.equal(ctx.jeTestovaciEmailTip_('Tip na koncert v Řečkovicích, profil rf-test nikde'), false);
+  assert.equal(ctx.jeTestovaciEmailTip_(undefined), false);
+});
+
+test('#79 zpracovatEmailTipy_: zpráva z testovacího profilu → "test-ignorováno" bez AI volání, mimo statistiku', () => {
+  const ss = zakladniSs_([emailTipRadek_('a', TELO_RF_TEST)]);
+  const volane = [];
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([], volane) });
+  const stats = ctx.zpracovatEmailTipy_(ss);
+  shodneNapricRealmy(stats, { celkem: 0, ok: 0, chyba: 0, nelzeOverit: 0 });
+  assert.equal(volane.length, 0, 'testovací zpráva nesmí volat AI');
+  const radek = ss.getSheetByName('EMAIL_TIPY').getRange(2, 1, 1, 9).getValues()[0];
+  assert.equal(radek[5], 'test-ignorováno');
+  assert.match(radek[8], /testovac/);
+});
+
+test('#79 zpracovatEmailTipy_: testovací a skutečný tip vedle sebe → AI jen pro skutečný', () => {
+  const ss = zakladniSs_([emailTipRadek_('a', TELO_RF_TEST), emailTipRadek_('b', 'nesmyslný text')]);
+  const resp = anthropicResp({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'report_events', input: { events: [] } }] });
+  const volane = [];
+  const ctx = nactiRadar({ properties: { ANTHROPIC_API_KEY: 'k' }, urlFetch: frontaFetchu([resp], volane) });
+  const stats = ctx.zpracovatEmailTipy_(ss);
+  shodneNapricRealmy(stats, { celkem: 1, ok: 0, chyba: 0, nelzeOverit: 1 });
+  assert.equal(volane.length, 1);
+  const radky = ss.getSheetByName('EMAIL_TIPY').getRange(2, 1, 2, 9).getValues();
+  assert.equal(radky[0][5], 'test-ignorováno');
+  assert.equal(radky[1][5], 'nelze-ověřit');
+});

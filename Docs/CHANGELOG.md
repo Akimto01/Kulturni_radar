@@ -1,5 +1,17 @@
 # Changelog
 
+## Backend v3.53 – testovací e-mailové tipy bez AI ověření (#79) – 13. 11. 2026
+### Chyba
+- RF test odeslání kontaktního formuláře (profil rf-test) při každém běhu vytvořil zprávu, která přes Cloudflare Worker skončila ve frontě EMAIL_TIPY. Denní kontrola ji ověřovala přes AI a hlásila „nešlo ověřit“: v exportu EMAIL_TIPY z 13. 11. 2026 bylo 37 ze 42 řádků zpráv z RF testu. Každá stála jedno AI volání a dělala šum v denní notifikaci. Nalezeno při prověrce #74.
+### Změněno
+- **`jeTestovaciEmailTip_(text)`** (čistá funkce): zpráva je z testovacího profilu, když řádek „Uživatelský profil: <id>“ ukazuje na profil podle `jeTestovaciProfil_` (`rf-…`); konec řádku může být skutečný i doslovné `\n`.
+- **`zpracovatEmailTipy_`:** takovou zprávu označí novým stavem **„test-ignorováno“** (`EMAIL_TIP_STAV.TEST`) s poznámkou, bez AI volání a mimo statistiku denní notifikace.
+### Testy
+- **+3 Node testy (backend 450 → 453, celkem 659 → 662):** `jeTestovaciEmailTip_` s doslovným i skutečným koncem řádku, jiný profil a bez řádku; testovací zpráva skončí jako „test-ignorováno“ bez AI volání a mimo statistiku; testovací a skutečný tip vedle sebe (AI jen pro skutečný). Pokrytí řádků backendu 92,13 % (baseline 92,10 %).
+### Nasazení a ověření
+- Backend v3.53 (`kulturni_radar.gs`), `Index.html` beze změny (v3.66). `clasp push -f` a `clasp deploy -i … --description "v3.53"` (verze projektu 116), `?api=meta` hlásí `3.53`. Smoke RF: API 3/3; ve frontendu jednou spadl „Stránka se načte bez JS chyby v konzoli“ (karty se do 20 s nezobrazily), izolovaný opakovaný běh prošel (přechodný zákmit, vzorec B). Ověří denní kontrola 14. 11.: 4 zprávy z ručních RF běhů 13. 11. mají skončit jako „test-ignorováno“.
+- Dokumentace: ARCHITEKTURA-APLIKACE (stavy EMAIL_TIPY), README (počty), DEFEKTY.md (#79 Ověřuje se), BACKLOG (#79 opraveno, čeká na ověření).
+
 ## Lint: ruff B905 v generovat-index-reportu.py, baseline ruff 0; prověření #76 – 13. 11. 2026
 - **Ruff B905:** oba `zip()` v `.github/scripts/generovat-index-reportu.py` (karty sad a souhrn) mají `strict=True`: `SADY` a `sady` vznikají jedna k jedné, rozdílná délka by byla chyba. Ověřeno spuštěním generátoru nad artefaktem `rf-reporty` z běhu 43514270130 (výstup do scratchpadu, index i report a log obou sad vygenerované, API 8/9, frontend 52/53).
 - **Baseline lintu:** ruff 2 → 0 (`--zapsat-baseline`), Robocop beze změny 120. ARCHITEKTURA-TESTU (tabulka slabin) a BACKLOG (Testovací dluh, B905 přeškrtnuté) aktualizované.

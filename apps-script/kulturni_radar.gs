@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.52 (3. 11. 2026) – samotest hlídá všechny triggery ze setupTriggers, selhání sendUserNotifications pošle notifikaci, apiNajdiProUzivatele_ vrací skutečný počet aktualizovaných (#48)
- * (předchozí: 3.51 – sledovaná města: rozpočet běhu podle délky města, počasí před smyčkou měst, záznam přerušení do KONTROL (#49))
+ * Verze: 3.53 (13. 11. 2026) – zprávy z testovacího profilu (rf-…) se ve frontě EMAIL_TIPY neověřují přes AI a nezapočítají do denní notifikace (#79)
+ * (předchozí: 3.52 – samotest hlídá všechny triggery ze setupTriggers, selhání sendUserNotifications pošle notifikaci, apiNajdiProUzivatele_ vrací skutečný počet aktualizovaných (#48))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.52';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.53';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -2192,7 +2192,19 @@ const EMAIL_TIP_STAV = {
   OK: 'zpracováno-ok',
   CHYBA: 'zpracováno-chyba',
   NELZE_OVERIT: 'nelze-ověřit',
+  TEST: 'test-ignorováno',   // v3.53 (#79): zpráva z testovacího profilu, bez AI ověření
 };
+
+/** PURE (v3.53, #79): je zpráva v EMAIL_TIPY z testovacího profilu? Kontaktní
+ *  formulář (apiKontakt_) píše do těla řádek „Uživatelský profil: <id>“; RF test
+ *  ho posílá z profilu rf-test, takže by jinak každý běh RF skončil jako tip
+ *  ověřovaný přes AI („nešlo ověřit“ v denní notifikaci). Pravidlo pro testovací
+ *  profil je stejné jako jinde (jeTestovaciProfil_). Konec řádku může být
+ *  skutečný, nebo doslovné \n (tak je tělo uložené v listu EMAIL_TIPY). */
+function jeTestovaciEmailTip_(text) {
+  const m = /Uživatelský profil:\s*([^\s\\]+)/.exec(String(text || ''));
+  return !!m && jeTestovaciProfil_(m[1]);
+}
 
 function ensureEmailTipySheet_(ss) {
   let sh = ss.getSheetByName(SHEET.EMAIL_TIPY);
@@ -2290,9 +2302,15 @@ function zpracovatEmailTipy_(ss) {
     }
     const row = data[i];
     if (String(row[5] || '') !== EMAIL_TIP_STAV.NOVE) continue;   // jen nezpracované
-    stats.celkem++;
     const r = i + 2;   // 1-based řádek v listu (řádek 1 = hlavička)
     const text = String(row[4] || '');
+    // v3.53 (#79): zprávy z testovacího profilu bez AI ověření a mimo statistiku
+    // denní notifikace (jen záznam stavu, ať je fronta čistá).
+    if (jeTestovaciEmailTip_(text)) {
+      sh.getRange(r, 6, 1, 4).setValues([[EMAIL_TIP_STAV.TEST, '', dnes, 'Zpráva z testovacího profilu, bez AI ověření (#79).']]);
+      continue;
+    }
+    stats.celkem++;
 
     try {
       const events = callAnthropicEmailTip_(text);
