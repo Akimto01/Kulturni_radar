@@ -18,21 +18,32 @@ Suite Teardown    Close Browser
 ${PROBIHA_LABEL}    Probíhá / dlouhodobé
 # #77: index prvního pinu, jehož střed leží uvnitř kontejneru mapy (-1, když žádný),
 # pro klíčové slovo „Kliknout na pin ve viditelné části mapy“.
-${JS_VIDITELNY_PIN}    separator=SPACE
-...    (mapa) => { const k = mapa.getBoundingClientRect();
-...    return [...mapa.querySelectorAll('.leaflet-marker-icon')].findIndex((p) => {
-...    const r = p.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2;
-...    return x > k.left + 20 && x < k.right - 20 && y > k.top + 20 && y < k.bottom - 20; }); }
-# #77: test „Popup pinu u okraje mapy zůstane otevřený po automatickém posunu“.
-# Řádky se spojí mezerou (separator=SPACE), proto bez komentářů // uvnitř. Funkce nesmí
-# začínat slovem async (Browser Library ji pak nepřijme), proto async uvnitř.
-${JS_POPUP_U_OKRAJE}    separator=SPACE
-...    (mapa) => (async () => {
+# Hodnoty RF spojí mezerou, proto bez komentářů // uvnitř. flyTo nedrží třídu
+# leaflet-zoom-anim po celou dobu letu, proto se nejdřív čeká na klid podpisu mapy
+# (transform panelu a pozice pinů 8 kontrol po 50 ms beze změny, nejvýš 5 s).
+${JS_VIDITELNY_PIN}    (mapa) => (async () => {
 ...    const cekat = (ms) => new Promise((r) => setTimeout(r, ms));
 ...    const panel = mapa.querySelector('.leaflet-map-pane');
-...    const doKlidu = async () => { let pred = panel.style.transform, klid = 0;
-...    for (let i = 0; i < 60 && klid < 8; i++) { await cekat(50);
-...    const ted = panel.style.transform; klid = ted === pred ? klid + 1 : 0; pred = ted; } };
+...    const podpis = () => panel.style.transform + '|' + [...mapa.querySelectorAll('.leaflet-marker-icon')].map((p) => {
+...    const r = p.getBoundingClientRect(); return Math.round(r.left) + ',' + Math.round(r.top); }).join(';');
+...    const doKlidu = async () => { let pred = podpis(), klid = 0;
+...    for (let i = 0; i < 100 && klid < 8; i++) { await cekat(50);
+...    const ted = podpis(); klid = ted === pred ? klid + 1 : 0; pred = ted; } };
+...    await doKlidu();
+...    const k = mapa.getBoundingClientRect();
+...    return [...mapa.querySelectorAll('.leaflet-marker-icon')].findIndex((p) => {
+...    const r = p.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2;
+...    return x > k.left + 20 && x < k.right - 20 && y > k.top + 20 && y < k.bottom - 20; }); })()
+# #77: test „Popup pinu u okraje mapy zůstane otevřený po automatickém posunu“.
+# Hodnoty RF spojí mezerou, proto bez komentářů // uvnitř.
+${JS_POPUP_U_OKRAJE}    (mapa) => (async () => {
+...    const cekat = (ms) => new Promise((r) => setTimeout(r, ms));
+...    const panel = mapa.querySelector('.leaflet-map-pane');
+...    const podpis = () => panel.style.transform + '|' + [...mapa.querySelectorAll('.leaflet-marker-icon')].map((p) => {
+...    const r = p.getBoundingClientRect(); return Math.round(r.left) + ',' + Math.round(r.top); }).join(';');
+...    const doKlidu = async () => { let pred = podpis(), klid = 0;
+...    for (let i = 0; i < 100 && klid < 8; i++) { await cekat(50);
+...    const ted = podpis(); klid = ted === pred ? klid + 1 : 0; pred = ted; } };
 ...    mapaLeaflet.closePopup();
 ...    const k = mapa.getBoundingClientRect();
 ...    const uvnitr = (p) => { const r = p.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2;
