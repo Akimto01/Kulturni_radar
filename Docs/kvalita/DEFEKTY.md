@@ -117,6 +117,7 @@ Správu boardu a BACKLOGu pro všechna issues (nejen bug) hlídá druhý skript 
 | [#73](https://github.com/Akimto01/Kulturni_radar/issues/73) | Akce hlášená jako změněná v po sobě jdoucích dnech bez skutečné změny | S4 | P4 | Živá kontrola | Potvrzený |
 | [#77](https://github.com/Akimto01/Kulturni_radar/issues/77) | Popup pinu u okraje mapy se hned po otevření zavře (autoPan vyvolá movestart) | S3 | P2 | Automatický test (E2E nebo API) | Uzavřený |
 | [#78](https://github.com/Akimto01/Kulturni_radar/issues/78) | Test živosti ntfy falešně selhává v ručním běhu večer (ntfy.sh drží zprávy jen 12 h) | S4 | P3 | Automatický test (E2E nebo API) | Uzavřený |
+| [#79](https://github.com/Akimto01/Kulturni_radar/issues/79) | Zprávy z RF testu kontaktního formuláře se zpracovávají jako e-mailové tipy | S4 | P3 | Živá kontrola | Potvrzený |
 
 #48 (29. 10. 2026) je první defekt založený formulářem `defekt.yml`, ne zpětnou klasifikací: nalezen čtením kódu při psaní tabulky triggerů v `PROVOZ.md` (#47). Opraveno v backendu v3.52 (3. 11. 2026) se třemi Node testy a uzavřeno po nasazení (`?api=meta` 3.52, smoke 11/11).
 
