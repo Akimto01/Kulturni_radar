@@ -16,28 +16,39 @@ Suite Teardown    Close Browser
 
 *** Variables ***
 ${PROBIHA_LABEL}    Probíhá / dlouhodobé
+# #77: index prvního pinu, jehož střed leží uvnitř kontejneru mapy (-1, když žádný),
+# pro klíčové slovo „Kliknout na pin ve viditelné části mapy“.
+${JS_VIDITELNY_PIN}    separator=SPACE
+...    (mapa) => { const k = mapa.getBoundingClientRect();
+...    return [...mapa.querySelectorAll('.leaflet-marker-icon')].findIndex((p) => {
+...    const r = p.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2;
+...    return x > k.left + 20 && x < k.right - 20 && y > k.top + 20 && y < k.bottom - 20; }); }
 # #77: test „Popup pinu u okraje mapy zůstane otevřený po automatickém posunu“.
-# Řádky se spojí mezerou (separator=SPACE), proto bez komentářů // uvnitř.
+# Řádky se spojí mezerou (separator=SPACE), proto bez komentářů // uvnitř. Funkce nesmí
+# začínat slovem async (Browser Library ji pak nepřijme), proto async uvnitř.
 ${JS_POPUP_U_OKRAJE}    separator=SPACE
-...    async (mapa) => {
+...    (mapa) => (async () => {
 ...    const cekat = (ms) => new Promise((r) => setTimeout(r, ms));
 ...    const panel = mapa.querySelector('.leaflet-map-pane');
 ...    const doKlidu = async () => { let pred = panel.style.transform, klid = 0;
 ...    for (let i = 0; i < 60 && klid < 8; i++) { await cekat(50);
 ...    const ted = panel.style.transform; klid = ted === pred ? klid + 1 : 0; pred = ted; } };
 ...    mapaLeaflet.closePopup();
-...    const kontejner = mapa.getBoundingClientRect();
-...    const pin = mapa.querySelector('.leaflet-marker-icon');
-...    mapaLeaflet.panBy([0, pin.getBoundingClientRect().top - kontejner.top - 40], { animate: false });
+...    const k = mapa.getBoundingClientRect();
+...    const uvnitr = (p) => { const r = p.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2;
+...    return x > k.left + 20 && x < k.right - 20 && y > k.top + 20 && y < k.bottom - 20; };
+...    const piny = [...mapa.querySelectorAll('.leaflet-marker-icon')]; const i = piny.findIndex(uvnitr);
+...    if (i < 0) return { posun: null, otevreno: null };
+...    mapaLeaflet.panBy([0, piny[i].getBoundingClientRect().top - k.top - 40], { animate: false });
 ...    await doKlidu();
 ...    let posun = false; const priPosunu = () => { posun = true; };
 ...    mapaLeaflet.on('movestart', priPosunu);
-...    mapa.querySelector('.leaflet-marker-icon').click();
+...    mapa.querySelectorAll('.leaflet-marker-icon')[i].click();
 ...    await cekat(100); await doKlidu();
 ...    mapaLeaflet.off('movestart', priPosunu);
 ...    const otevreno = mapa.querySelector('.leaflet-popup') !== null;
 ...    mapaLeaflet.closePopup();
-...    return { posun, otevreno }; }
+...    return { posun, otevreno }; })()
 
 *** Test Cases ***
 Hlavička a základní prvky jsou na místě
@@ -1067,7 +1078,7 @@ Klik na pin otevře popup se strukturálně konzistentním obsahem
     IF    ${pocet_pinu} == 0
         Log    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice) – test nemá co ověřit v tomto běhu.    level=WARN
     ELSE
-        Click    ${FRAME} \#mapa .leaflet-marker-icon >> nth=0
+        Kliknout na pin ve viditelné části mapy
         Wait For Elements State    ${FRAME} .leaflet-popup .mapa-popup    visible    timeout=3s
         ${pocet_nazvu}=    Get Element Count    ${FRAME} .leaflet-popup .mapa-popup strong
         ${pocet_tlacitek}=    Get Element Count    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn
@@ -1096,10 +1107,7 @@ Tlačítko „Zobrazit v seznamu" v popupu zvýrazní odpovídající kartu
     IF    ${pocet_pinu} == 0
         Log    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice) – test nemá co ověřit v tomto běhu.    level=WARN
     ELSE
-        # v3.66 (#77): klikat až po doběhnutí animace přiblížení (13. 11. 2026
-        # spadl klik na pin s TimeoutError, pin se během animace hýbal).
-        Wait For Elements State    ${FRAME} \#mapa.leaflet-container:not(.leaflet-zoom-anim)    visible    timeout=10s
-        Click    ${FRAME} \#mapa .leaflet-marker-icon >> nth=0
+        Kliknout na pin ve viditelné části mapy
         Wait For Elements State    ${FRAME} .leaflet-popup .mapa-popup    visible    timeout=3s
         ${id_akce}=    Get Attribute    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn >> nth=0    data-id
         Click    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn >> nth=0
@@ -1118,6 +1126,7 @@ Popup pinu u okraje mapy zůstane otevřený po automatickém posunu
     ${pocet_pinu}=    Get Element Count    ${FRAME} \#mapa .leaflet-marker-icon
     Skip If    ${pocet_pinu} == 0    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice)
     ${vysledek}=    Evaluate JavaScript    ${FRAME} \#mapa    ${JS_POPUP_U_OKRAJE}
+    Skip If    $vysledek['posun'] is None    Žádný pin ve viditelné části mapy
     Should Be True    ${vysledek}[posun]
     ...    msg=Pin 40 px od okraje měl vyvolat automatický posun mapy (autoPan); test tak neověřil nic
     Should Be True    ${vysledek}[otevreno]
@@ -1185,6 +1194,16 @@ Responzivní pásma: široké (≥1360px) main přesáhne 656px a mapa zůstáv�
     ...    msg=#mapa-panel (y=${mapa_y}) má být VEDLE main (y=${main_y}), ne pod ním
 
 *** Keywords ***
+Kliknout na pin ve viditelné části mapy
+    [Documentation]    Issue 77: předchozí testy přiblíží mapu na vybraný pin (flyTo), takže
+    ...    pin nth=0 může ležet mimo viditelnou část mapy a klik na něj zachytí
+    ...    hlavička (CI 13. 11. 2026). Klikne se proto na první pin, jehož střed je
+    ...    uvnitř kontejneru mapy, a až po doběhnutí animace přiblížení.
+    Wait For Elements State    ${FRAME} \#mapa.leaflet-container:not(.leaflet-zoom-anim)    visible    timeout=10s
+    ${index}=    Evaluate JavaScript    ${FRAME} \#mapa    ${JS_VIDITELNY_PIN}
+    Skip If    ${index} < 0    Žádný pin ve viditelné části mapy
+    Click    ${FRAME} \#mapa .leaflet-marker-icon >> nth=${index}
+
 Cíl dne musí být poblíž horního okraje viewportu
     [Documentation]    Pomocná keyword pro „Kalendář: klik na den s akcí
     ...    odscrolluje..." – scrollIntoView({behavior:'smooth', block:'start'})
