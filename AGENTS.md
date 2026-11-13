@@ -35,6 +35,7 @@ python .github/scripts/kontrola-nastroju.py
 python .github/scripts/kontrola-architektury-testu.py
 python .github/scripts/kontrola-dokumentace.py
 python .github/scripts/kontrola-dokumentace-kodu.py   # varování: kód změněn, dokument ne (jen upozornění)
+python .github/scripts/kontrola-pokryti.py            # práh pokrytí řádků backendu podle baseline-pokryti.json (#38)
 pip install -r .github/requirements-lint.txt -c tests/robot/requirements.txt   # jednou, pak:
 python .github/scripts/kontrola-lintu.py              # Robocop a ruff s baseline, selže jen při nárůstu nálezů
 ```

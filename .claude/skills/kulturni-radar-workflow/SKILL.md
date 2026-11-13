@@ -69,7 +69,9 @@ souboru.
 6. `present_files` s krátkým shrnutím, co se změnilo a kolik testů prošlo.
 
 ### Nasazovací kroky (dělá je uživatel v Apps Script editoru)
-1. Rozbalit zip do lokálního repa.
+1. Rozbalit zip do lokálního repa. V `git diff` zkontrolovat, že
+   dokumentační komentář sousední funkce zůstal u své funkce (3. 11. 2026
+   se v zipu pro v3.52 nová konstanta vložila mezi komentář a `runSelfTest`).
 2. `node --test tests/unit.test.js tests/frontend.test.js` — potvrdit
    stejný počet testů jako v balíčku.
 3. Obsah `kulturni_radar.gs` → vložit do souboru **`Kulturní radar.gs`**
@@ -168,6 +170,13 @@ místního času `zpracovatSledovanaMesta`). Plánovat mimo celou hodinu: fronta
 GitHubu je na začátku hodiny nejvytíženější a běhy se zdržují o hodiny
 (dnes `20 20 * * 0`, tedy 21:20 SEČ / 22:20 SELČ). GitHub neposílá e-maily
 o selhání plánovaných běhů (ověřeno v Gmailu), proto notifikace přes ntfy.
+
+**Zpoždění plánovaných běhů je 3–10 h.** Doloženo 30. 10.–9. 11. 2026:
+`kontrola-projektu.yml` s cronem 6:40 UTC běžela mezi 13:00 a 16:50 UTC
+(pondělní souhrn přišel 2. 11. v 17:32 a 9. 11. v 17:49 SEČ), `rf-tests.yml`
+s cronem 20:20 UTC startoval 1. 11. ve 23:40 a 8. 11. ve 23:46 UTC.
+Důsledek: ověřovačky navázané na plánovaný běh termínovat na následující
+den, pondělní souhrn čekat až odpoledne.
 
 ### Drobnosti, na které jsme narazili jen jednou, ale stojí za zapsání
 - `Wait For Elements State` (knihovna Browser) **nepodporuje** pojmenovaný
@@ -285,6 +294,15 @@ informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
   `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-defektu.py` (defekty: pole boardu, formulář, stavy, uzavírací komentář, DEFEKTY.md)
   a `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/kontrola-boardu.py` (všechna issues: Status, milník, štítek, Odhad, checklisty, BACKLOG.md).
   Nálezy (chyby i varování) uvést ve shrnutí; neopravovat automaticky, navrhnout opravu.
+  **Ve Windows PowerShellu** (tam Vojta pracuje) bash syntaxe `GH_TOKEN=$(...)` nefunguje. Token nastavit jednou pro celé okno
+  a skripty pak spouštět bez prefixu:
+  ```powershell
+  $env:GH_TOKEN = gh auth token --user Akimto01
+  python .github/scripts/kontrola-defektu.py
+  python .github/scripts/kontrola-boardu.py
+  python .github/scripts/navrh-session.py --cas "60"
+  Remove-Item Env:GH_TOKEN   # úklid na konci
+  ```
   Nejdřív zavřít hotová issues (viz „Pořadí při zavírání issue“ níže): pravidlo „zavřít hned po pushi a CI, kontroly
   až potom“ platí i pro ruční běh `kontrola-projektu.yml`, jinak se falešný nález zapíše do #52 a odejde v notifikaci.
 - Při „End“ navíc spustit `python .github/scripts/kontrola-dokumentace-kodu.py --od <datum nebo commit před začátkem session>`
@@ -307,7 +325,7 @@ informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
 - **WIP limit:** nejvýš 3 issues najednou In Progress (konstanta `WIP_LIMIT` v `kontrola-boardu.py`); víc je varování.
 - **Odhad u Todo:** issue ve stavu Todo nebo In Progress musí mít vyplněný Odhad (h), bez něj kontrola hlásí chybu. Todo jen pro vybrané na nejbližší práci
   (Doporučené pořadí, fáze 1 a 2), ostatní Backlog.
-- **Ranní kontrola běží sama:** workflow `kontrola-projektu.yml` (denně 6:40 UTC, v pondělí týdenní souhrn) pošle notifikaci ntfy jen při nálezu (v pondělí vždy).
+- **Ranní kontrola běží sama:** workflow `kontrola-projektu.yml` (denně 6:40 UTC, ve skutečnosti odpoledne, viz zpoždění v sekci 2, v pondělí týdenní souhrn) pošle notifikaci ntfy jen při nálezu (v pondělí vždy).
   Token `BOARD_READ_TOKEN` je classic jen se scope `read:project` (fine-grained token uživatelský projekt číst neumí), platí do 27. 1. 2027,
   obnova je issue „Obnovit BOARD_READ_TOKEN“ (Termín 20. 1. 2027); při vypršení workflow selže a upozorní. Ruční spuštění skriptů zůstává (viz výše).
 
@@ -345,7 +363,7 @@ Doplňkově, kvůli prevenci zapomnění:
 - Ranní kontrola (workflow `kontrola-projektu.yml`) už mohla poslat notifikaci; při „Start“ na ni navázat (zeptat se, co přišlo) a návrh práce znovu spustit s aktuálním časem:
   při „Start“, ideálně s časem (např. „Start, mám 60 minut“ nebo „Start, mám cca 3 h“), spustit
   `GH_TOKEN=$(gh auth token --user Akimto01) python .github/scripts/navrh-session.py --cas "<čas>"` a oba kontrolní skripty
-  (`kontrola-defektu.py`, `kontrola-boardu.py`). Výstup předat do hlavního chatu, kde Claude z kandidátů sestaví plán
+  (`kontrola-defektu.py`, `kontrola-boardu.py`); v PowerShellu přes `$env:GH_TOKEN`, viz „Kontroly projektu na konci session“. Výstup předat do hlavního chatu, kde Claude z kandidátů sestaví plán
   s ohledem na dočasná omezení, která skript nezná (např. „do neděle neměnit RF testy“). Po potvrzení přesunout vybrané
   na boardu do In Progress (WIP limit 3).
 - Bez uvedeného času se Claude na čas zeptá. Skript přijímá např. `60`, `90 min`, `1,5h`, `2:30`, `cca 3h`; `--test` ověří převod času.
@@ -473,7 +491,9 @@ Kontext: [1-3 věty CO a PROČ se změnilo]. Přiložený zip obsahuje
 Udělej prosím:
 
 1. Rozbal zip ~/Downloads/<název>.zip do repa (přepíše [N] soubor/y).
-2. `git status` — potvrď, že se změnily jen tyhle [N].
+2. `git status` – potvrď, že se změnily jen tyhle [N]. V `git diff`
+   zkontroluj, že dokumentační komentáře sousedních funkcí zůstaly
+   u svých funkcí.
 3. `node --test tests/unit.test.js tests/frontend.test.js` — očekávám
    [staré]/[staré] → [nové]/[nové] ([+X] nových testů pro [co]).
 4. Ukaž mi diff [souborů] před commitem.
@@ -503,6 +523,17 @@ musí vždy upozornit (krok 5 výše), jinak hrozí přesně to, co se stalo
 8. 8. 2026: commit a push proběhly, appka na `kulturniradar.cz` se
 aktualizovala automaticky, zatímco Apps Script `/exec` zůstal na staré
 verzi, protože se na druhý kanál zapomnělo.
+
+### Ověření po clasp deploy
+Produkční implementaci poznáš podle shody ID (`AKfycb…`) s URL
+v `tests/robot/resources.robot` (výchozí hodnota `BASE_URL`), ne jen
+podle toho, že řádek v `clasp deployments` nemá `@HEAD`. Po
+`clasp deploy -i <ID> --description "vXX"` ověřit:
+```bash
+curl -sL "<URL>?api=meta"
+```
+a v odpovědi přečíst pole `verze`; musí odpovídat nové `VERZE`
+v `kulturni_radar.gs`.
 
 ### Změny Index.html: dva kanály a pořadí ověření
 Index.html běží na Cloudflare Pages (nasazuje `git push`) i v Apps Scriptu
@@ -856,6 +887,7 @@ aktuálně rozpracované/vybrané úkoly:**
 - **Bezpečnostní nálezy (Dependabot a podobně) ve veřejných issues a komentářích** jen jako balíčky, počty a rozhodnutí
   (opraveno, odloženo s důvodem, zamítnuto), bez závažnosti a verzí oprav, dokud nejsou opravené: repo je veřejné, alerty
   vidí jen správce a zveřejněná závažnost neopravené zranitelnosti ukazuje okno k zneužití (vzor: issue #70).
+- **Stav Dependabotu (ověřeno 13. 11. 2026 přes `gh api`):** alerts zapnuté (`vulnerability-alerts` vrací 204), automatické security updates vypnuté (`automated-security-fixes`: `enabled: false`).
 - **Konvence pro `navrh-session.py` (psát záměrně):**
   - **Závislost:** „až po #N“ (i „(až po #N)“, „až po dokončení [#N]“) v řádku BACKLOG.md nebo v těle issue znamená, že issue čeká na #N;
     dokud je #N otevřené, návrh session issue nenavrhne a vypíše ho v seznamu „Blokováno“. Pro čekání na termín závislost nepoužívat.
