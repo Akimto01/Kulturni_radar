@@ -58,6 +58,7 @@ Počty testů jsou jen v hlavním README (tabulka „Testy v číslech“).
 | [kvalita/DEFEKTY.md](kvalita/DEFEKTY.md) | správa defektů: stupnice závažnosti a priority, životní cyklus, analýza úniků |
 | [kvalita/PRIBEHY-CHYB.md](kvalita/PRIBEHY-CHYB.md) | tři případové studie chyb od příznaku po pojistku |
 | [kvalita/HISTORIE-INCIDENTU.md](kvalita/HISTORIE-INCIDENTU.md) | tabulka incidentů: co se stalo, dopad, doba, odkaz; každý uzavřený defekt S1 a S2 má řádek |
+| [kvalita/VYHODNOCENI-AI.md](kvalita/VYHODNOCENI-AI.md) | vyhodnocení Sonnetu 5.5 v denní kontrole: nové akce na běh, cena, předstih, rozhodnutí o frekvenci (#8) |
 
 ## Audity
 

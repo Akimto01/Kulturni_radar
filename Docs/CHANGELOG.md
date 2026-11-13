@@ -1,5 +1,11 @@
 # Changelog
 
+## Docs: vyhodnocení Sonnet 5.5 (#8) – 13. 11. 2026
+- **Nový dokument `Docs/kvalita/VYHODNOCENI-AI.md`:** denní kontrola na Sonnetu 5.5 (27. 10.–13. 11., 18 běhů) dává 2,44 nové akce na běh a žádný běh bez nálezu (Haiku v říjnu 1,04, srpnový Sonnet 4.6 1,21). Cena ~0,145 USD za běh, celá aplikace ~6–7 USD měsíčně; 3× týdně by ušetřilo jen ~2,5 USD měsíčně. Předstih nalezených akcí: medián 10 dní, při běhu po, st, pá by se našlo 96 % akcí před začátkem konání.
+- **Rozhodnutí:** denní kontrola zůstává denně na Sonnetu 5.5, strop 15 akcí na běh beze změny (maximum za běh 13); strop u velkých sledovaných měst řeší #49 část 2.
+- **Omezení a nový nález:** „První nález“ nerozlišuje typ běhu; 13. 11. bylo v konzoli Anthropic vypnuté auto-reload kreditu po selhání platby (opraveno týž den), do BACKLOGu (Ke kontrole) přidán bod o hlídání zůstatku.
+- Rozcestník `Docs/README.md` (řádek v sekci Kvalita a defekty), BACKLOG (obě položky „Vyhodnotit Sonnet 5.5…“ přeškrtnuté).
+
 ## CI: práh pokrytí backendu (ratchet) (#38) – 3. 11. 2026
 - **Skript `.github/scripts/kontrola-pokryti.py`** (standardní knihovna): spustí `node --test --experimental-test-coverage` nad `tests/unit.test.js` (jen soubor `kulturni_radar.gs`, `TZ=Europe/Prague` si nastaví sám), přečte pokrytí řádků a větví a porovná pokrytí řádků s `.github/scripts/baseline-pokryti.json`. Exit 1 při poklesu pod baseline, 2 při chybě měření (testy selhaly, výstup bez řádku pokrytí). Při zlepšení o 0,1 procentního bodu a víc vyzve ke zvýšení baseline (`--zapsat-baseline`). Pokrytí větví se jen vypisuje.
 - **Baseline:** 92,1 % řádků (naměřeno 92,10 %, 86,08 % větví, 3. 11. 2026, po dokončení #35). Baseline se nesnižuje ručně kvůli projití CI: pokles znamená doplnit testy, nebo vědomé rozhodnutí zdůvodněné tady.

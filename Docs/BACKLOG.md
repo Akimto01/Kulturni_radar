@@ -87,7 +87,7 @@ Pořadí: AGENTS.md, smoke, rozcestník, katalog, kontrola odkazů, případová
 - **Předpoklad otevření přátelům: ověřování identity u zápisových akcí** (odhad po návrhu) – `toggle`, `toggle-misto`, `filtry`, `set-notifikace` a `vygenerovat-ntfy-tema` dnes berou jen veřejné `uzivatelId`, takže jde měnit cizí data a přesměrovat cizí notifikace. Musí se vyřešit před otevřením, souvisí s #16. → issue #50
 
 **Cíl 3 – kvalita akcí:**
-- **Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – rozhodnout o rozpočtu a stropu 15 akcí na běh; další kroky podle vyhodnocení; výstupem je dokument s vyhodnocením AI, ne jen rozhodnutí. → issue #8
+- ~~**Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – rozhodnout o rozpočtu a stropu 15 akcí na běh; další kroky podle vyhodnocení; výstupem je dokument s vyhodnocením AI, ne jen rozhodnutí.~~ **HOTOVO 13. 11. 2026** (ponechat denně, strop 15 beze změny, viz Docs/kvalita/VYHODNOCENI-AI.md) → issue #8
 
 **Ruční úklid (Vojta, kdykoli):** smazat 5 řádků „neuvedeno“ v AKCE (v3.48); projít 5 podezřelých fuzzy sloučení (CHANGELOG v3.50); volitelně 2 staré skryté duplicity v MÍSTA (v3.46).
 
@@ -141,8 +141,9 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
   - Prověřit první e-mailový tip, který nešlo ověřit (denní kontrola 2. 11.), případně založit defekt – ~0,25 h. → issue #74
   - Akce bez rozpoznatelného data (samotest 1. i 8. 11.: 5 akcí) a nová akce s datem před oknem hledání (Výlov rybníka Olšovec 2026, 7. 11., v denní kontrole 8. 11.); případně založit defekt – ~0,5 h. → issue #76
 - **Sledovat: HTTP kódy selhání Open-Meteo v KONTROLY (v3.44)** – podle nich rozhodnout o pauzách mezi voláními nebo denním přepočtu počasí.
-- **Vyhodnotit Sonnet 5.5 po 2 týdnech (kolem 9. 11. 2026)** – výchozí stav Haiku v říjnu: 1,0 nové na běh a 10/26 nulových běhů. Cíl: aspoň srpnový Sonnet (1,2 nové, téměř bez nul). Zdroj dat: týdenní report v nedělním samotestu a konzole Anthropic (včetně poplatků za vyhledávání, které odhad v reportu neobsahuje). 27. 10. 2026 první denní kontrola na Sonnetu 5.5: nalezeno 6, nové 3, tokeny 36573/4342, 3 vyhledávání (~$0,12); den předtím Haiku 0/0.
+- ~~**Vyhodnotit Sonnet 5.5 po 2 týdnech (kolem 9. 11. 2026)** – výchozí stav Haiku v říjnu: 1,0 nové na běh a 10/26 nulových běhů. Cíl: aspoň srpnový Sonnet (1,2 nové, téměř bez nul). Zdroj dat: týdenní report v nedělním samotestu a konzole Anthropic (včetně poplatků za vyhledávání, které odhad v reportu neobsahuje). 27. 10. 2026 první denní kontrola na Sonnetu 5.5: nalezeno 6, nové 3, tokeny 36573/4342, 3 vyhledávání (~$0,12); den předtím Haiku 0/0.~~ **HOTOVO 13. 11. 2026** (ponechat denně, strop 15 beze změny, viz Docs/kvalita/VYHODNOCENI-AI.md)
 - **Sledovat: strop 15 akcí na běh v promptu** – velká města (Praha, Plzeň, Zlín) na něj narážejí téměř každý běh.
+- Zvážit hlídání zůstatku kreditu nebo stavu auto-reloadu Anthropic (13. 11. 2026 auto-reload vypnutý po selhání platby, zjištěno náhodou v konzoli)
 
 ## Testovací dluh
 - Ruff B905 (`zip()` bez `strict=`) na dvou místech `generovat-index-reportu.py` (2 nálezy v baseline lintu): opravit **po neděli 1. 11. 2026**, soubor se do té doby nemění (první plánovaný běh publikace reportu). Souvisí s #34 (úklid nálezů lintu po dávkách) a s issue #58 (baseline).
