@@ -31,7 +31,8 @@ jobs:
           rfbrowser init chromium
 
       - name: API kontrakt
-        run: robot --variable BASE_URL:${{ secrets.RADAR_URL }} --variable NTFY_TOPIC:${{ secrets.NTFY_TOPIC }} --outputdir vysledky/api tests/robot/api.robot
+        # #78: v plánovaném běhu je prázdné 12h okno ntfy selhání, v ručním se test živosti přeskočí
+        run: robot --variable BASE_URL:${{ secrets.RADAR_URL }} --variable NTFY_TOPIC:${{ secrets.NTFY_TOPIC }} --variable NTFY_VYZADOVAT_ZPRAVU:${{ github.event_name == 'schedule' }} --outputdir vysledky/api tests/robot/api.robot
 
       - name: Frontend E2E
         if: always()

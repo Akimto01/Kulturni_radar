@@ -16,6 +16,28 @@ Suite Teardown    Close Browser
 
 *** Variables ***
 ${PROBIHA_LABEL}    Probíhá / dlouhodobé
+# #77: test „Popup pinu u okraje mapy zůstane otevřený po automatickém posunu“.
+# Řádky se spojí mezerou (separator=SPACE), proto bez komentářů // uvnitř.
+${JS_POPUP_U_OKRAJE}    separator=SPACE
+...    async (mapa) => {
+...    const cekat = (ms) => new Promise((r) => setTimeout(r, ms));
+...    const panel = mapa.querySelector('.leaflet-map-pane');
+...    const doKlidu = async () => { let pred = panel.style.transform, klid = 0;
+...    for (let i = 0; i < 60 && klid < 8; i++) { await cekat(50);
+...    const ted = panel.style.transform; klid = ted === pred ? klid + 1 : 0; pred = ted; } };
+...    mapaLeaflet.closePopup();
+...    const kontejner = mapa.getBoundingClientRect();
+...    const pin = mapa.querySelector('.leaflet-marker-icon');
+...    mapaLeaflet.panBy([0, pin.getBoundingClientRect().top - kontejner.top - 40], { animate: false });
+...    await doKlidu();
+...    let posun = false; const priPosunu = () => { posun = true; };
+...    mapaLeaflet.on('movestart', priPosunu);
+...    mapa.querySelector('.leaflet-marker-icon').click();
+...    await cekat(100); await doKlidu();
+...    mapaLeaflet.off('movestart', priPosunu);
+...    const otevreno = mapa.querySelector('.leaflet-popup') !== null;
+...    mapaLeaflet.closePopup();
+...    return { posun, otevreno }; }
 
 *** Test Cases ***
 Hlavička a základní prvky jsou na místě
@@ -1074,6 +1096,9 @@ Tlačítko „Zobrazit v seznamu" v popupu zvýrazní odpovídající kartu
     IF    ${pocet_pinu} == 0
         Log    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice) – test nemá co ověřit v tomto běhu.    level=WARN
     ELSE
+        # v3.66 (#77): klikat až po doběhnutí animace přiblížení (13. 11. 2026
+        # spadl klik na pin s TimeoutError, pin se během animace hýbal).
+        Wait For Elements State    ${FRAME} \#mapa.leaflet-container:not(.leaflet-zoom-anim)    visible    timeout=10s
         Click    ${FRAME} \#mapa .leaflet-marker-icon >> nth=0
         Wait For Elements State    ${FRAME} .leaflet-popup .mapa-popup    visible    timeout=3s
         ${id_akce}=    Get Attribute    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn >> nth=0    data-id
@@ -1082,6 +1107,21 @@ Tlačítko „Zobrazit v seznamu" v popupu zvýrazní odpovídající kartu
         Should Be Equal As Integers    ${pocet_zvyraznenych}    1
         ...    msg=Klik na „Zobrazit v seznamu" měl zvýraznit PRÁVĚ kartu s id „${id_akce}" (.karta[data-id="${id_akce}"].zvyrazneno)
     END
+
+Popup pinu u okraje mapy zůstane otevřený po automatickém posunu
+    [Tags]    mapa
+    [Documentation]    v3.66 (#77, regrese): popup pinu u okraje mapy nesmí po
+    ...    automatickém posunu (Leaflet autoPan) zmizet; do v3.65 ho zavíral handler
+    ...    na movestart. Výjimka z auditu selektorů: posun přes mapaLeaflet.panBy
+    ...    (tažení myší by popup zavřelo samo), skript v \${JS_POPUP_U_OKRAJE}.
+    Wait For Elements State    ${FRAME} \#mapa.leaflet-container:not(.leaflet-zoom-anim)    visible    timeout=20s
+    ${pocet_pinu}=    Get Element Count    ${FRAME} \#mapa .leaflet-marker-icon
+    Skip If    ${pocet_pinu} == 0    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice)
+    ${vysledek}=    Evaluate JavaScript    ${FRAME} \#mapa    ${JS_POPUP_U_OKRAJE}
+    Should Be True    ${vysledek}[posun]
+    ...    msg=Pin 40 px od okraje měl vyvolat automatický posun mapy (autoPan); test tak neověřil nic
+    Should Be True    ${vysledek}[otevreno]
+    ...    msg=Popup pinu u okraje se po automatickém posunu mapy zavřel (regrese #77)
 
 Header a #controls-oznaceni zůstávají viditelné po scrollu (sticky)
     [Tags]    ui    krehky

@@ -14,6 +14,9 @@ Resource          resources.robot
 
 *** Variables ***
 ${NTFY_TOPIC}      %{NTFY_TOPIC=}
+# #78: ntfy.sh drží zprávy jen 12 h, takže prázdné okno je selhání jen v plánovaném
+# běhu (neděle večer, samotest v 18:53 je v okně). rf-tests.yml nastaví true pro schedule.
+${NTFY_VYZADOVAT_ZPRAVU}    false
 
 *** Test Cases ***
 Meta vrací aktivní profil, profily a kategorie
@@ -123,6 +126,12 @@ Notifikační kanál ntfy je živý
     ...                nejspíš mrtvý (špatný topic, tichá chyba sendNotification_,
     ...                změna ntfy API) – a nikdo si toho jinak nevšimne,
     ...                protože mrtvý kanál nemá jak křičet.
+    ...                Issue 78: veřejný server ntfy.sh drží zprávy jen 12 h, proto okno
+    ...                12 h (dřív 48 h, ve skutečnosti ale stejně jen 12 h). Prázdné
+    ...                okno je selhání jen v plánovaném běhu (neděle večer, samotest
+    ...                v 18:53 je v okně, \${NTFY_VYZADOVAT_ZPRAVU} nastaví rf-tests.yml);
+    ...                v ručním běhu večer po 20:14 by bylo prázdné i u živého kanálu,
+    ...                proto se test přeskočí (13. 11. 2026 falešný pád ve 20:44).
     ...                Topic je soukromý → bez \${NTFY_TOPIC} se test přeskočí
     ...                (zpětné lomítko je nutné: RF v dokumentaci rozvíjí proměnné
     ...                a hodnota by skončila v log.html, output.xml i report.html).
@@ -136,7 +145,7 @@ Notifikační kanál ntfy je živý
     Skip If    '${NTFY_TOPIC}' == ''    NTFY_TOPIC nenastaven – test přeskočen
     ${puvodni_uroven}=    Set Log Level    NONE
     TRY
-        ${r}=    GET    https://ntfy.sh/${NTFY_TOPIC}/json    params=poll=1&since=48h    expected_status=any
+        ${r}=    GET    https://ntfy.sh/${NTFY_TOPIC}/json    params=poll=1&since=12h    expected_status=any
         ${stav}=    Set Variable    ${r.status_code}
         ${zprav}=    Set Variable    ${0}
         IF    ${stav} == 200
@@ -146,5 +155,7 @@ Notifikační kanál ntfy je živý
         Set Log Level    ${puvodni_uroven}
     END
     Should Be Equal As Integers    ${stav}    200    ntfy vrátilo jiný stav než 200 (URL se kvůli tajnému tématu nezapisuje)
+    Skip If    ${zprav} == 0 and '${NTFY_VYZADOVAT_ZPRAVU}'.lower() != 'true'
+    ...    Za 12 h žádná zpráva na ntfy, ruční běh: ntfy.sh drží zprávy jen 12 h, živost nelze ověřit
     Should Be True    ${zprav} >= 1
-    ...    Za 48 h nepřišla na ntfy žádná zpráva – notifikační kanál je nejspíš mrtvý
+    ...    Za 12 h nepřišla na ntfy žádná zpráva – notifikační kanál je nejspíš mrtvý

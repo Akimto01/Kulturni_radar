@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.65 – oprava dvojitého URL kódování profilu (města s diakritikou ukazovala 0 akcí i míst) -->
+<!-- Kulturní radar Index.html v3.66 – popup pinu u okraje mapy se po automatickém posunu nezavře (#77) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -2340,7 +2340,11 @@
     // se při zoomu/posunu mohl ocitnout u okraje kontejneru a oříznout se.
     // Zavřít ho hned na začátku gesta; po dokončení jde otevřít znovu
     // (Leaflet autoPan pak zajistí, že je celý v kontejneru).
-    mapaLeaflet.on('movestart zoomstart', () => mapaLeaflet.closePopup());
+    // v3.66 (#77): dřív 'movestart zoomstart'. Jenže autoPan otevíraného popupu
+    // sám posouvá mapu přes panBy, což vyvolá movestart, a popup pinu u okraje
+    // se tak hned po otevření zavřel. Zavírá se proto jen při gestech
+    // uživatele: tažení (dragstart) a zoom (zoomstart).
+    mapaLeaflet.on('dragstart zoomstart', () => mapaLeaflet.closePopup());
   }
 
   /** PURE (v3.56, testovací dluh krok 5 auditu, část 2/2): obsahová data

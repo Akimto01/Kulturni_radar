@@ -1,5 +1,20 @@
 # Changelog
 
+## Index.html v3.66 – popup pinu u okraje mapy (#77), okno testu ntfy (#78) – 13. 11. 2026
+### Chyba #77 (S3, P2)
+- Handler `mapaLeaflet.on('movestart zoomstart', closePopup)` zavíral popup i při automatickém posunu mapy: Leaflet autoPan otevíraného popupu posouvá mapu přes `panBy`, což vyvolá `movestart`, takže popup pinu u okraje se hned po otevření zavřel. Živě ověřeno 13. 11. v prohlížeči (pin 40 px od okraje: popup zmizel; s `dragstart zoomstart` zůstal, zoom ho dál zavírá).
+- Nestabilní RF test „Tlačítko Zobrazit v seznamu…“ chybu ukazoval od 1. 11. (běhy 41363193882 a 43494954441), pád ale vypadal jako problém testu.
+### Chyba #78 (S4, P3)
+- RF test „Notifikační kanál ntfy je živý“ hledal zprávy za 48 h, ntfy.sh je ale drží jen 12 h. Ruční běh 13. 11. ve 20:44 (poslední zpráva 8:14) proto selhal, i když kanál funguje.
+### Změněno
+- **Index.html v3.66:** popup se zavírá jen při gestech uživatele (`dragstart zoomstart`). Backend beze změny (v3.52).
+- **api.robot:** okno 12 h; nová proměnná `NTFY_VYZADOVAT_ZPRAVU` (výchozí `false`): při 0 zprávách se test v ručním běhu přeskočí, v plánovaném selže. `rf-tests.yml` ji nastavuje na `true` jen pro `schedule`. Přijaté riziko: falešný pád jen při startu plánovaného běhu mezi ~5:53 a 6:53 UTC (zpoždění přes 9,5 h), později už je v okně pondělní ranní notifikace.
+### Testy
+- **+1 RF test (frontend 52 → 53, RF celkem 61 → 62):** „Popup pinu u okraje mapy zůstane otevřený po automatickém posunu“ (tag `mapa`): posune mapu přes `panBy` tak, aby pin byl 40 px od okraje, klikne na pin a ověří, že autoPan proběhl a popup zůstal otevřený. Test „Zobrazit v seznamu“ nově před kliknutím čeká na doběhnutí animace přiblížení. Node testy beze změny (659).
+### Nasazení
+- Apps Script: `clasp push -f` a `clasp deploy -i … --description "Index v3.66"` (verze projektu 115), `?api=meta` hlásí backend 3.52, nasazené HTML obsahuje `dragstart zoomstart`. Cloudflare Pages: push tohoto commitu.
+- Dokumentace: README (počty), DEFEKTY.md (řádky #77 a #78), BACKLOG (nestabilní test mapy vyřešen, příčina #77).
+
 ## CI: publikace RF reportu spouštěná z rf-tests.yml (#36) – 13. 11. 2026
 - **Ověření plánovaných běhů:** běh 1. 11. 2026 (`41363193882`) proběhl se zpožděním 3 h 20 min za 3 min 45 s, 60/61: spadl nestabilní test mapy „Tlačítko Zobrazit v seznamu v popupu“ (prvek se během kliknutí překreslil), kontrola úniku prošla, ntfy přišla. Běh 8. 11. (`42536753846`) 61/61, ntfy nepřišla (notifikace jen při selhání ověřena). Oba bez timeoutu a bez pádu zápisových a chip testů.
 - **Publikace na Pages se nespouštěla:** trigger `workflow_run` v `publikovat-report.yml` (na main od 28. 10.) se po žádném z obou běhů nespustil, v repu nebyl jediný běh s událostí `workflow_run` (ani přeskočený). Konfigurace ověřena (workflow aktivní, název a větev sedí, Pages ze workflow, prostředí `github-pages` povoluje main); příčina neznámá.
