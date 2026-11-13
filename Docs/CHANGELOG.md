@@ -1,5 +1,12 @@
 # Changelog
 
+## Docs: ověření v3.44 v datech, uzavření #6 a #18 – 13. 11. 2026
+- **Data:** export 13. 11. 2026 (POČASÍ aktualizováno 12. 11., KONTROLY), kód se neměnil.
+- **Počasí (#18):** 0 akcí ve stavu CHYBA ve všech 4 bězích od 1. 11. (v říjnu 2–12 na běh). Z 64 akcí začínajících 12.–21. 11. má řádek v POČASÍ 58, z toho 57 OK (98 %); zbylých 6 přidala sledovaná města až po aktualizaci počasí ve stejném běhu (Znojmo 12. 11.), počasí dostanou dalším během. Akce za 10+ dní mají N/A podle návrhu.
+- **Souřadnice (#18):** ověřeno nepřímo, všech 58 zpracovaných akcí má počasí, tedy i souřadnice (list SOUŘADNICE nebyl v exportu).
+- **HTTP kódy Open-Meteo:** HTTP 429 pro všechny lokality ve všech 4 bězích (36, 42, 43, 43), odmítnutý i první dotaz, pauzy tedy nepomohou (nejspíš limit sdílených IP Apps Scriptu). Rozhodnutí: Open-Meteo z Apps Scriptu přestat volat, met.no jako hlavní zdroj, řešit v #49 části 2.
+- **Dokumentace:** BACKLOG (bod 1 Doporučeného pořadí, oba nálezy z 26. 10. a „Sledovat: HTTP kódy“ přeškrtnuté; rozpočet na Claude API v Cílech ~6–7 USD měsíčně podle VYHODNOCENI-AI.md), DEFEKTY.md (#18 Uzavřený).
+
 ## Docs: vyhodnocení Sonnet 5.5 (#8) – 13. 11. 2026
 - **Nový dokument `Docs/kvalita/VYHODNOCENI-AI.md`:** denní kontrola na Sonnetu 5.5 (27. 10.–13. 11., 18 běhů) dává 2,44 nové akce na běh a žádný běh bez nálezu (Haiku v říjnu 1,04, srpnový Sonnet 4.6 1,21). Cena ~0,145 USD za běh, celá aplikace ~6–7 USD měsíčně; 3× týdně by ušetřilo jen ~2,5 USD měsíčně. Předstih nalezených akcí: medián 10 dní, při běhu po, st, pá by se našlo 96 % akcí před začátkem konání.
 - **Rozhodnutí:** denní kontrola zůstává denně na Sonnetu 5.5, strop 15 akcí na běh beze změny (maximum za běh 13); strop u velkých sledovaných měst řeší #49 část 2.

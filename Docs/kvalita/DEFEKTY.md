@@ -104,7 +104,7 @@ Správu boardu a BACKLOGu pro všechna issues (nejen bug) hlídá druhý skript 
 | [#31](https://github.com/Akimto01/Kulturni_radar/issues/31) | Města s diakritikou bez akcí | S2 | P1 | Živá kontrola | Uzavřený |
 | [#17](https://github.com/Akimto01/Kulturni_radar/issues/17) | Proběhlé akce na webu (sériové číslo data) | S2 | P1 | Živá kontrola | Uzavřený |
 | [#26](https://github.com/Akimto01/Kulturni_radar/issues/26) | Závod pozdních odpovědí při přepínání měst | S2 | P2 | Automatický test (E2E nebo API) | Uzavřený |
-| [#18](https://github.com/Akimto01/Kulturni_radar/issues/18) | Počasí ve stavu CHYBA, chybějící souřadnice | S3 | P2 | Živá kontrola | Ověřuje se |
+| [#18](https://github.com/Akimto01/Kulturni_radar/issues/18) | Počasí ve stavu CHYBA, chybějící souřadnice | S3 | P2 | Živá kontrola | Uzavřený |
 | [#23](https://github.com/Akimto01/Kulturni_radar/issues/23) | Akce s datem „neuvedeno“ | S3 | P3 | Živá kontrola | Uzavřený |
 | [#21](https://github.com/Akimto01/Kulturni_radar/issues/21) | Duplicity stálých míst | S3 | P3 | Analýza nebo review | Uzavřený |
 | [#27](https://github.com/Akimto01/Kulturni_radar/issues/27) | Hláška prázdného stavu s časem jiného města | S4 | P3 | Automatický test (E2E nebo API) | Uzavřený |
@@ -126,8 +126,9 @@ Správu boardu a BACKLOGu pro všechna issues (nejen bug) hlídá druhý skript 
 
 #71 až #73 (3. 11. 2026) našla živá kontrola týdenního přehledu z 2. 11. a denních kontrol z 1. a 2. 11.: #71 duplicity akcí, které fuzzy slučování nechytí (Festival Janáček Brno ve třech podobách, Brnohraní 2026 dvakrát; samotest 1. 11. hlásil 11 duplicit), #72 zastaralá sezónní otevírací doba stálých míst (Lednice a Punkevní jeskyně s textem „Říjen“ v listopadu) a #73 falešně hlášená změna akce dva dny po sobě (podezření na kmitající pole). Všechny jsou ve stavu Potvrzený, příčiny se teprve analyzují. U #73 je S4 a P4: board má i S5 a P5, ale S5 je jen pro kosmetické vady a P5 pro „sledovat, opravit jen při zhoršení“.
 
-#18 zůstává ve stavu *Ověřuje se* a issue je proto otevřená: oprava počasí
-a souřadnic čeká na ověření v datech po čtvrtečním běhu sledovaných měst (issue #6).
+#18 je uzavřený 13. 11. 2026: oprava počasí a souřadnic (backend v3.44) byla
+ověřena v datech z 12. 11. 2026 (issue #6), 0 akcí ve stavu CHYBA a 98 % akcí
+v dosahu předpovědi má počasí OK.
 Duplicitu stálých míst (#21) poprvé zaznamenal rozbor dat při přípravě quality
 checku (7.–8. 10. 2026), živá kontrola 26. 10. ji potvrdila.
 
