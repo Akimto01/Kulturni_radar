@@ -92,7 +92,12 @@ ne o přímý důkaz.
 - **test:** po přepnutí čeká na skutečnou změnu obsahu, ne na staré karty,
 - **CI:** notifikace na telefon při selhání (funkčnost ověřena 28. 10., od té doby jen
   u plánovaných běhů), připnuté verze nástrojů a delší čekání na server jen v CI.
-  Ostré ověření celé sady úprav přinese plánovaný běh 1. 11. 2026.
+  Ostré ověření: plánovaný běh 1. 11. 2026 proběhl se zpožděním 3 h 20 min za
+  3 min 45 s, 60/61 (spadl nestabilní test mapy „Tlačítko Zobrazit v seznamu
+  v popupu“, prvek se během kliknutí překreslil), kontrola úniku prošla a ntfy
+  přišla. Běh 8. 11. prošel 61/61 a ntfy nepřišla, notifikace tedy chodí jen při
+  selhání. Publikace reportu přes `workflow_run` se nespouštěla, od 13. 11. ji
+  spouští `rf-tests.yml` explicitně.
 
 **Poučení.** Slabý test může rozbít jiné testy, ne jen sebe. Čekání na „nějaký
 prvek“ projde i nad starým stavem stránky. A automatizace má hodnotu jen tehdy,

@@ -1,5 +1,11 @@
 # Changelog
 
+## CI: publikace RF reportu spouštěná z rf-tests.yml (#36) – 13. 11. 2026
+- **Ověření plánovaných běhů:** běh 1. 11. 2026 (`41363193882`) proběhl se zpožděním 3 h 20 min za 3 min 45 s, 60/61: spadl nestabilní test mapy „Tlačítko Zobrazit v seznamu v popupu“ (prvek se během kliknutí překreslil), kontrola úniku prošla, ntfy přišla. Běh 8. 11. (`42536753846`) 61/61, ntfy nepřišla (notifikace jen při selhání ověřena). Oba bez timeoutu a bez pádu zápisových a chip testů.
+- **Publikace na Pages se nespouštěla:** trigger `workflow_run` v `publikovat-report.yml` (na main od 28. 10.) se po žádném z obou běhů nespustil, v repu nebyl jediný běh s událostí `workflow_run` (ani přeskočený). Konfigurace ověřena (workflow aktivní, název a větev sedí, Pages ze workflow, prostředí `github-pages` povoluje main); příčina neznámá.
+- **Náhrada:** `rf-tests.yml` má oprávnění `contents: read` a `actions: write` a jako poslední krok (`if: always()` na main, za „Uložit reporty“) spouští `gh workflow run publikovat-report.yml -f run_id=<běh>`. `publikovat-report.yml` už má jen `workflow_dispatch` se vstupem `run_id`; běh bez artefaktu `rf-reporty` dál přeskočí. Report z 8. 11. publikován ručně (`43493982374`).
+- **Dokumentace:** POKRYTI.md (R11), ARCHITEKTURA-TESTU.md (C, tabulka spouštění, D1, D3), PRIBEHY-CHYB.md (příběh 2) se skutečným výsledkem místo „ověří běh 1. 11.“; BACKLOG: bod 3 Doporučeného pořadí hotový, „Timeouty v CI“ ověřeno, „Proměnlivá nestabilita RF sady“ uzavřena, chip testy rozhodnout po 15. 11., nový bod Testovacího dluhu (nestabilní test mapy).
+
 ## Docs: ověření v3.44 v datech, uzavření #6 a #18 – 13. 11. 2026
 - **Data:** export 13. 11. 2026 (POČASÍ aktualizováno 12. 11., KONTROLY), kód se neměnil.
 - **Počasí (#18):** 0 akcí ve stavu CHYBA ve všech 4 bězích od 1. 11. (v říjnu 2–12 na běh). Z 64 akcí začínajících 12.–21. 11. má řádek v POČASÍ 58, z toho 57 OK (98 %); zbylých 6 přidala sledovaná města až po aktualizaci počasí ve stejném běhu (Znojmo 12. 11.), počasí dostanou dalším během. Akce za 10+ dní mají N/A podle návrhu.

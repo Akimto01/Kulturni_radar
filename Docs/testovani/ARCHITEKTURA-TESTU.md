@@ -183,7 +183,7 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
 - **Timeouty:** čekání na server v proměnných `CEKANI_ZAPIS`,
   `CEKANI_PRIHLASENI` a `CEKANI_NAVIGACE`; výchozí hodnoty platí lokálně, CI je
   zvyšuje přes `--variable` (Apps Script v CI odpovídá pomaleji; hodnoty pro CI
-  ověří první plánovaný běh 1. 11. 2026). **Opakování padlých testů** záměrně
+  ověřeny plánovanými běhy 1. a 8. 11. 2026, oba bez timeoutu). **Opakování padlých testů** záměrně
   není (viz C3).
 - **Secrets:** PIN testovacího profilu, ntfy téma a tokeny nikdy nejsou v repu:
   lokálně v proměnných prostředí, v CI v GitHub Secrets. V klíčových slovech se
@@ -253,7 +253,7 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
 | Testy workeru | testy e-mailového webhooku (počet v [README](../../README.md), tabulka „Testy v číslech“) | push se změnou `cloudflare-worker/**` | nasazení workeru | vlastník |
 | Smoke po nasazení | E2E a API testy s tagem `smoke` (`robot --include smoke`) | ručně po každém nasazení | další práci, dokud neprojde | vlastník |
 | Týdenní regrese | API a E2E testy proti produkci (počty v [README](../../README.md), tabulka „Testy v číslech“) | plán, neděle 20:20 UTC (21:20 SEČ, 22:20 SELČ; od 28. 10. 2026, dřív 19:00 UTC; GitHub plánované běhy zdržuje, dřívější skutečný start byl zhruba 2 až 4 h po plánu); ručně | nic automaticky; selhání = úkol na další session | notifikace na telefon (jen plánované běhy), veřejný report |
-| Publikace reportu | stažení artefaktu, kontrola úniku, nasazení na GitHub Pages | po dokončení týdenní regrese (automatické spuštění ověří běh 1. 11.; ručně ověřeno) | nic | veřejné, hodnotitelé |
+| Publikace reportu | stažení artefaktu, kontrola úniku, nasazení na GitHub Pages | po dokončení týdenní regrese, spouští ho poslední krok `rf-tests.yml` (od 13. 11. 2026; `workflow_run` se po bězích 1. a 8. 11. nespustil); ručně | nic | veřejné, hodnotitelé |
 
 Obecný lint hlídá Robocop (testy) a ruff (skripty) s baseline, konvence
 specifické pro tento projekt pojistka souladu. ESLint pro `.gs` a kontrola typů
@@ -338,8 +338,13 @@ observabilita, analýza selhání, důvěryhodnost a hodnota automatizace).
 ### D1. Reporting a observabilita
 
 - **Výsledky testů:** odznaky v README, veřejný report, notifikace na telefon při
-  selhání plánovaného běhu (doručení na telefon ověřeno 28. 10. na ručních bězích,
-  podmínku pro plánovaný běh ověří běh 1. 11.).
+  selhání plánovaného běhu (doručení na telefon ověřeno 28. 10. na ručních bězích;
+  plánovaný běh 1. 11. 2026 proběhl se zpožděním 3 h 20 min za 3 min 45 s, 60/61,
+  spadl nestabilní test mapy „Tlačítko Zobrazit v seznamu v popupu“, protože se
+  prvek během kliknutí překreslil; kontrola úniku prošla a ntfy přišla. Běh 8. 11.
+  61/61 a ntfy nepřišla, notifikace tedy chodí jen při selhání). Publikace reportu
+  přes `workflow_run` se po žádném z obou běhů nespustila, od 13. 11. ji spouští
+  `rf-tests.yml` explicitně (issue #36).
 - **Observabilita produkce** (doplněk testů): týdenní samotest a audit dat v Apps
   Scriptu, denní watchdog, týdenní report kvality dat. Řada defektů byla vidět
   nejdřív v datech, ne v testech (DEFEKTY.md).
@@ -357,7 +362,7 @@ Hodnoty k 28. 10. 2026, spočítané z historie GitHub Actions, gitu a DEFEKTY.m
 | Metrika | Dnes | Cíl | Komentář |
 |---|---|---|---|
 | Spolehlivost týdenní regrese | 7 z 22 běhů zelených (31 %); od 23. 8. jen 2 ze 17 | aspoň 3 ze 4 posledních týdenních běhů zelené | nízké číslo je poctivý výchozí bod: deset týdnů nikdo nesledoval |
-| Doba do odhalení selhání CI | 66 dní (23. 8. až 28. 10.) | do 1 dne | notifikace při selhání plánovaného běhu, ověří běh 1. 11. |
+| Doba do odhalení selhání CI | 66 dní (23. 8. až 28. 10.) | do 1 dne | notifikace při selhání plánovaného běhu, ověřeno 1. 11. 2026 (selhání 60/61, ntfy přišla) |
 | Rychlost zpětné vazby | jednotkové testy 0,8 s, workflow medián 12 s; týdenní regrese medián 3 min 39 s | jednotkové pod 2 s, týdenní pod 6 min | |
 | Stabilita rychlé sady | 231 z 232 běhů `node-tests.yml` zelených (99,6 %) | udržet | jediný červený běh 4. 8. |
 | Podíl defektů odhalených automatizací | 2 z 8 (25 %); u závažnosti S1 a S2 1 ze 4 | aspoň 40 % | ostatní odhalila živá kontrola (4) a analýza (2), viz DEFEKTY.md |

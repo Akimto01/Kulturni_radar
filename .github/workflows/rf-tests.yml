@@ -9,6 +9,12 @@ on:
     # na letní čas
     - cron: '20 20 * * 0'
 
+# Dřív platilo výchozí oprávnění repa (read). contents: read stačí pro checkout,
+# actions: write potřebuje poslední krok (gh workflow run publikovat-report.yml).
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   rf-testy:
     runs-on: ubuntu-latest
@@ -103,3 +109,13 @@ jobs:
             -H "Click: $RUN_URL" \
             -d "Behy RF testu proti produkci skoncily chybou. Log a reporty: $RUN_URL" \
             "https://ntfy.sh/$NTFY_TOPIC"
+
+      # Trigger workflow_run v publikovat-report.yml se po plánovaných bězích 1. a 8. 11. 2026
+      # vůbec nespustil (v repu žádný běh s událostí workflow_run), proto explicitní spuštění.
+      # Musí běžet až po kroku „Uložit reporty“; publikovat-report.yml sám přeskočí běh bez
+      # artefaktu rf-reporty (kontrola úniku selhala).
+      - name: Spustit publikaci reportu na Pages
+        if: always() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run publikovat-report.yml -f run_id=${{ github.run_id }}

@@ -1,15 +1,13 @@
 name: Publikovat RF report (GitHub Pages)
 
-# Po každém dokončeném běhu rf-tests.yml na main (a ručně pro zvolený běh) vezme
-# artefakt rf-reporty, znovu zkontroluje únik tajných hodnot a publikuje jen
-# report.html a log.html + souhrnnou stránku. Screenshoty a playwright-log.txt
-# se nikdy nezveřejňují. Viz Docs/CHANGELOG.md a issue #11.
+# Pro zvolený běh rf-tests.yml z main vezme artefakt rf-reporty, znovu zkontroluje
+# únik tajných hodnot a publikuje jen report.html a log.html + souhrnnou stránku.
+# Screenshoty a playwright-log.txt se nikdy nezveřejňují. Viz Docs/CHANGELOG.md a issue #11.
+# Spouští ho poslední krok rf-tests.yml (gh workflow run, od 13. 11. 2026) nebo ručně.
+# Trigger workflow_run se po plánovaných bězích 1. a 8. 11. 2026 nespustil, proto je
+# odstraněný (issue #36).
 
 on:
-  workflow_run:
-    workflows: ["RF testy (API + frontend)"]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
     inputs:
       run_id:
@@ -39,10 +37,9 @@ jobs:
         id: beh
         env:
           GH_TOKEN: ${{ github.token }}
-          UDALOST_RUN_ID: ${{ github.event.workflow_run.id }}
           VSTUP_RUN_ID: ${{ inputs.run_id }}
         run: |
-          run_id="${UDALOST_RUN_ID:-$VSTUP_RUN_ID}"
+          run_id="$VSTUP_RUN_ID"
           case "$run_id" in
             ''|*[!0-9]*) echo "::error::ID běhu musí být číslo, dostal jsem '$run_id'"; exit 1 ;;
           esac
