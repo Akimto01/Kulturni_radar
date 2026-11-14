@@ -111,7 +111,7 @@ Soupis toho, co projekt používá. První sloupec obsahuje identifikátor v zp�
 | Cloudflare Pages (`cloudflare-pages`) | hosting frontendu na kulturniradar.cz, nasazuje `git push` | `apps-script/Index.html` (jeden soubor pro oba nasazovací kanály); konfigurace v repu není | |
 | Cloudflare Workers (`cloudflare-workers`) | e-mailový Worker: tip na akci přepošle dál a pošle ho jako webhook do appky | `cloudflare-worker/email-webhook.js`, `cloudflare-worker/wrangler.toml` | `compatibility_date` 2024-09-23 |
 | `wrangler` | nasazení a vývoj Workeru | `cloudflare-worker/package.json` (devDependencies) | ^4.0.0 |
-| `postal-mime` | čtení příchozího e-mailu ve Workeru | `cloudflare-worker/package.json` (dependencies) | ^3.0.0 |
+| `postal-mime` | čtení příchozího e-mailu ve Workeru | `cloudflare-worker/package.json` (dependencies) | ^4.0.8 |
 | `clasp` | nasazení backendu do Apps Scriptu (`clasp push`, `clasp deploy -i`) | `.clasp.json` | |
 
 ### Externí služby a API

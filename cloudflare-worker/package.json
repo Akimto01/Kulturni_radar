@@ -5,7 +5,7 @@
   "description": "Cloudflare Email Worker: preposle mail na Gmail a zaroven ho posle jako webhook do appky Kulturni radar (EMAIL_TIPY fronta).",
   "type": "module",
   "dependencies": {
-    "postal-mime": "^3.0.0"
+    "postal-mime": "^4.0.8"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
