@@ -178,6 +178,10 @@ s cronem 20:20 UTC startoval 1. 11. ve 23:40 a 8. 11. ve 23:46 UTC.
 Důsledek: ověřovačky navázané na plánovaný běh termínovat na následující
 den, pondělní souhrn čekat až odpoledne.
 
+Publikaci reportu na Pages spouští poslední krok `rf-tests.yml` (`gh workflow run publikovat-report.yml`),
+`workflow_run` se po plánovaných bězích 1. a 8. 11. 2026 nespustil (#36); report starého běhu jde zveřejnit
+ručně přes `-f run_id=<id>`, dokud artefakt neexpiruje (30 dní).
+
 ### Drobnosti, na které jsme narazili jen jednou, ale stojí za zapsání
 - `Wait For Elements State` (knihovna Browser) **nepodporuje** pojmenovaný
   argument `msg=` (na rozdíl od `Should Be Equal` a podobných) —
