@@ -1,5 +1,19 @@
 # Changelog
 
+## Backend v3.54 – zastaralá otevírací doba stálých míst (#72) – 16. 11. 2026
+### Chyba
+- Stálá místa ukazovala sezónní otevírací dobu z minulých měsíců (Lednice a Punkevní jeskyně s „Říjen: …“ v listopadu). Příčina z dat MÍSTA 16. 11.: měsíční aktualizace 1. 11. vrátila jen 3 místa, 13 z 22 míst mělo údaj starší měsíce; Macocha je v listu 3× pod různou obcí.
+### Změněno
+- **Pojistka (`oteviraciDobaProPrehled_`, čistá funkce, konstanta `MISTA_DOBA_PLATNOST_DNI = 35`):** otevírací doba starší 35 dní (sloupec Poslední aktualizace) se v `readMista_` nahradí textem „ověřte na webu místa (údaj z <datum>)“, na webu i v přehledech; bez data aktualizace (ruční řádek) se text ponechá.
+- **`updateMista`:** prompt dostane seznam už známých míst profilu s ID (`znamaMista_`, `textZnamychMist_`), model je má obnovit pod stejným ID a zavřená vrátit se stavem „zavřeno“; limit 20 míst místo 12.
+### Testy
+- **+4 Node testy (backend 453 → 457, celkem 662 → 666):** `oteviraciDobaProPrehled_` (do 35 dní, starší, bez data, prázdná doba), `readMista_` s výzvou k ověření, `textZnamychMist_` (max 20, prázdný vstup), prompt `updateMista` se známými místy a limitem 20.
+- **Baseline pokrytí řádků backendu 92,10 → 92,21 %** (`kontrola-pokryti.py --zapsat-baseline`, ratchet: po zlepšení se baseline zvyšuje).
+### Nasazení a ověření
+- Backend v3.54, `Index.html` beze změny (v3.66). `clasp deploy -i … --description "v3.54"` (verze projektu 117), `?api=meta` hlásí `3.54`. API `?api=places&profil=Brno`: Státní zámek Lednice „ověřte na webu místa (údaj z 1. 10. 2026)“, Zoo Brno původní text, výzvu má 17 z 20 míst.
+- Smoke lokálně: API 3/3 a 5 frontend smoke testů PASS, „Mapa lze otevřít a zavřít“ lokálně spadl na timeoutu (lokální prostředí, viz Testovací dluh); ruční RF běh v CI 43923689168 proti v3.54: frontend 53/53, API 8/9 (jen „Nasazená verze odpovídá repu“: produkce 3.54 před pushem tohoto commitu, očekávané).
+- Obnovu všech známých míst pod stejným ID ověří měsíční aktualizace 1. 12. 2026. Dokumentace: ARCHITEKTURA-APLIKACE (Stálá místa), README (počty), DEFEKTY.md (#72 Ověřuje se), BACKLOG (#72, ruční úklid duplicit v MÍSTA, počasí Punkevní jeskyně, chip testy po 3 bězích).
+
 ## Závislosti: triáž Dependabot alertů (#70) – 14.–16. 11. 2026
 - **Stav před triáží:** 17 otevřených alertů (od založení #70 přibyly další) v 5 balíčcích: `undici` 11, `sharp` 2 a `postal-mime` 1 v `cloudflare-worker`, `qs` 2 a `minimatch` 1 v `tests/mutace`. Jediná runtime závislost je `postal-mime`, ostatní jsou tranzitivní vývojové nástroje. Podrobnosti zranitelností se do repa záměrně nepíšou (repo je veřejné).
 - **`postal-mime` (runtime Workeru):** `^3.0.0` → `^4.0.8`, lockfile 4.2.0 (nejnovější verze starší 14 dní). Major 4 je přepis do TypeScriptu bez změny výstupu parseru, kód Workeru se neměnil. Worker testy 7/7, Worker nasazen (`wrangler deploy` z commitu 49c7bc4) a ověřen zkušebním e-mailem 14. 11. (Email Routing: přeposláno i zpracováno, nový řádek v EMAIL_TIPY ve stavu „nové“). README: verze v soupisu nástrojů.

@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.53 (13. 11. 2026) – zprávy z testovacího profilu (rf-…) se ve frontě EMAIL_TIPY neověřují přes AI a nezapočítají do denní notifikace (#79)
- * (předchozí: 3.52 – samotest hlídá všechny triggery ze setupTriggers, selhání sendUserNotifications pošle notifikaci, apiNajdiProUzivatele_ vrací skutečný počet aktualizovaných (#48))
+ * Verze: 3.54 (16. 11. 2026) – stálá místa: otevírací doba starší 35 dní se v přehledech a na webu nahradí výzvou k ověření, měsíční aktualizace dostane seznam známých míst a obnoví je pod stejným ID (#72)
+ * (předchozí: 3.53 – zprávy z testovacího profilu (rf-…) se ve frontě EMAIL_TIPY neověřují přes AI a nezapočítají do denní notifikace (#79))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.53';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.54';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -3117,7 +3117,7 @@ function updateMista() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const cfg = readCriteria_(ss.getSheetByName(SHEET.KRITERIA));
     ensureMistaSheet_(ss);
-    const places = callAnthropicPlaces_(cfg);
+    const places = callAnthropicPlaces_(cfg, znamaMista_(ss, cfg.profil));   // v3.54 (#72)
     const stats = upsertMista_(ss, cfg, places);
     updateLokalita_(ss, cfg.profil, new Date());
     const body = [
@@ -3146,8 +3146,31 @@ function updateMista() {
   }
 }
 
+/** PURE (v3.54, #72): řádky promptu se seznamem už známých míst profilu.
+ *  Bez nich model vrací jen část míst a ostatním zůstane otevírací doba
+ *  z minulých měsíců; se stejným id je upsertMista_ přepíše místo duplicit. */
+function textZnamychMist_(znama) {
+  const seznam = (znama || []).filter(m => m && m.nazev).slice(0, 20);
+  if (!seznam.length) return [];
+  return [
+    'Už známá místa (nejdřív aktualizuj jejich otevírací dobu pro toto období a použij STEJNÉ id;',
+    'místo, které už neexistuje, vrať se stavem "zavřeno"; pak případně doplň nová, celkem max 20):',
+  ].concat(seznam.map(m => '- ' + m.id + ': ' + m.nazev + (m.obec ? ' (' + m.obec + ')' : '')));
+}
+
+/** v3.54 (#72): už známá místa profilu pro prompt (bez duplicit, s ID). */
+function znamaMista_(ss, profil) {
+  const sh = ss.getSheetByName(SHEET.MISTA);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const data = sh.getRange(2, 1, sh.getLastRow() - 1, 15).getValues()
+    .filter(r => norm_(r[14]) === norm_(profil) && String(r[0] || '').trim());
+  return deduplikovatMista_(data).map(r => ({
+    id: String(r[0]).trim(), nazev: String(r[1] || '').trim(), obec: String(r[3] || '').trim(),
+  }));
+}
+
 /** Hledání stálých míst přes Anthropic API (tool use, web search). */
-function callAnthropicPlaces_(cfg) {
+function callAnthropicPlaces_(cfg, znama) {
   const apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('Chybí ANTHROPIC_API_KEY ve Script Properties.');
 
@@ -3169,9 +3192,9 @@ function callAnthropicPlaces_(cfg) {
     'Zaměř se na: zoo, botanické zahrady, science centra, hvězdárny/planetária,',
     'významné hrady a zámky, jeskyně, skanzeny, technické památky, aquaparky,',
     'rozhledny a zábavní parky. U každého místa ověř AKTUÁLNÍ otevírací dobu.',
-    'Odevzdej max 12 nejzajímavějších míst zavoláním nástroje report_places.',
+    'Odevzdej max ' + ((znama || []).length ? 20 : 12) + ' nejzajímavějších míst zavoláním nástroje report_places.',   // v3.54: se známými místy 20
     'Uváděj pouze KONKRÉTNÍ existující místa; žádné obecné položky.',
-  ].join('\n');
+  ].concat(textZnamychMist_(znama)).join('\n');
 
   const basePayload = {
     model: ANTHROPIC_MODEL,
@@ -3812,6 +3835,26 @@ function esc_(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/** v3.54 (#72): stáří údaje o otevírací době stálého místa, po kterém se už
+ *  nezobrazuje. Aktualizace míst běží 1. den v měsíci, takže údaj z minulého
+ *  měsíce je ještě platný; starší (místo se při aktualizaci nevrátilo) by
+ *  ukazoval např. říjnovou dobu v listopadu. */
+const MISTA_DOBA_PLATNOST_DNI = 35;
+
+/** PURE (v3.54, #72): otevírací doba pro web a přehledy. Starší než
+ *  MISTA_DOBA_PLATNOST_DNI → výzva k ověření na webu místa místo zastaralého
+ *  textu. Bez data aktualizace (ruční řádek) se text ponechá. */
+function oteviraciDobaProPrehled_(doba, aktualizovano, dnes) {
+  const text = String(doba || '').trim();
+  if (!text) return '';
+  const d = parseCzDate_(aktualizovano);
+  if (!d) return text;   // bez data (ruční řádek) stáří neznáme, text ponechat
+  if ((dnes.getTime() - d.getTime()) / 86400000 > MISTA_DOBA_PLATNOST_DNI) {
+    return 'ověřte na webu místa (údaj z ' + formatDateOnly_(d) + ')';
+  }
+  return text;
+}
+
 /** Načte aktivní stálá místa profilu, seřazená podle skóre sestupně. */
 function readMista_(ss, profil) {
   const sh = ss.getSheetByName(SHEET.MISTA);
@@ -3825,7 +3868,7 @@ function readMista_(ss, profil) {
       nazev: String(row[1] || '').trim(),
       typ: String(row[2] || '').split(';')[0].trim(),
       obec: String(row[3] || '').trim(),
-      doba: String(row[5] || '').trim(),
+      doba: oteviraciDobaProPrehled_(row[5], row[13], new Date()),   // v3.54 (#72)
       skore: Number(row[9]) || 0,
     });
   });

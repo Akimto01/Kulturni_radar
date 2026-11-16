@@ -126,6 +126,13 @@ ke každé akci pro frontend (mapa/karty), bez dalšího volání za běhu.
 (id, název, typ, obec, otevírací doba, sezónní poznámka, vstupné, děti,
 skóre, stav, URL). Upsert podle id → název+obec. Měsíční trigger.
 
+Od v3.54 (#72) dostane prompt seznam už známých míst profilu s ID
+(`znamaMista_`, `textZnamychMist_`, nejvýš 20): model je má obnovit pod stejným
+ID, takže aktualizace přepíše všechna známá místa, ne jen část (limit 20 místo 12).
+Otevírací doba starší než 35 dní (`MISTA_DOBA_PLATNOST_DNI`, sloupec Poslední
+aktualizace) se v `readMista_` nahradí výzvou „ověřte na webu místa (údaj z <datum>)“
+(`oteviraciDobaProPrehled_`), na webu i v přehledech; řádek bez data zůstane beze změny.
+
 ## Sledovaná města
 
 Tiché doplnění dat na pozadí pro profily mimo domácí (`zpracovatSledovanaMesta`,

@@ -5639,3 +5639,48 @@ test('#79 zpracovatEmailTipy_: testovací a skutečný tip vedle sebe → AI jen
   assert.equal(radky[0][5], 'test-ignorováno');
   assert.equal(radky[1][5], 'nelze-ověřit');
 });
+
+// ---------------------------------------------------------------------------
+// #72: zastaralá otevírací doba stálých míst
+// ---------------------------------------------------------------------------
+
+test('#72 oteviraciDobaProPrehled_: do 35 dní původní text, starší → výzva k ověření, bez data původní text, prázdná doba zůstane prázdná', () => {
+  const ctx = nactiRadar();
+  const dnes = new Date(2026, 10, 16, 10, 0);
+  assert.equal(ctx.oteviraciDobaProPrehled_('Út–Ne 9–17', '1. 11. 2026 6:00', dnes), 'Út–Ne 9–17');
+  assert.equal(ctx.oteviraciDobaProPrehled_('Říjen: Út–Pá 11 a 14', '1. 10. 2026 6:01', dnes), 'ověřte na webu místa (údaj z 1. 10. 2026)');
+  assert.equal(ctx.oteviraciDobaProPrehled_('Po–Ne 10–21', '', dnes), 'Po–Ne 10–21', 'bez data stáří neznáme');
+  assert.equal(ctx.oteviraciDobaProPrehled_('', '1. 10. 2026', dnes), '');
+  // hranice: parseCzDate_ bere jen datum (půlnoc), 34 dní platí, 36 dní už ne
+  assert.equal(ctx.oteviraciDobaProPrehled_('X', '13. 10. 2026 10:00', dnes), 'X');
+  assert.match(ctx.oteviraciDobaProPrehled_('X', '11. 10. 2026', dnes), /^ověřte/);
+});
+
+test('#72 readMista_: zastaralá otevírací doba se na webu i v přehledu nahradí výzvou', () => {
+  const ctx = nactiRadar({ ss: fakeSpreadsheet({ 'MÍSTA': [MISTA_HLAVICKA_T,
+    ['lednice', 'Státní zámek Lednice', 'hrad/zámek', 'Lednice', '', 'Říjen: Út–Pá 11:00 a 14:00', '', '', '', 9, 'aktivní', '', '', '1. 1. 2020 6:01', 'Brno']] }) });
+  const mista = ctx.readMista_(ctx.SpreadsheetApp.getActiveSpreadsheet(), 'Brno');
+  assert.equal(mista.length, 1);
+  assert.match(mista[0].doba, /^ověřte na webu místa \(údaj z 1\. 1\. 2020\)$/);
+});
+
+test('#72 textZnamychMist_: seznam známých míst s ID (max 20), prázdný vstup → žádné řádky', () => {
+  const ctx = nactiRadar();
+  assert.equal(ctx.textZnamychMist_([]).length, 0);
+  assert.equal(ctx.textZnamychMist_(undefined).length, 0);
+  const radky = ctx.textZnamychMist_([{ id: 'lednice', nazev: 'Státní zámek Lednice', obec: 'Lednice' }, { id: 'x', nazev: '' }]);
+  assert.equal(radky.length, 3, 'dva úvodní řádky + jedno místo (bez názvu vynecháno)');
+  assert.equal(radky[2], '- lednice: Státní zámek Lednice (Lednice)');
+  const mnoho = Array.from({ length: 25 }, (_, i) => ({ id: 'm' + i, nazev: 'Místo ' + i }));
+  assert.equal(ctx.textZnamychMist_(mnoho).length, 22);
+});
+
+test('#72 updateMista: prompt obsahuje známá místa profilu s ID a limit 20', () => {
+  const f = pripravMista_({ fronta: [odpovedMista_(MISTA_AI)] });
+  f.ctx.updateMista();
+  jenAiVolani_(f.volane, 1);
+  const text = f.volane[0].payload.messages[0].content;
+  assert.match(text, /Už známá místa/);
+  assert.match(text, /- old-vida: VIDA! science centrum \(Brno\)/);
+  assert.match(text, /Odevzdej max 20 /);
+});
