@@ -1,5 +1,17 @@
 # Changelog
 
+## Backend v3.55 – vlastní limit vyhledávání pro stálá místa (#72) – 16. 11. 2026
+### Zjištění z ručního běhu v3.54
+- Ruční `updateMista` 16. 11. v 19:08 s v3.54 obnovil všech 20 známých míst pod stejným ID (Nová: 0, Aktualizovaná: 20), takže seznam známých míst v promptu funguje. S limitem 3 webových vyhledávání ale u většiny míst zapsal „NEOVĚŘENO … bývá …“ a některá označil „sezónně zavřeno“ jen odhadem.
+### Změněno
+- **`MAX_WEB_SEARCHES_MISTA = 12`:** vlastní limit vyhledávání pro `callAnthropicPlaces_` (měsíční aktualizace ověřuje až 20 míst, běží jednou měsíčně, vyšší limit stojí řádově desítky centů). Ostatní hledání zůstává na `MAX_WEB_SEARCHES = 3`.
+- **Prompt:** stav „sezónně zavřeno“ jen tehdy, když to oficiální web místa potvrzuje, jinak „aktivní“.
+- Časový strop smyčky `pause_turn` (180 s) zůstává: vyšší by riskoval tvrdý limit Apps Scriptu 6 min (kontrola času je jen před dalším kolem, ne během volání), tedy tiché selhání bez notifikace. Délku běhu s 12 vyhledáváními ověří ruční běh.
+### Testy
+- Node testy beze změny počtu (666): test promptu `updateMista` ověřuje i `max_uses` 12 a pravidlo pro „sezónně zavřeno“. Pokrytí řádků 92,22 % (baseline 92,21 %).
+### Nasazení a ověření
+- Backend v3.55, `Index.html` beze změny (v3.66). `clasp deploy -i … --description "v3.55"` (verze projektu 118), `?api=meta` hlásí `3.55`, API smoke 3/3 (lokální frontend běhy visí, viz Testovací dluh). Dokumentace: ARCHITEKTURA-APLIKACE (Stálá místa).
+
 ## Backend v3.54 – zastaralá otevírací doba stálých míst (#72) – 16. 11. 2026
 ### Chyba
 - Stálá místa ukazovala sezónní otevírací dobu z minulých měsíců (Lednice a Punkevní jeskyně s „Říjen: …“ v listopadu). Příčina z dat MÍSTA 16. 11.: měsíční aktualizace 1. 11. vrátila jen 3 místa, 13 z 22 míst mělo údaj starší měsíce; Macocha je v listu 3× pod různou obcí.

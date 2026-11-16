@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.54 (16. 11. 2026) – stálá místa: otevírací doba starší 35 dní se v přehledech a na webu nahradí výzvou k ověření, měsíční aktualizace dostane seznam známých míst a obnoví je pod stejným ID (#72)
- * (předchozí: 3.53 – zprávy z testovacího profilu (rf-…) se ve frontě EMAIL_TIPY neověřují přes AI a nezapočítají do denní notifikace (#79))
+ * Verze: 3.55 (16. 11. 2026) – aktualizace stálých míst má vlastní limit 12 webových vyhledávání (dřív 3 jako hledání akcí), aby stihla ověřit otevírací dobu všech známých míst; stav „sezónně zavřeno“ jen ověřený (#72)
+ * (předchozí: 3.54 – stálá místa: otevírací doba starší 35 dní se v přehledech a na webu nahradí výzvou k ověření, měsíční aktualizace dostane seznam známých míst a obnoví je pod stejným ID (#72))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.54';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.55';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -94,6 +94,10 @@ const CENY_MODELU_USD_MTOK = {
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const WEB_COOLDOWN_MS = 10 * 60 * 1000;  // min. rozestup mezi web-spuštěnými kontrolami
 const MAX_WEB_SEARCHES = 3;  // v3.6: úspora kreditů (bývalo 5)
+// v3.55 (#72): měsíční aktualizace stálých míst ověřuje otevírací dobu až 20
+// známých míst; se 3 vyhledáváními 16. 11. 2026 většinu jen odhadla
+// („NEOVĚŘENO …“). Běží jednou měsíčně, vyšší limit stojí řádově desítky centů.
+const MAX_WEB_SEARCHES_MISTA = 12;
 
 const KONTAKT_EMAIL = 'info@kulturniradar.cz';
 const KONTAKT_ZPRAVA_MAX = 2000;        // znaků – proti zneužití formuláře
@@ -3184,6 +3188,7 @@ function callAnthropicPlaces_(cfg, znama) {
     'výlet hodný cesty odjinud, 6–8 = solidní půldenní výlet, 3–5 = pěkné doplnění programu, 1–2 = drobnost.',
     'stav = "aktivní" / "sezónně zavřeno" / "zavřeno". Piš česky.',
     'Otevírací dobu uváděj AKTUÁLNÍ pro toto roční období a ověřenou na OFICIÁLNÍM webu místa.',
+    'Stav "sezónně zavřeno" uveď jen tehdy, když to oficiální web místa potvrzuje; jinak "aktivní".',   // v3.55 (#72)
   ].join('\n');
 
   const userMsg = [
@@ -3201,7 +3206,7 @@ function callAnthropicPlaces_(cfg, znama) {
     max_tokens: 16000,
     system: system,
     tools: [
-      { type: 'web_search_20250305', name: 'web_search', max_uses: MAX_WEB_SEARCHES },
+      { type: 'web_search_20250305', name: 'web_search', max_uses: MAX_WEB_SEARCHES_MISTA },   // v3.55 (#72)
       REPORT_PLACES_TOOL,
     ],
   };

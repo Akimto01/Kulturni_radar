@@ -132,6 +132,9 @@ ID, takže aktualizace přepíše všechna známá místa, ne jen část (limit 
 Otevírací doba starší než 35 dní (`MISTA_DOBA_PLATNOST_DNI`, sloupec Poslední
 aktualizace) se v `readMista_` nahradí výzvou „ověřte na webu místa (údaj z <datum>)“
 (`oteviraciDobaProPrehled_`), na webu i v přehledech; řádek bez data zůstane beze změny.
+Od v3.55 má aktualizace stálých míst vlastní limit 12 webových vyhledávání
+(`MAX_WEB_SEARCHES_MISTA`, ostatní hledání 3), aby stihla ověřit otevírací dobu
+všech známých míst; „sezónně zavřeno“ jen tehdy, když to potvrzuje oficiální web místa.
 
 ## Sledovaná města
 

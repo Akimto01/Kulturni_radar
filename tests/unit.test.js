@@ -4699,6 +4699,8 @@ test('#35 callAnthropicPlaces_: payload s modelem, nástroji a profilem; chyběj
   const p = volane[0].payload;
   assert.equal(p.model, 'claude-sonnet-5-5');
   assert.deepEqual(p.tools.map(t => t.name), ['web_search', 'report_places']);
+  assert.equal(p.tools[0].max_uses, 12, 'v3.55 (#72): stálá místa mají vlastní limit vyhledávání');
+  assert.match(p.system, /sezónně zavřeno" uveď jen tehdy/);
   assert.match(p.messages[0].content, /v okolí lokality: Brno/);
   assert.match(p.messages[0].content, /Maximální dojezd: 90 min/);
 
