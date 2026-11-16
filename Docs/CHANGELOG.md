@@ -1,5 +1,13 @@
 # Changelog
 
+## Závislosti: triáž Dependabot alertů (#70) – 14.–16. 11. 2026
+- **Stav před triáží:** 17 otevřených alertů (od založení #70 přibyly další) v 5 balíčcích: `undici` 11, `sharp` 2 a `postal-mime` 1 v `cloudflare-worker`, `qs` 2 a `minimatch` 1 v `tests/mutace`. Jediná runtime závislost je `postal-mime`, ostatní jsou tranzitivní vývojové nástroje. Podrobnosti zranitelností se do repa záměrně nepíšou (repo je veřejné).
+- **`postal-mime` (runtime Workeru):** `^3.0.0` → `^4.0.8`, lockfile 4.2.0 (nejnovější verze starší 14 dní). Major 4 je přepis do TypeScriptu bez změny výstupu parseru, kód Workeru se neměnil. Worker testy 7/7, Worker nasazen (`wrangler deploy` z commitu 49c7bc4) a ověřen zkušebním e-mailem 14. 11. (Email Routing: přeposláno i zpracováno, nový řádek v EMAIL_TIPY ve stavu „nové“). README: verze v soupisu nástrojů.
+- **`wrangler` (vývojová závislost Workeru):** lockfile na 4.156.0 v rámci `^4.0.0`; nový `miniflare` tahá opravené tranzitivní `undici` a `sharp` (12 alertů).
+- **`qs` (tests/mutace):** `overrides` na 6.16.2, protože `@stryker-mutator/core` drží `typed-rest-client ~2.3.0`, který má `qs` napevno. Mutační testy kritické sady lokálně i v CI 96,88 % (práh 95 %).
+- **`minimatch` (tests/mutace) ponechán otevřený s důvodem:** tranzitivně přes Stryker a glob, oprava jen v major 11, kterou Stryker zatím nepustí; jen vývojový nástroj, vstupy jsou vlastní vzory. Sledování v BACKLOGu (Testovací dluh).
+- **Výsledek:** 1 otevřený alert (`minimatch`), potvrzená dosažitelná zranitelnost v produkci po opravě `postal-mime` žádná. Dokumentace: BACKLOG (5b hotovo, stav Dependabotu, nový bod Testovacího dluhu), TESTY.md (stav alertů).
+
 ## Backend v3.53 – testovací e-mailové tipy bez AI ověření (#79) – 13. 11. 2026
 ### Chyba
 - RF test odeslání kontaktního formuláře (profil rf-test) při každém běhu vytvořil zprávu, která přes Cloudflare Worker skončila ve frontě EMAIL_TIPY. Denní kontrola ji ověřovala přes AI a hlásila „nešlo ověřit“: v exportu EMAIL_TIPY z 13. 11. 2026 bylo 37 ze 42 řádků zpráv z RF testu. Každá stála jedno AI volání a dělala šum v denní notifikaci. Nalezeno při prověrce #74.

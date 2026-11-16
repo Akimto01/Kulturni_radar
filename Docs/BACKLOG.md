@@ -36,7 +36,7 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 **Fáze 2 – zpevnění základu (po 2. 11.):**
 5. **Sjednocení testů s architekturou, dávka 1** (~1,5–2 h): suite-level teardown a `Close Page`. Pak dávky 2 (~45 min), 3 (~1 h) a 5 (~1–1,5 h). Audit `Docs/audity/AUDIT-SOULADU-TESTU.md`. → issue #34
 5a. ~~**Opravit #48 tichá selhání** (~30 min, po nedělním samotestu 1. 11.): samotest hlídá všechny triggery ze setupTriggers, sendUserNotifications hlásí chybu přes notifyFail_, pole aktualizovano v odpovědi apiNajdiProUzivatele_; testy podle scénáře v #35, nasazení backendu.~~ **HOTOVO 3. 11. 2026** (backend v3.52, viz CHANGELOG). → issue #48
-5b. **Triáž Dependabot alertů (16)** (~1 h, do 3. 11.): po balíčcích (`undici` 11, `sharp` 2 a `postal-mime` 1 ve workeru, `qs` 2 v `tests/mutace`), rozlišit runtime a vývojové závislosti, u každého alertu závažnost a opravitelnost bez porušení pravidla o verzích starších 14 dní; `postal-mime` první (runtime Workeru, parsuje nedůvěryhodné e-maily), potvrzená dosažitelná zranitelnost = defekt formulářem. → issue #70
+5b. ~~**Triáž Dependabot alertů (16)** (~1 h, do 3. 11.): po balíčcích (`undici` 11, `sharp` 2 a `postal-mime` 1 ve workeru, `qs` 2 v `tests/mutace`), rozlišit runtime a vývojové závislosti, u každého alertu závažnost a opravitelnost bez porušení pravidla o verzích starších 14 dní; `postal-mime` první (runtime Workeru, parsuje nedůvěryhodné e-maily), potvrzená dosažitelná zranitelnost = defekt formulářem.~~ **HOTOVO 16. 11. 2026**: 17 alertů, opraveno `postal-mime` (runtime Workeru, nasazeno), `wrangler` (tranzitivní `undici` a `sharp`) a `qs` (override v `tests/mutace`); otevřený zůstal `minimatch` s důvodem (viz Testovací dluh), viz CHANGELOG. → issue #70
 
 **Fáze 3 – pokrytí kritických funkcí:**
 6. ~~**Pokrytí kritických funkcí backendu** (hotové: stub tabulky a triggerů v harnessu, platba AI, triggery a hlídač, scénář #48 v backendu v3.52).~~ **HOTOVO 3. 11. 2026** (backend 92,1 % řádků a 86,1 % větví, viz POKRYTI.md a CHANGELOG). → issue #35
@@ -147,6 +147,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
 - Zvážit hlídání zůstatku kreditu nebo stavu auto-reloadu Anthropic (13. 11. 2026 auto-reload vypnutý po selhání platby, zjištěno náhodou v konzoli)
 
 ## Testovací dluh
+- Sledovat: minimatch v tests/mutace (tranzitivně přes Stryker a glob), oprava jen v major 11; alert ponechán otevřený, vrátit se při vydání Strykeru s minimatch 11+. Jen vývojový nástroj, vstupy jsou vlastní vzory.
 - Sledovat: lokální RF běh visí po posledním testu na Suite Teardown (13. 11. 2026 třikrát, Windows, Browser Library); v CI se neděje. Zjistit příčinu (Close Browser, otevřené procesy node/chrome).
 - Sledovat: test „Sekce stálých míst existuje“ spadl 13. 11. 2026 v ručním CI běhu 43514270130 (TimeoutError 15 s na `#mista-sekce .misto-karta`), jednorázově po večeru s mnoha nasazeními a běhy; při opakování ve 2 ze 3 běhů vyšetřit.
 - ~~Sledovat: nestabilní test mapy „Tlačítko Zobrazit v seznamu v popupu“ (1. 11. pád: element not stable / detached, 8. 11. prošel); opravit (čekat na ustálení popupu) při druhém pádu ve 3 bězích.~~ **VYŘEŠENO 13. 11. 2026**: příčina byla chyba aplikace #77.
@@ -294,7 +295,7 @@ Poznámka: pořadí není striktní závazek, jen doporučení podle cílů, zá
       Free tier: 120 core-hodin/měsíc (= 60 hodin na 2jádrovém stroji) + 15 GB úložiště zdarma.
       Klíčová omezení: automatické vypnutí po ~30 min nečinnosti (nastavitelné, ale ne donekonečna zdarma) — riziko pro déle běžící úkoly bez zásahu; nutná ruční instalace Claude Code při prvním otevření (jednorázové); 60 hodin měsíčně může být těsné při častém používání na delší session.
       **Doporučení:** vyzkoušet jako ALTERNATIVU pro situace, kdy Vojta nemá notebook vůbec po ruce (ne jako náhradu za dnešní řešení remote control ve VS Code + mobilní appka, které už řeší většinu případů). Zvážit hlavně kvůli časovému limitu nečinnosti u delších úkolů.
-  - Dependabot: alerts **zapnuté 30. 10. 2026**, otevřených 16 (`undici`, `sharp`, `postal-mime` ve workeru, `qs` v `tests/mutace`; projít a rozhodnout, viz CHANGELOG); bezpečnostní aktualizace (automatické pull requesty) zůstávají vypnuté, zvážit později
+  - Dependabot: alerts **zapnuté 30. 10. 2026**; triáž 16. 11. 2026 (#70): opraveno `postal-mime`, `undici`, `sharp` a `qs`, otevřený zůstal 1 alert `minimatch` s důvodem (viz Testovací dluh); bezpečnostní aktualizace (automatické pull requesty) zůstávají vypnuté, zvážit později
   - Milestones (seskupení issues podle verze/fáze, např. „Notifikace A–F")
   - GitHub Wiki (zvažováno, ale `Docs/*.md` verzovaný v repu je pravděpodobně lepší volba pro tenhle projekt)
   - ~~**Kontrola defektů a boardu v CI s read-only tokenem** (nápad 29. 10. 2026)~~ **REALIZOVÁNO 29. 10. 2026:** workflow `.github/workflows/kontrola-projektu.yml` (denně 6:40 UTC, v pondělí souhrn), classic token `BOARD_READ_TOKEN` jen se scope `read:project` (fine-grained token uživatelský projekt číst neumí), platnost do 27. 1. 2027, obnova issue #51 (viz CHANGELOG a `Docs/kvalita/DEFEKTY.md`, Kontrola úplnosti).
