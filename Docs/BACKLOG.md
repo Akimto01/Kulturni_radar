@@ -89,7 +89,7 @@ Pořadí: AGENTS.md, smoke, rozcestník, katalog, kontrola odkazů, případová
 **Cíl 3 – kvalita akcí:**
 - ~~**Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – rozhodnout o rozpočtu a stropu 15 akcí na běh; další kroky podle vyhodnocení; výstupem je dokument s vyhodnocením AI, ne jen rozhodnutí.~~ **HOTOVO 13. 11. 2026** (ponechat denně, strop 15 beze změny, viz Docs/kvalita/VYHODNOCENI-AI.md) → issue #8
 
-**Ruční úklid (Vojta, kdykoli):** smazat 5 řádků „neuvedeno“ v AKCE (v3.48); projít 5 podezřelých fuzzy sloučení (CHANGELOG v3.50); volitelně 2 staré skryté duplicity v MÍSTA (v3.46); smazat duplicitní řádky v MÍSTA a nechat vždy ten s nejnovější Poslední aktualizací: Punkevní jeskyně a propast Macocha (3×), VIDA! science centrum (2×), Skanzen Strážnice (2×).
+**Ruční úklid (Vojta, kdykoli):** ~~smazat 5 řádků „neuvedeno“ v AKCE (v3.48)~~ **HOTOVO 16. 11. 2026**; projít 5 podezřelých fuzzy sloučení (CHANGELOG v3.50); volitelně 2 staré skryté duplicity v MÍSTA (v3.46); ~~smazat duplicitní řádky v MÍSTA a nechat vždy ten s nejnovější Poslední aktualizací: Punkevní jeskyně a propast Macocha (3×), VIDA! science centrum (2×), Skanzen Strážnice (2×)~~ **HOTOVO 16. 11. 2026**.
 
 **Odloženo:** Cesta B zrychlení přihlášení (jen sledovat).
 

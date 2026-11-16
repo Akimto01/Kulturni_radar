@@ -225,7 +225,9 @@ ručně přes `-f run_id=<id>`, dokud artefakt neexpiruje (30 dní).
   a `node -e "new Function('return ' + kod)"`, pak mapové testy proti produkci.
 - **Lokální RF běhy:** pro každý běh nový `--outputdir`. Lokální běh (Windows) umí viset na Suite Teardown
   (`Close Browser`); po zastavení zůstane `output.xml` smíchaný se staršími daty a plete rozbor pádu
-  (13. 11. 2026 třikrát). V CI se to neděje.
+  (13. 11. 2026 třikrát). V CI se to neděje. Od 16. 11. 2026 lokální frontend běhy na Windows spolehlivě nedobíhají:
+  frontend ověřovat rovnou v CI (`gh workflow run rf-tests.yml --ref main`), lokálně jen API smoke
+  (`robot --include smoke --outputdir <nový adresář> tests/robot/api.robot`).
 - **Testy mapy** nesmí počítat se stavem mapy z předchozího testu: po `flyTo` může být pin `nth=0` mimo viditelnou
   část a klik zachytí hlavička. Klikat přes klíčové slovo „Kliknout na pin ve viditelné části mapy“. Na konec pohybu
   mapy čekat přes klid podpisu (transform panelu a pozice pinů), ne přes třídu `leaflet-zoom-anim`, kterou `flyTo`
@@ -542,6 +544,11 @@ musí vždy upozornit (krok 5 výše), jinak hrozí přesně to, co se stalo
 aktualizovala automaticky, zatímco Apps Script `/exec` zůstal na staré
 verzi, protože se na druhý kanál zapomnělo.
 
+**Cloudflare (od 16. 11. 2026):** build příkaz Pages a Email Routing žijí jen
+v dashboardu (popis v `Docs/aplikace/PROVOZ.md`). Změny v dashboardu dělá Vojta
+nebo hlavní chat přes prohlížeč, ne Claude Code. Worker nasazuje Vojta:
+`npx wrangler login --browser=false`, odkaz otevřít v Chrome, pak `npx wrangler deploy`.
+
 ### Ověření po clasp deploy
 Produkční implementaci poznáš podle shody ID (`AKfycb…`) s URL
 v `tests/robot/resources.robot` (výchozí hodnota `BASE_URL`), ne jen
@@ -777,6 +784,8 @@ fungují spolehlivě.
   buňka v aktuálním listu (typicky KRITÉRIA, kde B2 řídí automatiku).
 - Rozbor dat z tabulky (od 13. 11. 2026): Vojta stáhne list jako CSV (Soubor → Stáhnout → .csv) a rozbor dělá
   hlavní chat. Do veřejných issues jen počty a závěry, nikdy obsah e-mailů ani adresy.
+- Ověření změny v AI hledání bez čekání na trigger (od 16. 11. 2026): Vojta spustí funkci (např. `updateMista`) ručně
+  v editoru Apps Scriptu a pošle protokol spuštění a export dotčeného listu jako CSV.
 
 ### Sondy po přepnutí profilu
 Po přepnutí profilu v dropdownu nikdy nečekat na „nějakou“ kartu – podmínku splní ještě karty předchozího profilu a sonda změří starý stav (27. 10. 2026: všechna města hlásila 17 karet Brna). Buď přejít přes město „nikdy neprohledáno“ (0 karet, pak čekat na nové karty), nebo počkat pevnou dobu (~8 s) a ověřit obsah (např. název první karty). Stejná past jako u RF testu „Opakované přepnutí profilu“ (opraveno v Index.html v3.62).
@@ -908,9 +917,13 @@ aktuálně rozpracované/vybrané úkoly:**
   (opraveno, odloženo s důvodem, zamítnuto), bez závažnosti a verzí oprav, dokud nejsou opravené: repo je veřejné, alerty
   vidí jen správce a zveřejněná závažnost neopravené zranitelnosti ukazuje okno k zneužití (vzor: issue #70).
 - **Stav Dependabotu (ověřeno 13. 11. 2026 přes `gh api`):** alerts zapnuté (`vulnerability-alerts` vrací 204), automatické security updates vypnuté (`automated-security-fixes`: `enabled: false`).
+- **Alerty se po pushi opravy zavírají se zpožděním (minuty):** nejdřív ověřit graf závislostí
+  (`gh api repos/Akimto01/Kulturni_radar/dependency-graph/sbom`), že obsahuje novou verzi, pak stav alertů (16. 11. 2026).
 - **Konvence pro `navrh-session.py` (psát záměrně):**
   - **Závislost:** „až po #N“ (i „(až po #N)“, „až po dokončení [#N]“) v řádku BACKLOG.md nebo v těle issue znamená, že issue čeká na #N;
     dokud je #N otevřené, návrh session issue nenavrhne a vypíše ho v seznamu „Blokováno“. Pro čekání na termín závislost nepoužívat.
+    „Až po #N“ blokuje **celé** issue, i když se týká jen jednoho bodu checklistu; psát jen při skutečné blokaci, jinak
+    „po dokončení #N“ bez slova „až“ (16. 11. 2026 u #80).
   - **Termín:** Termín po dnešku (typicky ověřovačka čekající na běh) znamená „nenavrhovat dřív“, issue skončí v seznamu „Naplánováno na později“.
     Stav defektu „Ověřuje se“ bez Termínu se také nenavrhuje (seznam „Čeká na data“), proto u něj vždy nastavit Termín ověření.
   - **Checklist:** u velkého issue psát odhad do textu položky, např. `- [ ] **1. Úklid** (1,5 až 2 h): …` nebo `(45 min)`; návrh pak nabídne
