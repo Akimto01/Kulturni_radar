@@ -1,6 +1,6 @@
 # Příběhy chyb – Kulturní radar
 
-Tři skutečné chyby z října 2026, každá popsaná od prvního příznaku po pojistku,
+Čtyři skutečné chyby z října a listopadu 2026, každá popsaná od prvního příznaku po pojistku,
 která zabrání jejímu návratu. Nejsou vybrané proto, že by byly technicky složité,
 ale proto, že každá ukazuje jinou stránku práce testera: proč testy chybu
 nechytily, jak se hledala příčina a co se změnilo, aby se to neopakovalo.
@@ -10,6 +10,7 @@ nechytily, jak se hledala příčina a co se změnilo, aby se to neopakovalo.
 | [1. Města s diakritikou bez akcí](#1-města-s-diakritikou-bez-akcí) | funkční chyba v produkci | od 8. 8. (podle kódu možná od 2. 8.) do 27. 10. 2026 | ruční ověření v prohlížeči při jiné změně |
 | [2. CI deset týdnů červená a nikdo to neviděl](#2-ci-deset-týdnů-červená-a-nikdo-to-neviděl) | souhra chyby v appce, slabého testu a chybějícího upozornění | od 23. 8. do 28. 10. 2026 | odznak v README |
 | [3. Únik tajných hodnot v reportech testů](#3-únik-tajných-hodnot-v-reportech-testů) | bezpečnostní chyba v testovací infrastruktuře | od 2. 8. (veřejně dostupné od 8. 10.) do 28. 10. 2026 | příprava veřejného reportu, pak automatická pojistka |
+| [4. Nestabilní test, který ukazoval na skutečnou chybu](#4-nestabilní-test-který-ukazoval-na-skutečnou-chybu) | funkční chyba v appce skrytá za nestabilním testem | od 18. 8. do 13. 11. 2026 (test padal od 1. 11.) | nestabilní E2E test, potvrzení živě v prohlížeči |
 
 Podrobné technické záznamy včetně commitů jsou v [CHANGELOG.md](../CHANGELOG.md),
 průběh práce na [boardu](https://github.com/users/Akimto01/projects/1).
@@ -148,3 +149,58 @@ vyměnit, ne jen skrýt. A hledá se počítáním výskytů, ne vypisováním h
 Záznam: „Bezpečnost: únik tajných hodnot v artefaktech CI“ v CHANGELOGu, issue
 [#33](https://github.com/Akimto01/Kulturni_radar/issues/33). Veřejný report:
 [akimto01.github.io/Kulturni_radar](https://akimto01.github.io/Kulturni_radar/).
+
+---
+
+## 4. Nestabilní test, který ukazoval na skutečnou chybu
+
+**Příznak.** V plánovaném běhu CI 1. 11. 2026 spadl test mapy „Tlačítko Zobrazit
+v seznamu…“: prvek se během kliknutí překreslil. Izolovaně test procházel, takže
+pád dostal nálepku „nestabilní test“ (zmínka je i v příběhu 2) a nikdo ho
+nevyšetřoval. 13. 11. spadl znovu, tentokrát na timeout kliknutí.
+
+**Diagnóza.** Místo dalšího opakování jsem zkusil, co test vlastně dělá: klikne na pin
+a čeká na popup. Živě v Chrome na produkci jsem posunul mapu tak, aby pin ležel 40 px
+od okraje, a klikl na něj. Popup se otevřel a hned zmizel. To už nebyl problém testu,
+ale appky, a uživatel ho mohl potkat u každého pinu blízko okraje mapy.
+
+**Kořenová příčina.** Od Index.html v3.40 (18. 8. 2026) zavíral popup handler
+`movestart zoomstart`, aby se při posunu mapy neořezával. Jenže Leaflet popup u okraje
+sám posune do viditelné oblasti (autoPan přes `panBy`) a tím vyvolá `movestart`.
+Popup tak zavíral sám sebe. Oprava v Index.html v3.66: zavírat jen při gestech
+uživatele, `dragstart zoomstart`. Ověřeno živě: popup zůstane otevřený, zoom ho dál
+zavírá.
+
+**Proč ji testy nechytily.** Žádný test neklikal na pin u okraje mapy. A test, který
+na chybu občas narazil, měl navíc dvě vlastní vady, které ji zakrývaly:
+
+- **sdílený stav:** předchozí test přiblížil mapu (`flyTo`), takže první pin
+  (`nth=0`) ležel mimo viditelnou část a klik zachytila hlavička stránky. Výsledek
+  závisel na pořadí testů a pinů v datech. Řešení: klíčové slovo „Kliknout na pin ve
+  viditelné části mapy“,
+- **čekání na pomocnou třídu:** test čekal, až zmizí třída `leaflet-zoom-anim`, ale
+  `flyTo` ji po celou dobu letu nedrží, takže se pin vybíral uprostřed animace.
+  Řešení: čekat na klid podpisu mapy (posun panelu a pozice pinů beze změny 8 kontrol
+  po sobě).
+
+**Oprava a pojistka.** Kromě opravy appky nový regresní test „Popup pinu u okraje mapy
+zůstane otevřený po automatickém posunu“: posune pin 40 px od okraje, klikne a ověří,
+že autoPan opravdu proběhl a popup zůstal otevřený. Při opravě testů vznikla ještě
+chyba v testovacím kódu: zápis `separator=SPACE` jako první hodnota proměnné Robot
+Frameworku se nebere jako značka a skončil uvnitř JavaScriptu. Test hlásil
+nejdřív „Unexpected token 'async'“, po další úpravě „Malformed arrow function
+parameter list“, a první vysvětlení (slovo `async`) bylo špatně. Dry run, který
+v CI hlídá testy, JavaScript nespouští, takže chybu odhalil až běh proti produkci.
+Skripty v proměnných se od té doby ověřují předem: složí se přes `TestSuiteBuilder`
+a zkontrolují v Node přes `new Function`. Výsledek: CI běh se všemi 8 testy mapy PASS.
+
+**Poučení.** Nestabilní test je signál k vyšetření, ne k ignorování: tady dva týdny
+ukazoval na skutečnou chybu. Testy UI nesmí sdílet stav, každý si mapu musí připravit
+sám. Čekat se má na skutečný klid stránky, ne na pomocnou třídu, kterou knihovna
+nastavuje jen někdy. A kontroly typu dry run mají slepá místa: ověří strukturu testů,
+ne kód, který testy spouštějí v prohlížeči.
+
+Záznamy: Index.html v3.66 v CHANGELOGu (včetně oprav RF testů 13. 11.), commity
+e346384, 757d07d a a117e11, issue [#77](https://github.com/Akimto01/Kulturni_radar/issues/77);
+v téže verzi opravený související falešný pád testu ntfy je
+[#78](https://github.com/Akimto01/Kulturni_radar/issues/78).
