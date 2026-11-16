@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Kulturní radar Index.html v3.66 – popup pinu u okraje mapy se po automatickém posunu nezavře (#77) -->
+<!-- Kulturní radar Index.html v3.67 – PWA: manifest a ikony pro instalaci na plochu (Cíl 2, Android) -->
 <html lang="cs">
 <head>
 <meta charset="utf-8">
@@ -19,6 +19,9 @@
 <meta name="twitter:title" content="Kulturní radar">
 <meta name="twitter:description" content="Automatické hlídání kulturních akcí v okolí – Brno a další města ČR. Denní přehled podle kategorie, mapa, kalendář a filtrování zdarma.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<!-- v3.67 (PWA): barva lišty systému; manifest a apple-touch-icon se vkládají
+     skriptem jen mimo Apps Script (viz pwaOdkazy_). -->
+<meta name="theme-color" content="#1a1a2e">
 <!-- v3.35: Leaflet – vestavěná mapa (redesign fáze 3), první externí JS
      závislost appky. Bez API klíče (OpenStreetMap dlaždice). -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -1121,6 +1124,24 @@
   // Jeden Index.html tak beze změny funguje v obou prostředích.
   const EXEC_URL = 'https://script.google.com/macros/s/AKfycbwwLACExWtRUULK5XX1bMD8SJiC6cBqAY-q99Flp3SLAEr4ejB4VnekFNH9yYnlOuJvRQ/exec';
   const JE_V_APPS_SCRIPTU = typeof google !== 'undefined' && google.script && google.script.run;
+
+  /** PURE (v3.67, PWA): odkazy pro instalaci na plochu. Jen na kulturniradar.cz;
+   *  v Apps Scriptu cesty /manifest.webmanifest a ikony neexistují (vrátily by
+   *  chybu načtení manifestu). Soubory leží v apps-script/pwa/ a do kořene webu
+   *  je kopíruje build příkaz Cloudflare Pages (viz PROVOZ.md). */
+  function pwaOdkazy_(jeVAppsScriptu) {
+    if (jeVAppsScriptu) return [];
+    return [
+      { rel: 'manifest', href: '/manifest.webmanifest' },
+      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+    ];
+  }
+  pwaOdkazy_(JE_V_APPS_SCRIPTU).forEach(o => {
+    const l = document.createElement('link');
+    l.rel = o.rel;
+    l.href = o.href;
+    document.head.appendChild(l);
+  });
 
   /** PURE: přeloží volání serverové funkce na popis HTTP požadavku
    *  ({metoda, url} pro GET, {metoda, url, telo} pro POST). PIN a token jdou

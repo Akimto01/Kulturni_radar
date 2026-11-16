@@ -205,6 +205,18 @@ v repu nemůže přebít — řešitelné jen přes Cloudflare dashboard). Stejn
 session zavedla i konzistentnější `data-*` selektory pro opakované prvky
 UI (karty/chipy/dlaždice) – viz `Docs/audity/AUDIT-SELEKTORU.md`.
 
+## PWA (Index.html v3.67)
+
+Na `kulturniradar.cz` jde appku nainstalovat na plochu (Android, Chrome): manifest
+`/manifest.webmanifest` (standalone, start a scope `/`, barvy appky) a ikony 192, 512,
+maskable 512 a `apple-touch-icon` 180 leží v `apps-script/pwa/` a do kořene webu je
+kopíruje build příkaz Cloudflare Pages (viz PROVOZ.md). Ikony jsou dočasné, vygenerované
+z konceptu C (`Docs/aplikace/design/ikona-varianta-C.svg`), do finálního designu.
+`<meta name="theme-color">` je statický; odkazy na manifest a apple-touch-icon vkládá
+čistá funkce `pwaOdkazy_` **jen mimo Apps Script** (v `/exec` by se cesty nenačetly).
+**Bez service workeru záměrně:** Chrome na Androidu ho pro instalaci z menu od verze 108
+nevyžaduje a cache by mohla držet starou verzi appky. Další kroky (TWA, Google Play) v BACKLOGu, Cíl 2.
+
 ## Zásady
 
 - Skript nikdy nemaže akce (jen stav proběhlo/zrušeno) a nesahá na cizí profily.

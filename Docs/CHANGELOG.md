@@ -1,5 +1,16 @@
 # Changelog
 
+## Index.html v3.67 – PWA: manifest a ikony (Cíl 2, Android) – 16. 11. 2026
+### Přidáno
+- **`apps-script/pwa/`:** `manifest.webmanifest` (standalone, start a scope `/`, barvy appky) a ikony `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` a `apple-touch-icon.png` (180). Ikony jsou dočasné, vygenerované z `Docs/aplikace/design/ikona-varianta-C.svg`, do finálního designu s dcerou.
+- **Index.html:** `<meta name="theme-color" content="#1a1a2e">` a čistá funkce **`pwaOdkazy_(jeVAppsScriptu)`**: odkazy na manifest a apple-touch-icon vloží jen mimo Apps Script (v `/exec` by se cesty nenačetly).
+- **Bez service workeru záměrně:** Chrome na Androidu ho pro instalaci z menu od verze 108 nevyžaduje a cache by mohla držet starou verzi appky.
+### Nasazení
+- **Cloudflare Pages:** build příkaz v dashboardu rozšířen 16. 11. 2026 o `&& cp apps-script/pwa/* dist/` (celý příkaz a pravidlo pro nové statické soubory v PROVOZ.md, sekce Cloudflare Pages). Soubory v `apps-script/pwa/` clasp do Apps Scriptu nenahrává (`clasp status` je vede jako nesledované).
+### Testy
+- **+3 Node testy (frontend 209 → 212, celkem 666 → 669):** `pwaOdkazy_` v Apps Scriptu a mimo něj; manifest má povinná pole pro instalaci a ikony 192 a 512 včetně maskable; každá ikona z manifestu i apple-touch-icon existuje a má deklarované rozměry. RF dry run 62, lint na baseline.
+- Dokumentace: README (počty), PROVOZ.md (nová sekce Cloudflare Pages), ARCHITEKTURA-APLIKACE (sekce PWA), BACKLOG (Cíl 2: PWA základ hotov, zbývá finální design ikon, TWA a Google Play).
+
 ## Backend v3.55 – vlastní limit vyhledávání pro stálá místa (#72) – 16. 11. 2026
 ### Zjištění z ručního běhu v3.54
 - Ruční `updateMista` 16. 11. v 19:08 s v3.54 obnovil všech 20 známých míst pod stejným ID (Nová: 0, Aktualizovaná: 20), takže seznam známých míst v promptu funguje. S limitem 3 webových vyhledávání ale u většiny míst zapsal „NEOVĚŘENO … bývá …“ a některá označil „sezónně zavřeno“ jen odhadem.

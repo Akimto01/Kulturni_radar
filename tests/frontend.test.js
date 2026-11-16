@@ -6,6 +6,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { nactiFrontendFunkce } = require('./frontend-harness');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const f = nactiFrontendFunkce([
   'parseCeskeDatum', 'dateKeyBezpecne_', 'pad2_', 'gcalUrl_',
@@ -1690,4 +1692,43 @@ test('v3.65: api – město bez diakritiky a prázdný profil beze změny (regre
   await g.api('places', '');
   assert.equal(g.volani[0].args[0], 'Brno');
   assert.equal(g.volani[1].args[0], '');
+});
+
+// ---------------------------------------------------------------------------
+// v3.67: PWA (Cíl 2, Android) – manifest, ikony a odkazy jen mimo Apps Script
+// ---------------------------------------------------------------------------
+
+const PWA_ADR = path.join(__dirname, '..', 'apps-script', 'pwa');
+/** Rozměry PNG z hlavičky IHDR (bajty 16–23), bez závislostí. */
+function rozmeryPng_(soubor) {
+  const b = fs.readFileSync(soubor);
+  assert.equal(b.slice(1, 4).toString('latin1'), 'PNG', soubor + ' není PNG');
+  return [b.readUInt32BE(16), b.readUInt32BE(20)];
+}
+
+test('v3.67 pwaOdkazy_: mimo Apps Script manifest a apple-touch-icon, v Apps Scriptu nic', () => {
+  const f = nactiFrontendFunkce(['pwaOdkazy_']);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.pwaOdkazy_(false))),
+    [{ rel: 'manifest', href: '/manifest.webmanifest' }, { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }]);
+  assert.equal(f.pwaOdkazy_(true).length, 0);
+});
+
+test('v3.67 manifest.webmanifest: povinná pole pro instalaci a ikony 192 a 512 včetně maskable', () => {
+  const m = JSON.parse(fs.readFileSync(path.join(PWA_ADR, 'manifest.webmanifest'), 'utf8'));
+  for (const k of ['name', 'short_name', 'start_url', 'display', 'icons']) assert.ok(m[k], 'chybí ' + k);
+  assert.equal(m.display, 'standalone');
+  assert.equal(m.start_url, '/');
+  const velikosti = m.icons.map(i => i.sizes + ':' + (i.purpose || 'any'));
+  assert.ok(velikosti.includes('192x192:any'));
+  assert.ok(velikosti.includes('512x512:any'));
+  assert.ok(velikosti.includes('512x512:maskable'));
+});
+
+test('v3.67 PWA ikony: každá ikona z manifestu i apple-touch-icon existuje a má deklarované rozměry', () => {
+  const m = JSON.parse(fs.readFileSync(path.join(PWA_ADR, 'manifest.webmanifest'), 'utf8'));
+  for (const i of m.icons) {
+    const [w, h] = rozmeryPng_(path.join(PWA_ADR, i.src.replace(/^\//, '')));
+    assert.equal(w + 'x' + h, i.sizes, i.src);
+  }
+  assert.deepEqual(rozmeryPng_(path.join(PWA_ADR, 'apple-touch-icon.png')), [180, 180]);
 });

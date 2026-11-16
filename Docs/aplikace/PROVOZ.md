@@ -82,6 +82,23 @@ Appka do tohoto sloupce zapisuje výhradně sama a sama si hlídá platnost
 jmen měst (podle LOKALITY) – ruční ověřovací pravidlo na Y je tedy zbytečné
 a případná budoucí obnova by měla znovu skončit jeho odstraněním, ne opravou rozsahu.
 
+## Cloudflare Pages (kulturniradar.cz)
+
+Frontend na `kulturniradar.cz` nasazuje Cloudflare Pages po každém `git push`.
+Konfigurace žije **jen v dashboardu Cloudflare** (projekt Pages → Settings → Builds),
+v repu žádná není (`_redirects`, `_headers` ani `wrangler.toml` pro Pages). Stav k 16. 11. 2026:
+
+- **Build command:**
+  `mkdir -p dist && cp apps-script/Index.html dist/index.html && cp apps-script/robots.txt dist/robots.txt && cp apps-script/sitemap.xml dist/sitemap.xml && cp apps-script/favicon.svg dist/favicon.svg && cp apps-script/pwa/* dist/`
+- **Build output directory:** `dist`
+
+Na web se tedy dostanou jen vyjmenované soubory a obsah `apps-script/pwa/`; ostatní soubory
+z `apps-script/` (kód backendu, `appsscript.json`) se záměrně nezveřejňují a jejich cesty
+vrátí stránku appky (SPA fallback). **Nový statický soubor pro web** patří do
+`apps-script/pwa/` (zkopíruje se sám), jinak je nutné ho přidat do build příkazu v dashboardu.
+Po pushi ověřit `curl -sI https://kulturniradar.cz/<soubor>`: správný content-type, ne `text/html`.
+Soubory v `apps-script/pwa/` clasp do Apps Scriptu nenahrává (nejsou to typy, které Apps Script zná).
+
 ## Diagnostika
 
 1. **Spuštění** (Apps Script) — stav, délka, po rozkliknutí Logger výstup.
