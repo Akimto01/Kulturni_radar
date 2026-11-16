@@ -57,6 +57,15 @@ Aktualizovat stálá místa.
 - **E-mail:** MailApp z účtu vlastníka skriptu; předmět `[Kulturní radar] …`.
 - Selhání běhu se hlásí oběma kanály (`… selhala` + text chyby).
 
+### E-mailové adresy (Cloudflare Email Routing)
+
+Konfigurace žije **jen v dashboardu Cloudflare** (doména kulturniradar.cz → Email Routing), v repu žádná není.
+
+- **`info@kulturniradar.cz`** → Worker `kulturni-radar-email-webhook` (`cloudflare-worker/`):
+  přeposlání na osobní Gmail a zároveň zápis do fronty `EMAIL_TIPY`.
+- **`podpora@kulturniradar.cz`** → přímé přeposlání na osobní Gmail, bez Workeru (založeno
+  16. 11. 2026). Je to veřejný e-mail profilu vývojáře v Google Play; do `EMAIL_TIPY` nechodí.
+
 ## Časté situace
 
 | Příznak | Příčina / řešení |

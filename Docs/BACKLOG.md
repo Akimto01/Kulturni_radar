@@ -77,7 +77,7 @@ Pořadí: AGENTS.md, smoke, rozcestník, katalog, kontrola odkazů, případová
 - ~~**Správa defektů: formulář, životní cyklus a analýza úniků** (~1,5–2 h) – včetně zpětného přepisu defektů z 26.–27. 10. 2026 se závažností a prioritou.~~ **HOTOVO 28. 10. 2026** (commit fd18940, `Docs/DEFEKTY.md`, viz CHANGELOG). → issue #32
 
 **Cíl 2 – otevření přátelům (souběžně s cílem 3):**
-- **Design s dcerou → Android** (~3–4 h aktivní práce po designu) – čeká na dceru; koncept ikony varianta C předschválen 27. 8. 2026. PWA základ hotov 16. 11. 2026 (Index.html v3.67, dočasné ikony z konceptu C); zbývá finální design ikon, TWA balíček a Google Play (nový osobní účet: uzavřený test 12 testerů 14 dní před produkcí; pro rodinu a přátele stačí interní nebo uzavřený test).
+- **Design s dcerou → Android** (~3–4 h aktivní práce po designu) – čeká na dceru; koncept ikony varianta C předschválen 27. 8. 2026. PWA základ hotov 16. 11. 2026 (Index.html v3.67, dočasné ikony z konceptu C); zbývá finální design ikon, TWA balíček a Google Play (nový osobní účet: uzavřený test 12 testerů 14 dní před produkcí; pro rodinu a přátele stačí interní nebo uzavřený test); redesign ikon odložen, další fáze (TWA a Google Play) → issue #80.
 - **Zakládání nového profilu bez ruční práce v Sheetu** (odhad po návrhu). → issue #15
 - **Přihlašovací obrazovka pro víc uživatelů** (odhad po návrhu) – dnes ukazuje jména všech profilů každému návštěvníkovi. → issue #16
 - **Model hrozeb** (~1,5 h; navazuje na #50, revize čtvrtletně) – aktiva, útoky, ochrany, otevřené slabiny. → issue #65
