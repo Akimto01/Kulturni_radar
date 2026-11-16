@@ -342,6 +342,7 @@ informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
   spouštět až po zavření, jinak se falešný nález zapíše do #52 a odejde v notifikaci (stalo se u #57 a #63).
   V zadání zavření vždy uvést i odškrtnutí všech bodů checklistu v těle issue, jinak `kontrola-boardu.py` hlásí chybu
   (13. 11. 2026 u #76).
+- **Čekání na CI:** `gh run list --commit $(git rev-parse HEAD)` s plným SHA; zkrácený hash nic nenajde (filtr API porovnává celý SHA), 16. 11. 2026 tři čekací smyčky doběhly naprázdno.
 - **WIP limit:** nejvýš 3 issues najednou In Progress (konstanta `WIP_LIMIT` v `kontrola-boardu.py`); víc je varování.
 - **Odhad u Todo:** issue ve stavu Todo nebo In Progress musí mít vyplněný Odhad (h), bez něj kontrola hlásí chybu. Todo jen pro vybrané na nejbližší práci
   (Doporučené pořadí, fáze 1 a 2), ostatní Backlog.

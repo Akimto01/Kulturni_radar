@@ -9,6 +9,9 @@ v [ARCHITEKTURA-TESTU.md](ARCHITEKTURA-TESTU.md), D3, řádek v C1.
 
 Z kořene repa (Node 22 nebo novější). Nástroje jsou v `tests/mutace/` s vlastním `package.json`, aby
 kořen repa žádný neměl (Cloudflare Pages by ho při `git push` mohl instalovat).
+Tranzitivní `qs` je v `tests/mutace/package.json` připnuté přes `overrides` na 6.16.2 kvůli bezpečnostním alertům
+(#70); při aktualizaci Strykeru override ověřit a odstranit, pokud Stryker přinese opravenou verzi sám. Totéž platí pro
+sledovaný `minimatch` (BACKLOG, Testovací dluh).
 
 ```
 cd tests/mutace && npm ci && cd ../..         # jednou: instalace (pevné verze z package-lock.json)
