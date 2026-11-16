@@ -11,6 +11,7 @@
 - Node testy beze změny počtu (666): test promptu `updateMista` ověřuje i `max_uses` 12 a pravidlo pro „sezónně zavřeno“. Pokrytí řádků 92,22 % (baseline 92,21 %).
 ### Nasazení a ověření
 - Backend v3.55, `Index.html` beze změny (v3.66). `clasp deploy -i … --description "v3.55"` (verze projektu 118), `?api=meta` hlásí `3.55`, API smoke 3/3 (lokální frontend běhy visí, viz Testovací dluh). Dokumentace: ARCHITEKTURA-APLIKACE (Stálá místa).
+- **Ruční běh `updateMista` s v3.55** (16. 11. 19:27:36–19:29:00, 84 s, tedy hluboko pod stropem 180 s): 18 míst aktualizováno pod stejným ID (Nová: 0); 16 s ověřenou listopadovou otevírací dobou (dřív 16 „NEOVĚŘENO“), „NEOVĚŘENO“ jen 2 (Děvičky, Aquapark Kohoutovice); „sezónně zavřeno“ jen 2, ověřené oficiálním webem (Pernštejn, Náměšť nad Oslavou). Duplicitní starší řádky (Macocha z 1. 9., Skanzen z 1. 8.) model správně nevrátil; zobrazují výzvu k ověření a odstraní je ruční úklid z BACKLOGu.
 
 ## Backend v3.54 – zastaralá otevírací doba stálých míst (#72) – 16. 11. 2026
 ### Chyba
