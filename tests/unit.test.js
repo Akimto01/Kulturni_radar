@@ -2623,10 +2623,17 @@ function isoDatum_(d) {
   const p = (n) => String(n).padStart(2, '0');
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
+/** v3.60: odpověď met.no s jedním polednim záznamem pro daný den. */
+function metNoPoledne_(d, teplota, symbol = 'cloudy') {
+  return { code: 200, body: { properties: { timeseries: [
+    { time: isoDatum_(d) + 'T12:00:00Z', data: { instant: { details: { air_temperature: teplota } },
+      next_1_hours: { summary: { symbol_code: symbol } } } },
+  ] } } };
+}
 
-test('v3.22: aktualizujPocasi_ – tři budoucí akce → OK / NA (mimo dosah) / CHYBA (výpadek obou zdrojů)', () => {
+test('v3.22/v3.60: aktualizujPocasi_ – tři budoucí akce → OK / NA (mimo dosah met.no) / CHYBA (výpadek met.no), Open-Meteo se nevolá', () => {
   const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
-  const zitra = pridatDny_(dnes, 1);          // v dosahu 16 dní
+  const zitra = pridatDny_(dnes, 1);          // v dosahu met.no (~9 dní)
   const zaHranici = pridatDny_(dnes, 40);     // daleko mimo dosah
   const poslezitri = pridatDny_(dnes, 2);     // v dosahu, ale API selže
 
@@ -2646,21 +2653,13 @@ test('v3.22: aktualizujPocasi_ – tři budoucí akce → OK / NA (mimo dosah) /
     [klicC, 49.3, 16.8, '', ''],
   ];
 
-  const FORECAST_A = { code: 200, body: { daily: {
-    time: [isoDatum_(zitra)], weather_code: [3], temperature_2m_max: [18.6],
-  } } };
-  // Odpověď B je „úspěšná“, ale neobsahuje datum akce B (ta je 40 dní napřed,
-  // mimo 16denní dosah Open-Meteo) – proto z toho musí vyjít NA, ne CHYBA.
-  const FORECAST_B = { code: 200, body: { daily: {
-    time: [isoDatum_(dnes)], weather_code: [1], temperature_2m_max: [22.0],
-  } } };
-
+  // v3.60 (#81 krok 2): jediný zdroj je met.no. Odpověď B je „úspěšná“, ale
+  // neobsahuje datum akce B (40 dní napřed, mimo dosah) – NA, ne CHYBA.
   const volane = [];
   const ctx = nactiRadar({ urlFetch: frontaFetchu([
-    FORECAST_A,             // A: Open-Meteo uspěje napoprvé
-    FORECAST_B,             // B: Open-Meteo uspěje, ale bez hledaného data
-    'throw', 'throw',       // C: Open-Meteo selže (2 pokusy)
-    'throw', 'throw',       // C: záložní met.no selže taky (2 pokusy)
+    metNoPoledne_(zitra, 18.6),   // A: met.no uspěje napoprvé
+    metNoPoledne_(dnes, 22.0),    // B: met.no uspěje, ale bez hledaného data
+    'throw', 'throw',             // C: met.no selže (2 pokusy)
   ], volane) });
 
   const ss = fakeSpreadsheet({
@@ -2675,8 +2674,10 @@ test('v3.22: aktualizujPocasi_ – tři budoucí akce → OK / NA (mimo dosah) /
   const mapa = new Map(pocasi.map(p => [p.id, p]));
 
   assert.equal(mapa.get('ev-a').stav, 'OK');
-  assert.equal(mapa.get('ev-a').kod, 3);
+  assert.equal(mapa.get('ev-a').kod, r.metNoTextNaKod_(r.metNoTextFor_('cloudy')));
   assert.equal(mapa.get('ev-a').teplota, 19);
+  assert.equal(volane.length, 4);
+  assert.ok(volane.every(u => /api\.met\.no/.test(u)), 'v3.60: jen met.no, žádné Open-Meteo');
 
   assert.equal(mapa.get('ev-b').stav, 'NA');
   assert.equal(mapa.get('ev-b').kod, '');
@@ -2690,6 +2691,8 @@ test('v3.22: aktualizujPocasi_ – tři budoucí akce → OK / NA (mimo dosah) /
   const kontroly = ss.getSheetByName('KONTROLY');
   assert.equal(kontroly.getLastRow(), 2, 'přibyl jeden řádek s chybou počasí');
   assert.match(kontroly.rows[1][1], /počasí/);
+  assert.match(kontroly.rows[1][2], /^CHYBA u 1 .*; met\.no selhalo 1× \(síť ×1\)$/);
+  assert.doesNotMatch(kontroly.rows[1][2], /Open-Meteo/);
 });
 
 test('v3.22: aktualizujPocasi_ – při CHYBA se zachová poslední známá hodnota z předchozího běhu', () => {
@@ -3888,14 +3891,14 @@ test('v3.44: fetchJsonSKodem_ – vrací skutečný důvod selhání (HTTP kód 
   assert.equal(ctx.fetchJson_ === undefined, false, 'fetchJson_ dál existuje (obal)');
 });
 
-test('v3.44: aktualizujPocasi_ – Open-Meteo 429, met.no odpoví bez data akce → NA, log nese „HTTP 429“', () => {
+test('v3.44/v3.60: aktualizujPocasi_ – met.no odpoví bez data akce (za 12 dní) → NA, bez řádku v KONTROLÁCH', () => {
   const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
   const za12 = pridatDny_(dnes, 12);
   const klic = r.klicSouradnic_('Výstaviště', 'Brno');
   const METNO_BEZ_DATA = { code: 200, body: { properties: { timeseries: [
     { time: isoDatum_(dnes) + 'T12:00:00Z', data: { instant: { details: { air_temperature: 10 } } } },
   ] } } };
-  const ctx = nactiRadar({ urlFetch: frontaFetchu([{ code: 429, body: {} }, { code: 429, body: {} }, METNO_BEZ_DATA]) });
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([METNO_BEZ_DATA]) });
   const ss = fakeSpreadsheet({
     AKCE: [[], ['ev-g', czDatum_(za12), '', '', 'Caravaning', 'Výstaviště', 'Brno', '', '', '', '', '', '', '']],
     SOUŘADNICE: [[], [klic, 49.18, 16.58, '', '']],
@@ -3903,20 +3906,33 @@ test('v3.44: aktualizujPocasi_ – Open-Meteo 429, met.no odpoví bez data akce 
   });
   ctx.aktualizujPocasi_(ss);
   assert.equal(ctx.readPocasi_(ss).find(p => p.id === 'ev-g').stav, 'NA');
+  assert.equal(ss.getSheetByName('KONTROLY').getLastRow(), 1, 'dosah předpovědi není chyba, nic se neloguje');
+});
+
+test('v3.60: aktualizujPocasi_ – met.no 429 → CHYBA a v KONTROLÁCH důvod „HTTP 429“', () => {
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const zitra = pridatDny_(dnes, 1);
+  const klic = r.klicSouradnic_('Výstaviště', 'Brno');
+  const ctx = nactiRadar({ urlFetch: frontaFetchu([{ code: 429, body: {} }, { code: 429, body: {} }]) });
+  const ss = fakeSpreadsheet({
+    AKCE: [[], ['ev-i', czDatum_(zitra), '', '', 'Caravaning', 'Výstaviště', 'Brno', '', '', '', '', '', '', '']],
+    SOUŘADNICE: [[], [klic, 49.18, 16.58, '', '']],
+    KONTROLY: [[]],
+  });
+  ctx.aktualizujPocasi_(ss);
+  assert.equal(ctx.readPocasi_(ss).find(p => p.id === 'ev-i').stav, 'CHYBA');
   const kontroly = ss.getSheetByName('KONTROLY');
-  assert.equal(kontroly.getLastRow(), 2, 'selhání Open-Meteo se loguje, i když z něj nevznikla CHYBA');
-  assert.match(kontroly.rows[1][2], /CHYBA u 0/);
-  assert.match(kontroly.rows[1][2], /HTTP 429 ×1/);
+  assert.equal(kontroly.getLastRow(), 2);
+  assert.equal(kontroly.rows[1][2], 'CHYBA u 1 akc(í/e); met.no selhalo 1× (HTTP 429 ×1)');
 });
 
 test('v3.44: aktualizujPocasi_ – místo bez souřadnic → počasí podle obce, pin (klíč místa) nevznikne', () => {
   const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
   const zitra = pridatDny_(dnes, 1);
-  const FORECAST_OK = { code: 200, body: { daily: { time: [isoDatum_(zitra)], weather_code: [2], temperature_2m_max: [9.6] } } };
   const volane = [];
   const ctx = nactiRadar({ urlFetch: frontaFetchu([
     NOMINATIM_BOD(49.19, 16.61),   // geokódování obce „Brno“
-    FORECAST_OK,
+    metNoPoledne_(zitra, 9.6),     // v3.60: počasí z met.no
   ], volane) });
   const ss = fakeSpreadsheet({
     AKCE: [[], ['ev-h', czDatum_(zitra), '', '', 'Akce', 'areál ZŠ Pastviny a Komín', 'Brno', '', '', '', '', '', '', '']],

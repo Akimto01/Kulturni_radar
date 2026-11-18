@@ -116,8 +116,8 @@ odeslání, jen sestaví obsah (viz Notifikace níže).
 **Počasí u jednotlivých AKCÍ (list POČASÍ, v3.22):** oddělené od přehledů
 výše. `aktualizujPocasi_` běží od v3.59 ve vlastním triggeru `prepocitatPocasi`
 (neděle 22:00, čtvrtek 11:00, #81; dřív v běhu sledovaných měst) a pro každou budoucí akci
-dopočítá/aktualizuje stav (souřadnice z cache SOUŘADNICE → Open-Meteo,
-16 dní dopředu, fallback met.no) — výsledek pak `readEventsApi_` připojí
+dopočítá/aktualizuje stav (souřadnice z cache SOUŘADNICE → od v3.60 jen met.no,
+~9 dní dopředu, dál NA; Open-Meteo z Apps Scriptu trvale vracelo 429, #81) — výsledek pak `readEventsApi_` připojí
 ke každé akci pro frontend (mapa/karty), bez dalšího volání za běhu.
 
 ## Stálá místa

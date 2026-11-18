@@ -1,5 +1,17 @@
 # Changelog
 
+## Backend v3.60 – počasí jen z met.no (#81 krok 2) – 18. 11. 2026
+### Proč
+- Open-Meteo od 1. 11. vracelo z Apps Scriptu HTTP 429 pro všechny lokality ve všech bězích, nejspíš kvůli limitu sdílených IP. Každý přepočet tak nejdřív spálil desítky marných volání a teprve pak šel na met.no, který byl fakticky jediným zdrojem. Rozhodnutí 13. 11.: Open-Meteo pro list POČASÍ nevolat.
+### Změněno
+- **`aktualizujPocasi_`:** předpověď jen z met.no (jedno volání na souřadnice, cache v běhu). Akce za dosahem met.no (~9 dní) mají NA, stejně jako dřív při výpadku Open-Meteo. Řádek „aktualizace počasí“ v KONTROLÁCH vzniká jen při CHYBA nebo selhání met.no a uvádí jen met.no.
+- **Odstraněno:** `ziskatOpenMeteoPredpoved_`, `ziskatOpenMeteoPredpovedSKodem_` a konstanta `POCASI_FORECAST_DAYS` (bez dalšího použití). `vyhodnotPocasiUdalosti_` beze změny, větev pro Open-Meteo dostává `null`.
+- **Mimo rozsah:** `weatherFor_` (počasí v přehledech) a sonda `weatherApiDostupne_` v samotestu dál volají Open-Meteo; zapsáno v #81.
+- Dokumentace: ARCHITEKTURA-APLIKACE.md (Počasí), komentář sekce POČASÍ v kódu.
+### Testy
+- **+1 Node test (backend 474 → 475, celkem 686 → 687), 3 upravené:** end-to-end přepočet (OK, NA mimo dosah, CHYBA při výpadku) jen s met.no a kontrolou, že žádné volání nejde na Open-Meteo, plus přesný text řádku v KONTROLÁCH; met.no bez data akce za 12 dní → NA bez řádku v KONTROLÁCH; nový test met.no 429 → CHYBA a „met.no selhalo 1× (HTTP 429 ×1)“; geokódování obce pro počasí s odpovědí met.no.
+- **Baseline pokrytí vědomě snížena z 92,38 na 92,34 %:** odstraněné funkce Open-Meteo byly plně pokryté testy, jejich vymazáním klesl podíl pokrytých řádků, i když žádný dosud pokrytý kód nezůstal bez testu. Snížení je čistě aritmetické, ne ztráta testů.
+
 ## Backend v3.59 – přepočet počasí jako samostatný trigger (#81 krok 1) – 18. 11. 2026
 ### Proč
 - Ověření #49 z 18. 11. (5 běhů 1.–15. 11.): `zpracovatSledovanaMesta` zpracuje trvale jen 1 město za běh, protože přepočet počasí před smyčkou bere 1–2 minuty z rozpočtu 330 s. Každé ze 6 měst se tak obnoví jednou za 3 týdny, bez rezervy vůči oknu hledání. Běh 15. 11. skončil jen 20 s pod rozpočtem.
