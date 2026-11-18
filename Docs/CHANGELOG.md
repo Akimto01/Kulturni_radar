@@ -1,7 +1,13 @@
 # Changelog
 
+## CI: pilot Claude Code rozdělen na dva joby – 18. 11. 2026
+- **Proč:** z `action.yml` akce plyne, že token bere ze vstupu `github_token`, jinak z `github.token`, a ten má Claude k dispozici; s `id-token: write` by si navíc vyměnila token aplikace Claude. Zákaz zápisu by tak držel jen prompt a `--allowedTools`. Skutečnou ochranou jsou oprávnění jobu.
+- **`claude-pilot.yml`:** výchozí `permissions: {}`. Job **claude** (`contents: read`, `issues: read`, bez `id-token: write`) načte zadání od správce, spustí Clauda, znovu Node testy a uloží diff a shrnutí jako artefakt. Job **pr** (`contents: write`, `pull-requests: write`, `issues: write`) nespouští kód z repa: aplikuje diff, založí větev, commit a draft PR, komentuje issue. Checkout v obou jobech bez uložení tokenu.
+- **Přihlášení k Claude:** `claude_code_oauth_token` (secret `CLAUDE_CODE_OAUTH_TOKEN` z `claude setup-token`, čerpá z předplatného), alternativa samostatný `ANTHROPIC_API_KEY`. Aplikace Claude pro GitHub už není potřeba.
+- Dokumentace: PROVOZ.md (sekce Pilot přepsána).
+
 ## CI: pilot Claude Code bez tokenu v kroku Claude – 18. 11. 2026
-- **`claude-pilot.yml`:** `GH_TOKEN` už není v prostředí celého jobu, dostávají ho jen kroky „Načíst zadání“ a „Větev, commit a PR“. `actions/checkout` běží s `persist-credentials: false`, takže token není ani v git konfiguraci; push jde přes token jen v posledním kroku. Krok Claude tak nemůže pushovat ani komentovat sám (ani přes `node -e`), zákaz už nedrží jen prompt. Nález z review Claude Code po založení #82.
+- **`claude-pilot.yml`:** `GH_TOKEN` už není v prostředí celého jobu, dostávají ho jen kroky „Načíst zadání“ a „Větev, commit a PR“. `actions/checkout` běží s `persist-credentials: false`, takže token není ani v git konfiguraci; push jde přes token jen v posledním kroku. Nález z review Claude Code po založení #82. Tvrzení, že krok Claude pak nemůže zapisovat, neplatilo: akce si bere token z `github_token` nebo `github.token` (viz další záznam).
 
 ## CI: pilot Claude Code GitHub Action – 18. 11. 2026
 - **Nový workflow `.github/workflows/claude-pilot.yml`:** jen ruční spuštění (`workflow_dispatch`, vstup číslo issue). Zadání bere jen z issue, které založil správce repa (repo je veřejné), komentáře nečte. Claude Code (`anthropics/claude-code-action@v1`) podle CLAUDE.md, AGENTS.md a skillu upraví soubory a spustí Node testy, s omezenými nástroji (čtení a úpravy souborů, `node`, `python3`, `git status` a `git diff`) a `--max-turns 40`. Testy pak workflow spustí znovu sám, založí větev `claude/issue-N-<běh>`, commit a draft PR a do issue napíše odkaz; když Claude nic nezmění, napíše do issue jeho shrnutí. Nic nenasazuje. Limity: 30 min, jeden běh najednou.

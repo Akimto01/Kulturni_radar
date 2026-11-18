@@ -1,8 +1,12 @@
 # Pilot: implementace issue přes Claude Code GitHub Action (nápad 18. 11. 2026, BACKLOG,
-# „Noční implementace přes Claude Code GitHub Action“). Spouští jen ručně správce repa
-# (workflow_dispatch vyžaduje právo zápisu), na komentáře ani cron nereaguje.
-# Claude jen upravuje soubory a spouští testy; větev, commit a PR dělají kroky za ním.
-# Nic nenasazuje: clasp ani přihlášení do Apps Scriptu tu nejsou. Merge a deploy ručně.
+# issue #82). Spouští jen ručně správce repa (workflow_dispatch vyžaduje právo zápisu),
+# na komentáře ani cron nereaguje. Nic nenasazuje: clasp ani přihlášení do Apps Scriptu
+# tu nejsou, merge a deploy zůstávají ručně.
+#
+# Dva joby kvůli tokenům: akce si bere GitHub token ze vstupu github_token nebo z
+# github.token a ten má Claude k dispozici. Job „claude“ proto dostane jen oprávnění
+# ke čtení a žádné id-token: write (bez něj si akce nevymění token aplikace Claude).
+# Zapisuje až job „pr“, který jen aplikuje diff z artefaktu a nespouští kód z repa.
 name: Claude pilot (implementace issue)
 
 on:
@@ -13,25 +17,22 @@ on:
         required: true
         type: number
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+permissions: {}
 
 concurrency:
   group: claude-pilot
   cancel-in-progress: false
 
 jobs:
-  implementace:
+  claude:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: read
     env:
       ISSUE: ${{ inputs.issue }}
     steps:
-      # Token se do git konfigurace neukládá: krok Claude ho nesmí mít k dispozici
-      # (ani přes git, ani přes node -e). GH_TOKEN dostávají jen kroky, které ho
-      # potřebují (načtení zadání, větev a PR).
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
@@ -40,11 +41,11 @@ jobs:
         with:
           node-version: '22'
 
-      # Zadání bere jen z issue, které založil správce repa: repo je veřejné a text
-      # cizího issue by byl instrukcí od kohokoli. Komentáře se nenačítají vůbec.
+      # Zadání jen z issue, které založil správce repa: repo je veřejné a text cizího
+      # issue by byl instrukcí od kohokoli. Komentáře se nenačítají vůbec.
       - name: Načíst zadání (jen issue od správce)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           autor=$(gh issue view "$ISSUE" --json author -q .author.login)
           if [ "$autor" != "Akimto01" ]; then
@@ -55,7 +56,8 @@ jobs:
       - name: Claude Code
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
           prompt: |
             Pracuješ na repu Kulturní radar. Postupuj podle CLAUDE.md, AGENTS.md
             a skillu .claude/skills/kulturni-radar-workflow/SKILL.md.
@@ -63,7 +65,7 @@ jobs:
             Implementuj první neodškrtnutou položku jeho checklistu, nebo celé
             issue, pokud checklist nemá. Pravidla:
             - Měň jen soubory v pracovní kopii. Necommituj, nepushuj, nevytvářej
-              větve ani PR, nic nenasazuj (žádný clasp). To udělají kroky workflow.
+              větve ani PR, nic nenasazuj (žádný clasp). To udělá workflow.
             - Spusť node --test tests/unit.test.js tests/frontend.test.js; všechny
               testy musí projít. Při změně kódu bump verze podle skillu.
             - Aktualizuj Docs/CHANGELOG.md a README (počty testů), pokud se mění.
@@ -75,21 +77,54 @@ jobs:
             --max-turns 40
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(node:*),Bash(python3:*),Bash(git status:*),Bash(git diff:*)"
 
-      # Kontrola je ve workflow, ne v Claudovi: testy se spustí znovu bez ohledu na to,
-      # co Claude tvrdí ve shrnutí.
+      # Testy znovu, nezávisle na tom, co tvrdí shrnutí. Spadnou-li, job „pr“ neběží.
       - name: Ověřit testy
         env:
           TZ: Europe/Prague
         run: node --test tests/unit.test.js tests/frontend.test.js
 
+      - name: Uložit změny jako artefakt
+        run: |
+          mkdir -p "$RUNNER_TEMP/vystup"
+          git add -N .
+          git diff --binary > "$RUNNER_TEMP/vystup/zmeny.patch"
+          if [ -f "$RUNNER_TEMP/shrnuti.md" ]; then cp "$RUNNER_TEMP/shrnuti.md" "$RUNNER_TEMP/vystup/"; else echo "(Claude nezapsal shrnutí.)" > "$RUNNER_TEMP/vystup/shrnuti.md"; fi
+          wc -l "$RUNNER_TEMP/vystup/zmeny.patch"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: claude-vystup
+          path: ${{ runner.temp }}/vystup/
+          retention-days: 7
+
+  # Jediný job s právem zápisu. Nespouští žádný kód z repa (ani testy), jen git a gh.
+  pr:
+    needs: claude
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      ISSUE: ${{ inputs.issue }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: claude-vystup
+          path: ${{ runner.temp }}/vystup
+
       - name: Větev, commit a PR (draft)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          shrnuti="$RUNNER_TEMP/shrnuti.md"
-          [ -f "$shrnuti" ] || echo "(Claude nezapsal shrnutí.)" > "$shrnuti"
-          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
-            { echo "Pilot Claude Code (běh ${{ github.run_id }}) nic nezměnil."; echo; cat "$shrnuti"; } > "$RUNNER_TEMP/komentar.md"
+          d="$RUNNER_TEMP/vystup"
+          if [ ! -s "$d/zmeny.patch" ]; then
+            { echo "Pilot Claude Code (běh ${{ github.run_id }}) nic nezměnil."; echo; cat "$d/shrnuti.md"; } > "$RUNNER_TEMP/komentar.md"
             gh issue comment "$ISSUE" --body-file "$RUNNER_TEMP/komentar.md"
             exit 0
           fi
@@ -97,9 +132,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$vetev"
-          git add -A
+          git apply --index "$d/zmeny.patch"
           git commit -m "Claude pilot: issue #$ISSUE"
           git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$vetev"
-          { cat "$shrnuti"; echo; echo "Issue #$ISSUE, běh ${{ github.run_id }}. Draft, merge a nasazení ručně."; } > "$RUNNER_TEMP/pr.md"
+          { cat "$d/shrnuti.md"; echo; echo "Issue #$ISSUE, běh ${{ github.run_id }}. Draft, merge a nasazení ručně; CI na PR spustit ručně (PR od tokenu workflow ho nespouští)."; } > "$RUNNER_TEMP/pr.md"
           url=$(gh pr create --draft --base main --head "$vetev" --title "Claude pilot: issue #$ISSUE" --body-file "$RUNNER_TEMP/pr.md")
           gh issue comment "$ISSUE" --body "Pilot Claude Code připravil draft PR: $url"
