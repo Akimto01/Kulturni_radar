@@ -1,5 +1,15 @@
 # Changelog
 
+## Backend v3.57 – párování vícedenních akcí podle konce (#71 krok 2) – 18. 11. 2026
+### Chyba
+- Festival Janáček Brno byl v AKCÍCH třikrát (začátek 13. 10., 15. 10. a 13. 11., vždy konec 17. 11.). Fuzzy shoda v `upsertEvents_` hledala kandidáty jen se stejným začátkem a AI u probíhající vícedenní akce posílá pokaždé jiný začátek, často dnešek (analýza #71, 16. 11.).
+### Změněno
+- **Index podle konce:** když se nová akce nenajde podle ID, klíče ani začátku, hledá se mezi vícedenními akcemi téhož profilu se stejným koncem. Obě strany musí být vícedenní (`jeVicedenni_`) a menší množina tokenů názvu musí být podmnožinou větší, aspoň 2 tokeny (`jePodmnozinaNazvu_`). Poměrová větev `isSameName_` se tu nepoužívá: stejný konec má mnoho výstav (31. 12.) a podobné názvy z téže instituce se sloučit nesmí. Pojistka `ruznyDenSerie_` platí dál. Nově přidaná vícedenní akce se do indexu registruje hned, takže se spojí i dvě varianty z téhož běhu.
+- **Začátek u shody podle konce:** posun začátku se nebere jako změna a v řádku zůstává původní začátek. Prakticky shodný název (v3.56) je jistá shoda, jiný název podmnožinou je nejistá shoda s širokou definicí změny a logem sloučení (bez pole „datum od“).
+- Stávající trojí řádky Janáčka oprava nesloučí; úklid jde přes list NÁVRH DUPLICIT.
+### Testy
+- **+7 Node testů (backend 461 → 468, celkem 673 → 680):** `jeVicedenni_` a `jePodmnozinaNazvu_` (hranice); Janáček se stejným koncem a jiným začátkem (žádný nový řádek, beze změny, začátek původní); přeformulovaný název podmnožinou (sloučeno, log jen „popis“); negativní: dvě výstavy Moravské galerie se stejným koncem, jednodenní akce v den konce série, vícedenní série proti jednodenní akci v den svého konce; dvě varianty v témže běhu. Ruční mutace (vypnuté párování podle konce, nezachovaný začátek, poměrová větev místo podmnožiny, index i pro jednodenní, bez registrace nové akce, minimum 1 token) shodí vždy aspoň jeden test. Pokrytí řádků 92,33 %, baseline zvýšena z 92,21 %.
+
 ## Backend v3.56 – jistá shoda při prakticky shodném názvu (#71 krok 1, #73) – 18. 11. 2026
 ### Chyba
 - Tatáž akce se hlásila jako změněná při každém běhu (Comic-Con Brno & Junior 1., 2. a 9. 11., Festival Life! 3. a 8. 11.) a plnila log sloučení ve sloupci Z. Příčina z analýzy 16. 11. (#71): AI posílá pokaždé jiné ID a jinak popsané místo, akce se proto páruje přes fuzzy shodu a fuzzy větev `upsertEvents_` bere jakýkoli rozdíl v místě, ceně nebo popisu jako změnu. Metrika „fuzzy sloučení“ v samotestu tím počítala hlavně opakovaná přepárování.

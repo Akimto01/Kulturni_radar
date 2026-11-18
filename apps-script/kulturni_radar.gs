@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.56 (18. 11. 2026) – fuzzy shoda s prakticky shodným názvem je jistá shoda: změna je jen posun termínu nebo stavu, přeformulace popisu, místa a ceny se nehlásí ani nezapisuje do logu sloučení (#71 krok 1, #73)
- * (předchozí: 3.55 – aktualizace stálých míst má vlastní limit 12 webových vyhledávání (dřív 3 jako hledání akcí), aby stihla ověřit otevírací dobu všech známých míst; stav „sezónně zavřeno“ jen ověřený (#72))
+ * Verze: 3.57 (18. 11. 2026) – vícedenní akce se párují i podle stejného konce, když se liší začátek (Festival Janáček Brno s začátkem 13. 10., 15. 10. a 13. 11.); posun začátku se pak nehlásí ani nepřepisuje (#71 krok 2)
+ * (předchozí: 3.56 – fuzzy shoda s prakticky shodným názvem je jistá shoda: změna je jen posun termínu nebo stavu, přeformulace popisu, místa a ceny se nehlásí ani nezapisuje do logu sloučení (#71 krok 1, #73))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.56';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.57';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -1213,12 +1213,20 @@ function upsertEvents_(ss, cfg, events) {
   const byId = {};
   const byKey = {};
   const byProfilDatum = {};
+  const byProfilKonec = {};   // v3.57 (#71 krok 2): jen vícedenní akce, podle konce
+  const pridatKonec = (profil, od, ddo, i, tokens, nazev) => {
+    if (!jeVicedenni_(od, ddo)) return;
+    const pk = norm_(profil) + '|' + dateKey_(ddo);
+    (byProfilKonec[pk] = byProfilKonec[pk] || []).push({ i: i, tokens: tokens, nazev: nazev });
+  };
   existing.forEach((row, i) => {
     const id = norm_(row[0]);
     if (id) byId[id] = i;
     byKey[dedupKey_(row[24], row[1], row[4], row[5])] = i;
     const pd = norm_(row[24]) + '|' + dateKey_(row[1]);
-    (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: i, tokens: nazevTokens_(row[4]), nazev: String(row[4]) });
+    const tokens = nazevTokens_(row[4]);
+    (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: i, tokens: tokens, nazev: String(row[4]) });
+    pridatKonec(row[24], row[1], row[2], i, tokens, String(row[4]));
   });
 
   const today = formatDateOnly_(new Date());
@@ -1251,6 +1259,17 @@ function upsertEvents_(ss, cfg, events) {
       const hit = (byProfilDatum[pd] || []).find(c => !ruznyDenSerie_(c.nazev, ev.nazev) && isSameName_(c.tokens, evTokens));
       if (hit) { idx = hit.i; viaFuzzy = true; }
     }
+    // v3.57 (#71 krok 2): vícedenní akce, u které AI pokaždé pošle jiný začátek
+    // (u probíhající akce často dnešek), ale stejný konec. Páruje se jen
+    // vícedenní s vícedenní a jen podmnožinou názvu (jePodmnozinaNazvu_), ne
+    // poměrovou větví isSameName_: stejný konec má spousta výstav (31. 12.)
+    // a podobné názvy z téže instituce se sloučit nesmí.
+    let viaKonec = false;
+    if (idx === undefined && jeVicedenni_(ev.datum_od, ev.datum_do)) {
+      const pk = norm_(cfg.profil) + '|' + dateKey_(ev.datum_do);
+      const hit = (byProfilKonec[pk] || []).find(c => !ruznyDenSerie_(c.nazev, ev.nazev) && jePodmnozinaNazvu_(c.tokens, evTokens));
+      if (hit) { idx = hit.i; viaFuzzy = true; viaKonec = true; }
+    }
     // v3.56 (#71 krok 1, #73): fuzzy kandidát s prakticky shodným názvem
     // (liší se jen velikostí písmen, diakritikou, interpunkcí nebo letopočtem)
     // je táž akce stejně jistě jako přesná shoda ID, jen AI poslala jiné ID
@@ -1270,6 +1289,7 @@ function upsertEvents_(ss, cfg, events) {
       if (norm_(ev.id)) byId[norm_(ev.id)] = ni;
       byKey[key] = ni;
       (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: ni, tokens: evTokens, nazev: String(ev.nazev || '') });
+      pridatKonec(cfg.profil, ev.datum_od, ev.datum_do, ni, evTokens, String(ev.nazev || ''));
       stats.noveNazvy.push(polozka(ev));
       stats.nove++;
     } else {
@@ -1298,9 +1318,13 @@ function upsertEvents_(ss, cfg, events) {
       // v3.56: jistaShoda (prakticky shodný název) se vrací k úzké definici –
       // jinak se tatáž akce s pokaždé jiným ID hlásila jako změněná při každém
       // běhu a plnila log sloučení (Comic-Con, Festival Life!, #73).
+      //
+      // v3.57: shoda podle konce (viaKonec) bere začátek jako nespolehlivý –
+      // posun začátku se nehlásí a v řádku zůstává původní začátek.
+      if (viaKonec) rowVals[1] = old[1];
       const changed = (viaFuzzy && !jistaShoda)
         ? (zmenenaPoleFuzzy = zjistiZmenenaPole_(old, rowVals)).length > 0
-        : dateKey_(old[1]) !== dateKey_(ev.datum_od) ||
+        : dateKey_(old[1]) !== dateKey_(rowVals[1]) ||
           dateKey_(old[2]) !== dateKey_(ev.datum_do) ||
           norm_(old[13]) !== norm_(ev.stav);
 
@@ -4354,6 +4378,21 @@ function denZeSerie_(nazev) {
 function ruznyDenSerie_(nazevA, nazevB) {
   const dA = denZeSerie_(nazevA), dB = denZeSerie_(nazevB);
   return dA !== null && dB !== null && dA !== dB;
+}
+
+/** PURE (v3.57, #71 krok 2): vícedenní akce = obě data rozpoznaná a konec
+ *  je jiný den než začátek. */
+function jeVicedenni_(od, ddo) {
+  return !!(parseCzDate_(od) && parseCzDate_(ddo)) && dateKey_(od) !== dateKey_(ddo);
+}
+
+/** PURE (v3.57, #71 krok 2): menší množina tokenů názvu je podmnožinou větší
+ *  a má aspoň 2 tokeny. Přísnější než isSameName_ (bez poměrové větve), pro
+ *  párování podle konce vícedenní akce. */
+function jePodmnozinaNazvu_(tokA, tokB) {
+  const a = Object.keys(tokA), b = Object.keys(tokB);
+  const [mensi, vetsi] = a.length <= b.length ? [a, tokB] : [b, tokA];
+  return mensi.length >= 2 && mensi.every(w => vetsi[w]);
 }
 
 /** PURE (v3.56, #71 krok 1): prakticky shodný název – po odstranění velikosti

@@ -3532,6 +3532,120 @@ test('v3.56: upsertEvents_ – jistá shoda s posunem konce → změněná, data
 });
 
 // ---------------------------------------------------------------------------
+// v3.57 (#71 krok 2): vícedenní akce se párují i podle stejného konce.
+// Produkční případ: Festival Janáček Brno ve třech řádcích se začátkem
+// 13. 10., 15. 10. a 13. 11., vždy s koncem 17. 11. (analýza 16. 11. 2026).
+// ---------------------------------------------------------------------------
+
+test('v3.57: jeVicedenni_ a jePodmnozinaNazvu_ – hranice', () => {
+  assert.equal(r.jeVicedenni_('13. 10. 2026', '17. 11. 2026'), true);
+  assert.equal(r.jeVicedenni_('17. 11. 2026', '17. 11. 2026'), false, 'jednodenní');
+  assert.equal(r.jeVicedenni_('13. 10. 2026', ''), false, 'bez konce');
+  assert.equal(r.jeVicedenni_('neuvedeno', '17. 11. 2026'), false, 'nerozpoznaný začátek');
+  const t = r.nazevTokens_;
+  assert.equal(r.jePodmnozinaNazvu_(t('Festival Janáček Brno'), t('Janáček Brno 2026 – mezinárodní operní a hudební festival')), true);
+  assert.equal(r.jePodmnozinaNazvu_(t('Výstava Bauhaus – Moravská galerie'), t('Výstava Secese – Moravská galerie')), false, 'poměrová shoda nestačí');
+  assert.equal(r.jePodmnozinaNazvu_(t('Brno'), t('Festival Brno')), false, 'jeden token nestačí');
+});
+
+/** Existující řádek vícedenního festivalu tak, jak ho zapsal dřívější běh. */
+function existujiciJanacek_(overrides = {}) {
+  return akceRadekFuzzy_(Object.assign({
+    id: 'jb-1', datumOd: '13. 10. 2026', datumDo: '17. 11. 2026',
+    nazev: 'Festival Janáček Brno', misto: 'Janáčkovo divadlo',
+    kategorie: 'hudba', cena: 'od 300 Kč', popis: 'Mezinárodní operní festival.',
+  }, overrides));
+}
+
+test('v3.57: upsertEvents_ – stejný konec, jiný začátek, prakticky shodný název → žádný nový řádek, beze změny, začátek původní', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciJanacek_()])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'jb-2', datum_od: '13. 11. 2026', datum_do: '17. 11. 2026', stav: 'potvrzeno',
+    nazev: 'Festival Janáček Brno 2026', misto: 'Národní divadlo Brno', kategorie: 'hudba',
+    cena: '300–1500 Kč', popis: 'Opera a koncerty.',
+  }]);
+
+  assert.equal(stats.nove, 0, 'nesmí vzniknout druhý řádek festivalu');
+  assert.equal(stats.bezZmeny, 1, 'jiný začátek u probíhající akce není změna');
+  const sh = ss.getSheetByName('AKCE');
+  assert.equal(sh.getLastRow(), 2);
+  const row = sh.getRange(2, 1, 1, 25).getValues()[0];
+  assert.equal(row[0], 'jb-1');
+  assert.equal(row[1], '13. 10. 2026', 'začátek zůstává původní');
+});
+
+test('v3.57: upsertEvents_ – stejný konec, přeformulovaný název (podmnožina) → sloučeno, změna zalogovaná bez „datum od“', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciJanacek_()])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'jb-3', datum_od: '15. 10. 2026', datum_do: '17. 11. 2026', stav: 'potvrzeno',
+    nazev: 'Janáček Brno 2026 – mezinárodní operní a hudební festival', misto: 'Janáčkovo divadlo',
+    kategorie: 'hudba', cena: 'od 300 Kč', popis: 'Bienále opery a hudby.',
+  }]);
+
+  assert.equal(stats.nove, 0, 'přeformulovaný název téhož festivalu se nesmí přidat jako nový');
+  assert.equal(stats.zmenene, 1, 'nejistá shoda bere jiný popis jako změnu (široká definice z v3.42)');
+  const row = ss.getSheetByName('AKCE').getRange(2, 1, 1, 25).getValues()[0];
+  assert.equal(row[1], '13. 10. 2026', 'začátek se ani při změně nepřepíše');
+  const log = ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0];
+  assert.match(log, /přepsáno: popis$/, 'v logu jen skutečně změněné pole, ne datum od');
+});
+
+test('v3.57: upsertEvents_ – negativní: dvě výstavy se stejným koncem a podobným názvem se nesloučí', () => {
+  const vystava = akceRadekFuzzy_({
+    id: 'mg-1', datumOd: '1. 9. 2026', datumDo: '31. 12. 2026', nazev: 'Výstava Bauhaus – Moravská galerie',
+    misto: 'Pražákův palác', kategorie: 'výstava', cena: '150 Kč', popis: 'Design meziválečné éry.',
+  });
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([vystava])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'mg-2', datum_od: '15. 10. 2026', datum_do: '31. 12. 2026', stav: 'potvrzeno',
+    nazev: 'Výstava Secese – Moravská galerie', misto: 'Uměleckoprůmyslové muzeum',
+    kategorie: 'výstava', cena: '150 Kč', popis: 'Secesní sklo a nábytek.',
+  }]);
+  assert.equal(stats.nove, 1, 'jiná výstava téže galerie zůstává samostatná');
+  assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'Výstava Bauhaus – Moravská galerie');
+});
+
+test('v3.57: upsertEvents_ – negativní: jednodenní akce v den konce deštníkové série se nespáruje se sérií', () => {
+  const serie = existujiciAkceFuzzy_({ id: 'kl-1', datumOd: '1. 7. 2026', datumDo: '31. 8. 2026' });
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([serie])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [Object.assign({}, NOVA_AKCE_FUZZY_, {
+    id: 'kl-2', datum_od: '31. 8. 2026', datum_do: '31. 8. 2026',
+  })]);
+  assert.equal(stats.nove, 1, 'párování podle konce platí jen pro vícedenní akci na obou stranách');
+});
+
+test('v3.57: upsertEvents_ – negativní: vícedenní série se nespáruje s existující jednodenní akcí v den svého konce', () => {
+  const jednodenni = akceRadekFuzzy_({
+    id: 'dp-1', datumOd: '31. 8. 2026', datumDo: '31. 8. 2026',
+    nazev: 'Divadelní představení – Kulturní léto na Poděbradech', misto: 'Zámecká zahrada',
+    kategorie: 'divadlo', cena: '150 Kč', popis: 'Pohádka pro děti.',
+  });
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([jednodenni])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'kl-3', datum_od: '1. 7. 2026', datum_do: '31. 8. 2026', stav: 'potvrzeno',
+    nazev: 'Kulturní léto na Poděbradech', misto: 'Poděbradské nábřeží', kategorie: 'ostatní',
+  }]);
+  assert.equal(stats.nove, 1, 'jednodenní řádek se do indexu podle konce nezařazuje');
+  assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'Divadelní představení – Kulturní léto na Poděbradech');
+});
+
+test('v3.57: upsertEvents_ – dvě varianty festivalu v témže běhu skončí v jednom řádku', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]]) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [
+    { id: 'a', datum_od: '13. 10. 2026', datum_do: '17. 11. 2026', nazev: 'Festival Janáček Brno', misto: 'Janáčkovo divadlo', stav: 'potvrzeno' },
+    { id: 'b', datum_od: '15. 10. 2026', datum_do: '17. 11. 2026', nazev: 'Festival Janáček Brno 2026', misto: 'Mahenovo divadlo', stav: 'potvrzeno' },
+  ]);
+  assert.equal(stats.nove, 1);
+  assert.equal(ss.getSheetByName('AKCE').getLastRow(), 2, 'nově přidaná vícedenní akce se registruje i do indexu podle konce');
+});
+
+// ---------------------------------------------------------------------------
 // v3.43: parseCzDate_ a sériové číslo data (živá kontrola 26. 10. 2026:
 // API vracelo akce dávno po skončení – Vavřinecké hody do 9. 8., Znojmo 5/6
 // akcí z července/srpna. Buňka s datem jako sériové číslo prošla cellText_
