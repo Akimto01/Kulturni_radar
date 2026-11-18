@@ -2,7 +2,7 @@
 
 ## Testy: přímý API test přihlášení (#43) – 18. 11. 2026
 - **`api.robot`:** +3 testy POST `akce: login`: špatný PIN testovacího profilu, neexistující profil a správný PIN (ten běží poslední a vynuluje počítadlo pokusů). PIN se čte z `RF_TEST_PIN`, bez něj se testy s PINem přeskočí. Volání běží při Log Level NONE bez FOR, aserce nevypisují hodnoty (pravidla incidentu #33).
-- **POST přes redirect:** Apps Script odpoví na POST 302 na dočasnou echo adresu. Klíčové slovo „Poslat login POST“ proto posílá POST s `allow_redirects=False` a výsledek čte GET na hlavičku `Location`. Ověřeno lokálně proti produkci 19. 11. 2026 (3/3, PIN ani echo adresa v reportu 0×); v CI od doplnění RF_TEST_USER_ID a RF_TEST_PIN do kroku API kontrakt.
+- **POST přes redirect:** Apps Script odpoví na POST 302 na dočasnou echo adresu. Klíčové slovo „Poslat login POST“ proto posílá POST s `allow_redirects=False` a výsledek čte GET na hlavičku `Location`. Ověřeno lokálně proti produkci 19. 11. 2026 (3/3; PIN, ntfy téma ani echo adresa v reportu 0×). První běh v CI zastavila kontrola úniku (ntfy téma z odpovědi loginu v reportu); nic se nenahrálo, opraveno zúžením návratové hodnoty.
 - Dokumentace: README (RF testy 62 → 65, API 9 → 12), POKRYTI.md (mezera login uzavřena). Kód appky beze změny, verze zůstávají.
 
 ## CI: pilot Claude Code rozdělen na dva joby – 18. 11. 2026

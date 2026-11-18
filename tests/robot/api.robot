@@ -170,7 +170,7 @@ Přihlášení přes API: špatný PIN je odmítnut
     ${j}=    Poslat login POST    ${RF_TEST_USER_ID}    ${TRUE}
     Should Not Be True    ${j}[ok]
     Should Contain    ${j}[error]    PIN
-    Dictionary Should Not Contain Key    ${j}    jmeno
+    Should Be Empty    ${j}[jmeno]    Odmítnutý login nesmí vrátit data profilu
 
 Přihlášení přes API: neexistující profil je odmítnut
     [Tags]    api
@@ -192,13 +192,14 @@ Přihlášení přes API: správný PIN testovacího profilu
     Should Be True    ${j}[ok]    Přihlášení správným PINem selhalo (zamčený profil? viz SKILL.md sekce 2)
     Should Be Equal    ${j}[id]    ${RF_TEST_USER_ID}
     Should Not Be Empty    ${j}[jmeno]
-    Dictionary Should Not Contain Key    ${j}    pinHash
-    Dictionary Should Not Contain Key    ${j}    pin
+    Should Not Be True    ${j}[ma_pinHash]    Odpověď loginu obsahuje pinHash
+    Should Not Be True    ${j}[ma_pin]    Odpověď loginu obsahuje pin
 
 
 *** Keywords ***
 Poslat login POST
-    [Documentation]    POST `akce: login` na \${BASE_URL} a vrátí slovník ok/error/id/jmeno.
+    [Documentation]    POST `akce: login` na \${BASE_URL} a vrátí zúžený slovník ok/error/id/jmeno
+    ...    a příznaky ma_pin/ma_pinHash (zbytek odpovědi, např. ntfy téma, se nevrací).
     ...    Apps Script na POST odpoví 302 na dočasnou „echo“ adresu a výsledek je až v GET na ni.
     ...    Automatické následování redirectu v requests POST změní na GET bez těla, proto se
     ...    redirect řeší ručně: POST s allow_redirects=False a pak GET na hlavičku Location.
@@ -214,12 +215,29 @@ Poslat login POST
         ${r}=    POST    ${BASE_URL}    data=${telo_json}    headers=${{{'Content-Type': 'text/plain;charset=utf-8'}}}
         ...    allow_redirects=${FALSE}    expected_status=any    timeout=30
         ${r}=    Dokončit redirect    ${r}
-        ${j}=    Evaluate    $r.json() if $r.status_code == 200 else {}
+        # Odpověď úspěšného loginu nese i nastavení notifikací s ntfy tématem profilu.
+        # Vrací se jen zúžený slovník, celá odpověď se nesmí dostat do logu (přiřazení
+        # návratové hodnoty RF zapisuje už při obnovené úrovni logování).
+        ${j}=    Zúžit odpověď loginu    ${r}
     FINALLY
         Set Log Level    ${puvodni_uroven}
     END
     Should Be Equal As Integers    ${r.status_code}    200
     ...    Přihlášení přes API: konečný stav ${r.status_code}, adresa se kvůli echo klíči nevypisuje
+    RETURN    ${j}
+
+Zúžit odpověď loginu
+    [Documentation]    Z odpovědi loginu vrátí jen ok/error/id/jmeno a příznaky ma_pin/ma_pinHash.
+    ...    Volat jen při Log Level NONE: odpověď obsahuje i ntfy téma profilu.
+    [Arguments]    ${odpoved}
+    ${odp}=    Evaluate    $odpoved.json() if $odpoved.status_code == 200 else {}
+    VAR    &{j}=
+    ...    ok=${{ $odp.get('ok', False) }}
+    ...    error=${{ str($odp.get('error', '')) }}
+    ...    id=${{ str($odp.get('id', '')) }}
+    ...    jmeno=${{ str($odp.get('jmeno', '')) }}
+    ...    ma_pin=${{ 'pin' in $odp }}
+    ...    ma_pinHash=${{ 'pinHash' in $odp }}
     RETURN    ${j}
 
 Dokončit redirect
