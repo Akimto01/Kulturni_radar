@@ -1,5 +1,15 @@
 # Changelog
 
+## Backend v3.58 – znovu použité ID a jednoslovné názvy (#71 krok 4) – 18. 11. 2026
+### Chyba
+- Brnohraní 2026 bylo v AKCÍCH dvakrát. Příčina z analýzy 16. 11. (#71, bod c): AI poslala Brnohraní s ID řádku „Caravaning – doprovodný program“, přesná shoda ID řádek přejmenovala a přesunula na jiný termín a nic nehlídalo, že Brnohraní už existuje. Caravaning tím z AKCÍ zmizel. Druhá příčina: jednoslovný název „Brnohraní 2026“ s časem a bez se fuzzy shodou nespároval, protože `isSameName_` chce aspoň 2 společná slova.
+### Změněno
+- **`jeKompatibilniNazevProId_(stary, novy)`** (čistá funkce): přesná shoda ID se použije jen tehdy, když jeden z názvů chybí, když jsou prakticky shodné (v3.56), nebo když sdílí aspoň jedno významové slovo. Různé dny téže série a názvy bez společného slova ID nespojí; akce se pak hledá dál podle klíče a fuzzy shody, případně se přidá jako nová. Legitimní přejmenování („Dýňobraní 2026“ na „Dýňobraní v Zoo Brno“) přes ID projde dál.
+- **Fuzzy shoda podle začátku** bere i prakticky shodný název (`jePraktickyShodnyNazev_`), takže se spáruje i jednoslovný název s jiným ID, místem a časem.
+- **Charakterizační testy z #13 (dávka 3b-3) upraveny vědomě:** dva testy fixovaly dřívější chování „shoda přes ID i při úplně jiném názvu“. Teď používají název s jedním společným slovem, který fuzzy shodou neprojde, takže dál ověřují index podle ID.
+### Testy
+- **+4 Node testy (backend 468 → 472, celkem 680 → 684), 2 upravené:** `jeKompatibilniNazevProId_` (společné slovo, prakticky shodný název včetně krátkého „U2“, prázdný název; negativní: bez společného slova, jiný den série); Caravaning a Brnohraní (znovu použité ID: Caravaning se nepřejmenuje ani nepřesune, Brnohraní zůstane ve svém řádku); znovu použité ID bez jiné shody (nový řádek, původní nedotčený); jednoslovný prakticky shodný název (spárován, beze změny). Ruční mutace (bez kontroly ID, fuzzy bez prakticky shodného názvu, bez výjimky pro prázdný název, bez kontroly dne série, bez prakticky shodného názvu v kontrole ID, `every` místo `some`) shodí vždy aspoň jeden test. Pokrytí řádků 92,36 %, baseline zvýšena z 92,33 %.
+
 ## Backend v3.57 – párování vícedenních akcí podle konce (#71 krok 2) – 18. 11. 2026
 ### Chyba
 - Festival Janáček Brno byl v AKCÍCH třikrát (začátek 13. 10., 15. 10. a 13. 11., vždy konec 17. 11.). Fuzzy shoda v `upsertEvents_` hledala kandidáty jen se stejným začátkem a AI u probíhající vícedenní akce posílá pokaždé jiný začátek, často dnešek (analýza #71, 16. 11.).

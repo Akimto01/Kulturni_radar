@@ -3646,6 +3646,67 @@ test('v3.57: upsertEvents_ – dvě varianty festivalu v témže běhu skončí 
 });
 
 // ---------------------------------------------------------------------------
+// v3.58 (#71 krok 4): znovu použité ID jiné akce. Produkční případ (analýza
+// 16. 11.): řádek „Caravaning – doprovodný program“ přejmenován přes shodu ID
+// na „Brnohraní 2026“, které už v AKCE bylo, takže Brnohraní bylo 2×.
+// ---------------------------------------------------------------------------
+
+test('v3.58: jeKompatibilniNazevProId_ – společné slovo, prakticky shodný název, prázdno ano; bez společného slova a jiný den série ne', () => {
+  assert.equal(r.jeKompatibilniNazevProId_('Dýňobraní 2026', 'Dýňobraní v Zoo Brno'), true);
+  assert.equal(r.jeKompatibilniNazevProId_('Brnohraní 2026', 'BRNOHRANÍ'), true);
+  assert.equal(r.jeKompatibilniNazevProId_('', 'Cokoli'), true, 'řádek bez názvu ID neblokuje');
+  assert.equal(r.jeKompatibilniNazevProId_('U2', 'U2 2026'), true, 'krátký název bez významových slov: rozhodne prakticky shodný název');
+  assert.equal(r.jeKompatibilniNazevProId_('Caravaning – doprovodný program', 'Brnohraní 2026'), false);
+  assert.equal(r.jeKompatibilniNazevProId_('Letní program Ostrava – 13. srpna', 'Letní program Ostrava – 14. srpna'), false);
+});
+
+/** Dva řádky téhož dne: Caravaning a Brnohraní, každý s vlastním ID. */
+function caravaningABrnohrani_() {
+  return [
+    akceRadekFuzzy_({ id: 'cv-1', datumOd: '6. 11. 2026', datumDo: '8. 11. 2026', nazev: 'Caravaning – doprovodný program',
+      misto: 'Výstaviště Brno', kategorie: 'zábava', cena: 'v ceně vstupného', popis: 'Program pro rodiny.' }),
+    akceRadekFuzzy_({ id: 'bh-1', datumOd: '6. 11. 2026', datumDo: '6. 11. 2026', nazev: 'Brnohraní 2026',
+      misto: 'Výstaviště Brno, pavilon F', kategorie: 'hry', cena: '100 Kč', popis: 'Festival deskových her.' }),
+  ];
+}
+
+test('v3.58: upsertEvents_ – znovu použité ID jiné akce: Caravaning zůstane, Brnohraní se spáruje se svým řádkem, žádný nový', () => {
+  const { stats, sh } = upsertBeh_(caravaningABrnohrani_(), [{
+    id: 'cv-1', datum_od: '6. 11. 2026', datum_do: '6. 11. 2026', cas: '10:00–18:00', stav: 'potvrzeno',
+    nazev: 'Brnohraní 2026', misto: 'BVV', kategorie: 'hry', cena: '100 Kč', popis: 'Deskové hry.',
+  }]);
+
+  assert.equal(stats.nove, 0, 'Brnohraní už existuje, nesmí vzniknout další řádek');
+  assert.equal(sh.getLastRow(), 3);
+  assert.equal(sh.rows[1][4], 'Caravaning – doprovodný program', 'řádek Caravaningu se nepřejmenuje');
+  assert.equal(sh.rows[1][2], '8. 11. 2026', 'ani nepřesune');
+  assert.equal(sh.rows[2][0], 'bh-1', 'Brnohraní zůstává ve svém řádku');
+});
+
+test('v3.58: upsertEvents_ – znovu použité ID a akce jinde neexistuje → nový řádek, původní nedotčený', () => {
+  const { stats, sh } = upsertBeh_([caravaningABrnohrani_()[0]], [{
+    id: 'cv-1', datum_od: '20. 11. 2026', datum_do: '20. 11. 2026', stav: 'potvrzeno',
+    nazev: 'Večer deskovek', misto: 'Klub Hráčů', kategorie: 'hry',
+  }]);
+
+  assert.equal(stats.nove, 1);
+  assert.equal(sh.getLastRow(), 3);
+  assert.equal(sh.rows[1][4], 'Caravaning – doprovodný program');
+  assert.equal(sh.rows[1][1], '6. 11. 2026');
+});
+
+test('v3.58: upsertEvents_ – jednoslovný prakticky shodný název téhož dne (jiné ID, místo i čas) se spáruje, ne nový řádek', () => {
+  const { stats, sh } = upsertBeh_([caravaningABrnohrani_()[1]], [{
+    id: 'bh-2', datum_od: '6. 11. 2026', datum_do: '6. 11. 2026', cas: '10:00', stav: 'potvrzeno',
+    nazev: 'BRNOHRANÍ', misto: 'BVV', kategorie: 'hry', cena: '100 Kč', popis: 'Hry.',
+  }]);
+
+  assert.equal(stats.nove, 0, 'isSameName_ jeden token nespáruje, prakticky shodný název ano');
+  assert.equal(stats.bezZmeny, 1, 'jistá shoda: jiný čas, místo a popis nejsou změna');
+  assert.equal(sh.getLastRow(), 2);
+});
+
+// ---------------------------------------------------------------------------
 // v3.43: parseCzDate_ a sériové číslo data (živá kontrola 26. 10. 2026:
 // API vracelo akce dávno po skončení – Vavřinecké hody do 9. 8., Znojmo 5/6
 // akcí z července/srpna. Buňka s datem jako sériové číslo prošla cellText_
@@ -5576,8 +5637,12 @@ function upsertBeh_(radky, akce) {
   return { stats, sh: ss.getSheetByName('AKCE') };
 }
 
-test('3b-3: upsertEvents_ – shoda přes ID i při úplně jiném názvu a místě, nová akce se nezaloží', () => {
-  const { stats, sh } = upsertBeh_([existujiciUpsert_()], [novaAkceUpsert_({ nazev: 'Večer jazzu', misto: 'Klub Fléda' })]);
+test('3b-3: upsertEvents_ – shoda přes ID i při jiném názvu (jedno společné slovo) a jiném místě, nová akce se nezaloží', () => {
+  // v3.58: dřív úplně jiný název; od v3.58 musí názvy sdílet aspoň jedno
+  // významové slovo (jeKompatibilniNazevProId_), jinak se ID ignoruje.
+  // „Koncert Večer jazzu“ fuzzy shodou neprojde (1 společné slovo), takže
+  // test dál ověřuje právě index podle ID.
+  const { stats, sh } = upsertBeh_([existujiciUpsert_()], [novaAkceUpsert_({ nazev: 'Koncert Večer jazzu', misto: 'Klub Fléda' })]);
 
   assert.equal(stats.nove, 0);
   assert.equal(stats.bezZmeny, 1);
@@ -5612,8 +5677,11 @@ test('3b-3: upsertEvents_ – táž akce dvakrát v jednom běhu: jedna nová, d
   assert.equal(sh.rows[1][14], 'ANO', 'Novinka zůstává u první');
 });
 
-test('3b-3: upsertEvents_ – v jednom běhu se akce se stejným ID a jiným názvem spojí do jednoho řádku', () => {
-  const { stats, sh } = upsertBeh_([], [novaAkceUpsert_(), novaAkceUpsert_({ nazev: 'Večer jazzu', misto: 'Klub Fléda' })]);
+test('3b-3: upsertEvents_ – v jednom běhu se akce se stejným ID a jiným názvem (jedno společné slovo) spojí do jednoho řádku', () => {
+  // v3.58: dřív úplně jiný název; od v3.58 musí názvy sdílet aspoň jedno
+  // významové slovo (jeKompatibilniNazevProId_), jinak se ID ignoruje a
+  // vznikly by dva řádky. Test dál ověřuje spojení přes ID v jednom běhu.
+  const { stats, sh } = upsertBeh_([], [novaAkceUpsert_(), novaAkceUpsert_({ nazev: 'Koncert Večer jazzu', misto: 'Klub Fléda' })]);
 
   assert.equal(stats.nove, 1);
   assert.equal(stats.bezZmeny, 1);

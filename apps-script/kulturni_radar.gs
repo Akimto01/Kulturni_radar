@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.57 (18. 11. 2026) – vícedenní akce se párují i podle stejného konce, když se liší začátek (Festival Janáček Brno s začátkem 13. 10., 15. 10. a 13. 11.); posun začátku se pak nehlásí ani nepřepisuje (#71 krok 2)
- * (předchozí: 3.56 – fuzzy shoda s prakticky shodným názvem je jistá shoda: změna je jen posun termínu nebo stavu, přeformulace popisu, místa a ceny se nehlásí ani nezapisuje do logu sloučení (#71 krok 1, #73))
+ * Verze: 3.58 (18. 11. 2026) – shoda přes ID s úplně jiným názvem se nepoužije (AI znovu použila ID jiné akce, Brnohraní přepsalo Caravaning); fuzzy shoda podle začátku bere i prakticky shodný jednoslovný název (#71 krok 4)
+ * (předchozí: 3.57 – vícedenní akce se párují i podle stejného konce, když se liší začátek (Festival Janáček Brno s začátkem 13. 10., 15. 10. a 13. 11.); posun začátku se pak nehlásí ani nepřepisuje (#71 krok 2))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.57';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.58';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -1251,12 +1251,20 @@ function upsertEvents_(ss, cfg, events) {
     const pd = norm_(cfg.profil) + '|' + dateKey_(ev.datum_od);
     const evTokens = nazevTokens_(ev.nazev);
     let idx = byId[norm_(ev.id)];
+    // v3.58 (#71 krok 4): AI občas pošle ID jiné akce (Brnohraní 2026 s ID řádku
+    // „Caravaning – doprovodný program“). Přesná shoda ID by pak řádek přejmenovala
+    // a přesunula. Když názvy nesdílí ani jedno významové slovo, ID se ignoruje
+    // a akce se hledá dál podle klíče a fuzzy shody.
+    if (idx !== undefined && !jeKompatibilniNazevProId_(existing[idx][4], ev.nazev)) idx = undefined;
     let viaFuzzy = false;
     if (idx === undefined) idx = byKey[key];
     if (idx === undefined) {
       // Fuzzy: stejný profil + stejné datum + dostatečný překryv názvů
       // (ale ne když jde jen o jiný den téže denní série, viz ruznyDenSerie_)
-      const hit = (byProfilDatum[pd] || []).find(c => !ruznyDenSerie_(c.nazev, ev.nazev) && isSameName_(c.tokens, evTokens));
+      // v3.58: i prakticky shodný název (jednoslovné „Brnohraní 2026“ s časem
+      // a bez, isSameName_ chce aspoň 2 společná slova).
+      const hit = (byProfilDatum[pd] || []).find(c => !ruznyDenSerie_(c.nazev, ev.nazev)
+        && (isSameName_(c.tokens, evTokens) || jePraktickyShodnyNazev_(c.nazev, ev.nazev)));
       if (hit) { idx = hit.i; viaFuzzy = true; }
     }
     // v3.57 (#71 krok 2): vícedenní akce, u které AI pokaždé pošle jiný začátek
@@ -4378,6 +4386,19 @@ function denZeSerie_(nazev) {
 function ruznyDenSerie_(nazevA, nazevB) {
   const dA = denZeSerie_(nazevA), dB = denZeSerie_(nazevB);
   return dA !== null && dB !== null && dA !== dB;
+}
+
+/** PURE (v3.58, #71 krok 4): smí přesná shoda ID spojit tyto dva názvy?
+ *  Ano, když jeden z nich chybí, když jsou prakticky shodné, nebo když sdílí
+ *  aspoň jedno významové slovo (legitimní přejmenování typu „Dýňobraní 2026“
+ *  na „Dýňobraní v Zoo Brno“). Ne pro různé dny téže série ani pro názvy
+ *  bez jediného společného slova (znovu použité ID jiné akce). */
+function jeKompatibilniNazevProId_(stary, novy) {
+  if (!String(stary || '').trim() || !String(novy || '').trim()) return true;
+  if (ruznyDenSerie_(stary, novy)) return false;
+  if (jePraktickyShodnyNazev_(stary, novy)) return true;
+  const a = nazevTokens_(stary), b = nazevTokens_(novy);
+  return Object.keys(a).some(w => b[w]);
 }
 
 /** PURE (v3.57, #71 krok 2): vícedenní akce = obě data rozpoznaná a konec
