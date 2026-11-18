@@ -109,12 +109,12 @@ Správu boardu a BACKLOGu pro všechna issues (nejen bug) hlídá druhý skript 
 | [#21](https://github.com/Akimto01/Kulturni_radar/issues/21) | Duplicity stálých míst | S3 | P3 | Analýza nebo review | Uzavřený |
 | [#27](https://github.com/Akimto01/Kulturni_radar/issues/27) | Hláška prázdného stavu s časem jiného města | S4 | P3 | Automatický test (E2E nebo API) | Uzavřený |
 | [#48](https://github.com/Akimto01/Kulturni_radar/issues/48) | Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu | S3 | P3 | Analýza nebo review | Uzavřený |
-| [#49](https://github.com/Akimto01/Kulturni_radar/issues/49) | Sledovaná města: běh narazí na limit 6 min, přepočet počasí se nespustí a selhání se nenahlásí | S3 | P2 | Živá kontrola | Ověřuje se |
+| [#49](https://github.com/Akimto01/Kulturni_radar/issues/49) | Sledovaná města: běh narazí na limit 6 min, přepočet počasí se nespustí a selhání se nenahlásí | S3 | P2 | Živá kontrola | Uzavřený |
 | [#50](https://github.com/Akimto01/Kulturni_radar/issues/50) | Server neověřuje identitu uživatele u zápisových akcí: stačí veřejné `uzivatelId` | S2 | P4 | Analýza nebo review | Potvrzený |
 | [#4](https://github.com/Akimto01/Kulturni_radar/issues/4) | Cloudflare: crawlery GPTBot a ClaudeBot blokované, `robots.txt`, `sitemap.xml` a `favicon.svg` se na kulturniradar.cz neservírují (doplněno 29. 10. při kontrole úplnosti) | S4 | P4 | Živá kontrola | Potvrzený |
 | [#71](https://github.com/Akimto01/Kulturni_radar/issues/71) | Fuzzy slučování nechytí duplicity akcí se shodným nebo podobným názvem | S3 | P3 | Živá kontrola | Potvrzený |
 | [#72](https://github.com/Akimto01/Kulturni_radar/issues/72) | Stálá místa mají zastaralou sezónní otevírací dobu | S3 | P3 | Živá kontrola | Uzavřený |
-| [#73](https://github.com/Akimto01/Kulturni_radar/issues/73) | Akce hlášená jako změněná v po sobě jdoucích dnech bez skutečné změny | S4 | P4 | Živá kontrola | Potvrzený |
+| [#73](https://github.com/Akimto01/Kulturni_radar/issues/73) | Akce hlášená jako změněná v po sobě jdoucích dnech bez skutečné změny | S4 | P4 | Živá kontrola | Ověřuje se |
 | [#77](https://github.com/Akimto01/Kulturni_radar/issues/77) | Popup pinu u okraje mapy se hned po otevření zavře (autoPan vyvolá movestart) | S3 | P2 | Automatický test (E2E nebo API) | Uzavřený |
 | [#78](https://github.com/Akimto01/Kulturni_radar/issues/78) | Test živosti ntfy falešně selhává v ručním běhu večer (ntfy.sh drží zprávy jen 12 h) | S4 | P3 | Automatický test (E2E nebo API) | Uzavřený |
 | [#79](https://github.com/Akimto01/Kulturni_radar/issues/79) | Zprávy z RF testu kontaktního formuláře se zpracovávají jako e-mailové tipy | S4 | P3 | Živá kontrola | Uzavřený |
