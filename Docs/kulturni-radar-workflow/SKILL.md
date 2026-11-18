@@ -462,16 +462,17 @@ GitHub maskuje secrets jen v konzoli, ne v souborech z testů (`output.xml`,
 ### Měření pokrytí kódu (od 28. 10. 2026)
 
 `node --test --experimental-test-coverage tests/unit.test.js tests/frontend.test.js`
-(CI od 3. 11. 2026 hlídá práh řádků backendu přes `kontrola-pokryti.py` a `baseline-pokryti.json`, #38; po zlepšení baseline zvýšit).
-**Snížení baseline** je povolené jen tehdy, když pokles je čistě aritmetický:
-smazaný kód byl pokrytý testy, takže klesl podíl pokrytých řádků, i když
-žádný zbývající kód nepřišel o test. Zdůvodnění patří do CHANGELOGu k dané
-verzi (precedens backend v3.60, 92,38 → 92,34 %, odstraněné funkce
-Open-Meteo). Pokles z jiného důvodu se řeší doplněním testů, ne baseline. Funguje jen proto, že `tests/harness.js` předává
+(CI od 3. 11. 2026 hlídá práh řádků backendu přes `kontrola-pokryti.py` a `baseline-pokryti.json`, #38; po zlepšení baseline zvýšit). Funguje jen proto, že `tests/harness.js` předává
 `vm.runInContext` jako `filename` URL souboru (`pathToFileURL`); holé jméno se
 v reportu neukáže. Aktuální hodnoty v README (Testy v číslech) a
 ARCHITEKTURA-TESTU.md, D3. Matice pokrytí podle názvů testů nadhodnocuje,
 tvrzení o pokrytí opírat o měření.
+
+**Snížení baseline** je povolené jen tehdy, když pokles je čistě aritmetický:
+smazaný kód byl pokrytý testy, takže klesl podíl pokrytých řádků, i když
+žádný zbývající kód nepřišel o test. Zdůvodnění patří do CHANGELOGu k dané
+verzi (precedens backend v3.60, 92,38 → 92,34 %, odstraněné funkce
+Open-Meteo). Pokles z jiného důvodu se řeší doplněním testů, ne baseline.
 
 Frontend (`Index.html`) se měří skriptem `node tests/pokryti-frontendu.js`
 ze syrových dat V8 (`NODE_V8_COVERAGE`), protože tabulka
@@ -505,7 +506,7 @@ změnu v `apps-script/kulturni_radar.gs` a/nebo `apps-script/Index.html`
    (`apps-script/...`, `tests/...`). Žádné soubory navíc "pro jistotu".
 4. `present_files` s jednořádkovým shrnutím (co se změnilo, kolik testů).
 
-### Varianta A2 — patch místo zipu (od 18. 11. 2026, preferovaná)
+### Varianta A2 – patch místo zipu (od 18. 11. 2026, preferovaná)
 Chat si repo naklonuje (`git clone` z GitHubu jde), změnu udělá přímo
 v pracovní kopii a výsledek předá jako `vX.YY.patch` (`git diff` proti
 aktuálnímu `main`). V odpovědi vždy uvést **základní commit** (krátký
