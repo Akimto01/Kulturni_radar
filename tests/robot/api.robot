@@ -159,3 +159,74 @@ Notifikační kanál ntfy je živý
     ...    Za 12 h žádná zpráva na ntfy, ruční běh: ntfy.sh drží zprávy jen 12 h, živost nelze ověřit
     Should Be True    ${zprav} >= 1
     ...    Za 12 h nepřišla na ntfy žádná zpráva – notifikační kanál je nejspíš mrtvý
+
+Přihlášení přes API: špatný PIN je odmítnut
+    [Tags]    api
+    [Documentation]    Negativní případ: nesprávný PIN vrátí ok=false a chybu, ne data profilu.
+    ...    Jeden chybný pokus je hluboko pod limitem 5 pokusů; následující test s platným PINem
+    ...    počítadlo vynuluje. Opakované spouštění samotného testu zamyká profil (SKILL.md sekce 2).
+    Skip If    '${RF_TEST_USER_ID}' == '' or '${RF_TEST_PIN}' == ''
+    ...    RF_TEST_USER_ID/RF_TEST_PIN nenastaveny – test přeskočen
+    ${j}=    Poslat login POST    ${RF_TEST_USER_ID}    ${TRUE}
+    Should Not Be True    ${j}[ok]
+    Should Contain    ${j}[error]    PIN
+    Dictionary Should Not Contain Key    ${j}    jmeno
+
+Přihlášení přes API: neexistující profil je odmítnut
+    [Tags]    api
+    [Documentation]    Neznámý profil se nezapisuje do počítadla pokusů (nic se nezamyká),
+    ...    takže test je bezpečný pro opakování. Nepotřebuje tajnou hodnotu.
+    ${j}=    Poslat login POST    neexistujici-profil-rf    ${TRUE}
+    Should Not Be True    ${j}[ok]
+    Should Contain    ${j}[error]    profil
+
+Přihlášení přes API: správný PIN testovacího profilu
+    [Tags]    api    regrese
+    [Documentation]    Přímý kontrakt POST `akce: login` (mezera z části C POKRYTI.md).
+    ...    PIN se čte z \${RF_TEST_PIN}, volání běží při Log Level NONE (viz klíčové slovo
+    ...    „Poslat login POST“) a aserce nevypisují hodnoty. Úspěch vynuluje počítadlo
+    ...    chybných PINů, proto test běží až po negativních případech.
+    Skip If    '${RF_TEST_USER_ID}' == '' or '${RF_TEST_PIN}' == ''
+    ...    RF_TEST_USER_ID/RF_TEST_PIN nenastaveny – test přeskočen
+    ${j}=    Poslat login POST    ${RF_TEST_USER_ID}    ${FALSE}
+    Should Be True    ${j}[ok]    Přihlášení správným PINem selhalo (zamčený profil? viz SKILL.md sekce 2)
+    Should Be Equal    ${j}[id]    ${RF_TEST_USER_ID}
+    Should Not Be Empty    ${j}[jmeno]
+    Dictionary Should Not Contain Key    ${j}    pinHash
+    Dictionary Should Not Contain Key    ${j}    pin
+
+
+*** Keywords ***
+Poslat login POST
+    [Documentation]    POST `akce: login` na \${BASE_URL} a vrátí slovník ok/error/id/jmeno.
+    ...    Apps Script na POST odpoví 302 na dočasnou „echo“ adresu a výsledek je až v GET na ni.
+    ...    Automatické následování redirectu v requests POST změní na GET bez těla, proto se
+    ...    redirect řeší ručně: POST s allow_redirects=False a pak GET na hlavičku Location.
+    ...    Tělo jde jako text/plain (stejně jako ve frontendu, bez CORS preflightu).
+    ...    Argumenty nejsou tajné (PIN se bere z \${RF_TEST_PIN} uvnitř), proto smí být
+    ...    zapsané v logu; vše s PINem a Location běží při Log Level NONE bez FOR.
+    [Arguments]    ${uzivatel_id}    ${spatny_pin}
+    ${puvodni_uroven}=    Set Log Level    NONE
+    TRY
+        VAR    ${pin}=    spatny-pin-rf-test
+        IF    not ${spatny_pin}    VAR    ${pin}=    ${RF_TEST_PIN}
+        ${telo_json}=    Evaluate    json.dumps({'akce': 'login', 'uzivatelId': $uzivatel_id, 'pin': $pin})    modules=json
+        ${r}=    POST    ${BASE_URL}    data=${telo_json}    headers=${{{'Content-Type': 'text/plain;charset=utf-8'}}}
+        ...    allow_redirects=${FALSE}    expected_status=any    timeout=30
+        ${r}=    Dokončit redirect    ${r}
+        ${j}=    Evaluate    $r.json() if $r.status_code == 200 else {}
+    FINALLY
+        Set Log Level    ${puvodni_uroven}
+    END
+    Should Be Equal As Integers    ${r.status_code}    200
+    ...    Přihlášení přes API: konečný stav ${r.status_code}, adresa se kvůli echo klíči nevypisuje
+    RETURN    ${j}
+
+Dokončit redirect
+    [Documentation]    Když odpověď je přesměrování, přečte výsledek GET na `Location`
+    ...    (echo adresa obsahuje klíč, proto se volá jen při Log Level NONE).
+    [Arguments]    ${odpoved}
+    IF    $odpoved.status_code in (301, 302, 303, 307, 308)
+        ${odpoved}=    GET    ${odpoved.headers}[Location]    expected_status=any    timeout=30
+    END
+    RETURN    ${odpoved}

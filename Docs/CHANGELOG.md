@@ -1,5 +1,10 @@
 # Changelog
 
+## Testy: přímý API test přihlášení (#43) – 18. 11. 2026
+- **`api.robot`:** +3 testy POST `akce: login`: špatný PIN testovacího profilu, neexistující profil a správný PIN (ten běží poslední a vynuluje počítadlo pokusů). PIN se čte z `RF_TEST_PIN`, bez něj se testy s PINem přeskočí. Volání běží při Log Level NONE bez FOR, aserce nevypisují hodnoty (pravidla incidentu #33).
+- **POST přes redirect:** Apps Script odpoví na POST 302 na dočasnou echo adresu. Klíčové slovo „Poslat login POST“ proto posílá POST s `allow_redirects=False` a výsledek čte GET na hlavičku `Location`. Neověřeno proti produkci (lokálně jen dry run), první ověření je běh `rf-tests.yml`.
+- Dokumentace: README (RF testy 62 → 65, API 9 → 12), POKRYTI.md (mezera login uzavřena). Kód appky beze změny, verze zůstávají.
+
 ## CI: pilot Claude Code rozdělen na dva joby – 18. 11. 2026
 - **Proč:** z `action.yml` akce plyne, že token bere ze vstupu `github_token`, jinak z `github.token`, a ten má Claude k dispozici; s `id-token: write` by si navíc vyměnila token aplikace Claude. Zákaz zápisu by tak držel jen prompt a `--allowedTools`. Skutečnou ochranou jsou oprávnění jobu.
 - **`claude-pilot.yml`:** výchozí `permissions: {}`. Job **claude** (`contents: read`, `issues: read`, bez `id-token: write`) načte zadání od správce, spustí Clauda, znovu Node testy a uloží diff a shrnutí jako artefakt. Job **pr** (`contents: write`, `pull-requests: write`, `issues: write`) nespouští kód z repa: aplikuje diff, založí větev, commit a draft PR, komentuje issue. Checkout v obou jobech bez uložení tokenu.

@@ -38,8 +38,8 @@ Documentation is in Czech.*
 |---|---|---|---|
 | Jednotkové testy backendu (logika Apps Scriptu přes vlastní harness, bez Googlu) | `node:test` | 480 | každý push (CI) |
 | Jednotkové testy frontendu (čisté funkce z `Index.html`) | `node:test` | 212 | každý push (CI) |
-| Kontrola syntaxe a klíčových slov RF sady (dry run) | Robot Framework | 62 | každý push (CI) |
-| E2E testy proti produkci: frontend + API kontrakt | Robot Framework + Browser Library (Playwright), RequestsLibrary | 53 + 9 | týdně (CI) a smoke po každém nasazení |
+| Kontrola syntaxe a klíčových slov RF sady (dry run) | Robot Framework | 65 | každý push (CI) |
+| E2E testy proti produkci: frontend + API kontrakt | Robot Framework + Browser Library (Playwright), RequestsLibrary | 53 + 12 | týdně (CI) a smoke po každém nasazení |
 | Testy e-mailového Workeru | `node:test` | 7 | push nebo PR se změnou `cloudflare-worker/**` (CI) |
 | Cvičné API testy produkčního API | SoapUI, Bruno, JMeter | 8 + 8 + zátěžový scénář | ručně, viz [api-tests/](api-tests/README.md) |
 
