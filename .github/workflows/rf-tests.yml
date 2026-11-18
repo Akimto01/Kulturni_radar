@@ -31,6 +31,9 @@ jobs:
           rfbrowser init chromium
 
       - name: API kontrakt
+        env:
+          RF_TEST_USER_ID: ${{ secrets.RF_TEST_USER_ID }}
+          RF_TEST_PIN: ${{ secrets.RF_TEST_PIN }}
         # #78: v plánovaném běhu je prázdné 12h okno ntfy selhání, v ručním se test živosti přeskočí
         run: robot --variable BASE_URL:${{ secrets.RADAR_URL }} --variable NTFY_TOPIC:${{ secrets.NTFY_TOPIC }} --variable NTFY_VYZADOVAT_ZPRAVU:${{ github.event_name == 'schedule' }} --outputdir vysledky/api tests/robot/api.robot
 

@@ -95,7 +95,7 @@ operace, klik na Sdílet, cross-browser, přístupnost, výkon):
 
 | Mezera | Proč vznikla | Riziko |
 |---|---|---|
-| API sada netestuje POST routy (login, toggle, notifikace, kontakt) | Jsou pokryté unit testy `routePost_` a nepřímo přes E2E | Nízké – obě strany hranice jsou pokryté, chybí jen přímý kontrakt |
+| API sada netestuje POST routy toggle, notifikace a kontakt (login má přímý test od 18. 11. 2026) | Jsou pokryté unit testy `routePost_` a nepřímo přes E2E | Nízké – obě strany hranice jsou pokryté, chybí jen přímý kontrakt |
 | Sledovaná města (16) a cache (8) nemají test nad nasazenou appkou | Běží na pozadí nebo nejsou zvenku vidět | Nízké až střední – selhání se projeví až chybějícími akcemi |
 | Týdenní a víkendový přehled se netestují jako celek odeslání | Unit testy pokrývají sestavení obsahu, ne trigger | Nízké – watchdog hlídá, že denní běh proběhl |
 | Běh přes Apps Script iframe (`FRAME`) není v CI | CI běží proti statickému webu | Střední – viz R5 |
