@@ -131,6 +131,8 @@ def projit_backlog(text):
         m_faze = re.match(r'^\*\*Fáze (\d+)', radek)
         if m_faze and sekce == 'Doporučené pořadí':
             faze = int(m_faze.group(1))
+        elif radek.startswith('**'):
+            faze = None   # jiný tučný nadpis (např. „**Cíl 2 – …:**“) fázi ukončí
         m = re.search(r'→\s*issue\s+((?:#\d+(?:\s*\([^)]*\))?(?:\s*,\s*)?)+)', radek)
         if not m:
             continue

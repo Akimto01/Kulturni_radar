@@ -1,5 +1,10 @@
 # Changelog
 
+## CI: fáze Doporučeného pořadí končí u každého tučného nadpisu – 18. 11. 2026
+- **Falešné varování:** `kontrola-boardu.py` hlásila #80 (Todo) „ve fázi 6 Doporučeného pořadí“. `projit_backlog()` v `gh_projekt.py` nulovala fázi jen na nadpisu `## `, takže položky pod „**Hotovo (Cíl 1 …):**“ a „**Cíl 2 – …:**“ dědily fázi 6.
+- **Oprava:** každý řádek začínající `**`, který není „**Fáze N“, nastaví fázi na žádnou. Týká se i `navrh-session.py` (krok 6, nejbližší fáze Backlogu).
+- **Test:** `navrh-session.py --test` ověřuje položky pod „**Hotovo“ a „**Cíl 2 –“ (bez fáze) a pod „**Fáze 2“ (fáze 2); bez opravy test padá. `kontrola-boardu.py` po opravě hlásí jen varování u #71.
+
 ## Index.html v3.67 – PWA: manifest a ikony (Cíl 2, Android) – 16. 11. 2026
 ### Přidáno
 - **`apps-script/pwa/`:** `manifest.webmanifest` (standalone, start a scope `/`, barvy appky) a ikony `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` a `apple-touch-icon.png` (180). Ikony jsou dočasné, vygenerované z `Docs/aplikace/design/ikona-varianta-C.svg`, do finálního designu s dcerou.

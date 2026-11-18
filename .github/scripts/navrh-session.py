@@ -484,6 +484,13 @@ def vlastni_test():
     d = sestavit_kandidaty([iss(30, 'Jediná')], {30: {'status': 'Backlog', 'odhad (h)': None}}, '## Doporučené pořadí' + chr(10) + '**Fáze 3 – x:**' + chr(10) + '1. a → issue #30', dnes)
     over([k['n'] for k in d['kandidati']] == [30] and d['kandidati'][0]['odhad'] is None, 'krok 6: jen položka bez Odhadu -> nabídne se zvlášť, bez chyby')
 
+    # --- fáze v BACKLOGu: jiný tučný nadpis než „**Fáze N“ fázi ukončí
+    backlog = chr(10).join(['## Doporučené pořadí', '**Fáze 6 – x:**', '1. a → issue #40', '**Hotovo (Cíl 1):**',
+                            '- b → issue #41', '**Cíl 2 – y:**', '- c → issue #42', '**Fáze 2 – z:**', '2. d → issue #43'])
+    faze = {c[0]: f for _, c, _, f in gh_projekt.projit_backlog(backlog)}
+    over(faze == {40: 6, 41: None, 42: None, 43: 2},
+         'fáze z BACKLOGu: pod „**Hotovo“ a „**Cíl 2 –“ None, pod „**Fáze 2“ 2: %s' % faze)
+
     # --- checklist s odhady v různých tvarech
     body = chr(10).join(['Úvod', '## Dávky', '',
                          '- [x] **1. Hotová** (3 h): a',
