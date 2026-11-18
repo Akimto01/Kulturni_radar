@@ -181,7 +181,7 @@ Přihlášení přes API: neexistující profil je odmítnut
     Should Contain    ${j}[error]    profil
 
 Přihlášení přes API: správný PIN testovacího profilu
-    [Tags]    api    regrese
+    [Tags]    api
     [Documentation]    Přímý kontrakt POST `akce: login` (mezera z části C POKRYTI.md).
     ...    PIN se čte z \${RF_TEST_PIN}, volání běží při Log Level NONE (viz klíčové slovo
     ...    „Poslat login POST“) a aserce nevypisují hodnoty. Úspěch vynuluje počítadlo
