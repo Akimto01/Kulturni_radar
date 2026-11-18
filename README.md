@@ -153,6 +153,7 @@ Soupis toho, co projekt používá. První sloupec obsahuje identifikátor v zp�
 | Python skripty (`python`) | kontroly projektu, testů, dokumentace a lintu, návrh práce, sestavení notifikací; jen standardní knihovna, kontroly testů navíc `robot.api`, lint volá Robocop a ruff z `.github/requirements-lint.txt` | `.github/scripts/` | Python 3.12 (CI) |
 | GitHub CLI (`gh`) | čtení boardu a issues, zápis přehledu; předinstalované na runnerech | `.github/scripts/gh_projekt.py`, `.github/workflows/` | |
 | `curl` a `jq` | odeslání zpráv do ntfy a zpracování JSON ve workflow | `.github/workflows/` | |
+| Claude Code Action (`anthropics/claude-code-action`) | pilot od 18. 11. 2026: ruční spuštění nad issue správce, Claude upraví soubory a spustí testy, workflow založí větev a draft PR; nic nenasazuje, popis v [PROVOZ.md](Docs/aplikace/PROVOZ.md#pilot-claude-code-github-action) | `.github/workflows/claude-pilot.yml` | v1 |
 
 ### Vývoj
 

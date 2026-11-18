@@ -475,3 +475,4 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | 29. 10. 2026 | C1 a D3: mutační testy v CI (`mutacni-testy.yml`): kritická sada s prahem 95 % při změně backendu nebo jeho testů, celý backend týdně bez prahu; první skóre celého backendu 62,8 % |
 | 29. 10. 2026 | D3: mutační skóre kritických funkcí 82,4 % po dávce 1 z #13 (`parseCzDate_`, `apiSetFiltry_`, `apiToggle_`, `runCheck_`, `apiNajdiProUzivatele_`; 18 mutantů zabito, bonusem #226 v `upsertEvents_`; `serioveCisloNaDatum_` 100 %), backend 413 na 421 testů |
 | 29. 10. 2026 | C1: kontrola boardu a defektů běží automaticky (workflow `kontrola-projektu.yml`, token jen pro čtení) |
+| 18. 11. 2026 | C1 beze změny: nový workflow `claude-pilot.yml` (pilot Claude Code GitHub Action) není testovací sada, jen implementuje issue do draft PR; popis v [PROVOZ.md](../aplikace/PROVOZ.md#pilot-claude-code-github-action) |

@@ -109,6 +109,12 @@ vrátí stránku appky (SPA fallback). **Nový statický soubor pro web** patř�
 Po pushi ověřit `curl -sI https://kulturniradar.cz/<soubor>`: správný content-type, ne `text/html`.
 Soubory v `apps-script/pwa/` clasp do Apps Scriptu nenahrává (nejsou to typy, které Apps Script zná).
 
+## Pilot Claude Code GitHub Action
+
+Workflow `.github/workflows/claude-pilot.yml` (od 18. 11. 2026, nápad v BACKLOGu „Noční implementace přes Claude Code GitHub Action“). Spouští se jen ručně: Actions, „Claude pilot (implementace issue)“, Run workflow, číslo issue. Ruční spuštění vyžaduje právo zápisu do repa a workflow navíc odmítne issue, které nezaložil správce repa; komentáře issue nečte. Claude podle skillu upraví soubory a spustí Node testy, workflow testy spustí znovu, založí větev `claude/issue-N-<běh>`, commit a **draft PR** a do issue napíše odkaz. Nic nenasazuje (žádný clasp), merge a nasazení zůstávají ručně. Limity: 30 min na job, `--max-turns 40`, jeden běh najednou.
+
+Jednorázové nastavení (dělá Vojta): (1) aplikace Claude pro GitHub nainstalovaná jen na tohle repo; (2) secret `ANTHROPIC_API_KEY` v Settings → Secrets and variables → Actions, **samostatný klíč, ne ten z appky** (ten je ve Script Properties a má měsíční limit pro hledání akcí); (3) v Settings → Actions → General → Workflow permissions povolit „Allow GitHub Actions to create and approve pull requests“, jinak krok s PR selže. PR založený tokenem workflow nespouští CI automaticky (pravidlo GitHubu); testy proběhly v jobu, CI na PR jde pustit ručně.
+
 ## Diagnostika
 
 1. **Spuštění** (Apps Script) — stav, délka, po rozkliknutí Logger výstup.

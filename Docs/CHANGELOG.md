@@ -1,5 +1,10 @@
 # Changelog
 
+## CI: pilot Claude Code GitHub Action – 18. 11. 2026
+- **Nový workflow `.github/workflows/claude-pilot.yml`:** jen ruční spuštění (`workflow_dispatch`, vstup číslo issue). Zadání bere jen z issue, které založil správce repa (repo je veřejné), komentáře nečte. Claude Code (`anthropics/claude-code-action@v1`) podle CLAUDE.md, AGENTS.md a skillu upraví soubory a spustí Node testy, s omezenými nástroji (čtení a úpravy souborů, `node`, `python3`, `git status` a `git diff`) a `--max-turns 40`. Testy pak workflow spustí znovu sám, založí větev `claude/issue-N-<běh>`, commit a draft PR a do issue napíše odkaz; když Claude nic nezmění, napíše do issue jeho shrnutí. Nic nenasazuje. Limity: 30 min, jeden běh najednou.
+- **Jednorázové nastavení před prvním během** (PROVOZ.md, sekce Pilot): aplikace Claude pro GitHub, samostatný secret `ANTHROPIC_API_KEY` (ne klíč appky) a povolení „Allow GitHub Actions to create and approve pull requests“.
+- Dokumentace: README (Nástroje a technologie, CI a automatizace), PROVOZ.md (nová sekce), ARCHITEKTURA-TESTU (historie: C1 beze změny, pilot není testovací sada), BACKLOG (stav nápadu).
+
 ## Backend v3.61 – záznam o tvrdém ukončení (#81 krok 3) – 18. 11. 2026
 ### Proč
 - Tvrdé ukončení limitem 6 min Apps Scriptu nejde zachytit (`try/finally` neproběhne), takže ho nikdo nehlásil, jen stav „Časový limit vypršel“ ve Spuštění (#49, bod b, varianta D). Časový strop pro přepočet počasí z původního plánu kroku 3 po v3.59 odpadl: počasí má vlastní trigger s celými 6 minutami.

@@ -1,0 +1,97 @@
+# Pilot: implementace issue přes Claude Code GitHub Action (nápad 18. 11. 2026, BACKLOG,
+# „Noční implementace přes Claude Code GitHub Action“). Spouští jen ručně správce repa
+# (workflow_dispatch vyžaduje právo zápisu), na komentáře ani cron nereaguje.
+# Claude jen upravuje soubory a spouští testy; větev, commit a PR dělají kroky za ním.
+# Nic nenasazuje: clasp ani přihlášení do Apps Scriptu tu nejsou. Merge a deploy ručně.
+name: Claude pilot (implementace issue)
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: 'Číslo issue k implementaci'
+        required: true
+        type: number
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: claude-pilot
+  cancel-in-progress: false
+
+jobs:
+  implementace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE: ${{ inputs.issue }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      # Zadání bere jen z issue, které založil správce repa: repo je veřejné a text
+      # cizího issue by byl instrukcí od kohokoli. Komentáře se nenačítají vůbec.
+      - name: Načíst zadání (jen issue od správce)
+        run: |
+          autor=$(gh issue view "$ISSUE" --json author -q .author.login)
+          if [ "$autor" != "Akimto01" ]; then
+            echo "Issue #$ISSUE založil $autor, ne správce repa. Končím."; exit 1
+          fi
+          gh issue view "$ISSUE" --json title,body -q '"# " + .title + "\n\n" + .body' > "$RUNNER_TEMP/zadani.md"
+
+      - name: Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Pracuješ na repu Kulturní radar. Postupuj podle CLAUDE.md, AGENTS.md
+            a skillu .claude/skills/kulturni-radar-workflow/SKILL.md.
+            Zadání je issue #${{ inputs.issue }} v souboru ${{ runner.temp }}/zadani.md.
+            Implementuj první neodškrtnutou položku jeho checklistu, nebo celé
+            issue, pokud checklist nemá. Pravidla:
+            - Měň jen soubory v pracovní kopii. Necommituj, nepushuj, nevytvářej
+              větve ani PR, nic nenasazuj (žádný clasp). To udělají kroky workflow.
+            - Spusť node --test tests/unit.test.js tests/frontend.test.js; všechny
+              testy musí projít. Při změně kódu bump verze podle skillu.
+            - Aktualizuj Docs/CHANGELOG.md a README (počty testů), pokud se mění.
+            - Na konci zapiš do ${{ runner.temp }}/shrnuti.md krátké shrnutí v češtině:
+              co se změnilo, výsledek testů, co je potřeba zkontrolovat.
+            - Když zadání není jasné nebo vyžaduje rozhodnutí, nic neměň a do
+              shrnutí napiš, na co se Vojta musí rozhodnout.
+          claude_args: |
+            --max-turns 40
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(node:*),Bash(python3:*),Bash(git status:*),Bash(git diff:*)"
+
+      # Kontrola je ve workflow, ne v Claudovi: testy se spustí znovu bez ohledu na to,
+      # co Claude tvrdí ve shrnutí.
+      - name: Ověřit testy
+        env:
+          TZ: Europe/Prague
+        run: node --test tests/unit.test.js tests/frontend.test.js
+
+      - name: Větev, commit a PR (draft)
+        run: |
+          shrnuti="$RUNNER_TEMP/shrnuti.md"
+          [ -f "$shrnuti" ] || echo "(Claude nezapsal shrnutí.)" > "$shrnuti"
+          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+            { echo "Pilot Claude Code (běh ${{ github.run_id }}) nic nezměnil."; echo; cat "$shrnuti"; } > "$RUNNER_TEMP/komentar.md"
+            gh issue comment "$ISSUE" --body-file "$RUNNER_TEMP/komentar.md"
+            exit 0
+          fi
+          vetev="claude/issue-$ISSUE-${{ github.run_id }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$vetev"
+          git add -A
+          git commit -m "Claude pilot: issue #$ISSUE"
+          git push origin "$vetev"
+          { cat "$shrnuti"; echo; echo "Issue #$ISSUE, běh ${{ github.run_id }}. Draft, merge a nasazení ručně."; } > "$RUNNER_TEMP/pr.md"
+          url=$(gh pr create --draft --base main --head "$vetev" --title "Claude pilot: issue #$ISSUE" --body-file "$RUNNER_TEMP/pr.md")
+          gh issue comment "$ISSUE" --body "Pilot Claude Code připravil draft PR: $url"
