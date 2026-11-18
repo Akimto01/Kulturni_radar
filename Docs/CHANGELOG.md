@@ -1,5 +1,16 @@
 # Changelog
 
+## Backend v3.61 – záznam o tvrdém ukončení (#81 krok 3) – 18. 11. 2026
+### Proč
+- Tvrdé ukončení limitem 6 min Apps Scriptu nejde zachytit (`try/finally` neproběhne), takže ho nikdo nehlásil, jen stav „Časový limit vypršel“ ve Spuštění (#49, bod b, varianta D). Časový strop pro přepočet počasí z původního plánu kroku 3 po v3.59 odpadl: počasí má vlastní trigger s celými 6 minutami.
+### Změněno
+- **`sHlidanimUkonceni_(ss, klic, popis, fn)`:** pod zámkem zapíše do Script Properties značku `BEH_<klic>` se startem, spustí práci a ve `finally` značku smaže (výjimka tedy tvrdé ukončení není). Když běh najde značku z předchozího běhu, předchozí nedoběhl: **`nahlasitTvrdeUkonceni_`** zapíše do KONTROL řádek „běh ukončen limitem“ (s časem startu) a pošle notifikaci „Běh nedoběhl: …“. Chyba zápisu ani notifikace nový běh neshodí. Hlášení přijde až s dalším během.
+- **`zpracovatSledovanaMesta`** (značka `BEH_SLEDOVANA_MESTA`) a **`prepocitatPocasi`** (`BEH_POCASI`) běží přes `sHlidanimUkonceni_`. Práce sledovaných měst vyčleněna do `zpracovatSledovanaMestaBezZamku_` (beze změny logiky, jen odsazení).
+- **Úklid po v3.60:** z `logKontrolaPocasi_` odstraněna nepoužitá větev pro `openMeteoKody`.
+- Dokumentace: PROVOZ.md (jak poznat selhání u obou triggerů).
+### Testy
+- **+5 Node testů (backend 475 → 480, celkem 687 → 692):** `sHlidanimUkonceni_` bez značky (návratová hodnota, značka jen během běhu, nic se nehlásí), se značkou z předchozího běhu (řádek s časem startu, notifikace, nový běh proběhne), výjimka (značka smazána, výjimka projde); `prepocitatPocasi` a `zpracovatSledovanaMesta` hlásí nedoběhnutý předchozí běh. Ruční mutace (bez hlášení, bez mazání značky, mazání mimo `finally`, bez notifikace, sledovaná města bez hlídání) shodí vždy aspoň jeden test. Pokrytí řádků 92,46 %, baseline zvýšena z 92,34 %.
+
 ## Backend v3.60 – počasí jen z met.no (#81 krok 2) – 18. 11. 2026
 ### Proč
 - Open-Meteo od 1. 11. vracelo z Apps Scriptu HTTP 429 pro všechny lokality ve všech bězích, nejspíš kvůli limitu sdílených IP. Každý přepočet tak nejdřív spálil desítky marných volání a teprve pak šel na met.no, který byl fakticky jediným zdrojem. Rozhodnutí 13. 11.: Open-Meteo pro list POČASÍ nevolat.

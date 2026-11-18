@@ -1597,7 +1597,7 @@ test('v3.51 (#49): sestavRadekPreruseniSledovanychMest_ – typ, počty a uplynu
 /** Spustí zpracovatSledovanaMesta se zadanými městy (všechna nikdy nezpracovaná)
  *  a řízenými hodinami: každé volání AI posune čas o `delkaMestaMs`, počasí o
  *  `delkaPocasiMs`. Vrací {ctx, ss, poradi, volaneAi}. */
-function spustitSledovanaMestaSHodinami_(mesta, delkaMestaMs, delkaPocasiMs) {
+function spustitSledovanaMestaSHodinami_(mesta, delkaMestaMs, delkaPocasiMs, extraProps = {}) {
   let cas = 0;
   const poradi = [];
   const odpovedi = mesta.map(() => anthropicResp({
@@ -1606,7 +1606,7 @@ function spustitSledovanaMestaSHodinami_(mesta, delkaMestaMs, delkaPocasiMs) {
   }));
   const zaklad = frontaFetchu(odpovedi);
   const ctx = nactiRadar({
-    properties: { ANTHROPIC_API_KEY: 'test-key' },
+    properties: Object.assign({ ANTHROPIC_API_KEY: 'test-key' }, extraProps),
     urlFetch: (url) => { poradi.push('ai'); cas += delkaMestaMs; return zaklad(url); },
   });
   ctx.__Date.now = () => cas;
@@ -1662,6 +1662,63 @@ test('v3.59 (#81): prepocitatPocasi – výjimka v přepočtu zámek přesto uvo
   ctx.aktualizujPocasi_ = () => { throw new Error('met.no nedostupné'); };
   assert.throws(() => ctx.prepocitatPocasi(), /met.no/);
   assert.equal(ctx.__zamek.uvolneno, 1);
+});
+
+// ---------------------------------------------------------------------------
+// v3.61 (#81 krok 3, varianta D z #49): záznam o tvrdém ukončení limitem.
+// ---------------------------------------------------------------------------
+
+test('v3.61: sHlidanimUkonceni_ – bez značky: běh proběhne, značka existuje jen během běhu, nic se nehlásí', () => {
+  const ss = fakeSpreadsheet({ KONTROLY: [[]] });
+  const ctx = nactiRadar({ ss, properties: { NOTIFY_EMAIL: 'a@example.com' } });
+  let behem = null;
+  const vysledek = ctx.sHlidanimUkonceni_(ss, 'TEST', 'test', () => { behem = ctx.__props.BEH_TEST; return 42; });
+  assert.equal(vysledek, 42, 'návratová hodnota projde');
+  assert.ok(Number(behem) > 0, 'během běhu je značka se startem');
+  assert.equal('BEH_TEST' in ctx.__props, false, 'po doběhnutí značka zmizí');
+  assert.equal(ss.getSheetByName('KONTROLY').getLastRow(), 1);
+  assert.equal(ctx.__odeslaneEmaily.length, 0);
+});
+
+test('v3.61: sHlidanimUkonceni_ – značka z předchozího běhu → řádek „běh ukončen limitem“ a notifikace, nový běh proběhne', () => {
+  const ss = fakeSpreadsheet({ KONTROLY: [[]] });
+  const start = new Date(2026, 10, 19, 10, 0).getTime();
+  const ctx = nactiRadar({ ss, properties: { NOTIFY_EMAIL: 'a@example.com', BEH_TEST: String(start) } });
+  let probehl = false;
+  ctx.sHlidanimUkonceni_(ss, 'TEST', 'sledovaná města', () => { probehl = true; });
+  assert.ok(probehl);
+  const radek = ss.getSheetByName('KONTROLY').rows[1];
+  assert.equal(radek[1], 'běh ukončen limitem');
+  assert.equal(radek[2], 'sledovaná města');
+  assert.match(radek[10], /^Předchozí běh \(sledovaná města\) začal 19\. ?11\. ?2026 10:00 a nedoběhl/);
+  assert.equal(ctx.__odeslaneEmaily.length, 1);
+  assert.match(ctx.__odeslaneEmaily[0].predmet, /Běh nedoběhl: sledovaná města/);
+  assert.equal('BEH_TEST' in ctx.__props, false);
+});
+
+test('v3.61: sHlidanimUkonceni_ – výjimka není tvrdé ukončení: značka se smaže, výjimka projde', () => {
+  const ss = fakeSpreadsheet({ KONTROLY: [[]] });
+  const ctx = nactiRadar({ ss });
+  assert.throws(() => ctx.sHlidanimUkonceni_(ss, 'TEST', 'test', () => { throw new Error('chyba'); }), /chyba/);
+  assert.equal('BEH_TEST' in ctx.__props, false, 'příští běh nesmí hlásit falešné tvrdé ukončení');
+});
+
+test('v3.61: prepocitatPocasi – nedoběhnutý předchozí přepočet se nahlásí', () => {
+  const ss = fakeSpreadsheet({ KONTROLY: [[]] });
+  const ctx = nactiRadar({ ss, zamek: true, properties: { BEH_POCASI: String(Date.now() - 400000) } });
+  ctx.aktualizujPocasi_ = () => {};
+  ctx.prepocitatPocasi();
+  assert.equal(ss.getSheetByName('KONTROLY').rows[1][2], 'přepočet počasí');
+  assert.equal('BEH_POCASI' in ctx.__props, false);
+});
+
+test('v3.61: zpracovatSledovanaMesta – nedoběhnutý předchozí běh se nahlásí, města se pak zpracují', () => {
+  const v = spustitSledovanaMestaSHodinami_(['Praha'], 60 * S_, 0, { BEH_SLEDOVANA_MESTA: '1' });
+  const radky = v.ss.getSheetByName('KONTROLY').rows.filter(rad => rad[1] === 'běh ukončen limitem');
+  assert.equal(radky.length, 1);
+  assert.equal(radky[0][2], 'sledovaná města');
+  assert.equal(v.poradi.filter(x => x === 'ai').length, 1, 'nový běh normálně zpracuje město');
+  assert.equal('BEH_SLEDOVANA_MESTA' in v.ctx.__props, false);
 });
 
 test('v3.51 (#49): zpracovatSledovanaMesta – odhad z naměřené délky města: město 170 s zastaví druhé město (s minimem 150 s by začalo)', () => {
