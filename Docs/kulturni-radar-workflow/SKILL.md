@@ -462,7 +462,12 @@ GitHub maskuje secrets jen v konzoli, ne v souborech z testů (`output.xml`,
 ### Měření pokrytí kódu (od 28. 10. 2026)
 
 `node --test --experimental-test-coverage tests/unit.test.js tests/frontend.test.js`
-(CI od 3. 11. 2026 hlídá práh řádků backendu přes `kontrola-pokryti.py` a `baseline-pokryti.json`, #38; po zlepšení baseline zvýšit). Funguje jen proto, že `tests/harness.js` předává
+(CI od 3. 11. 2026 hlídá práh řádků backendu přes `kontrola-pokryti.py` a `baseline-pokryti.json`, #38; po zlepšení baseline zvýšit).
+**Snížení baseline** je povolené jen tehdy, když pokles je čistě aritmetický:
+smazaný kód byl pokrytý testy, takže klesl podíl pokrytých řádků, i když
+žádný zbývající kód nepřišel o test. Zdůvodnění patří do CHANGELOGu k dané
+verzi (precedens backend v3.60, 92,38 → 92,34 %, odstraněné funkce
+Open-Meteo). Pokles z jiného důvodu se řeší doplněním testů, ne baseline. Funguje jen proto, že `tests/harness.js` předává
 `vm.runInContext` jako `filename` URL souboru (`pathToFileURL`); holé jméno se
 v reportu neukáže. Aktuální hodnoty v README (Testy v číslech) a
 ARCHITEKTURA-TESTU.md, D3. Matice pokrytí podle názvů testů nadhodnocuje,
@@ -499,6 +504,22 @@ změnu v `apps-script/kulturni_radar.gs` a/nebo `apps-script/Index.html`
 3. Zip **jen skutečně změněných souborů**, zachovat strukturu repa
    (`apps-script/...`, `tests/...`). Žádné soubory navíc "pro jistotu".
 4. `present_files` s jednořádkovým shrnutím (co se změnilo, kolik testů).
+
+### Varianta A2 — patch místo zipu (od 18. 11. 2026, preferovaná)
+Chat si repo naklonuje (`git clone` z GitHubu jde), změnu udělá přímo
+v pracovní kopii a výsledek předá jako `vX.YY.patch` (`git diff` proti
+aktuálnímu `main`). V odpovědi vždy uvést **základní commit** (krátký
+SHA), proti kterému patch vznikl. Claude Code pak místo rozbalení zipu:
+1. `git pull`, ověří, že `HEAD` odpovídá základnímu commitu (jiný HEAD
+   nevadí, `--3way` ho sloučí, ale stojí za zmínku ve shrnutí).
+2. `git apply --3way ~/Downloads/vX.YY.patch` a `git status --short`.
+3. U přesunu nebo přeodsazení kódu (vyčlenění funkce) kontrolovat tělo
+   přes `git diff --cached -w`: bez bílých znaků musí zbýt jen obal.
+Proč: zip přepisuje celé soubory, takže souběžný commit (třeba úprava
+BACKLOGu z Claude Code mezi dvěma balíčky) by se tiše ztratil; patch se
+s ním sloučí nebo konflikt ohlásí. Ověřeno na šesti releasech v3.56–v3.61
+(18. 11. 2026), všechny se aplikovaly čistě. V patchi chybí jen soubory,
+které chat nevidí (board, issues); ty jdou dál krokem v promptu.
 
 ### Krok B — Claude Code prompt (dělá Claude v chatu, hned pod balíčkem)
 Pevná šablona, měnit jen vyplněné části v `[hranatých závorkách]`:
@@ -549,6 +570,20 @@ verzi, protože se na druhý kanál zapomnělo.
 v dashboardu (popis v `Docs/aplikace/PROVOZ.md`). Změny v dashboardu dělá Vojta
 nebo hlavní chat přes prohlížeč, ne Claude Code. Worker nasazuje Vojta:
 `npx wrangler login --browser=false`, odkaz otevřít v Chrome, pak `npx wrangler deploy`.
+
+### Změna sestavy triggerů: setupTriggers ručně (od 18. 11. 2026)
+`clasp push` ani `clasp deploy` triggery nezakládají ani nemění. Když release
+mění `setupTriggers` (nový trigger, jiný čas, jiná obslužná funkce):
+1. Prompt pro Claude Code to musí výslovně říct a na konci Vojtovi připomenout.
+2. Vojta v editoru Apps Scriptu spustí `setupTriggers` (rozbalovací seznam
+   funkcí, Spustit). Protokol ukáže řádek „Triggery vytvořeny: …“.
+3. Ověřit počet ve **Spouštěčích** (ikona budíku) proti testu
+   `#35 setupTriggers: přesný rozvrh všech N triggerů` (od v3.59 jich je 12).
+4. Potvrdit komentářem v issue (čas spuštění, počet, nové triggery).
+Bez kroku 2 nový trigger neexistuje: od v3.59 by se počasí nepřepočítávalo
+vůbec a nedělní samotest by ho hlásil jako chybějící (`POTREBNE_TRIGGERY`).
+Triggery běží na verzi „Head“, tedy na kódu z posledního `clasp push`.
+Release, který triggery nemění, `setupTriggers` nespouští.
 
 ### Ověření po clasp deploy
 Produkční implementaci poznáš podle shody ID (`AKfycb…`) s URL
