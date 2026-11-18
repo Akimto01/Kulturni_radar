@@ -1,5 +1,17 @@
 # Changelog
 
+## Backend v3.59 – přepočet počasí jako samostatný trigger (#81 krok 1) – 18. 11. 2026
+### Proč
+- Ověření #49 z 18. 11. (5 běhů 1.–15. 11.): `zpracovatSledovanaMesta` zpracuje trvale jen 1 město za běh, protože přepočet počasí před smyčkou bere 1–2 minuty z rozpočtu 330 s. Každé ze 6 měst se tak obnoví jednou za 3 týdny, bez rezervy vůči oknu hledání. Běh 15. 11. skončil jen 20 s pod rozpočtem.
+### Změněno
+- **Nová obsluha triggeru `prepocitatPocasi()`:** zavolá `aktualizujPocasi_` nad aktivní tabulkou pod stejným script lockem jako sledovaná města (čeká až 30 s, při obsazeném zámku skončí a počasí přepočítá příští trigger), zámek uvolní i při výjimce. Položka menu „Počasí teď“.
+- **`setupTriggers`:** dva nové triggery `prepocitatPocasi`, neděle 22:00 a čtvrtek 11:00, tedy po sledovaných městech (počasí dostanou i akce, které města právě přidala) a před přehledy. Celkem 12 triggerů. `POTREBNE_TRIGGERY` (samotest, #48) obsahuje i `prepocitatPocasi`.
+- **`zpracovatSledovanaMesta`** už počasí nevolá, celý rozpočet zbývá na města. Při městě kolem 2 minut se vejdou 2 města za běh.
+- **Po nasazení je nutné v editoru Apps Scriptu znovu spustit `setupTriggers`**, jinak trigger počasí neexistuje a nedělní samotest ho nahlásí jako chybějící.
+- Dokumentace: PROVOZ.md (tabulka triggerů, samotest), ARCHITEKTURA-APLIKACE.md (Počasí, Sledovaná města).
+### Testy
+- **+2 Node testy (backend 472 → 474, celkem 684 → 686):** test v3.51 „počasí PŘED městy“ přepsán na v3.59 (počasí se nevolá, při 120 s na město projdou 2 města); test „počasí 200 s: žádné město“ nahrazen třemi testy `prepocitatPocasi` (přepočet nad aktivní tabulkou a uvolnění zámku, obsazený zámek s čekáním aspoň 30 s, uvolnění zámku při výjimce); rozvrh triggerů 10 → 12 a 9 → 10 funkcí; `chybejiciTriggery_` hlídá i `prepocitatPocasi`. Ruční mutace (kratší čekání na zámek, bez uvolnění zámku, počasí zpět ve městech, samotest bez `prepocitatPocasi`) shodí vždy aspoň jeden test. Pokrytí řádků 92,38 %, baseline zvýšena z 92,36 %.
+
 ## Backend v3.58 – znovu použité ID a jednoslovné názvy (#71 krok 4) – 18. 11. 2026
 ### Chyba
 - Brnohraní 2026 bylo v AKCÍCH dvakrát. Příčina z analýzy 16. 11. (#71, bod c): AI poslala Brnohraní s ID řádku „Caravaning – doprovodný program“, přesná shoda ID řádek přejmenovala a přesunula na jiný termín a nic nehlídalo, že Brnohraní už existuje. Caravaning tím z AKCÍ zmizel. Druhá příčina: jednoslovný název „Brnohraní 2026“ s časem a bez se fuzzy shodou nespároval, protože `isSameName_` chce aspoň 2 společná slova.

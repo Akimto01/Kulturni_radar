@@ -1625,23 +1625,43 @@ function spustitSledovanaMestaSHodinami_(mesta, delkaMestaMs, delkaPocasiMs) {
   return { ctx, ss, poradi };
 }
 
-test('v3.51 (#49): zpracovatSledovanaMesta – počasí běží PŘED městy a jeho čas se počítá do rozpočtu, přerušení se zapíše do KONTROL', () => {
-  // počasí 100 s, město 120 s: po 1. městě uplynulo 220 s, 220 + odhad 150 > 330 → 2. město se nezačne
+test('v3.59 (#81): zpracovatSledovanaMesta – počasí se nevolá, rozpočet je celý pro města: při 120 s na město projdou 2 města', () => {
+  // dřív (v3.51) počasí 100 s + město 120 s → jen 1 město. Teď: po 1. městě 120 s,
+  // 120 + 150 < 330 → 2. město; po něm 240 s, 240 + 150 > 330 → konec.
   const v = spustitSledovanaMestaSHodinami_(['Praha', 'Ostrava', 'Plzeň'], 120 * S_, 100 * S_);
-  assert.equal(v.poradi[0], 'pocasi', 'počasí je první');
-  assert.equal(v.poradi.filter(x => x === 'ai').length, 1, 'AI se zavolá jen pro první město');
+  assert.equal(v.poradi.includes('pocasi'), false, 'počasí má vlastní trigger');
+  assert.equal(v.poradi.filter(x => x === 'ai').length, 2, 'propustnost 2 města za běh');
   const kontroly = v.ss.getSheetByName('KONTROLY').rows.filter(rad => rad[1] === 'sledovaná města přerušena');
   assert.equal(kontroly.length, 1, 'právě jeden řádek o přerušení');
-  assert.equal(kontroly[0][2], 'Zpracováno měst: 1, zbývá: 2');
+  assert.equal(kontroly[0][2], 'Zpracováno měst: 2, zbývá: 1');
 });
 
-test('v3.51 (#49): zpracovatSledovanaMesta – počasí 200 s: žádné město se nezačne, řádek přerušení „Zpracováno měst: 0, zbývá 3“', () => {
-  // 200 s + minimální odhad 150 s = 350 s > 330 s, zabité volání AI by přišlo nazmar
-  const v = spustitSledovanaMestaSHodinami_(['Praha', 'Ostrava', 'Plzeň'], 120 * S_, 200 * S_);
-  assert.equal(v.poradi.filter(x => x === 'ai').length, 0, 'AI se nezavolá vůbec');
-  const radek = v.ss.getSheetByName('KONTROLY').rows.find(rad => rad[1] === 'sledovaná města přerušena');
-  assert.ok(radek, 'řádek o přerušení existuje');
-  assert.equal(radek[2], 'Zpracováno měst: 0, zbývá: 3');
+test('v3.59 (#81): prepocitatPocasi – přepočítá počasí nad aktivní tabulkou a uvolní zámek', () => {
+  const ss = fakeSpreadsheet({});
+  const ctx = nactiRadar({ ss, zamek: true });
+  const volane = [];
+  ctx.aktualizujPocasi_ = (t) => { volane.push(t); };
+  ctx.prepocitatPocasi();
+  assert.equal(volane.length, 1);
+  assert.equal(volane[0], ss, 'nad aktivní tabulkou');
+  assert.equal(ctx.__zamek.uvolneno, 1);
+});
+
+test('v3.59 (#81): prepocitatPocasi – obsazený zámek → počasí se nepřepočítá, zámek se neuvolňuje', () => {
+  const ctx = nactiRadar({ ss: fakeSpreadsheet({}), zamek: false });
+  const volane = [];
+  ctx.aktualizujPocasi_ = () => { volane.push(1); };
+  ctx.prepocitatPocasi();
+  assert.equal(volane.length, 0);
+  assert.equal(ctx.__zamek.uvolneno, 0);
+  assert.ok(ctx.__zamek.tryLock[0] >= 30000, 'čeká aspoň 30 s, než to vzdá');
+});
+
+test('v3.59 (#81): prepocitatPocasi – výjimka v přepočtu zámek přesto uvolní', () => {
+  const ctx = nactiRadar({ ss: fakeSpreadsheet({}), zamek: true });
+  ctx.aktualizujPocasi_ = () => { throw new Error('met.no nedostupné'); };
+  assert.throws(() => ctx.prepocitatPocasi(), /met.no/);
+  assert.equal(ctx.__zamek.uvolneno, 1);
 });
 
 test('v3.51 (#49): zpracovatSledovanaMesta – odhad z naměřené délky města: město 170 s zastaví druhé město (s minimem 150 s by začalo)', () => {
@@ -4456,15 +4476,19 @@ const OCEKAVANE_TRIGGERY = [
   'watchdogDailyCheck|cas|-|-|20|-|1',
   'zpracovatSledovanaMesta|cas|-|SUNDAY|20|-|-',
   'zpracovatSledovanaMesta|cas|-|THURSDAY|10|-|-',
+  // v3.59 (#81): počasí samostatně. Neděle 22:00 může v létě (SELČ) běžet
+  // souběžně s RF během (22:20); počasí jen přepisuje list POČASÍ, RF čte API.
+  'prepocitatPocasi|cas|-|SUNDAY|22|-|-',
+  'prepocitatPocasi|cas|-|THURSDAY|11|-|-',
 ];
 const popisTriggeru_ = (z) => [z.funkce, z.typ, z.udalost, z.den, z.hodina, z.denVMesici, z.kazdychDni]
   .map(v => (v === null ? '-' : v)).join('|');
 
-test('#35 setupTriggers: přesný rozvrh všech 10 triggerů podle tabulky (včetně neděle 20:00 a čtvrtka 10:00 zpracovatSledovanaMesta)', () => {
+test('#35 setupTriggers: přesný rozvrh všech 12 triggerů podle tabulky (včetně sledovaných měst a počasí v neděli a ve čtvrtek)', () => {
   const ss = fakeSpreadsheet({});
   const ctx = nactiRadar({ ss, triggery: [] });
   ctx.setupTriggers();
-  assert.equal(ctx.__triggery.vytvorene.length, 10);
+  assert.equal(ctx.__triggery.vytvorene.length, 12);
   assert.equal(ctx.__triggery.vytvorene.map(popisTriggeru_).join('\n'), OCEKAVANE_TRIGGERY.join('\n'));
   assert.equal(ctx.__triggery.vytvorene[0].tabulka, ss, 'onEdit trigger je navázaný na aktivní tabulku');
 });
@@ -4474,10 +4498,11 @@ test('#35 setupTriggers: idempotence – staré triggery se smažou, nové se za
   const ctx = nactiRadar({ ss: fakeSpreadsheet({}), triggery: stare });
   ctx.setupTriggers();
   assert.equal(ctx.__triggery.smazane.length, 3, 'všechny dosavadní triggery smazány');
-  assert.equal(ctx.__triggery.vytvorene.length, 10, 'nových přesně 10, žádné navíc');
+  assert.equal(ctx.__triggery.vytvorene.length, 12, 'nových přesně 12, žádné navíc');
   const funkce = ctx.__triggery.vytvorene.map(z => z.funkce);
   assert.equal(funkce.filter(f => f === 'zpracovatSledovanaMesta').length, 2);
-  assert.equal(new Set(funkce).size, 9, '9 různých funkcí');
+  assert.equal(funkce.filter(f => f === 'prepocitatPocasi').length, 2);
+  assert.equal(new Set(funkce).size, 10, '10 různých funkcí');
 });
 
 /** Tabulka s listem KONTROLY (hlavička + zadané řádky [datum, typ]). */
@@ -5839,7 +5864,8 @@ test('#48 chybejiciTriggery_: hlásí sendUserNotifications a zpracovatSledovana
   const bezDvou = vsechny.filter(f => f !== 'sendUserNotifications' && f !== 'zpracovatSledovanaMesta');
   assert.deepEqual([...ctx.chybejiciTriggery_(bezDvou)], ['sendUserNotifications', 'zpracovatSledovanaMesta']);
   assert.deepEqual([...ctx.chybejiciTriggery_(vsechny.concat(['jinyTrigger']))], []);
-  assert.equal(ctx.chybejiciTriggery_(undefined).length, 9);
+  assert.equal(ctx.chybejiciTriggery_(undefined).length, 10);
+  assert.ok([...ctx.chybejiciTriggery_([])].includes('prepocitatPocasi'), 'v3.59: samotest hlídá i trigger počasí');
 });
 
 test('#48 sendUserNotifications: selhání → notifyFail_ „Notifikace uživatelům selhaly“ a výjimka se propustí', () => {

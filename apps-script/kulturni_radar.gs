@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.58 (18. 11. 2026) – shoda přes ID s úplně jiným názvem se nepoužije (AI znovu použila ID jiné akce, Brnohraní přepsalo Caravaning); fuzzy shoda podle začátku bere i prakticky shodný jednoslovný název (#71 krok 4)
- * (předchozí: 3.57 – vícedenní akce se párují i podle stejného konce, když se liší začátek (Festival Janáček Brno s začátkem 13. 10., 15. 10. a 13. 11.); posun začátku se pak nehlásí ani nepřepisuje (#71 krok 2))
+ * Verze: 3.59 (18. 11. 2026) – přepočet počasí jako samostatný trigger prepocitatPocasi (neděle 22:00, čtvrtek 11:00), sledovaná města mají celý rozpočet pro sebe; po nasazení znovu spustit setupTriggers (#81 krok 1)
+ * (předchozí: 3.58 – shoda přes ID s úplně jiným názvem se nepoužije (AI znovu použila ID jiné akce, Brnohraní přepsalo Caravaning); fuzzy shoda podle začátku bere i prakticky shodný jednoslovný název (#71 krok 4))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.58';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.59';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -581,6 +581,7 @@ function onOpen() {
     .addItem('Aktualizovat stálá místa', 'updateMista')
     .addItem('Doplnit souřadnice (jednorázově)', 'doplnitSouradniceZpetne')
     .addItem('Sledovaná města teď', 'zpracovatSledovanaMesta')
+    .addItem('Počasí teď', 'prepocitatPocasi')
     .addSeparator()
     .addItem('Samotest', 'runSelfTest')
     .addSeparator()
@@ -727,7 +728,22 @@ function setupTriggers() {
     .atHour(10)
     .create();
 
-  Logger.log('Triggery vytvořeny: onEdit + denní 8:00 + notifikace uživatelů 9:00 + pondělní přehled 7:00 + čtvrteční tipy 16:00 + měsíční místa + nedělní samotest 18:00 + denní watchdog 20:00 + sledovaná města (neděle 20:00, čtvrtek 10:00).');
+  // v3.59 (#81): přepočet POČASÍ samostatně, hodinu až dvě po sledovaných
+  // městech (dostanou ho i akce, které města právě přidala) a před přehledy
+  // (pondělí 7:00, čtvrtek 16:00). Neděle 22:00 je i po týdenním RF běhu.
+  ScriptApp.newTrigger('prepocitatPocasi')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .atHour(22)
+    .create();
+
+  ScriptApp.newTrigger('prepocitatPocasi')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.THURSDAY)
+    .atHour(11)
+    .create();
+
+  Logger.log('Triggery vytvořeny: onEdit + denní 8:00 + notifikace uživatelů 9:00 + pondělní přehled 7:00 + čtvrteční tipy 16:00 + měsíční místa + nedělní samotest 18:00 + denní watchdog 20:00 + sledovaná města (neděle 20:00, čtvrtek 10:00) + počasí (neděle 22:00, čtvrtek 11:00).');
 }
 
 /** Instalovatelný onEdit – reaguje jen na zaškrtnutí KRITÉRIA!B11. */
@@ -2866,10 +2882,25 @@ function logKontrolaPocasi_(ss, pocetChyb, diag) {
   } catch (e) { Logger.log('Log do KONTROL (počasí) selhal: ' + e); }
 }
 
+/** v3.59 (#81 krok 1): obsluha triggeru přepočtu počasí (neděle 22:00,
+ *  čtvrtek 11:00). Vlastní běh s vlastním limitem 6 min, nezávislý na AI
+ *  části. Sdílí zámek se sledovanými městy, ať nepřepisují AKCE a POČASÍ
+ *  souběžně; když je zámek obsazený ani po 30 s, běh skončí a počasí
+ *  přepočítá příští trigger. */
+function prepocitatPocasi() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) { Logger.log('prepocitatPocasi: jiný běh právě probíhá – končím.'); return; }
+  try {
+    aktualizujPocasi_(SpreadsheetApp.getActiveSpreadsheet());
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /** Hlavní běh: pro VŠECHNY budoucí akce (i mimo 16denní dosah – ty dostanou
- *  NA) přepočítá počasí a přepíše list POČASÍ. Volá se z existujícího
- *  triggeru zpracovatSledovanaMesta (žádný nový trigger). Chyba tady nesmí
- *  shodit zbytek běhu (proto vlastní try/catch, stejně jako u souřadnic). */
+ *  NA) přepočítá počasí a přepíše list POČASÍ. Od v3.59 ho volá vlastní
+ *  trigger prepocitatPocasi (dřív zpracovatSledovanaMesta). Chyba tady nesmí
+ *  shodit volajícího (proto vlastní try/catch, stejně jako u souřadnic). */
 function aktualizujPocasi_(ss) {
   try {
     const akceSh = ss.getSheetByName(SHEET.AKCE);
@@ -3103,11 +3134,9 @@ function zpracovatSledovanaMesta() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   try {
     const t0 = Date.now();
-    // v3.51 (#49): počasí PŘED smyčkou měst. Je levné (bez AI) a dřív běželo až
-    // za smyčkou, takže když běh narazil na limit 6 min, nespustilo se vůbec.
-    // Jeho čas se teď započítá do uplynulého času rozpočtu. Akce nalezené až
-    // v tomhle běhu dostanou počasí při příštím běhu.
-    aktualizujPocasi_(ss);
+    // v3.59 (#81 krok 1): počasí už tady neběží, má vlastní trigger
+    // prepocitatPocasi (hodinu po městech). V3.51 ho volala před smyčkou
+    // a bralo 1–2 min z rozpočtu, takže se vešlo jen 1 město za běh.
 
     const krit = ss.getSheetByName(SHEET.KRITERIA);
     const zakladniCfg = readCriteria_(krit);
@@ -3146,9 +3175,6 @@ function zpracovatSledovanaMesta() {
     }
     Logger.log('zpracovatSledovanaMesta: hotovo, zpracováno ' + zpracovano + ' z ' + mesta.length
       + ' měst (přeskočeno jako dnes už hotové: ' + preskocenoDnes + ').');
-    // v3.22: počasí u akcí se přepočítává PŘI KAŽDÉM běhu tohoto triggeru
-    // (neděle 20:00 + čtvrtek 10:00), ne jen jednou při vzniku akce – blíž
-    // datu konání je předpověď přesnější. Od v3.51 běží na začátku běhu (viz výš).
   } finally {
     lock.releaseLock();
   }
@@ -3431,7 +3457,7 @@ function auditDat_(ss) {
  *  odpovídá tomu, co setupTriggers skutečně zakládá (ochrana proti rozjetí). */
 const POTREBNE_TRIGGERY = ['onEditInstallable', 'dailyCheck', 'sendUserNotifications',
   'weeklyDigest', 'weekendDigest', 'updateMista', 'runSelfTest', 'watchdogDailyCheck',
-  'zpracovatSledovanaMesta'];
+  'zpracovatSledovanaMesta', 'prepocitatPocasi'];
 
 /** PURE: které obslužné funkce z POTREBNE_TRIGGERY chybí mezi existujícími triggery. */
 function chybejiciTriggery_(mame) {

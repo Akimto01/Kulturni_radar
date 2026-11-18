@@ -114,8 +114,8 @@ kategorií (`UŽIVATELÉ.Filtry`); prázdné filtry = bez omezení. Neřeší
 odeslání, jen sestaví obsah (viz Notifikace níže).
 
 **Počasí u jednotlivých AKCÍ (list POČASÍ, v3.22):** oddělené od přehledů
-výše. `aktualizujPocasi_` běží jako součást stejného triggeru jako
-sledovaná města (neděle 20:00, čtvrtek 10:00) a pro každou budoucí akci
+výše. `aktualizujPocasi_` běží od v3.59 ve vlastním triggeru `prepocitatPocasi`
+(neděle 22:00, čtvrtek 11:00, #81; dřív v běhu sledovaných měst) a pro každou budoucí akci
 dopočítá/aktualizuje stav (souřadnice z cache SOUŘADNICE → Open-Meteo,
 16 dní dopředu, fallback met.no) — výsledek pak `readEventsApi_` připojí
 ke každé akci pro frontend (mapa/karty), bez dalšího volání za běhu.
@@ -143,9 +143,10 @@ list SLEDOVANÁ MĚSTA) — stejná kritéria (dojezd/horizont/kategorie) jako
 domácí profil, jen jiné město, **žádná notifikace**. Uživatel výsledky
 uvidí, až si dané město sám vybere v dropdownu. Časově rozpočtováno (~4,5 min)
 a přeskakuje dnes už zpracovaná města (`jeDnesJizZpracovano_`), takže
-opakované spuštění postupně projde celý seznam. Stejný běh navíc
-přepočítává POČASÍ (viz výš) — spouští se v neděli 20:00 (před pondělním
-přehledem) a ve čtvrtek 10:00 (před čtvrtečními tipy).
+opakované spuštění postupně projde celý seznam. Spouští se v neděli 20:00
+(před pondělním přehledem) a ve čtvrtek 10:00 (před čtvrtečními tipy).
+POČASÍ od v3.59 přepočítává samostatný trigger `prepocitatPocasi` (viz výš),
+takže celý rozpočet běhu zbývá na města (#81).
 
 ## Uživatelské profily (list UŽIVATELÉ, v3.20+)
 
