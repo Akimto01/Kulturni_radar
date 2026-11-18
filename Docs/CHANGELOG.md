@@ -1,5 +1,15 @@
 # Changelog
 
+## Backend v3.56 – jistá shoda při prakticky shodném názvu (#71 krok 1, #73) – 18. 11. 2026
+### Chyba
+- Tatáž akce se hlásila jako změněná při každém běhu (Comic-Con Brno & Junior 1., 2. a 9. 11., Festival Life! 3. a 8. 11.) a plnila log sloučení ve sloupci Z. Příčina z analýzy 16. 11. (#71): AI posílá pokaždé jiné ID a jinak popsané místo, akce se proto páruje přes fuzzy shodu a fuzzy větev `upsertEvents_` bere jakýkoli rozdíl v místě, ceně nebo popisu jako změnu. Metrika „fuzzy sloučení“ v samotestu tím počítala hlavně opakovaná přepárování.
+### Změněno
+- **`jePraktickyShodnyNazev_(a, b)`** (čistá funkce): názvy se shodují po odstranění velikosti písmen, diakritiky, interpunkce a samostatného letopočtu (19xx, 20xx). Ostatní čísla zůstávají rozlišující, prázdný název shodu nedává.
+- **`upsertEvents_`:** fuzzy kandidát s prakticky shodným názvem je jistá shoda. Změna se posuzuje úzce jako u přesné shody ID (jen datum od, datum do, stav), přeformulace místa, ceny a popisu se nehlásí a do logu sloučení se nic nezapisuje. Fuzzy shoda s odlišným názvem zůstává na široké definici z v3.42. Které řádky se párují, se nemění.
+- Duplicity vícedenních akcí s různým začátkem (Festival Janáček Brno) a přeformulované názvy řeší kroky (2) a (3) #71.
+### Testy
+- **+4 Node testy (backend 457 → 461, celkem 669 → 673):** `jePraktickyShodnyNazev_` pozitivní (diakritika, interpunkce, letopočet) a negativní (jiné číslo, jiný den série, přeformulovaný název, série vs. konkrétní akce, prázdno); `upsertEvents_` s jistou shodou beze změny (Comic-Con s jiným ID, místem, cenou a popisem: beze změny, ID a data původní, log prázdný) a s posunem konce (změněná, ID zachováno, bez logu). Bez opravy oba testy `upsertEvents_` padají. Pokrytí řádků 92,26 % (baseline 92,21 %).
+
 ## CI: fáze Doporučeného pořadí končí u každého tučného nadpisu – 18. 11. 2026
 - **Falešné varování:** `kontrola-boardu.py` hlásila #80 (Todo) „ve fázi 6 Doporučeného pořadí“. `projit_backlog()` v `gh_projekt.py` nulovala fázi jen na nadpisu `## `, takže položky pod „**Hotovo (Cíl 1 …):**“ a „**Cíl 2 – …:**“ dědily fázi 6.
 - **Oprava:** každý řádek začínající `**`, který není „**Fáze N“, nastaví fázi na žádnou. Týká se i `navrh-session.py` (krok 6, nejbližší fáze Backlogu).

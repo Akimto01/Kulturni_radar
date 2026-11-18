@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.55 (16. 11. 2026) – aktualizace stálých míst má vlastní limit 12 webových vyhledávání (dřív 3 jako hledání akcí), aby stihla ověřit otevírací dobu všech známých míst; stav „sezónně zavřeno“ jen ověřený (#72)
- * (předchozí: 3.54 – stálá místa: otevírací doba starší 35 dní se v přehledech a na webu nahradí výzvou k ověření, měsíční aktualizace dostane seznam známých míst a obnoví je pod stejným ID (#72))
+ * Verze: 3.56 (18. 11. 2026) – fuzzy shoda s prakticky shodným názvem je jistá shoda: změna je jen posun termínu nebo stavu, přeformulace popisu, místa a ceny se nehlásí ani nezapisuje do logu sloučení (#71 krok 1, #73)
+ * (předchozí: 3.55 – aktualizace stálých míst má vlastní limit 12 webových vyhledávání (dřív 3 jako hledání akcí), aby stihla ověřit otevírací dobu všech známých míst; stav „sezónně zavřeno“ jen ověřený (#72))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.55';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.56';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -1251,6 +1251,11 @@ function upsertEvents_(ss, cfg, events) {
       const hit = (byProfilDatum[pd] || []).find(c => !ruznyDenSerie_(c.nazev, ev.nazev) && isSameName_(c.tokens, evTokens));
       if (hit) { idx = hit.i; viaFuzzy = true; }
     }
+    // v3.56 (#71 krok 1, #73): fuzzy kandidát s prakticky shodným názvem
+    // (liší se jen velikostí písmen, diakritikou, interpunkcí nebo letopočtem)
+    // je táž akce stejně jistě jako přesná shoda ID, jen AI poslala jiné ID
+    // nebo jinak popsané místo. Změna se pak posuzuje úzce jako u přesné shody.
+    const jistaShoda = viaFuzzy && jePraktickyShodnyNazev_(existing[idx][4], ev.nazev);
 
     if (idx === undefined) {
       // NOVÁ akce → append: A:V + Y (W:X nechat vzorcům)
@@ -1289,7 +1294,11 @@ function upsertEvents_(ss, cfg, events) {
       // POLE_PRO_FUZZY_LOG_ (i misto/kategorie/cena/popis, ne jen
       // datum_do/stav) – cokoli obsahového se liší, bere se jako změna.
       let zmenenaPoleFuzzy = null;
-      const changed = viaFuzzy
+      //
+      // v3.56: jistaShoda (prakticky shodný název) se vrací k úzké definici –
+      // jinak se tatáž akce s pokaždé jiným ID hlásila jako změněná při každém
+      // běhu a plnila log sloučení (Comic-Con, Festival Life!, #73).
+      const changed = (viaFuzzy && !jistaShoda)
         ? (zmenenaPoleFuzzy = zjistiZmenenaPole_(old, rowVals)).length > 0
         : dateKey_(old[1]) !== dateKey_(ev.datum_od) ||
           dateKey_(old[2]) !== dateKey_(ev.datum_do) ||
@@ -1301,7 +1310,7 @@ function upsertEvents_(ss, cfg, events) {
         rowVals[15] = 'ANO';                     // Změna
         rowVals[16] = old[16];                   // První nález zachovat
         sh.getRange(r, 1, 1, AKCE_WRITE_AV).setValues([rowVals.slice(0, AKCE_WRITE_AV)]);
-        if (viaFuzzy) {
+        if (viaFuzzy && !jistaShoda) {
           zapsatFuzzyMergeLog_(sh, r, String(old[4] || ''), String(ev.nazev || ''), zmenenaPoleFuzzy);
         }
         if (norm_(ev.stav) === 'zrušeno') { stats.zrusene++; stats.zruseneNazvy.push(polozka(ev)); }
@@ -4345,6 +4354,21 @@ function denZeSerie_(nazev) {
 function ruznyDenSerie_(nazevA, nazevB) {
   const dA = denZeSerie_(nazevA), dB = denZeSerie_(nazevB);
   return dA !== null && dB !== null && dA !== dB;
+}
+
+/** PURE (v3.56, #71 krok 1): prakticky shodný název – po odstranění velikosti
+ *  písmen, diakritiky, interpunkce a samostatného letopočtu (19xx/20xx) zbude
+ *  stejný text. Na rozdíl od normNazev_ zachovává ostatní čísla, takže
+ *  „Prohlídka 1“ a „Prohlídka 2“ nebo různé dny série shodné nejsou.
+ *  Prázdný název shodu nikdy nedává. */
+function jePraktickyShodnyNazev_(a, b) {
+  const klic = v => norm_(v)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(?:19|20)\d{2}\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  const ka = klic(a);
+  return ka !== '' && ka === klic(b);
 }
 
 function parseCzDate_(v) {

@@ -3464,6 +3464,74 @@ test('upsertEvents_: FUZZY shoda, ÚPLNĚ stejný obsah (i misto/kategorie/cena/
 });
 
 // ---------------------------------------------------------------------------
+// v3.56 (#71 krok 1, #73): fuzzy shoda s prakticky shodným názvem je jistá
+// shoda – změna jen posun termínu nebo stav, bez logu sloučení. Produkční
+// případ: Comic-Con Brno & Junior hlášen jako změněný 1., 2. a 9. 11. 2026,
+// protože AI posílá pokaždé jiné ID a jinak popsané místo.
+// ---------------------------------------------------------------------------
+
+test('v3.56: jePraktickyShodnyNazev_ – shoda přes velikost písmen, diakritiku, interpunkci a letopočet', () => {
+  assert.equal(r.jePraktickyShodnyNazev_('Festival Janáček Brno', 'FESTIVAL JANACEK BRNO 2026'), true);
+  assert.equal(r.jePraktickyShodnyNazev_('Comic-Con Brno & Junior', 'Comic Con Brno – Junior'), true);
+  assert.equal(r.jePraktickyShodnyNazev_('Brnohraní 2026', 'Brnohraní'), true);
+});
+
+test('v3.56: jePraktickyShodnyNazev_ – negativní případy (jiné číslo, jiný den série, jiný text, prázdno)', () => {
+  assert.equal(r.jePraktickyShodnyNazev_('Prohlídka 1', 'Prohlídka 2'), false, 'jiné číslo než letopočet zůstává rozlišující');
+  assert.equal(r.jePraktickyShodnyNazev_('Letní program Ostrava – 13. srpna', 'Letní program Ostrava – 14. srpna'), false, 'různé dny série');
+  assert.equal(r.jePraktickyShodnyNazev_('Festival Janáček Brno', 'Janáček Brno 2026 – mezinárodní operní a hudební festival'), false, 'přeformulovaný název řeší krok (3), ne jistá shoda');
+  assert.equal(r.jePraktickyShodnyNazev_('Kulturní léto na Poděbradech', 'Divadelní představení – Kulturní léto na Poděbradech'), false, 'série vs. konkrétní akce');
+  assert.equal(r.jePraktickyShodnyNazev_('', ''), false, 'prázdný název nikdy neshoduje');
+  assert.equal(r.jePraktickyShodnyNazev_('2026', '2025'), false, 'po odečtení letopočtu prázdno');
+});
+
+/** Existující řádek Comic-Conu tak, jak ho zapsal dřívější běh. */
+function existujiciComicCon_(overrides = {}) {
+  return akceRadekFuzzy_(Object.assign({
+    id: 'cc-1', datumOd: '13. 11. 2026', datumDo: '15. 11. 2026',
+    nazev: 'Comic-Con Brno & Junior', misto: 'Výstaviště Brno, pavilon P',
+    kategorie: 'zábava', cena: 'od 390 Kč', popis: 'Festival popkultury, cosplay a komiksů.',
+  }, overrides));
+}
+
+test('v3.56: upsertEvents_ – jistá shoda (jiné ID, jinak popsané místo, cena a popis) → beze změny, bez logu, původní data zůstávají (#73)', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciComicCon_()])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'cc-2', datum_od: '13. 11. 2026', datum_do: '15. 11. 2026', stav: 'potvrzeno',
+    nazev: 'COMIC-CON Brno & Junior 2026', misto: 'BVV, pavilon P', kategorie: 'zábava',
+    cena: '390–590 Kč', popis: 'Největší popkulturní festival na Moravě.',
+  }]);
+
+  assert.equal(stats.bezZmeny, 1, 'tatáž akce jen s jiným ID a přeformulovaným textem se nehlásí jako změněná');
+  assert.equal(stats.zmenene, 0);
+  assert.equal(stats.nove, 0, 'nesmí vzniknout duplicitní řádek');
+  const row = ss.getSheetByName('AKCE').getRange(2, 1, 1, 25).getValues()[0];
+  assert.equal(row[0], 'cc-1', 'ID zůstává původní');
+  assert.equal(row[5], 'Výstaviště Brno, pavilon P', 'místo se nepřepíše, stejně jako u přesné shody ID');
+  assert.equal(row[11], 'Festival popkultury, cosplay a komiksů.');
+  const log = ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0];
+  assert.equal(log, '', 'jistá shoda nepřidává záznam do logu sloučení (metrika fuzzy sloučení se nenafukuje)');
+});
+
+test('v3.56: upsertEvents_ – jistá shoda s posunem konce → změněná, data převzata, ID zachováno, bez logu', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciComicCon_()])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'cc-3', datum_od: '13. 11. 2026', datum_do: '16. 11. 2026', stav: 'potvrzeno',
+    nazev: 'Comic-Con Brno & Junior', misto: 'BVV', kategorie: 'zábava', cena: 'od 390 Kč',
+    popis: 'Festival popkultury, cosplay a komiksů.',
+  }]);
+
+  assert.equal(stats.zmenene, 1, 'posun termínu je skutečná změna');
+  const row = ss.getSheetByName('AKCE').getRange(2, 1, 1, 25).getValues()[0];
+  assert.equal(row[0], 'cc-1', 'ID zůstává původní');
+  assert.equal(row[15], 'ANO', 'příznak Změna');
+  const log = ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0];
+  assert.equal(log, '', 'ani změna přes jistou shodu se nezapisuje do logu nejistých sloučení');
+});
+
+// ---------------------------------------------------------------------------
 // v3.43: parseCzDate_ a sériové číslo data (živá kontrola 26. 10. 2026:
 // API vracelo akce dávno po skončení – Vavřinecké hody do 9. 8., Znojmo 5/6
 // akcí z července/srpna. Buňka s datem jako sériové číslo prošla cellText_
