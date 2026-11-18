@@ -27,10 +27,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ISSUE: ${{ inputs.issue }}
     steps:
+      # Token se do git konfigurace neukládá: krok Claude ho nesmí mít k dispozici
+      # (ani přes git, ani přes node -e). GH_TOKEN dostávají jen kroky, které ho
+      # potřebují (načtení zadání, větev a PR).
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v6
         with:
@@ -39,6 +43,8 @@ jobs:
       # Zadání bere jen z issue, které založil správce repa: repo je veřejné a text
       # cizího issue by byl instrukcí od kohokoli. Komentáře se nenačítají vůbec.
       - name: Načíst zadání (jen issue od správce)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           autor=$(gh issue view "$ISSUE" --json author -q .author.login)
           if [ "$autor" != "Akimto01" ]; then
@@ -77,6 +83,8 @@ jobs:
         run: node --test tests/unit.test.js tests/frontend.test.js
 
       - name: Větev, commit a PR (draft)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           shrnuti="$RUNNER_TEMP/shrnuti.md"
           [ -f "$shrnuti" ] || echo "(Claude nezapsal shrnutí.)" > "$shrnuti"
@@ -91,7 +99,7 @@ jobs:
           git checkout -b "$vetev"
           git add -A
           git commit -m "Claude pilot: issue #$ISSUE"
-          git push origin "$vetev"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$vetev"
           { cat "$shrnuti"; echo; echo "Issue #$ISSUE, běh ${{ github.run_id }}. Draft, merge a nasazení ručně."; } > "$RUNNER_TEMP/pr.md"
           url=$(gh pr create --draft --base main --head "$vetev" --title "Claude pilot: issue #$ISSUE" --body-file "$RUNNER_TEMP/pr.md")
           gh issue comment "$ISSUE" --body "Pilot Claude Code připravil draft PR: $url"
