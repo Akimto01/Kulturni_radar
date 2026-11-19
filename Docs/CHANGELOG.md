@@ -1,5 +1,19 @@
 # Changelog
 
+## Backend v3.62 – fuzzy shoda: úzká změna, série a základ názvu (#71 krok 3, #73) – 19. 11. 2026
+### Chyba
+- Ověření 19. 11. (#73): „Vánoce Brno – trhy…“ se fuzzy sloučila a hlásila jako změněná denně 11.–19. 11. AI pokaždé poslala jinou variantu názvu a jinak formulovaný dojezd, popis a zdroje; nejistá shoda (ne prakticky shodný název z v3.56) dál používala širokou definici změny z v3.42.
+- Log sloučení 11. 11.: koncert „LUCIE – koncert (Vánoce Brno)“ se sloučil do zastřešující akce „Vánoce Brno 2026“ a z AKCÍ zmizel (podmnožina názvu).
+- Duplicita „Brněnské Vánoce (nám. Svobody, …)“ a „Brněnské Vánoce 2026 (rozsvícení stromu 27. 11.)“ se stejným začátkem i koncem: jen 2 společná slova, `isSameName_` je nespároval.
+### Změněno
+- **Úzká definice změny i pro nejistou fuzzy shodu:** změna je jen posun termínu nebo stavu. Log sloučení se zapisuje jen tehdy, když nejistá shoda akci opravdu přepisuje. Riziko, kvůli kterému v3.42 zavedla širokou definici (falešná shoda tiše zahodí jinou akci), teď řeší přísnější párování níže.
+- **`jeAkceVSerii_(a, b)`** (čistá funkce): akce v sérii se se sérií nepáruje. Série se pozná v závorce („LUCIE – koncert (Vánoce Brno)“) nebo za pomlčkou mimo první část („Divadelní představení – Kulturní léto na Poděbradech“). Část před první pomlčkou se za sérii nebere („Vánoce Brno – trhy…“ je táž akce jako „Vánoce Brno 2026“). Platí pro fuzzy shodu podle začátku i podle konce.
+- **`zakladNazvu_(v)`** (čistá funkce) a nová cesta fuzzy shody: při stejném začátku i konci stačí prakticky shodný základ názvu bez závorek.
+- **Vědomě upravené testy:** charakterizační testy z v3.42 stavěly na dvojici „Kulturní léto na Poděbradech“ a „Divadelní představení – Kulturní léto na Poděbradech“, kterou fuzzy shoda přepsala. Je to falešná shoda, od v3.62 se dvojice nespáruje (nový test). Testy přepisu a logu sloučení teď používají tutéž akci („… – letní program“); test v3.57 s přeformulovaným názvem je beze změny a bez logu.
+- Stávající duplicity v AKCE oprava nesloučí (úklid přes NÁVRH DUPLICIT). Dokumentace: ARCHITEKTURA-APLIKACE (Deduplikace).
+### Testy
+- **+8 Node testů (backend 480 → 488, celkem 692 → 700), 5 upravených:** `zakladNazvu_` a `jeAkceVSerii_` na reálných dvojicích z produkce (série v závorce, za pomlčkou, symetrie; negativní: popis za pomlčkou, místo v závorce, Janáček, Comic-Con); rotující název (#73) beze změny a bez logu; koncert v sérii zůstane; shodný základ názvu se stejnými daty spáruje, s jiným koncem ne; pojistka série i pro párování podle konce; nejistá shoda podle konce se změnou stavu zaloguje změněná pole bez „datum od“. Ruční mutace (bez pojistky série u začátku i konce, bez základu názvu, základ bez kontroly konce, pomlčka i první část, bez pomlčky, nesymetrická pojistka, široká definice zpět, bez logu při změně) shodí vždy aspoň jeden test. Pokrytí řádků 92,53 %, baseline zvýšena z 92,46 %.
+
 ## Testy: přímý API test přihlášení (#43) – 18. 11. 2026
 - **`api.robot`:** +3 testy POST `akce: login`: špatný PIN testovacího profilu, neexistující profil a správný PIN (ten běží poslední a vynuluje počítadlo pokusů). PIN se čte z `RF_TEST_PIN`, bez něj se testy s PINem přeskočí. Volání běží při Log Level NONE bez FOR, aserce nevypisují hodnoty (pravidla incidentu #33).
 - **POST přes redirect:** Apps Script odpoví na POST 302 na dočasnou echo adresu. Klíčové slovo „Poslat login POST“ proto posílá POST s `allow_redirects=False` a výsledek čte GET na hlavičku `Location`. Ověřeno lokálně proti produkci 19. 11. 2026 (3/3; PIN, ntfy téma ani echo adresa v reportu 0×). První běh v CI zastavila kontrola úniku (ntfy téma z odpovědi loginu v reportu); nic se nenahrálo, opraveno zúžením návratové hodnoty.

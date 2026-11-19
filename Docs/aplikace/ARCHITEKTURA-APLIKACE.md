@@ -79,12 +79,18 @@ i ověřené e-mailové tipy) skončily v jednom denním reportu.
 
 ### Deduplikace (upsertEvents_)
 
-1. `id` (normalizované) →
+1. `id` (normalizované), jen když názvy sdílí aspoň jedno slovo (v3.58) →
 2. přesný klíč profil|datum|název|místo →
 3. fuzzy: stejný profil+datum a překryv názvů (podmnožina, nebo ≥3 společná
-   slova po normalizaci bez diakritiky a čísel).
+   slova po normalizaci bez diakritiky a čísel), prakticky shodný název (v3.58),
+   nebo shodný základ názvu bez závorek při stejném začátku i konci (v3.62) →
+4. vícedenní akce se stejným koncem a podmnožinou názvu (v3.57).
+Ve fuzzy krocích se nepáruje jiný den denní série ani akce v sérii se sérií
+(„X (Série)“, „Akce – Série“; `jeAkceVSerii_`, v3.62).
 Nové řádky se registrují do indexů průběžně (dedup i uvnitř jedné dávky).
-„Změna“ = jen posun termínu nebo stavu; přeformulace textů se ignoruje.
+„Změna“ = jen posun termínu nebo stavu, od v3.62 i u nejisté fuzzy shody;
+přeformulace textů se ignoruje. Log sloučení (sloupec Z) jen u nejisté shody,
+která akci opravdu přepisuje.
 
 ### Souřadnice (mapa)
 

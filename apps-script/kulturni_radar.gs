@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.61 (18. 11. 2026) – záznam o tvrdém ukončení: sledovaná města a přepočet počasí si na začátku zapíší značku, další běh pozná nedoběhnutý předchozí, zapíše řádek do KONTROL a pošle notifikaci (#81 krok 3, varianta D z #49)
- * (předchozí: 3.60 – přepočet počasí (list POČASÍ) bere předpověď jen z met.no, Open-Meteo z Apps Scriptu trvale vrací 429; akce za dosahem met.no (~9 dní) mají NA (#81 krok 2))
+ * Verze: 3.62 (19. 11. 2026) – fuzzy shoda: změna jen posun termínu nebo stav i u nejisté shody, akce v sérii („X (Vánoce Brno)“) se nespáruje se sérií, shodný základ názvu bez závorek páruje akce se stejným začátkem i koncem (#71 krok 3, #73)
+ * (předchozí: 3.61 – záznam o tvrdém ukončení: sledovaná města a přepočet počasí si na začátku zapíší značku, další běh pozná nedoběhnutý předchozí, zapíše řádek do KONTROL a pošle notifikaci (#81 krok 3, varianta D z #49))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.61';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.62';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -1241,7 +1241,7 @@ function upsertEvents_(ss, cfg, events) {
     byKey[dedupKey_(row[24], row[1], row[4], row[5])] = i;
     const pd = norm_(row[24]) + '|' + dateKey_(row[1]);
     const tokens = nazevTokens_(row[4]);
-    (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: i, tokens: tokens, nazev: String(row[4]) });
+    (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: i, tokens: tokens, nazev: String(row[4]), ddo: dateKey_(row[2]) });
     pridatKonec(row[24], row[1], row[2], i, tokens, String(row[4]));
   });
 
@@ -1279,8 +1279,13 @@ function upsertEvents_(ss, cfg, events) {
       // (ale ne když jde jen o jiný den téže denní série, viz ruznyDenSerie_)
       // v3.58: i prakticky shodný název (jednoslovné „Brnohraní 2026“ s časem
       // a bez, isSameName_ chce aspoň 2 společná slova).
+      // v3.62 (#71 krok 3): akce v sérii se sérií nepáruje (jeAkceVSerii_) a se
+      // stejným začátkem i koncem stačí shodný základ názvu bez závorek.
+      const evDo = dateKey_(ev.datum_do);
       const hit = (byProfilDatum[pd] || []).find(c => !ruznyDenSerie_(c.nazev, ev.nazev)
-        && (isSameName_(c.tokens, evTokens) || jePraktickyShodnyNazev_(c.nazev, ev.nazev)));
+        && !jeAkceVSerii_(c.nazev, ev.nazev)
+        && (isSameName_(c.tokens, evTokens) || jePraktickyShodnyNazev_(c.nazev, ev.nazev)
+          || (c.ddo === evDo && jePraktickyShodnyNazev_(zakladNazvu_(c.nazev), zakladNazvu_(ev.nazev)))));
       if (hit) { idx = hit.i; viaFuzzy = true; }
     }
     // v3.57 (#71 krok 2): vícedenní akce, u které AI pokaždé pošle jiný začátek
@@ -1291,7 +1296,8 @@ function upsertEvents_(ss, cfg, events) {
     let viaKonec = false;
     if (idx === undefined && jeVicedenni_(ev.datum_od, ev.datum_do)) {
       const pk = norm_(cfg.profil) + '|' + dateKey_(ev.datum_do);
-      const hit = (byProfilKonec[pk] || []).find(c => !ruznyDenSerie_(c.nazev, ev.nazev) && jePodmnozinaNazvu_(c.tokens, evTokens));
+      const hit = (byProfilKonec[pk] || []).find(c => !ruznyDenSerie_(c.nazev, ev.nazev)
+        && !jeAkceVSerii_(c.nazev, ev.nazev) && jePodmnozinaNazvu_(c.tokens, evTokens));
       if (hit) { idx = hit.i; viaFuzzy = true; viaKonec = true; }
     }
     // v3.56 (#71 krok 1, #73): fuzzy kandidát s prakticky shodným názvem
@@ -1312,7 +1318,7 @@ function upsertEvents_(ss, cfg, events) {
       existing.push(rowVals.concat(['', '', cfg.profil]));
       if (norm_(ev.id)) byId[norm_(ev.id)] = ni;
       byKey[key] = ni;
-      (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: ni, tokens: evTokens, nazev: String(ev.nazev || '') });
+      (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: ni, tokens: evTokens, nazev: String(ev.nazev || ''), ddo: dateKey_(ev.datum_do) });
       pridatKonec(cfg.profil, ev.datum_od, ev.datum_do, ni, evTokens, String(ev.nazev || ''));
       stats.noveNazvy.push(polozka(ev));
       stats.nove++;
@@ -1346,11 +1352,19 @@ function upsertEvents_(ss, cfg, events) {
       // v3.57: shoda podle konce (viaKonec) bere začátek jako nespolehlivý –
       // posun začátku se nehlásí a v řádku zůstává původní začátek.
       if (viaKonec) rowVals[1] = old[1];
-      const changed = (viaFuzzy && !jistaShoda)
-        ? (zmenenaPoleFuzzy = zjistiZmenenaPole_(old, rowVals)).length > 0
-        : dateKey_(old[1]) !== dateKey_(rowVals[1]) ||
-          dateKey_(old[2]) !== dateKey_(ev.datum_do) ||
-          norm_(old[13]) !== norm_(ev.stav);
+      //
+      // v3.62 (#71 krok 3, #73): úzká definice platí i pro nejistou shodu.
+      // Široká z v3.42 hlásila tutéž akci jako změněnou při každém běhu, když
+      // AI rotovala variantu názvu a přeformulovala dojezd, popis a zdroje
+      // („Vánoce Brno – trhy…“ 9× po sobě 11.–19. 11. 2026). Riziko, kvůli
+      // kterému v3.42 vznikla (falešná shoda tiše zahodí jinou akci), řeší
+      // přísnější párování (jeAkceVSerii_, ruznyDenSerie_), ne hlášení změn.
+      // Log sloučení zůstává pro nejistou shodu, jen když se akce opravdu
+      // přepisuje (posun termínu nebo stav).
+      const changed = dateKey_(old[1]) !== dateKey_(rowVals[1]) ||
+        dateKey_(old[2]) !== dateKey_(ev.datum_do) ||
+        norm_(old[13]) !== norm_(ev.stav);
+      if (changed && viaFuzzy && !jistaShoda) zmenenaPoleFuzzy = zjistiZmenenaPole_(old, rowVals);
 
       if (changed) {
         rowVals[0] = old[0];                     // ID zachovat
@@ -4446,6 +4460,31 @@ function jePodmnozinaNazvu_(tokA, tokB) {
   const a = Object.keys(tokA), b = Object.keys(tokB);
   const [mensi, vetsi] = a.length <= b.length ? [a, tokB] : [b, tokA];
   return mensi.length >= 2 && mensi.every(w => vetsi[w]);
+}
+
+/** PURE (v3.62, #71 krok 3): název bez částí v závorkách („Brněnské Vánoce
+ *  (nám. Svobody, …)“ → „Brněnské Vánoce“). Závorky nesou místo nebo sérii. */
+function zakladNazvu_(v) {
+  return String(v == null ? '' : v).replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** PURE (v3.62, #71 krok 3): je jeden název konkrétní akcí v sérii, kterou je
+ *  druhý název? Taková dvojice se nepáruje, jinak série pohltí akci (falešné
+ *  sloučení 11. 11. 2026). Série se pozná dvojím způsobem:
+ *  - v závorce: „LUCIE – koncert (Vánoce Brno)“ proti „Vánoce Brno 2026“;
+ *  - za pomlčkou, ne na začátku: „Divadelní představení – Kulturní léto na
+ *    Poděbradech“ proti „Kulturní léto na Poděbradech“.
+ *  Část PŘED první pomlčkou se za sérii nebere: „Vánoce Brno – trhy na Zelném
+ *  trhu…“ je táž akce jako „Vánoce Brno 2026“, jen s popisem za pomlčkou. */
+function jeAkceVSerii_(a, b) {
+  const odpovida = (cast, y) => jePraktickyShodnyNazev_(cast, y) || jePraktickyShodnyNazev_(cast, zakladNazvu_(y));
+  const vSerii = (x, y) => {
+    const text = String(x == null ? '' : x);
+    const zavorky = (text.match(/\(([^)]*)\)/g) || []).map(z => z.slice(1, -1));
+    const zaPomlckou = zakladNazvu_(text).split(/\s+[–—-]\s+/).slice(1);
+    return zavorky.concat(zaPomlckou).some(cast => odpovida(cast, y));
+  };
+  return vSerii(a, b) || vSerii(b, a);
 }
 
 /** PURE (v3.56, #71 krok 1): prakticky shodný název – po odstranění velikosti

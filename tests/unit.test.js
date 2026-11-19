@@ -3416,9 +3416,25 @@ const NOVA_AKCE_FUZZY_ = {
   stav: 'potvrzeno',
 };
 
-test('upsertEvents_: fuzzy shoda názvu (podmnožinová větev isSameName_) tiše přepíše CELÝ obsah řádku, ne jen datum_do/stav', () => {
+/** v3.62: varianta NOVA_AKCE_FUZZY_, která je tatáž akce (série na začátku,
+ *  za pomlčkou jen popis), takže ji pojistka jeAkceVSerii_ nezastaví. */
+const NOVA_AKCE_FUZZY_TAZ_ = Object.assign({}, NOVA_AKCE_FUZZY_, { nazev: 'Kulturní léto na Poděbradech – letní program' });
+
+test('v3.62: upsertEvents_ – původní fixture (konkrétní představení vs. série) se už nespáruje, představení je nový řádek', () => {
+  // Do v3.61 tenhle případ dokumentoval fuzzy shodu, která tiše přepsala celý
+  // řádek série daty představení. Byla to falešná shoda, od v3.62 ji zastaví
+  // jeAkceVSerii_ (série za pomlčkou).
   const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciAkceFuzzy_()])) });
   const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [NOVA_AKCE_FUZZY_]);
+  assert.equal(stats.nove, 1);
+  assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'Kulturní léto na Poděbradech');
+});
+
+test('upsertEvents_: fuzzy shoda názvu (podmnožinová větev isSameName_) se změnou termínu přepíše CELÝ obsah řádku, ne jen datum_do/stav', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciAkceFuzzy_()])) });
+  const ctx = nactiRadar();
+  const NOVA_AKCE_FUZZY_ = NOVA_AKCE_FUZZY_TAZ_;   // v3.62: tatáž akce, ne představení v sérii
   const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [NOVA_AKCE_FUZZY_]);
 
   assert.equal(stats.zmenene, 1);
@@ -3438,13 +3454,13 @@ test('upsertEvents_: fuzzy shoda názvu (podmnožinová větev isSameName_) tiš
 test('upsertEvents_: při fuzzy merge s přepsáním obsahu zapíše do sloupce Z (26) audit log se starým i novým názvem', () => {
   const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciAkceFuzzy_()])) });
   const ctx = nactiRadar();
-  ctx.upsertEvents_(ss, { profil: 'Brno' }, [NOVA_AKCE_FUZZY_]);
+  ctx.upsertEvents_(ss, { profil: 'Brno' }, [NOVA_AKCE_FUZZY_TAZ_]);   // v3.62: tatáž akce
 
   const hlavicka = ss.getSheetByName('AKCE').getRange(1, 26, 1, 1).getValues()[0][0];
   assert.equal(hlavicka, 'Log sloučení (fuzzy)');
 
   const log = ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0];
-  assert.match(log, /^\[fuzzy merge \d{1,2}\.\s?\d{1,2}\.\s?\d{4} \d{1,2}:\d{2}\] "Kulturní léto na Poděbradech" → "Divadelní představení – Kulturní léto na Poděbradech"; přepsáno: /);
+  assert.match(log, /^\[fuzzy merge \d{1,2}\.\s?\d{1,2}\.\s?\d{4} \d{1,2}:\d{2}\] "Kulturní léto na Poděbradech" → "Kulturní léto na Poděbradech – letní program"; přepsáno: /);
   assert.match(log, /datum do/);
   assert.match(log, /místo/);
   assert.match(log, /kategorie/);
@@ -3498,30 +3514,27 @@ test('upsertEvents_: PŘESNÁ shoda ID, jen kosmetická přeformulace popisu/cen
   assert.equal(row[11], 'Celoletní kulturní program města.', 'popis zůstává PŮVODNÍ ze stejného důvodu');
 });
 
-test('upsertEvents_: FUZZY shoda, stejné datum_do+stav jako existující řádek, ale JINÉ misto/kategorie/cena/popis → changed=TRUE, data se převezmou a zalogují', () => {
+test('upsertEvents_: série vs. konkrétní akce téhož dne („Divadelní představení – Kulturní léto…“) → nespárují se, akce je nový řádek a série zůstává (v3.62, dřív v3.42)', () => {
+  // v3.42 tenhle případ řešila širokou definicí změny: nejistá fuzzy shoda
+  // přepsala řádek série daty konkrétní akce a zalogovala to. Od v3.62 se
+  // dvojice série a akce v ní vůbec nespáruje (jeAkceVSerii_, série za
+  // pomlčkou), takže žádná z obou akcí nezmizí.
   const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciAkceFuzzy_()])) });
   const ctx = nactiRadar();
-  // Stejné datum_do (15.6.) i stav ('potvrzeno') jako existujiciAkceFuzzy_() –
-  // dřív (v3.41) by to znamenalo changed=false a tiché zahození těchhle dat.
   const nova = {
     id: 'jiny-id', datum_od: '15. 6. 2026', datum_do: '15. 6. 2026', stav: 'potvrzeno',
     nazev: 'Divadelní představení – Kulturní léto na Poděbradech',
-    misto: 'Zámecká zahrada', kategorie: 'divadlo',   // obec záměrně vynechána – shodná (blank) s existujícím řádkem
+    misto: 'Zámecká zahrada', kategorie: 'divadlo',
     cena: '150 Kč', popis: 'Divadlo Continuo uvádí pohádku pro děti.',
   };
   const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [nova]);
 
-  assert.equal(stats.zmenene, 1, 'už NENÍ bezZmeny – rozšířené changed odhalí rozdílný obsah');
-  assert.equal(stats.bezZmeny, 0);
-
-  const row = ss.getSheetByName('AKCE').getRange(2, 1, 1, 25).getValues()[0];
-  assert.equal(row[5], nova.misto, 'místo se teď převezme, ne tiše zahodí');
-  assert.equal(row[8], nova.kategorie);
-  assert.equal(row[10], nova.cena);
-  assert.equal(row[11], nova.popis);
-
-  const log = ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0];
-  assert.match(log, /^\[fuzzy merge \d{1,2}\.\s?\d{1,2}\.\s?\d{4} \d{1,2}:\d{2}\] "Kulturní léto na Poděbradech" → "Divadelní představení – Kulturní léto na Poděbradech"; přepsáno: místo, kategorie, cena, popis$/);
+  assert.equal(stats.nove, 1, 'konkrétní akce v sérii je samostatný řádek');
+  assert.equal(stats.zmenene, 0);
+  const sh = ss.getSheetByName('AKCE');
+  assert.equal(sh.getRange(2, 5, 1, 1).getValues()[0][0], 'Kulturní léto na Poděbradech', 'řádek série se nepřepíše');
+  assert.equal(sh.getRange(3, 5, 1, 1).getValues()[0][0], nova.nazev);
+  assert.equal(sh.getRange(2, 26, 1, 1).getValues()[0][0], '', 'žádné sloučení, žádný log');
 });
 
 test('upsertEvents_: FUZZY shoda, ÚPLNĚ stejný obsah (i misto/kategorie/cena/popis) → changed=false, žádný log, žádná zbytečná notifikace', () => {
@@ -3655,7 +3668,7 @@ test('v3.57: upsertEvents_ – stejný konec, jiný začátek, prakticky shodný
   assert.equal(row[1], '13. 10. 2026', 'začátek zůstává původní');
 });
 
-test('v3.57: upsertEvents_ – stejný konec, přeformulovaný název (podmnožina) → sloučeno, změna zalogovaná bez „datum od“', () => {
+test('v3.57/v3.62: upsertEvents_ – stejný konec, přeformulovaný název (podmnožina) → sloučeno, jiný popis od v3.62 není změna, žádný log', () => {
   const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciJanacek_()])) });
   const ctx = nactiRadar();
   const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
@@ -3665,11 +3678,26 @@ test('v3.57: upsertEvents_ – stejný konec, přeformulovaný název (podmnoži
   }]);
 
   assert.equal(stats.nove, 0, 'přeformulovaný název téhož festivalu se nesmí přidat jako nový');
-  assert.equal(stats.zmenene, 1, 'nejistá shoda bere jiný popis jako změnu (široká definice z v3.42)');
+  assert.equal(stats.bezZmeny, 1, 'v3.62: jiný popis u nejisté shody není změna (dřív široká definice z v3.42)');
+  const row = ss.getSheetByName('AKCE').getRange(2, 1, 1, 25).getValues()[0];
+  assert.equal(row[1], '13. 10. 2026', 'začátek zůstává');
+  assert.equal(row[11], 'Mezinárodní operní festival.', 'popis se nepřepíše');
+  assert.equal(ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0], '', 'bez změny se neloguje');
+});
+
+test('v3.62: upsertEvents_ – nejistá shoda podle konce se změnou stavu → změněná, log bez „datum od“', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciJanacek_()])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'jb-4', datum_od: '15. 10. 2026', datum_do: '17. 11. 2026', stav: 'zrušeno',
+    nazev: 'Janáček Brno 2026 – mezinárodní operní a hudební festival', misto: 'Janáčkovo divadlo',
+    kategorie: 'hudba', cena: 'od 300 Kč', popis: 'Bienále opery a hudby.',
+  }]);
+  assert.equal(stats.zrusene, 1, 'změna stavu je skutečná změna');
   const row = ss.getSheetByName('AKCE').getRange(2, 1, 1, 25).getValues()[0];
   assert.equal(row[1], '13. 10. 2026', 'začátek se ani při změně nepřepíše');
   const log = ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0];
-  assert.match(log, /přepsáno: popis$/, 'v logu jen skutečně změněné pole, ne datum od');
+  assert.match(log, /přepsáno: popis, stav$/, 'v logu změněná pole, ne datum od');
 });
 
 test('v3.57: upsertEvents_ – negativní: dvě výstavy se stejným koncem a podobným názvem se nesloučí', () => {
@@ -3712,6 +3740,101 @@ test('v3.57: upsertEvents_ – negativní: vícedenní série se nespáruje s ex
   }]);
   assert.equal(stats.nove, 1, 'jednodenní řádek se do indexu podle konce nezařazuje');
   assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'Divadelní představení – Kulturní léto na Poděbradech');
+});
+
+// ---------------------------------------------------------------------------
+// v3.62 (#71 krok 3, #73): rotující název, série a základ názvu bez závorek.
+// Produkční případy z 19. 11. 2026 (export AKCE, log sloučení).
+// ---------------------------------------------------------------------------
+
+test('v3.62: zakladNazvu_ a jeAkceVSerii_ – reálné dvojice z produkce', () => {
+  assert.equal(r.zakladNazvu_('Brněnské Vánoce (nám. Svobody, Dominikánské nám.)'), 'Brněnské Vánoce');
+  assert.equal(r.zakladNazvu_('Bez závorky'), 'Bez závorky');
+  assert.equal(r.jeAkceVSerii_('LUCIE – koncert (Vánoce Brno)', 'Vánoce Brno 2026'), true, 'série v závorce');
+  assert.equal(r.jeAkceVSerii_('Vánoce Brno 2026', 'LUCIE – koncert (Vánoce Brno)'), true, 'symetricky');
+  assert.equal(r.jeAkceVSerii_('Divadelní představení – Kulturní léto na Poděbradech', 'Kulturní léto na Poděbradech'), true, 'série za pomlčkou');
+  assert.equal(r.jeAkceVSerii_('Vánoce Brno – trhy na Zelném trhu a Moravském náměstí', 'Vánoce Brno 2026'), false, 'část před pomlčkou je táž akce s popisem');
+  assert.equal(r.jeAkceVSerii_('Vánoce Brno 2026', 'Vánoce Brno (Zelný trh, Moravské náměstí)'), false, 'místo v závorce není série');
+  assert.equal(r.jeAkceVSerii_('Festival Janáček Brno', 'Janáček Brno 2026 – mezinárodní operní a hudební festival'), false);
+  assert.equal(r.jeAkceVSerii_('Comic-Con Brno & Junior', 'COMIC-CON Brno & Junior 2026'), false, 'pomlčka bez mezer není oddělovač');
+});
+
+/** Řádek „Vánoce Brno“ tak, jak ho v produkci držel běh 18. 11. 2026. */
+function existujiciVanoceBrno_(overrides = {}) {
+  return akceRadekFuzzy_(Object.assign({
+    id: 'vb-1', datumOd: '13. 11. 2026', datumDo: '31. 12. 2026', nazev: 'Vánoce Brno 2026',
+    misto: 'Zelný trh, Moravské náměstí', kategorie: 'jarmarky', cena: 'zdarma', popis: 'Vánoční trhy v centru.',
+  }, overrides));
+}
+
+test('v3.62: upsertEvents_ – rotující varianta názvu (#73) → spárováno, beze změny, žádný log', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciVanoceBrno_()])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'vb-2', datum_od: '13. 11. 2026', datum_do: '31. 12. 2026', stav: 'potvrzeno',
+    nazev: 'Vánoce Brno – trhy na Zelném trhu a Moravském náměstí', misto: 'Zelný trh, Moravské náměstí, Kapucínské nám.',
+    kategorie: 'jarmarky', cena: 'vstup volný', popis: 'Trhy, program a svařák.', dojezd: '15 min',
+  }]);
+  assert.equal(stats.nove, 0);
+  assert.equal(stats.zmenene, 0, 'jiná formulace místa, ceny, popisu a dojezdu není změna');
+  assert.equal(stats.bezZmeny, 1);
+  assert.equal(ss.getSheetByName('AKCE').getRange(2, 26, 1, 1).getValues()[0][0], '', 'log sloučení se nenafukuje');
+});
+
+test('v3.62: upsertEvents_ – koncert v sérii (falešné sloučení 11. 11.) → koncert zůstane, série je nový řádek', () => {
+  const koncert = akceRadekFuzzy_({
+    id: 'lu-1', datumOd: '13. 11. 2026', datumDo: '13. 11. 2026', nazev: 'LUCIE – koncert (Vánoce Brno)',
+    misto: 'Zelný trh', kategorie: 'koncerty', cena: 'zdarma', popis: 'Koncert na zahájení.',
+  });
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([koncert])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'vb-3', datum_od: '13. 11. 2026', datum_do: '31. 12. 2026', stav: 'potvrzeno',
+    nazev: 'Vánoce Brno 2026', misto: 'centrum', kategorie: 'jarmarky',
+  }]);
+  assert.equal(stats.nove, 1, 'série se přidá jako vlastní řádek');
+  assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'LUCIE – koncert (Vánoce Brno)', 'koncert se nepřejmenuje');
+});
+
+test('v3.62: upsertEvents_ – pojistka série platí i pro párování podle konce (vícedenní festival v rámci série)', () => {
+  const serie = existujiciAkceFuzzy_({ id: 'kl-9', datumOd: '1. 7. 2026', datumDo: '31. 8. 2026' });
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([serie])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'df-1', datum_od: '20. 8. 2026', datum_do: '31. 8. 2026', stav: 'potvrzeno',
+    nazev: 'Divadelní festival – Kulturní léto na Poděbradech', misto: 'Zámecká zahrada', kategorie: 'divadlo',
+  }]);
+  assert.equal(stats.nove, 1, 'festival v sérii se stejným koncem nepohltí sérii');
+  assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'Kulturní léto na Poděbradech');
+});
+
+test('v3.62: upsertEvents_ – shodný základ názvu bez závorek a stejný začátek i konec → táž akce', () => {
+  const brv = akceRadekFuzzy_({
+    id: 'bv-1', datumOd: '27. 11. 2026', datumDo: '23. 12. 2026', nazev: 'Brněnské Vánoce (nám. Svobody, Dominikánské nám., Stará radnice)',
+    misto: 'nám. Svobody', kategorie: 'jarmarky', cena: 'zdarma', popis: 'Vánoční trhy.',
+  });
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([brv])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'bv-2', datum_od: '27. 11. 2026', datum_do: '23. 12. 2026', stav: 'potvrzeno',
+    nazev: 'Brněnské Vánoce 2026 (rozsvícení stromu 27. 11.)', misto: 'náměstí Svobody', kategorie: 'jarmarky',
+  }]);
+  assert.equal(stats.nove, 0, 'isSameName_ má jen 2 společná slova z 4 a 7, spáruje je až základ názvu');
+  assert.equal(stats.bezZmeny, 1);
+});
+
+test('v3.62: upsertEvents_ – negativní: shodný základ názvu, ale jiný konec → nespárují se', () => {
+  const brv = akceRadekFuzzy_({
+    id: 'bv-1', datumOd: '27. 11. 2026', datumDo: '23. 12. 2026', nazev: 'Brněnské Vánoce (nám. Svobody)',
+    misto: 'nám. Svobody', kategorie: 'jarmarky', cena: 'zdarma', popis: 'Vánoční trhy.',
+  });
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([brv])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'bv-3', datum_od: '27. 11. 2026', datum_do: '27. 11. 2026', stav: 'potvrzeno',
+    nazev: 'Brněnské Vánoce 2026 (rozsvícení stromu)', misto: 'náměstí Svobody', kategorie: 'jarmarky',
+  }]);
+  assert.equal(stats.nove, 1, 'jednodenní rozsvícení není celé trhy, tolerance základu názvu chce shodný i konec');
 });
 
 test('v3.57: upsertEvents_ – dvě varianty festivalu v témže běhu skončí v jednom řádku', () => {
