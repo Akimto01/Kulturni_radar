@@ -1,5 +1,15 @@
 # Changelog
 
+## Testy: kontrola verze frontendu ve smoke (#41, riziko R2) – 19. 11. 2026
+### Proč
+- API test hlídal jen verzi backendu (`VERZE`). Verzi `Index.html` na Cloudflare Pages nic neověřovalo, takže nesoulad po pushi (Pages ještě nenasadilo) by se ukázal až náhodou.
+### Změněno
+- **`tests/robot/api.robot`:** nový test „Nasazená verze frontendu odpovídá repu“ (tagy `smoke`, `api`). Čte verzi z komentáře `Kulturní radar Index.html vX.YY` v `apps-script/Index.html` a porovná ji s komentářem na `SITE_URL` (kulturniradar.cz). Při nesouladu hláška odkazuje na čekání na Cloudflare. Při nastaveném `FRAME` (Apps Script iframe) se přeskočí. Pomocné klíčové slovo „Přečíst verzi frontendu z textu“.
+- Bez změny `kulturni_radar.gs` a `Index.html`, proto bez bumpu verze. Tag `regrese` test nemá (nejde o konkrétní historický bug, jinak by pojistka B4 chtěla verzi v názvu).
+- Dokumentace: README (počty), `POKRYTI.md` (R2 a seznam mezer), `TESTY.md` (R2).
+### Testy
+- **RF celkem 65 → 66, API 12 → 13.** Node testy beze změny (486 + 212). Test ověřen proti produkci (verze 3.67 shodná), dry run, lint a pojistky architektury bez nárůstu.
+
 ## Backend v3.65 – úklid po odstranění Open-Meteo (#81) – 19. 11. 2026
 ### Proč
 - Po v3.60 a v3.64 backend Open-Meteo nevolá, ale zůstala funkce `weatherText_` (převod číselného WMO kódu z Open-Meteo na text, bez volání) a ve `vyhodnotPocasiUdalosti_` větev pro předpověď z Open-Meteo, do které `aktualizujPocasi_` od v3.60 posílala jen `null`. Nález z review Claude Code po v3.64.

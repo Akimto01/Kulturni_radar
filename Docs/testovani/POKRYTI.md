@@ -35,7 +35,7 @@ Rizika R1–R11 odpovídají sekci 3 v `Docs/testovani/TESTY.md` (R9 až R11 př
 | Riziko | BE / FE / W | API | E2E | PROV / RUČ | Pokrytí |
 |---|---|---|---|---|---|
 | **R1** Špatná data akcí | BE: `parseEvents_`, `cellText_`, sériová čísla dat (BUG v3.2), `eventToRow_`, `upsertEvents_`, `najdiDuplicity_`, `isSameName_`, `jeVycpavka_` | Events s validními českými datumy | Hlavičky dnů jsou česká data, dlouhodobé akce bez minulých hlaviček | `auditDat_`, samotest; ruční schválení duplicit (list NÁVRH DUPLICIT) | ● |
-| **R2** Produkce běží na jiné verzi než repo | BE: konstanta `VERZE` souhlasí s hlavičkou | Nasazená verze backendu odpovídá repu | – (verze frontendu na Cloudflare se netestuje) | Po nasazení ruční smoke; konkrétní verze frontendu se neověřuje | ◐ |
+| **R2** Produkce běží na jiné verzi než repo | BE: konstanta `VERZE` souhlasí s hlavičkou | Nasazená verze backendu odpovídá repu, Nasazená verze frontendu odpovídá repu (komentář s verzí na kulturniradar.cz proti `Index.html` v repu, smoke) | – | Po nasazení smoke; frontend uvnitř Apps Script iframe (`FRAME`) se verzí nekontroluje | ◐ |
 | **R3** Ztráta nebo poškození označení | BE: `toggleOznaceni_` (izolace uživatelů), `apiToggle_` (100 % řádků od 29. 10.: neplatný typ, odznačení, neexistující akce, izolace uživatelů; k tomu E2E round-trip), `apiToggleMisto_`, sirotci v OZNAČENÍ | – | ★ / ✓ / 🏛 round-trip s reloadem, integrace ★ → filtr | Ruční kontrola dat po nestandardním běhu | ● |
 | **R4** Nedoručené notifikace | BE (měření 29. 10. a 3. 11. 2026, mutacemi ověřené mimo obálku `sendUserNotifications`): `sendNotification_`, `odeslatNotifikaci_`, `spojitPrijemce_`, `planNotifikaceUzivatele_`, `jeDueNaNotifikaci_`, `digestProUzivatele_`, `notifyFail_`, `weeklyDigest`, `weekendDigest`, `digestRange_` a `watchdogDailyCheck` 100 % řádků, `notifyOk_` 97 %, `sendUserNotifications_` 92 % (dry-run i reálné); testy ověřují obsah a předmět notifikací, rozsah dat (týdenní 7 dní, víkendový pátek až neděle včetně nejbližšího pátku pro každý den v týdnu), extra příjemce `NOTIFY_EMAIL_VIKEND` jen u víkendu a selhání s `notifyFail_` a propuštěnou výjimkou; obálka triggeru `sendUserNotifications` 100 % řádků (od v3.52: selhání hlásí `notifyFail_` a výjimku propustí) a samotest hlídá její trigger přes `POTREBNE_TRIGGERY` (testy z #48, měření 3. 11. 2026; mutační ověření těchto tří testů neproběhlo) | Kanál ntfy je živý | Nastavení notifikací, plný cyklus s návratem | – | ● |
 | **R5** Rozbití jednoho ze dvou prostředí | FE: `sestavFetchPozadavek_` (GET/POST routy) | – | Celá sada spustitelná proti statickému webu i Apps Scriptu (`FRAME`), regrese odhlášení | – | ◐ |
@@ -52,17 +52,18 @@ U R2 API test porovnává `VERZE` z repa s verzí, kterou hlásí produkční
 `/exec`. Tím zachytí třeba situaci z 8. 8., kdy `clasp deploy` bez `-i` nechal
 produkci na staré verzi. Problém je, že běží jen v neděli nebo ručně, takže se
 případný nesoulad neodhalí hned po nasazení. Zároveň hlídá jen backend. Verzi
-`Index.html` nasazeného přes Cloudflare Pages dnes žádný test přímo
-neověřuje.
+`Index.html` nasazeného přes Cloudflare Pages od testu „Nasazená verze
+frontendu odpovídá repu“ (smoke, issue 41) ověřuje porovnání komentáře
+s verzí na `kulturniradar.cz` s repem; nesoulad ukáže hned po nasazení.
 
 U R5 frontend běží jako statický web na `kulturniradar.cz` i uvnitř Apps
 Script iframu. RF sada umí obě varianty přes proměnnou `FRAME`, ale CI ji
 spouští jen proti statickému webu. Iframe se tak ověřuje jen při ručním běhu.
 
 Obojí je za mě zatím přijatelný kompromis. Nasazení dělám ručně a po něm
-pouštím smoke. Co tomu ale chybí, je kontrola konkrétní verze frontendu a
-iframe varianty v CI. Nejjednodušší další krok by proto byl přidat do smoke
-kontrolu verze frontendu a spouštět smoke v CI i s `FRAME`.
+pouštím smoke. Co tomu ještě chybí, je iframe
+varianta v CI. Nejjednodušší další krok by proto byl spouštět smoke v CI
+i s `FRAME`.
 
 ## B. Pokrytí podle funkčních oblastí
 
@@ -99,11 +100,11 @@ operace, klik na Sdílet, cross-browser, přístupnost, výkon):
 | Sledovaná města (16) a cache (8) nemají test nad nasazenou appkou | Běží na pozadí nebo nejsou zvenku vidět | Nízké až střední – selhání se projeví až chybějícími akcemi |
 | Týdenní a víkendový přehled se netestují jako celek odeslání | Unit testy pokrývají sestavení obsahu, ne trigger | Nízké – watchdog hlídá, že denní běh proběhl |
 | Běh přes Apps Script iframe (`FRAME`) není v CI | CI běží proti statickému webu | Střední – viz R5 |
-| Verze nasazeného frontendu (`Index.html` na Cloudflare) se netestuje | API test hlídá jen backend | Střední – viz R2 |
+| Verzi nasazeného frontendu hlídá jen smoke test na statické doméně, ne iframe varianta | Smoke běží po nasazení a týdně, v CI po pushi ne | Nízké – viz R2 |
 
-Jako první bych řešil mezery u R2 a R5, tedy kontrolu verze frontendu ve
-smoke a smoke přes `FRAME` v CI. Ani jedno není velká změna a zároveň tím
-pokryju dvě věci, které přímo souvisí s tím, jak aplikaci nasazuju.
+Jako první bych řešil mezeru u R5, tedy smoke přes `FRAME` v CI. Není to
+velká změna a zároveň tím pokryju věc, která přímo souvisí s tím, jak
+aplikaci nasazuju.
 
 Potom bych přidal přímý API test loginu. Login už sice testuju z obou stran
 přes unit a E2E, ale chybí mi přímé ověření přes skutečné API. Ostatní mezery
