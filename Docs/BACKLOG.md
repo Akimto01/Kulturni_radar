@@ -88,6 +88,7 @@ Pořadí: AGENTS.md, smoke, rozcestník, katalog, kontrola odkazů, případová
 
 **Cíl 3 – kvalita akcí:**
 - ~~**Vyhodnotit Sonnet 5.5** (~30 min, kolem 9. 11.) – rozhodnout o rozpočtu a stropu 15 akcí na běh; další kroky podle vyhodnocení; výstupem je dokument s vyhodnocením AI, ne jen rozhodnutí.~~ **HOTOVO 13. 11. 2026** (ponechat denně, strop 15 beze změny, viz Docs/kvalita/VYHODNOCENI-AI.md) → issue #8
+- **Jedna velká akce pod více názvy** (nález 19. 11. 2026): brněnské vánoční trhy přicházejí od AI jako „Vánoce Brno …“, „Vánoce Brno 2026 (zahájení …)“ i „Brněnské Vánoce …“ s různými daty (13. 11.–31. 12. a 27. 11.–23. 12.); jde o jednu akci na více místech. Fuzzy shoda je spojit nemá (jediné společné slovo, jiná data, riziko falešných sloučení jinde), ruční úklid 19. 11. nechal jeden řádek. Možnosti: seznam známých velkých akcí s jednotným názvem v promptu (podobně jako u stálých míst), nebo list aliasů (varianta názvu → jednotný název) použitý v `upsertEvents_` před párováním. Odhad 1–2 h; issue až při výběru.
 
 **Ruční úklid (Vojta, kdykoli):** ~~smazat 5 řádků „neuvedeno“ v AKCE (v3.48)~~ **HOTOVO 16. 11. 2026**; projít 5 podezřelých fuzzy sloučení (CHANGELOG v3.50); volitelně 2 staré skryté duplicity v MÍSTA (v3.46); ~~smazat duplicitní řádky v MÍSTA a nechat vždy ten s nejnovější Poslední aktualizací: Punkevní jeskyně a propast Macocha (3×), VIDA! science centrum (2×), Skanzen Strážnice (2×)~~ **HOTOVO 16. 11. 2026**.
 

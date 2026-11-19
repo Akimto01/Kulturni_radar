@@ -31,7 +31,7 @@ Meta vrací aktivní profil, profily a kategorie
     List Should Contain Value    ${j}[kategorie]    koncerty
 
 Nasazená verze odpovídá repu
-    [Tags]    smoke    regrese    api
+    [Tags]    smoke    regrese    api    verze
     [Documentation]    Zachycuje scénář z 8. 8. 2026 (viz SKILL.md sekce 6):
     ...    `clasp deploy` spuštěný BEZ `-i <deploymentId>` nechá produkci
     ...    běžet na staré verzi, i když repo i lokální Apps Script editor
@@ -56,7 +56,7 @@ Nasazená verze odpovídá repu
     ...    msg=Produkce hlásí verzi „${j}[verze]“, repo má „${verze_repo}“ – zapomenutý "clasp deploy -i" po push? (viz SKILL.md sekce 6)
 
 Nasazená verze frontendu odpovídá repu
-    [Tags]    smoke    api
+    [Tags]    smoke    api    verze
     [Documentation]    Riziko R2 (issue 41): `Index.html` na Cloudflare Pages se nasazuje
     ...    `git push`, nezávisle na backendu. Porovná verzi z komentáře na
     ...    začátku `Index.html` v repu s komentářem na ${SITE_URL}. Při

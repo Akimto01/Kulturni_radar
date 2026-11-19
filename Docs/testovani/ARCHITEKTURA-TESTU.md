@@ -200,7 +200,7 @@ tagům (mapa, kalendář, filtry, zápisy), s vlastním setupem každé suity.
 | Vrstva klíčových slov | kroky opakované aspoň ve dvou testech nebo kroky s vlastní logikou čekání se vytahují do klíčového slova |
 | Flaky testy | postup v C3; tag `krehky` nově jen po prokázání vnější příčiny (dnešních 12 označených testů čeká na revizi, viz Známé mezery) |
 | Ownership | jediný vlastník (Vojta); AI agent píše a opravuje testy podle pravidel tohoto dokumentu a skillu, vlastník schvaluje diff |
-| Test management | GitHub Issues a board, defekty formulářem a v pohledu Defekty (DEFEKTY.md); tagy RF (`smoke`, `api`, `ui`, `zapis`, `regrese`, `mapa`, `filtr`, `kalendar`, `notifikace`, `kontakt`, `krehky`) slouží k výběru sad |
+| Test management | GitHub Issues a board, defekty formulářem a v pohledu Defekty (DEFEKTY.md); tagy RF (`smoke`, `api`, `ui`, `zapis`, `regrese`, `mapa`, `filtr`, `kalendar`, `notifikace`, `kontakt`, `krehky`, od 19. 11. 2026 `verze`) slouží k výběru sad |
 | Tajné hodnoty | nikdy v kódu, issue ani logu; ověřuje se počítáním výskytů, nikdy vypsáním hodnoty |
 
 ### B5. Pravidla test designu

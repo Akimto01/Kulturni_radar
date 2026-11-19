@@ -103,6 +103,13 @@ jobs:
           python .github/scripts/kontrola-dokumentace.py
           cd "$RUNNER_TEMP" && python "$GITHUB_WORKSPACE/.github/scripts/kontrola-lintu.py"
 
+      # API smoke proti produkci (jen čtecí GET, bez tajných hodnot), ať výsledek RF testů
+      # doloží workflow, ne shrnutí (běh 2 #82: „PASS proti produkci“ šlo z logu jen tvrdit).
+      # Testy s tagem verze se vynechávají: porovnávají repo s nasazenou produkcí a po
+      # bumpu verze v PR by z principu padaly. Report jen do RUNNER_TEMP, nenahrává se.
+      - name: API smoke proti produkci (bez testů verze)
+        run: robot --include smoke --exclude verze --outputdir "$RUNNER_TEMP/smoke" tests/robot/api.robot
+
       # Nové soubory jdou do shrnutí, ať je v PR vidět i to, co do repa nepatří.
       - name: Nové soubory do shrnutí
         run: |

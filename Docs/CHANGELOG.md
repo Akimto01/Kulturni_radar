@@ -1,5 +1,12 @@
 # Changelog
 
+## CI: API smoke v pilotu Claude Code, tag verze (#82) – 19. 11. 2026
+- **Proč:** shrnutí běhu 2 (#41, PR #84) tvrdilo „nový RF test proti produkci: PASS“, ale z logu jobu to nešlo doložit (akce volání nástrojů Clauda nevypisuje). Test byl správný, ověřil se až při review. Tvrzení ve shrnutí nejsou důkaz.
+- **`claude-pilot.yml`, job `claude`:** nový krok „API smoke proti produkci“ po kontrolách: `robot --include smoke --exclude verze tests/robot/api.robot`, jen čtecí GET bez tajných hodnot, report do `RUNNER_TEMP` (nenahrává se). Spadne-li, PR nevznikne.
+- **Tag `verze`** u testů „Nasazená verze odpovídá repu“ a „Nasazená verze frontendu odpovídá repu“: porovnávají repo s nasazenou produkcí, takže po bumpu verze v PR by z principu padaly; pilot je vynechává.
+- **BACKLOG, Cíl 3:** nový nález „Jedna velká akce pod více názvy“ (brněnské vánoční trhy, aliasy nebo pokyn v promptu).
+- Dokumentace: PROVOZ.md (Pilot), ARCHITEKTURA-TESTU (seznam tagů), SKILL.md (tabulka tagů, obě kopie).
+
 ## Testy: kontrola verze frontendu ve smoke (#41, riziko R2) – 19. 11. 2026
 ### Proč
 - API test hlídal jen verzi backendu (`VERZE`). Verzi `Index.html` na Cloudflare Pages nic neověřovalo, takže nesoulad po pushi (Pages ještě nenasadilo) by se ukázal až náhodou.

@@ -149,6 +149,7 @@ každého testu):
 | `regrese` | regresní pojistka na konkrétní zdokumentovaný historický bug |
 | `ui` | ostatní bezpečné, nezapisující UI kontroly |
 | `api` | všechny testy v `api.robot` (kontraktové, ne E2E) |
+| `verze` | porovnává verzi v repu s nasazenou produkcí (backend i frontend); po bumpu před nasazením padá z principu, proto ho pilot Claude Code vynechává (`--exclude verze`, od 19. 11. 2026) |
 
 ```powershell
 # Rychlá sanity kontrola po nasazení (pár vteřin, ne celá sada)
