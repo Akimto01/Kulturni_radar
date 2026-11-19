@@ -117,6 +117,8 @@ Dva joby kvůli tokenům. Akce si bere GitHub token ze vstupu `github_token` neb
 
 Jednorázové nastavení (dělá Vojta): (1) secret `CLAUDE_CODE_OAUTH_TOKEN` v Settings → Secrets and variables → Actions, vygenerovaný příkazem `claude setup-token` (čerpá z předplatného, ne z API klíče appky, který je ve Script Properties s měsíčním limitem); místo něj jde použít samostatný API klíč jako `ANTHROPIC_API_KEY` a ve workflow vstup `anthropic_api_key`; (2) v Settings → Actions → General → Workflow permissions povolit „Allow GitHub Actions to create and approve pull requests“, jinak job pr selže. Aplikace Claude pro GitHub potřeba není. PR založený tokenem workflow nespouští CI automaticky (pravidlo GitHubu), CI na PR jde pustit ručně.
 
+**Výběr úkolů (rozhodnutí 19. 11. 2026, #82):** úkoly vhodné pro pilot nesou štítek `claude-ready`. Pilot se dál spouští ručně (Run workflow, číslo issue), klidně několik úkolů za večer; review a ověření dělá Vojta s Claude Code. Štítek nedávat na úkoly, které mění `.github/workflows/` (token workflow je nesmí pushnout), potřebují data z produkce nebo rozhodnutí, nebo mění Apps Script bez Node testů. Noční cron je odložený: úzkým hrdlem je review, ne psaní; zvážit po dalších zhruba pěti bězích bez větších nálezů. Bilance 18.–19. 11.: 4 běhy, 3 mergnuté PR (#83, #84, #85), 1 běh spadl na limitu kroků; každý pod 5 min, odhad ~1 USD.
+
 ## Diagnostika
 
 1. **Spuštění** (Apps Script) — stav, délka, po rozkliknutí Logger výstup.

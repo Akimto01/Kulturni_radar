@@ -1,5 +1,10 @@
 # Changelog
 
+## CI: pilot Claude Code uzavřen, štítek claude-ready (#82) – 19. 11. 2026
+- **Rozhodnutí:** úkoly vhodné pro pilot nesou nový štítek `claude-ready` (zatím jen #34), pilot se dál spouští ručně, review a ověření dělá Vojta s Claude Code. Noční cron odložen, úzkým hrdlem je review; zvážit po zhruba pěti dalších bězích bez větších nálezů.
+- **Bilance 18.–19. 11.:** 4 běhy, 3 mergnuté PR (#83, #84, #85), 1 běh spadl na limitu kroků; každý pod 5 min, odhad ~1 USD.
+- Dokumentace: PROVOZ.md (sekce Pilot, výběr úkolů), BACKLOG (nápad noční implementace: rozhodnutí, odkaz na uzavřený pilot).
+
 ## Testy: dávka 1 sjednocení s architekturou, úklid sdílené stránky (#34) – 19. 11. 2026
 ### Proč
 - Po pádu testu zůstala aktivní cizí stránka nebo otevřený dialog a následující testy běžely nad zkresleným stavem (kaskáda pádů, audit řádek 5 a 8).
