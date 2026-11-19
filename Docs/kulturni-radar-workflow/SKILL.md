@@ -350,6 +350,15 @@ informace v existující sekci), a (ii) pokud ano, navrhnout konkrétní
   Token `BOARD_READ_TOKEN` je classic jen se scope `read:project` (fine-grained token uživatelský projekt číst neumí), platí do 27. 1. 2027,
   obnova je issue „Obnovit BOARD_READ_TOKEN“ (Termín 20. 1. 2027); při vypršení workflow selže a upozorní. Ruční spuštění skriptů zůstává (viz výše).
 
+### Aktualizace skillu v claude.ai (od 19. 11. 2026)
+
+Claude Code čte skill z repa (`.claude/skills/kulturni-radar-workflow/`), hlavní
+chat ze skillu nahraného v claude.ai, a ten se z GitHubu sám neaktualizuje. Po
+změně SKILL.md: `Compress-Archive -Path .claude\skills\kulturni-radar-workflow
+-DestinationPath $HOME\Downloads\kulturni-radar-workflow.zip -Force`, pak
+v Customize → Skills otevřít skill a v menu „…“ zvolit **Replace** (není
+potřeba mazat a nahrávat znovu). Změna platí od dalšího chatu.
+
 ### Explicitní hranice session (Start/End)
 Kromě automatického rozpoznání farewell frází platí i explicitní
 anglická klíčová slova, protože v jedné dlouhé konverzaci může dojít
@@ -439,6 +448,20 @@ Frontend (`tests/frontend-harness.js`, `nactiFrontendFunkce(['fn1','fn2'])`):
   s `--zapsat-baseline` a commitnout sníženou baseline.
 - **Změna kritické funkce backendu = počkat na mutační CI** (`mutacni-testy.yml`, kritická sada, práh 95 %): běží při změně `kulturni_radar.gs`, `tests/unit.test.js`, `tests/harness.js` a `tests/mutace/**`. Při pádu pod práh doplnit testy (přežilé mutanty v reportu artefaktu `mutacni-report-kriticka-sada`, triáž v `Docs/testovani/MUTACE-TRIAZ.md`), práh nesnižovat. Týdenní běh celého backendu (sobota 3:40 UTC) jen měří, bez prahu. Přežilé mutanty po běhu v CI hledat v artefaktu `mutacni-report-kriticka-sada` (`mutation.json`, `mutation.html`). Lokální ověření, že nový test zabíjí mutant: `NODE_OPTIONS=--test-name-pattern=<regex bez mezer> node tests/mutace/spustit.js --rozsah A-B` (vzor s mezerami se rozpadne na víc vzorů a spustí se i cizí testy; místo mezer `.`), výsledek v `tests/mutace/reports/mutation.json`. Samotný odebraný test skóre nemusí snížit, drží ho souhrn testů.
 - **Nové testy = aktualizovat počty v README (tabulka Testy v číslech) ve stejném commitu; každý commit musí projít CI, ne jen poslední v dávce (29. 10. 2026 byla CI třikrát červená kvůli počtům v README).**
+- **Nová pojistka nebo změněná fixture může testům „ukrást“ cíl** (19. 11. 2026,
+  v3.62): pojistka série `jeAkceVSerii_` zastavila dvojici z negativních testů
+  v3.57 dřív, než kód došel ke kontrole „jen vícedenní“, kterou ty testy hlídaly.
+  Testy dál procházely, ale nic netestovaly a Stryker ukázal 3 nové přeživší.
+  Při přepisu nebo doplnění pojistky pustit ruční mutace i na kontroly, které
+  hlídaly staré testy, nebo lokálně `tests/mutace/spustit.js --rozsah` na dotčenou
+  funkci.
+- **Odstranění závislosti = projít i kód, který krmila** (19. 11. 2026): po
+  odstranění Open-Meteo zůstala ve v3.60 nepoužitá větev `openMeteoKody`
+  v `logKontrolaPocasi_` a ve v3.64 funkce `weatherText_` a větev Open-Meteo ve
+  `vyhodnotPocasiUdalosti_`. Nestačí smazat volání: projít funkce a parametry,
+  které závislost jako jediná plnila (grep na název zdroje i na jeho datové
+  tvary), a smazat je ve stejné verzi. Pokles pokrytí po smazání pokrytého kódu
+  je aritmetický (pravidlo u Měření pokrytí).
 - **Mutační ověření:** pomocný skript musí po neaplikované mutaci (zarážka nenalezena)
   skončit chybou a testy nepouštět. Jinak neaplikovaná mutace vypadá jako nezachycená,
   nebo naopak jako chycená. Ověřit, že se zdroj opravdu změnil (`git diff --stat` nebo
@@ -540,19 +563,26 @@ Udělej prosím:
 3. `node --test tests/unit.test.js tests/frontend.test.js` — očekávám
    [staré]/[staré] → [nové]/[nové] ([+X] nových testů pro [co]).
 4. Ukaž mi diff [souborů] před commitem.
-5. Po mém potvrzení: [je-li apps-script/*.gs či Index.html mezi soubory:]
-   nasaď přes clasp (`clasp push -f` a `clasp deploy -i <ID produkční
-   implementace> --description "[vXX]"`, viz sekce 6), ověř `?api=meta`,
-   pak `robot --include smoke --outputdir vysledky tests/robot/` (bez
-   --variable BASE_URL, výchozí hodnota v resources.robot je produkce),
-   commitni s hláškou: "[commit hláška v ~7 slovech, česky bez diakritiky]"
-6. Aktualizuj Docs/CHANGELOG.md [a Docs/BACKLOG.md, pokud se tím něco
+5. Aktualizuj Docs/CHANGELOG.md [a Docs/BACKLOG.md, pokud se tím něco
    z BACKLOGu dokončuje — viz sekce 3].
-7. `git add`, `git commit`, `git push`.
+6. Commit s hláškou "[commit hláška v ~7 slovech, česky bez diakritiky]",
+   `git show --stat` zvlášť (před pushem), `git push`, počkej na CI s plným
+   SHA: Node testy a při změně backendu i Mutační testy (Stryker).
+7. Teprve když je CI celé zelené: [je-li apps-script/*.gs či Index.html
+   mezi soubory:] nasaď přes clasp (`clasp push -f` a `clasp deploy -i <ID
+   produkční implementace> --description "[vXX]"`, viz sekce 6), ověř
+   `?api=meta`, pak `robot --include smoke --outputdir vysledky tests/robot/`
+   (bez --variable BASE_URL, výchozí hodnota v resources.robot je produkce).
 8. Krátké shrnutí a finální commit hash.
 
 Před commitem mi ukaž diff, ať vidím přesně, co jde do gitu.
 ```
+
+**Pořadí commit → zelené CI → nasazení (od 19. 11. 2026):** v3.62 šla do
+produkce dřív, než doběhl Stryker, a kritická sada pak spadla pod práh
+(94,16 %). Chování bylo ověřené Node testy, ale nasazovat se má až po celém
+zeleném CI. Při pádu CI po nasazení se nevrací verze, ale doplní testy
+v nové verzi (v3.63).
 
 ### Pravidlo pro krok 5 (dva nasazovací kanály)
 Od 8. 8. 2026 nasazuje Apps Script Claude Code přes clasp (sekce 6); ruční

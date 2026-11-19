@@ -746,7 +746,7 @@ test('v3.20: round-trip sestavení → parsování zachová profil i kategorie',
 // v3.25: Počasí u akce – weathercodeEmoji_, pocasiZobrazeni_
 // ---------------------------------------------------------------------------
 
-test('v3.25: weathercodeEmoji_ – reprezentativní kódy stejného bucketingu jako weatherText_ v .gs', () => {
+test('v3.25: weathercodeEmoji_ – reprezentativní kódy podle bucketingu škály WMO (jako metNoTextNaKod_ v .gs)', () => {
   assert.equal(f.weathercodeEmoji_(0), '☀️');
   assert.equal(f.weathercodeEmoji_(2), '🌤️');
   assert.equal(f.weathercodeEmoji_(3), '☁️');

@@ -1,5 +1,16 @@
 # Changelog
 
+## Backend v3.65 – úklid po odstranění Open-Meteo (#81) – 19. 11. 2026
+### Proč
+- Po v3.60 a v3.64 backend Open-Meteo nevolá, ale zůstala funkce `weatherText_` (převod číselného WMO kódu z Open-Meteo na text, bez volání) a ve `vyhodnotPocasiUdalosti_` větev pro předpověď z Open-Meteo, do které `aktualizujPocasi_` od v3.60 posílala jen `null`. Nález z review Claude Code po v3.64.
+### Změněno
+- **Smazáno:** `weatherText_`; ve `vyhodnotPocasiUdalosti_` větev Open-Meteo a parametry `iso` a `forecast`. Nový podpis `vyhodnotPocasiUdalosti_(souradnice, metNoDenni, stary, metNoOdpovedel)`, chování beze změny. Komentáře u `metNoTextFor_` a `vyhodnotPocasiUdalosti_` bez odkazů na Open-Meteo.
+- Komentář v `Index.html` (u `weathercodeEmoji_`) dál zmiňuje `weatherText_`; upraví se při příští změně frontendu, aby kvůli komentáři nevznikal release.
+- **SKILL.md (obě kopie):** šablona promptu má pořadí commit → zelené CI včetně Strykeru → nasazení; pravidla „nová pojistka může testům ukrást cíl“ a „odstranění závislosti = projít i kód, který krmila“; postup aktualizace skillu v claude.ai přes Replace.
+### Testy
+- **Backend 489 → 486, celkem 701 → 698:** smazán test `weatherText_` a dva testy větve Open-Meteo ve `vyhodnotPocasiUdalosti_`; zbylých 5 testů funkce na nový podpis (OK z met.no, NA bez souřadnic, NA mimo dosah met.no, CHYBA se starou hodnotou i bez ní). Test frontendu `weathercodeEmoji_` přejmenován (odkazoval na `weatherText_`).
+- **Baseline pokrytí vědomě snížena z 92,66 na 92,63 %:** smazaný kód byl plně pokrytý testy, pokles je aritmetický (pravidlo z v3.60).
+
 ## CI: pilot Claude Code, úprava po 1. běhu (#82) – 19. 11. 2026
 - **Nálezy 1. běhu (#43, PR #83):** v PR byl `robocop.json` (výstup nástroje v kořeni repa), nový test porušil pravidlo B4 (tag regrese) a lint ani architekturu testů nikdo nespustil, takže se chyby ukázaly až ručně na větvi.
 - **`claude-pilot.yml`, job `claude`:** po Claudovi a Node testech nově setup-python a stejné kontroly jako `node-tests.yml`: RF dry run, `kontrola-architektury-testu.py`, `kontrola-poctu-testu.py`, `kontrola-dokumentace.py` a `kontrola-lintu.py` (spouští se z `RUNNER_TEMP`, ať případné výstupy nástrojů nekončí v repu). Spadne-li kontrola, artefakt ani PR nevznikne. Nový krok vypíše nové soubory v repu do shrnutí v PR.

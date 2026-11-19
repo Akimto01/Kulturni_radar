@@ -124,14 +124,6 @@ test('parseCzDate_: mezera za tečkou může chybět i být jich víc (1.5.2026,
 // Počasí – převod WMO kódů
 // ---------------------------------------------------------------------------
 
-test('weatherText_: reprezentativní kódy', () => {
-  assert.equal(r.weatherText_(0), 'jasno');
-  assert.equal(r.weatherText_(3), 'zataženo');
-  assert.equal(r.weatherText_(63), 'déšť');
-  assert.equal(r.weatherText_(81), 'přeháňky');
-  assert.equal(r.weatherText_(95), 'bouřky');
-});
-
 // ---------------------------------------------------------------------------
 // Notifikace – zkracování pro ntfy (BUG v2.6) a seskupení (v2.8)
 // ---------------------------------------------------------------------------
@@ -2558,46 +2550,30 @@ test('v3.22: metNoTextNaKod_ – neznámý text nespadne, vrátí rozumný vých
 });
 
 test('v3.22: vyhodnotPocasiUdalosti_ – chybějící souřadnice (ještě negeokódováno) → NA', () => {
-  const v = r.vyhodnotPocasiUdalosti_('2026-08-09', null, { time: ['2026-08-09'], code: [1], teplota: [20] }, null, null);
+  const v = r.vyhodnotPocasiUdalosti_(null, { maxTeplota: 20, symbolCode: 'fair_day' }, null);
   assert.equal(v.stav, 'NA');
   assert.equal(v.kod, '');
   assert.equal(v.teplota, '');
 });
 
-test('v3.22: vyhodnotPocasiUdalosti_ – datum je ve vrácené předpovědi → OK, teplota zaokrouhlená', () => {
-  const forecast = { time: ['2026-08-08', '2026-08-09'], code: [3, 61], teplota: [18.6, 15.2] };
-  const v = r.vyhodnotPocasiUdalosti_('2026-08-09', { lat: 49.1, lng: 16.6 }, forecast, null, null);
-  assert.equal(v.stav, 'OK');
-  assert.equal(v.kod, 61);
-  assert.equal(v.teplota, 15);
-});
-
-test('v3.22: vyhodnotPocasiUdalosti_ – Open-Meteo odpověděl, ale datum mimo ~16denní dosah → NA (ne chyba)', () => {
-  const forecast = { time: ['2026-08-08', '2026-08-09'], code: [3, 61], teplota: [18.6, 15.2] };
-  const v = r.vyhodnotPocasiUdalosti_('2026-09-20', { lat: 49.1, lng: 16.6 }, forecast, null, null);
-  assert.equal(v.stav, 'NA');
-  assert.equal(v.kod, '');
-  assert.equal(v.teplota, '');
-});
-
-test('v3.22: vyhodnotPocasiUdalosti_ – Open-Meteo selhal, met.no zachránil → OK přes metNoTextNaKod_', () => {
+test('v3.22/v3.65: vyhodnotPocasiUdalosti_ – met.no má datum akce → OK přes metNoTextNaKod_, teplota zaokrouhlená', () => {
   const metNoDenni = { maxTeplota: 22.7, symbolCode: 'rain' };
-  const v = r.vyhodnotPocasiUdalosti_('2026-08-09', { lat: 49.1, lng: 16.6 }, null, metNoDenni, null);
+  const v = r.vyhodnotPocasiUdalosti_({ lat: 49.1, lng: 16.6 }, metNoDenni, null);
   assert.equal(v.stav, 'OK');
   assert.equal(v.kod, r.metNoTextNaKod_('déšť'));
   assert.equal(v.teplota, 23);
 });
 
-test('v3.22: vyhodnotPocasiUdalosti_ – oba zdroje selhaly, dřív existovala hodnota → CHYBA se zachovanou hodnotou', () => {
+test('v3.22/v3.65: vyhodnotPocasiUdalosti_ – met.no selhal, dřív existovala hodnota → CHYBA se zachovanou hodnotou', () => {
   const stary = { stav: 'OK', kod: 3, teplota: 19 };
-  const v = r.vyhodnotPocasiUdalosti_('2026-08-09', { lat: 49.1, lng: 16.6 }, null, null, stary);
+  const v = r.vyhodnotPocasiUdalosti_({ lat: 49.1, lng: 16.6 }, null, stary);
   assert.equal(v.stav, 'CHYBA');
   assert.equal(v.kod, 3);
   assert.equal(v.teplota, 19);
 });
 
-test('v3.22: vyhodnotPocasiUdalosti_ – oba zdroje selhaly a žádná předchozí hodnota → CHYBA prázdná (ne NA)', () => {
-  const v = r.vyhodnotPocasiUdalosti_('2026-08-09', { lat: 49.1, lng: 16.6 }, null, null, null);
+test('v3.22/v3.65: vyhodnotPocasiUdalosti_ – met.no selhal a žádná předchozí hodnota → CHYBA prázdná (ne NA)', () => {
+  const v = r.vyhodnotPocasiUdalosti_({ lat: 49.1, lng: 16.6 }, null, null);
   assert.equal(v.stav, 'CHYBA');
   assert.equal(v.kod, '');
   assert.equal(v.teplota, '');
@@ -4067,16 +4043,16 @@ test('v3.44: zajistitSouradnice_ – místo nejde zjednodušit → jen jeden dot
   assert.equal(ctx.readSouradnice_(ss).length, 0);
 });
 
-test('v3.44: vyhodnotPocasiUdalosti_ – Open-Meteo selhal, met.no odpověděl bez data akce → NA (ne CHYBA)', () => {
+test('v3.44/v3.65: vyhodnotPocasiUdalosti_ – met.no odpověděl bez data akce → NA (ne CHYBA), i když existuje stará hodnota', () => {
   const souradnice = { lat: 49.1, lng: 16.6 };
   const stary = { stav: 'OK', kod: 3, teplota: 12 };
-  const v = r.vyhodnotPocasiUdalosti_('2026-11-05', souradnice, null, null, stary, true);
+  const v = r.vyhodnotPocasiUdalosti_(souradnice, null, stary, true);
   assert.equal(v.stav, 'NA');
   assert.equal(v.kod, '');
 });
 
-test('v3.44: vyhodnotPocasiUdalosti_ – bez 6. argumentu se chová jako dřív (oba zdroje dole → CHYBA)', () => {
-  const v = r.vyhodnotPocasiUdalosti_('2026-11-05', { lat: 49.1, lng: 16.6 }, null, null, null);
+test('v3.44/v3.65: vyhodnotPocasiUdalosti_ – bez příznaku metNoOdpovedel → CHYBA', () => {
+  const v = r.vyhodnotPocasiUdalosti_({ lat: 49.1, lng: 16.6 }, null, null);
   assert.equal(v.stav, 'CHYBA');
 });
 

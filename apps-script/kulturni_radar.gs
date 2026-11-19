@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.64 (19. 11. 2026) – počasí v přehledech (weatherFor_) a sonda samotestu bez Open-Meteo: souřadnice obce z cache SOUŘADNICE (Nominatim), předpověď z met.no; srážky v % odpadají (#81 krok 4)
- * (předchozí: 3.63 – síla mutačních testů po v3.62: výpočet změněných polí pro log sloučení jen tam, kde se log zapisuje, a negativní testy párování podle konce bez dvojice série (bez změny chování))
+ * Verze: 3.65 (19. 11. 2026) – úklid po odstranění Open-Meteo z backendu: smazána weatherText_ a větev Open-Meteo ve vyhodnotPocasiUdalosti_ (bez změny chování, #81)
+ * (předchozí: 3.64 – počasí v přehledech (weatherFor_) a sonda samotestu bez Open-Meteo: souřadnice obce z cache SOUŘADNICE (Nominatim), předpověď z met.no; srážky v % odpadají (#81 krok 4))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.64';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.65';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -2801,24 +2801,18 @@ function metNoTextNaKod_(text) {
   return mapa.hasOwnProperty(text) ? mapa[text] : 2;
 }
 
-/** PURE: rozhodne výsledný záznam počasí pro JEDNU budoucí akci.
+/** PURE: rozhodne výsledný záznam počasí pro JEDNU budoucí akci (od v3.60 jen
+ *  z met.no; v3.65 odstraněna dřívější větev pro Open-Meteo i parametry iso
+ *  a forecast, které už dostávaly jen null).
  *  - souradnice chybí (ještě negeokódováno) → NA.
- *  - forecast (Open-Meteo, {time,code,teplota}) obsahuje datum akce → OK.
- *  - forecast je non-null, ale datum akce v něm není → mimo 16denní dosah → NA
- *    (Open-Meteo fungovalo, prostě tak daleko nevidí – to NENÍ chyba).
+ *  - metNoDenni (výsledek agregovatMetNoDen_ pro datum akce) → OK.
  *  - v3.44: met.no odpověděl (metNoOdpovedel), ale pro datum akce nemá data
  *    (vidí ~9 dní) → NA, ne CHYBA – dosah předpovědi, ne výpadek.
- *  - forecast je null (Open-Meteo request selhal) → zkusit metNoDenni
- *    (agregovatMetNoDen_ výsledek); když i ten chybí → CHYBA, se zachováním
- *    poslední OK hodnoty ze `stary`, pokud existuje (jinak NA-like prázdno,
- *    ale stav zůstává CHYBA, ať frontend/KONTROLY vidí skutečný výpadek). */
-function vyhodnotPocasiUdalosti_(iso, souradnice, forecast, metNoDenni, stary, metNoOdpovedel) {
+ *  - met.no neodpověděl → CHYBA, se zachováním poslední OK hodnoty ze
+ *    `stary`, pokud existuje (jinak prázdno, ale stav zůstává CHYBA, ať
+ *    frontend a KONTROLY vidí skutečný výpadek). */
+function vyhodnotPocasiUdalosti_(souradnice, metNoDenni, stary, metNoOdpovedel) {
   if (!souradnice) return { stav: 'NA', kod: '', teplota: '' };
-  if (forecast) {
-    const i = forecast.time.indexOf(iso);
-    if (i >= 0) return { stav: 'OK', kod: forecast.code[i], teplota: Math.round(forecast.teplota[i]) };
-    return { stav: 'NA', kod: '', teplota: '' };
-  }
   if (metNoDenni) {
     return {
       stav: 'OK',
@@ -2993,7 +2987,7 @@ function aktualizujPocasi_(ss) {
       }
 
       const stary = staryMapa.get(u.id) || null;
-      const vysledek = vyhodnotPocasiUdalosti_(u.iso, souradnice, null, metNoDenni, stary, metNoOdpovedel);
+      const vysledek = vyhodnotPocasiUdalosti_(souradnice, metNoDenni, stary, metNoOdpovedel);
       if (vysledek.stav === 'CHYBA') chyby++;
       return { id: u.id, aktualizovano: dnesText, stav: vysledek.stav, kod: vysledek.kod, teplota: vysledek.teplota };
     });
@@ -4101,8 +4095,8 @@ function agregovatMetNoDen_(timeseries, isoDatum) {
   return { maxTeplota, symbolCode };
 }
 
-/** Převod met.no symbol_code (např. 'partlycloudy_day') na český popis – hrubší
- *  než weatherText_ (ten čte přesný číselný WMO kód z Open-Meteo). */
+/** Převod met.no symbol_code (např. 'partlycloudy_day') na český popis.
+ *  Číselný kód pro frontend z něj dělá metNoTextNaKod_. */
 function metNoTextFor_(symbolCode) {
   const s = String(symbolCode || '');
   if (!s) return 'proměnlivo';
@@ -4118,20 +4112,6 @@ function metNoTextFor_(symbolCode) {
   if (s.indexOf('fair') !== -1) return 'skoro jasno';
   if (s.indexOf('clearsky') !== -1) return 'jasno';
   return 'proměnlivo';
-}
-
-/** Převod WMO kódu počasí na český popis. */
-function weatherText_(code) {
-  if (code === 0) return 'jasno';
-  if (code <= 2) return 'polojasno';
-  if (code === 3) return 'zataženo';
-  if (code === 45 || code === 48) return 'mlha';
-  if (code <= 57) return 'mrholení';
-  if (code <= 67) return 'déšť';
-  if (code <= 77) return 'sněžení';
-  if (code <= 82) return 'přeháňky';
-  if (code <= 86) return 'sněhové přeháňky';
-  return 'bouřky';
 }
 
 // ---------------------------------------------------------------------------
