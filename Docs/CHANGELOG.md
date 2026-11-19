@@ -9,7 +9,7 @@
 - **Baseline pojistky architektury:** `testy_bez_teardownu` 9 → 0, `nth_selektory` 61 → 60 (rozdíl existoval už před změnou).
 - **Dokumentace:** AUDIT-SOULADU-TESTU.md (stav dávky 1, rozhodnutí, vysvětlení „20 porušení“ proti 121 v baseline: skupiny z auditu proti výskytům v pojistce), ARCHITEKTURA-TESTU.md (odkaz na vysvětlení).
 ### Testy
-- Bez změny počtu testů (Node 486 + 212, RF 66). Ověřeno dry runem a lintem; živý běh teardownu se ověří v CI.
+- Bez změny počtu testů (Node 486 + 212, RF 66). Ověřeno dry runem a lintem. Živý běh teardownu ověřen 19. 11. 2026 zkouškou na dočasné větvi (běh rf-tests.yml 44566437037): dočasný první test otevřel profilový dialog na sdílené stránce, otevřel druhou stránku a vynuceně selhal; teardown zavřel cizí stránku, sdílenou znovu načetl a přihlásil a všech 53 původních testů prošlo (53/53). Dočasná větev smazána.
 
 ## CI: pilot Claude Code, max-turns 80 po běhu 3 (#82) – 19. 11. 2026
 - **Běh 3** (44563043357, #34): Claude doběhl úspěšně za 4 min, ale po 57 krocích při limitu 40. Akce limit kontroluje až po doběhnutí, takže běh označila jako failure, další kroky se přeskočily, artefakt nevznikl a hotová práce se zahodila. Odhad ceny běhu podle logu 1,14 USD (čerpá z předplatného přes `CLAUDE_CODE_OAUTH_TOKEN`).
