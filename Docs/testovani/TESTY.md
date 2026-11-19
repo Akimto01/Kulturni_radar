@@ -98,7 +98,7 @@ Co z toho plyne pro testování:
 |---|---|---|
 | Appka v Apps Scriptu žije o dva iframy hlouběji | Selektory mají předponu `${FRAME}` (proměnná prostředí `RF_FRAME`, výchozí prázdná). Prázdná = statický web, s hodnotou `id=sandboxFrame >>> id=userHtmlFrame >>>` = Apps Script. Jedna sada tak běží proti oběma prostředím bez úprav | 4.4, 4.9 |
 | Sandbox mění chování appky, nejen umístění v DOM | Chyby se mohou projevit jen v jednom prostředí, např. odhlášení 7. 8. vedlo v iframu k prázdné stránce | R5 |
-| Dva nezávislé nasazovací kanály; `clasp push` jen nahraje kód, novou verzi nasazení vytvoří až `clasp deploy -i` | Test „Nasazená verze odpovídá repu“ porovnává verzi backendu | R2 |
+| Dva nezávislé nasazovací kanály; `clasp push` jen nahraje kód, novou verzi nasazení vytvoří až `clasp deploy -i` | Testy „Nasazená verze odpovídá repu“ a „Nasazená verze frontendu odpovídá repu“ porovnávají verzi backendu a frontendu s repem | R2 |
 | Každý požadavek spouští skript na straně Googlu (běžně 1,4–2,9 s), pod opakovanou zátěží zpomaluje | Plná RF sada neběží opakovaně ani při každém push; bez automatického výkonnostního testu s pevným prahem | 4.7, 4.8, 8 |
 | Služby Googlu nejsou mimo Apps Script dostupné | Unit testy načítají `.gs` do Node `vm` sandboxu se stuby služeb | 4.2 |
 | Časový limit jednoho běhu skriptu | Zpracování sledovaných měst je rozdělené do dávek s orchestrátorem, ověřeným unit testem | `POKRYTI.md`, oblast 16 |
@@ -119,7 +119,7 @@ defektů ([DEFEKTY.md](../kvalita/DEFEKTY.md)), proto jsou na konci.
 | # | Riziko | Dopad | Doložený incident | Hlavní pokrytí |
 |---|---|---|---|---|
 | R1 | Špatná data akcí (datum, duplicity, tiché sloučení dvou akcí) | Vysoký – uživatel přijde o akci nebo dostane nesmysl | Sériová čísla místo dat (v3.2–3.3), duplicita „Light Up Tugendhat“ (31. 8.), tichý fuzzy přepis (v3.41–3.42) | Node unit (parsování, deduplikace), API regex dat, samotest (`auditDat_`) |
-| R2 | Produkce běží na jiné verzi než repo | Vysoký – opravy „jsou nasazené“, ale neběží | `clasp deploy` bez `-i` (8. 8.) | API „Nasazená verze odpovídá repu“ |
+| R2 | Produkce běží na jiné verzi než repo | Vysoký – opravy „jsou nasazené“, ale neběží | `clasp deploy` bez `-i` (8. 8.) | API „Nasazená verze odpovídá repu“ (backend), „Nasazená verze frontendu odpovídá repu“ |
 | R3 | Ztráta nebo poškození uživatelských označení ★/✓/🏛 | Střední | Zaseknutá hvězda u `rf-test` (21. 8.) | RF zápisové testy s ověřením reloadem |
 | R4 | Nedoručené notifikace | Střední – systém „neumí selhat potichu“ jen pokud kanál funguje | – | Node unit (sestavení zpráv), API živost ntfy, watchdog |
 | R5 | Rozbití jednoho ze dvou prostředí (iframe vs. statický web) | Střední | Odhlášení v sandboxovaném iframu → prázdná stránka (7. 8.) | RF s volitelným `FRAME`, Node testy `sestavFetchPozadavek_` |

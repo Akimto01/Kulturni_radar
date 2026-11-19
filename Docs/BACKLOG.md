@@ -48,7 +48,7 @@ Plán z 28. 10. 2026 po auditu a měření pokrytí: nejdřív ověřit, pak zpe
 
 **Fáze 5 – šířka:**
 10. **Lokalizační testy podle A4** (~4–6 h, odhad nejistý): řazení podle češtiny, datum přes půlnoc a přechod letního času, stálá místa s diakritikou (E2E a API). Část `TZ` viz bod 4. → issue #40
-11. **R2 a R5 z POKRYTI.md:** kontrola verze frontendu ve smoke a smoke přes `FRAME` v CI. → issue #41 (R2), #42 (R5)
+11. **R2 a R5 z POKRYTI.md:** ~~kontrola verze frontendu ve smoke~~ **HOTOVO 19. 11. 2026** (#41, PR z pilotu #82) a smoke přes `FRAME` v CI. → issue #41 (R2), #42 (R5)
 12. ~~**Přímý API test přihlášení** (login přes skutečné API).~~ **HOTOVO 19. 11. 2026** (PR #83, 3 testy v `api.robot`, první implementace pilotem Claude Code Action #82). → issue #43
 13. **Sdílený skript kontroly úniku** (~30 min, položky v Testovacím dluhu) a ~~**hlídání počtů testů v README skriptem** (~30 min)~~ **HOTOVO 29. 10. 2026**; katalog testů (#44) je ve Fázi 6, bod 19. → issue #45, #46
 14. **Sjednocení testů s architekturou, zbylé dávky** (4, 6 až 10; zbývá z ~12 h). → issue #34

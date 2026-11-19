@@ -55,6 +55,27 @@ Nasazená verze odpovídá repu
     Should Be Equal As Strings    ${j}[verze]    ${verze_repo}
     ...    msg=Produkce hlásí verzi „${j}[verze]“, repo má „${verze_repo}“ – zapomenutý "clasp deploy -i" po push? (viz SKILL.md sekce 6)
 
+Nasazená verze frontendu odpovídá repu
+    [Tags]    smoke    api
+    [Documentation]    Riziko R2 (issue 41): `Index.html` na Cloudflare Pages se nasazuje
+    ...    `git push`, nezávisle na backendu. Porovná verzi z komentáře na
+    ...    začátku `Index.html` v repu s komentářem na ${SITE_URL}. Při
+    ...    nesouladu Cloudflare pravděpodobně ještě nenasadil poslední push
+    ...    (po pushi počkat, viz SKILL.md sekce 5). Jen pro statickou doménu:
+    ...    u Apps Script iframe (FRAME) je HTML zabalené, test se přeskočí.
+    Skip If    '${FRAME}' != ''    Verze frontendu se čte jen ze statické domény (FRAME je nastavené).
+    ${zdroj}=    Get File    ${CURDIR}/../../apps-script/Index.html
+    ${verze_repo}=    Přečíst verzi frontendu z textu    ${zdroj}    Index.html v repu
+    TRY
+        ${r}=    GET    ${SITE_URL}    timeout=10
+    EXCEPT    AS    ${chyba}
+        Fail    Frontend nedostupný (${chyba}) – test vyžaduje připojení na SITE_URL (viz resources.robot)
+    END
+    Status Should Be    200    ${r}
+    ${nasazeno}=    Přečíst verzi frontendu z textu    ${r.text}    stránka ${SITE_URL}
+    Should Be Equal As Strings    ${nasazeno}    ${verze_repo}
+    ...    msg=Frontend na webu hlásí verzi „${nasazeno}“, repo má „${verze_repo}“ – Cloudflare Pages ještě nenasadilo poslední push? (viz SKILL.md sekce 5)
+
 Events vrací akce s validními českými datumy
     [Tags]    smoke    regrese    api
     [Documentation]    Regresní test bugů v3.2–3.3: datumOd nesmí být
@@ -248,3 +269,12 @@ Dokončit redirect
         ${odpoved}=    GET    ${odpoved.headers}[Location]    expected_status=any    timeout=30
     END
     RETURN    ${odpoved}
+
+Přečíst verzi frontendu z textu
+    [Documentation]    Vrátí číslo verze z komentáře „Kulturní radar Index.html vX.YY“
+    ...    v zadaném textu; selže, když komentář chybí nebo je víc než jeden.
+    [Arguments]    ${text}    ${odkud}
+    ${shody}=    Get Regexp Matches    ${text}    <!-- Kulturní radar Index\\.html v([0-9.]+)    1
+    Length Should Be    ${shody}    1
+    ...    msg=V textu (${odkud}) se nenašel právě jeden komentář s verzí „Kulturní radar Index.html vX.YY“
+    RETURN    ${shody}[0]
