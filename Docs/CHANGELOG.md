@@ -1,5 +1,15 @@
 # Changelog
 
+## Backend v3.63 – síla mutačních testů po v3.62 – 19. 11. 2026
+### Proč
+- Mutační testy kritické sady na v3.62 (commit 2780817) skončily pod prahem: skóre 94,16 % proti 95 % (v3.61: 95,44 %). Přibylo 7 přeživších mutantů v `upsertEvents_`, v3.62 byla už nasazená, chování ověřily Node testy.
+- **4 ekvivalentní mutanti** na samostatné podmínce `if (changed && viaFuzzy && !jistaShoda) zmenenaPoleFuzzy = …`: proměnnou četl jen zápis logu sloučení, který běží za stejné podmínky, takže změna podmínky jen spočítala nepoužitou hodnotu.
+- **3 mutanti v párování podle konce (v3.57):** kontrolu „jen vícedenní akce na obou stranách“ (`jeVicedenni_` v indexu i u nové akce) ověřovaly negativní testy z v3.57 s dvojicí „Divadelní představení – Kulturní léto na Poděbradech“ a „Kulturní léto na Poděbradech“. Tu od v3.62 zastaví už pojistka série `jeAkceVSerii_`, takže kontrolu samotnou nic netestovalo.
+### Změněno
+- **`upsertEvents_`:** změněná pole pro log sloučení se počítají až v bloku, který log zapisuje (`zjistiZmenenaPole_` nečte sloupce 0, 14, 15 a 16, které se před ním přepisují). Bez změny chování.
+### Testy
+- **+2 Node testy (backend 488 → 490, celkem 700 → 702):** negativní párování podle konce bez dvojice série: existující vícedenní „Festival Janáček Brno“ proti nové jednodenní „Janáček Brno festival“ se stejným koncem a obráceně, obojí nový řádek. Ruční mutace (index podle konce i pro jednodenní řádky, párování podle konce i pro jednodenní novou akci) shodí vždy jeden z nich. Mutační skóre kritické sady viz CI.
+
 ## Backend v3.62 – fuzzy shoda: úzká změna, série a základ názvu (#71 krok 3, #73) – 19. 11. 2026
 ### Chyba
 - Ověření 19. 11. (#73): „Vánoce Brno – trhy…“ se fuzzy sloučila a hlásila jako změněná denně 11.–19. 11. AI pokaždé poslala jinou variantu názvu a jinak formulovaný dojezd, popis a zdroje; nejistá shoda (ne prakticky shodný název z v3.56) dál používala širokou definici změny z v3.42.

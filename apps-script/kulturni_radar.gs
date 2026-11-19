@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.62 (19. 11. 2026) – fuzzy shoda: změna jen posun termínu nebo stav i u nejisté shody, akce v sérii („X (Vánoce Brno)“) se nespáruje se sérií, shodný základ názvu bez závorek páruje akce se stejným začátkem i koncem (#71 krok 3, #73)
- * (předchozí: 3.61 – záznam o tvrdém ukončení: sledovaná města a přepočet počasí si na začátku zapíší značku, další běh pozná nedoběhnutý předchozí, zapíše řádek do KONTROL a pošle notifikaci (#81 krok 3, varianta D z #49))
+ * Verze: 3.63 (19. 11. 2026) – síla mutačních testů po v3.62: výpočet změněných polí pro log sloučení jen tam, kde se log zapisuje, a negativní testy párování podle konce bez dvojice série (bez změny chování)
+ * (předchozí: 3.62 – fuzzy shoda: změna jen posun termínu nebo stav i u nejisté shody, akce v sérii („X (Vánoce Brno)“) se nespáruje se sérií, shodný základ názvu bez závorek páruje akce se stejným začátkem i koncem (#71 krok 3, #73)
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.62';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.63';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -1343,7 +1343,6 @@ function upsertEvents_(ss, cfg, events) {
       // Fuzzy větev proto používá širší zjistiZmenenaPole_/
       // POLE_PRO_FUZZY_LOG_ (i misto/kategorie/cena/popis, ne jen
       // datum_do/stav) – cokoli obsahového se liší, bere se jako změna.
-      let zmenenaPoleFuzzy = null;
       //
       // v3.56: jistaShoda (prakticky shodný název) se vrací k úzké definici –
       // jinak se tatáž akce s pokaždé jiným ID hlásila jako změněná při každém
@@ -1364,7 +1363,6 @@ function upsertEvents_(ss, cfg, events) {
       const changed = dateKey_(old[1]) !== dateKey_(rowVals[1]) ||
         dateKey_(old[2]) !== dateKey_(ev.datum_do) ||
         norm_(old[13]) !== norm_(ev.stav);
-      if (changed && viaFuzzy && !jistaShoda) zmenenaPoleFuzzy = zjistiZmenenaPole_(old, rowVals);
 
       if (changed) {
         rowVals[0] = old[0];                     // ID zachovat
@@ -1373,6 +1371,10 @@ function upsertEvents_(ss, cfg, events) {
         rowVals[16] = old[16];                   // První nález zachovat
         sh.getRange(r, 1, 1, AKCE_WRITE_AV).setValues([rowVals.slice(0, AKCE_WRITE_AV)]);
         if (viaFuzzy && !jistaShoda) {
+          // v3.63: změněná pole se počítají jen tady, kde se log zapisuje (dřív
+          // samostatná podmínka nad blokem, jejíž mutanti byli ekvivalentní).
+          // zjistiZmenenaPole_ nečte sloupce 0, 14, 15 a 16, které se výš přepisují.
+          const zmenenaPoleFuzzy = zjistiZmenenaPole_(old, rowVals);
           zapsatFuzzyMergeLog_(sh, r, String(old[4] || ''), String(ev.nazev || ''), zmenenaPoleFuzzy);
         }
         if (norm_(ev.stav) === 'zrušeno') { stats.zrusene++; stats.zruseneNazvy.push(polozka(ev)); }

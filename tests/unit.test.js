@@ -3742,6 +3742,33 @@ test('v3.57: upsertEvents_ – negativní: vícedenní série se nespáruje s ex
   assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'Divadelní představení – Kulturní léto na Poděbradech');
 });
 
+// v3.63: negativní testy párování podle konce bez dvojice série. Testy výš
+// (v3.57) od v3.62 zastaví už pojistka jeAkceVSerii_, takže kontrolu
+// „jen vícedenní na obou stranách“ (jeVicedenni_ v indexu i u nové akce)
+// samy neověřují. Názvy jsou podmnožinou, spojila by je jen ta kontrola.
+test('v3.63: upsertEvents_ – negativní: existující vícedenní festival a nová jednodenní akce se stejným koncem → nový řádek', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciJanacek_()])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'jb-den', datum_od: '17. 11. 2026', datum_do: '17. 11. 2026', stav: 'potvrzeno',
+    nazev: 'Janáček Brno festival', misto: 'Mahenovo divadlo', kategorie: 'hudba',
+  }]);
+  assert.equal(stats.nove, 1, 'jednodenní akce se podle konce s vícedenní nepáruje');
+  assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'Festival Janáček Brno', 'festival se nepřejmenuje');
+});
+
+test('v3.63: upsertEvents_ – negativní: existující jednodenní akce a nový vícedenní festival se stejným koncem → nový řádek', () => {
+  const jednodenni = existujiciJanacek_({ id: 'jb-den', datumOd: '17. 11. 2026', datumDo: '17. 11. 2026', nazev: 'Janáček Brno festival' });
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([jednodenni])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'jb-fest', datum_od: '13. 10. 2026', datum_do: '17. 11. 2026', stav: 'potvrzeno',
+    nazev: 'Festival Janáček Brno', misto: 'Janáčkovo divadlo', kategorie: 'hudba',
+  }]);
+  assert.equal(stats.nove, 1, 'jednodenní řádek se do indexu podle konce nezařazuje');
+  assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'Janáček Brno festival', 'jednodenní akce se nepřejmenuje');
+});
+
 // ---------------------------------------------------------------------------
 // v3.62 (#71 krok 3, #73): rotující název, série a základ názvu bez závorek.
 // Produkční případy z 19. 11. 2026 (export AKCE, log sloučení).
