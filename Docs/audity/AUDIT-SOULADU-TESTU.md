@@ -88,7 +88,7 @@ Pořadí podle dopadu: nejdřív dávka 1 (zastaví kaskádové pády), pak 2, 3
 
 | Dávka | Obsah | Testy | Odhad | Stav |
 |---|---|---|---|---|
-| 1 | Úklid sdílené stránky: suite-level Test Teardown a `[Teardown] Close Page` | 27, 86, 108, 130, 806 (+ všechny testy sdílené stránky) | 1,5 až 2 h | čeká |
+| 1 | Úklid sdílené stránky: suite-level Test Teardown a `[Teardown] Close Page` | 27, 86, 108, 130, 806 (+ všechny testy sdílené stránky) | 1,5 až 2 h | hotovo 19. 11. 2026 (čeká na ověření v CI) |
 | 2 | B5.6 mapa: `WARN` na `Skip If` | 948, 967, 991, 1032, 1061 | 45 min | čeká |
 | 3 | B5.6 kalendář, přepnutí profilu, podkategorie | 860, 898, 302, 426 | 1 h | čeká |
 | 4 | Chip testy: baseline karet, oracle místo `#status`, bez Sleep | 592, 609, 708, 549 | 1,5 h | čeká |
@@ -112,6 +112,24 @@ Celkem zhruba 11 až 13 h, v issue vedeno jako 12 h.
   původní profil, aktuální měsíc kalendáře a scroll nahoru.
 - **Testy s vlastní stránkou** (27, 86, 108, 130, 806) dostanou `[Teardown] Close Page`.
   Testy s vlastním kontextem už `Close Context CURRENT` mají.
+- **Provedení (19. 11. 2026):** keyword `Obnovit sdílenou stránku po selhání` v `frontend.robot`
+  zavře cizí stránky, přepne na sdílenou stránku (první stránka prvního kontextu) a načte
+  ji znovu včetně přihlášení; reload zahodí dialogy, popupy, kategorie, profil i měsíc
+  kalendáře. Testy s vlastním `[Teardown]` suite-level teardown přepisují, ten si
+  stránku vrací sám. Pojistka: `testy_bez_teardownu` 9 → 0 (suite-level teardown pokrývá
+  všechny testy).
+
+### Co znamená „20 porušení“ a 121 v baseline
+
+Jde o dvě různá měření. **20** je počet řádků tabulky výše, tedy skupin porušení z auditu
+(jedna skupina může zahrnovat víc testů, např. #8 má 22 testů). **121** je součet
+výskytů, které počítá pojistka (`baseline-architektury-testu.json`): `warn_v_testech` 11,
+`testy_bez_teardownu` 9, `text_selektory` 11, `nth_selektory` 61, `sleep_bez_povoleni` 11,
+`regrese_bez_verze` 6, `krehky_bez_pricin` 12 (a `aserce_v_resources` 0). Pojistka ale
+neměří všechno z auditu (např. slabé aserce, třídy vstupů, API testy) a naopak počítá
+každý výskyt zvlášť (61× `nth=`). Čísla se tedy nemají porovnávat. Po dávce 1 je
+v baseline 112 (`testy_bez_teardownu` 0, `nth_selektory` 60, ten druhý byl už před
+dávkou o 1 nižší než baseline).
 
 ## Co se hlídá automaticky a co jen checklistem
 
@@ -125,9 +143,9 @@ a **selže, jen když některý počet vzroste**. Při poklesu vypíše výzvu k
 | Metrika | Pravidlo | Co se počítá | Baseline (28. 10. 2026) |
 |---|---|---|---|
 | `warn_v_testech` | B5.6 | `Log … level=WARN` v těle testu | 11 |
-| `testy_bez_teardownu` | B5.4 | test s `New Page`, `New Context`, `Select Options By`, `Otevřít radar na mobilním viewportu` nebo tagem `zapis` bez `[Teardown]` (suite-level Test Teardown pokrývá všechny) | 9 |
+| `testy_bez_teardownu` | B5.4 | test s `New Page`, `New Context`, `Select Options By`, `Otevřít radar na mobilním viewportu` nebo tagem `zapis` bez `[Teardown]` (suite-level Test Teardown pokrývá všechny) | 0 (od 19. 11. 2026, dřív 9) |
 | `text_selektory` | B4 | argument s `text=` ve volání klíčového slova | 11 |
-| `nth_selektory` | B4 | výskyty `nth=` ve volání klíčového slova | 61 |
+| `nth_selektory` | B4 | výskyty `nth=` ve volání klíčového slova | 60 (dřív 61) |
 | `aserce_v_resources` | B5.2 | `Should*` a `Get Text` v `resources.robot` | 0 |
 | `sleep_bez_povoleni` | B5.3 | `Sleep` bez komentáře `# povoleno:` na řádku | 11 |
 | `regrese_bez_verze` | B4 | test s tagem `regrese` bez `vX.YY` v názvu | 6 |
