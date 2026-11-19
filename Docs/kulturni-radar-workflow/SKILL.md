@@ -287,6 +287,20 @@ cíl, každý `.md` v `Docs/` musí být v `Docs/README.md`, tabulka „Podle ro
 přepsat stav na „máme“). **Nový dokument v `Docs/` = řádek v rozcestníku ve stejném commitu.**
 Archiv a CHANGELOG se jako zdroje odkazů nekontrolují (historické cesty).
 
+### Přeškrtnutí v BACKLOGu u PR a řádků s více issues (od 19. 11. 2026)
+
+- **PR se squash merge:** položku v BACKLOGu přeškrtnout commitem na větvi PR ještě
+  před merge, ať je přeškrtnutí v `main` dřív, než se issue zavře (jinak kontrola
+  boardu hlásí „přeškrtnutá, ale otevřené“ nebo naopak). Pak merge, CI na `main`,
+  komentář a `gh issue close`, teprve potom kontroly (PR #83 a #84).
+- **Řádek s víc issues** (`→ issue #41 (R2), #42 (R5)`): kontrola bere přeškrtnutí
+  podle začátku řádku. Když je hotové jen jedno issue, přeškrtnout jen jeho část
+  uvnitř řádku (`~~kontrola verze frontendu~~ **HOTOVO …**`) a šipku nechat; celý
+  řádek přeškrtnout až se zavřením posledního issue.
+- **Nápad, který přežije uzavřené issue** (pilot #82, noční cron zůstává nápadem):
+  šipku `→ issue #N` na zavřené issue odstranit a napsat odkaz textem
+  („Pilot: #82 (uzavřen)“), řádek nechat nepřeškrtnutý.
+
 ## 4. Konec pracovní session
 
 Na konci každé pracovní session (rozloučení, „jdu spát", „končím na dnešek",
@@ -467,6 +481,11 @@ Frontend (`tests/frontend-harness.js`, `nactiFrontendFunkce(['fn1','fn2'])`):
   skončit chybou a testy nepouštět. Jinak neaplikovaná mutace vypadá jako nezachycená,
   nebo naopak jako chycená. Ověřit, že se zdroj opravdu změnil (`git diff --stat` nebo
   počet nahrazení), než se testy spustí. Zjištěno 29. 10. 2026 v #35 dávce 2.
+- **Escapování ověřovat podle znaků v souboru, ne podle výpisu** (19. 11. 2026, #41):
+  Python `repr`, JSON i některé diffy zobrazují zpětné lomítko zdvojeně. V RF je
+  `Index\\.html` (dvě lomítka v souboru) správně, RF z nich udělá regex `Index\.html`;
+  čtyři lomítka by vzor rozbila. Počet ověřit `s.count(chr(92))` nad úsekem souboru
+  a hlavně spuštěním testu (pozitivně i negativně), než se „oprava“ escapování udělá.
 
 ### Tajné hodnoty v RF reportech (incident #33, 28. 10. 2026)
 
@@ -482,6 +501,12 @@ GitHub maskuje secrets jen v konzoli, ne v souborech z testů (`output.xml`,
 - `playwright-log.txt` do reportů nepatří (zapisuje i hodnoty z DOM).
 - Hledání úniku vždy počítáním výskytů (`grep -c`, `-l`), nikdy vypsáním
   hodnoty.
+- **Návratová hodnota z bloku s `Log Level NONE`** (19. 11. 2026, PR #83): přiřazení
+  `${j}=    Klíčové slovo` zapíše RF do reportu až při obnovené úrovni logování,
+  i když klíčové slovo uvnitř běželo při NONE. Z bloku proto vracet jen zúžená
+  data (vybrané klíče, příznaky), nikdy celou odpověď API: odpověď loginu nese
+  i ntfy téma profilu a kontrola úniku v CI ho našla (`radar-` + 32 hex). Zúžení
+  dělat v pomocném klíčovém slově volaném uvnitř bloku NONE.
 
 ### Měření pokrytí kódu (od 28. 10. 2026)
 
@@ -1002,3 +1027,13 @@ Od 27. 10. 2026: milníky = cíle z BACKLOG.md (Cíl 1–4), pole Odhad (h) a Te
 Na Vojtově stroji je aktivní účet gh pracovní cermakvoj-tesena (v repu jen READ, bez scope project). Pro práci s issues a boardem používat u každého příkazu GH_TOKEN=$(gh auth token --user Akimto01), globální účet nepřepínat.
 
 Nastavení pohledů boardu (claude-in-chrome): po kliknutí na „Save view“ GitHub otevře potvrzovací dialog „Save display options … make it the default for everyone“, který se musí potvrdit tlačítkem „Save“ – Escape ho zruší a změna se tiše neuloží (27. 10. 2026 dvakrát). Změny pohledu (visibleFields, groupedBy, sumFields) jdou předvyplnit parametry v URL pohledu, pak stačí uložit. Uložení vždy ověřit znovunačtením čisté URL bez parametrů. V GitHub UI hledat prvky přes find, ne souřadnicemi – okno mění velikost a klik mine.
+
+- **Pilot Claude Code: `--max-turns` se kontroluje až po doběhnutí** (19. 11. 2026, běh 3 #34):
+  akce `anthropics/claude-code-action` po překročení limitu označí běh jako failure, i když
+  Claude práci dokončil; další kroky se přeskočí, artefakt nevznikne a hotová práce se
+  zahodí (57 kroků při limitu 40, ~1,14 USD). Limit proto nastavit s rezervou (dnes 80),
+  skutečnou brzdou je `timeout-minutes` jobu. Úkoly pro pilot nesou štítek `claude-ready`
+  (výběr a výjimky v `Docs/aplikace/PROVOZ.md`, sekce Pilot).
+- **Dočasná větev pro zkoušku** (např. vynucené selhání) spouští všechna CI, takže mail o pádu
+  Node testů nebo RF na ní je očekávaný; větev po zkoušce smazat lokálně i na GitHubu
+  (19. 11. 2026, docasne/obnova-34).
