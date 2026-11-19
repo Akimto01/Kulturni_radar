@@ -1,5 +1,11 @@
 # Changelog
 
+## CI: pilot Claude Code, úprava po 1. běhu (#82) – 19. 11. 2026
+- **Nálezy 1. běhu (#43, PR #83):** v PR byl `robocop.json` (výstup nástroje v kořeni repa), nový test porušil pravidlo B4 (tag regrese) a lint ani architekturu testů nikdo nespustil, takže se chyby ukázaly až ručně na větvi.
+- **`claude-pilot.yml`, job `claude`:** po Claudovi a Node testech nově setup-python a stejné kontroly jako `node-tests.yml`: RF dry run, `kontrola-architektury-testu.py`, `kontrola-poctu-testu.py`, `kontrola-dokumentace.py` a `kontrola-lintu.py` (spouští se z `RUNNER_TEMP`, ať případné výstupy nástrojů nekončí v repu). Spadne-li kontrola, artefakt ani PR nevznikne. Nový krok vypíše nové soubory v repu do shrnutí v PR.
+- **Prompt:** výstupy nástrojů jen do `RUNNER_TEMP`, nikdy do repa.
+- Dokumentace: PROVOZ.md (sekce Pilot).
+
 ## Backend v3.64 – počasí v přehledech a sonda samotestu bez Open-Meteo (#81 krok 4) – 19. 11. 2026
 ### Proč
 - Open-Meteo z Apps Scriptu trvale vrací HTTP 429 (od 1. 11.). List POČASÍ ho od v3.60 nevolá, ale `weatherFor_` (počasí v týdenním přehledu, víkendových tipech a u stálých míst) dál zkoušelo geokódování i předpověď z Open-Meteo a met.no bralo jen jako zálohu. Sonda samotestu `weatherApiDostupne_` mířila na Open-Meteo, takže by nedělní samotest hlásil výpadek, i když počasí z met.no funguje.
