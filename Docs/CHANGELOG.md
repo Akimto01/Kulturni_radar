@@ -1,5 +1,16 @@
 # Changelog
 
+## Testy: dávka 1 sjednocení s architekturou, úklid sdílené stránky (#34) – 19. 11. 2026
+### Proč
+- Po pádu testu zůstala aktivní cizí stránka nebo otevřený dialog a následující testy běžely nad zkresleným stavem (kaskáda pádů, audit řádek 5 a 8).
+### Změněno
+- **`tests/robot/frontend.robot`:** suite-level `Test Teardown    Run Keyword If Test Failed    Obnovit sdílenou stránku po selhání`. Nové klíčové slovo zavře cizí stránky, přepne na sdílenou stránku, načte ji znovu a přihlásí; jen po selhání, aby se nezatěžoval Apps Script při bězích, které projdou. Z `Otevřít radar` vyčleněno `Počkat na data radaru`.
+- **Pět testů s vlastní stránkou** (přihlašovací obrazovka, anonymní režim, špatný PIN, odhlášení, stránka bez JS chyby): `Close Page` přesunut z konce těla do `[Teardown]`, takže proběhne i po pádu.
+- **Baseline pojistky architektury:** `testy_bez_teardownu` 9 → 0, `nth_selektory` 61 → 60 (rozdíl existoval už před změnou).
+- **Dokumentace:** AUDIT-SOULADU-TESTU.md (stav dávky 1, rozhodnutí, vysvětlení „20 porušení“ proti 121 v baseline: skupiny z auditu proti výskytům v pojistce), ARCHITEKTURA-TESTU.md (odkaz na vysvětlení).
+### Testy
+- Bez změny počtu testů (Node 486 + 212, RF 66). Ověřeno dry runem a lintem; živý běh teardownu se ověří v CI.
+
 ## CI: pilot Claude Code, max-turns 80 po běhu 3 (#82) – 19. 11. 2026
 - **Běh 3** (44563043357, #34): Claude doběhl úspěšně za 4 min, ale po 57 krocích při limitu 40. Akce limit kontroluje až po doběhnutí, takže běh označila jako failure, další kroky se přeskočily, artefakt nevznikl a hotová práce se zahodila. Odhad ceny běhu podle logu 1,14 USD (čerpá z předplatného přes `CLAUDE_CODE_OAUTH_TOKEN`).
 - **`claude-pilot.yml`:** `--max-turns 40` → `--max-turns 80`, komentář nad krokem Claude Code s důvodem. Skutečnou brzdou je `timeout-minutes` jobu (30 min).

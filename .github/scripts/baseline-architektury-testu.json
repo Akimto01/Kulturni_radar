@@ -2,9 +2,9 @@
   "poznamka": "Pojistka proti nárůstu porušení, viz Docs/audity/AUDIT-SOULADU-TESTU.md. Baseline se jen snižuje.",
   "pocty": {
     "warn_v_testech": 11,
-    "testy_bez_teardownu": 9,
+    "testy_bez_teardownu": 0,
     "text_selektory": 11,
-    "nth_selektory": 61,
+    "nth_selektory": 60,
     "aserce_v_resources": 0,
     "sleep_bez_povoleni": 11,
     "regrese_bez_verze": 6,

@@ -13,6 +13,7 @@ Library           Browser
 Resource          resources.robot
 Suite Setup       Otevřít radar
 Suite Teardown    Close Browser
+Test Teardown     Run Keyword If Test Failed    Obnovit sdílenou stránku po selhání
 
 *** Variables ***
 ${PROBIHA_LABEL}    Probíhá / dlouhodobé
@@ -73,6 +74,7 @@ Přihlašovací obrazovka nabízí dlaždice profilů k výběru
     [Documentation]    v3.14: appka startuje anonymně – login overlay se otevírá
     ...    badgem "Přihlásit se". Vlastní nezávislá stránka, aby test ověřil
     ...    počáteční stav bez ovlivnění přihlášení sdílené stránky.
+    [Teardown]    Close Page
     New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Click    ${FRAME} \#uzivatel-badge
@@ -82,7 +84,6 @@ Přihlašovací obrazovka nabízí dlaždice profilů k výběru
     ${existuje}=    Get Element Count    ${FRAME} .dlazdice-uzivatel[data-uzivatel-id="${RF_TEST_USER_ID}"]
     Should Be Equal As Integers    ${existuje}    1
     ...    msg=Testovací profil RF_TEST_USER_ID se mezi dlaždicemi nenašel – je založený v UŽIVATELÍCH (a nastavil Suite Setup příznak testovacích profilů)?
-    Close Page
 
 Testovací profil je bez příznaku na přihlašovací obrazovce skrytý (vlastní kontext)
     [Tags]    ui    regrese
@@ -134,6 +135,7 @@ Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastn
     ...    2) Klik na ★ v anonymním stavu NEZAPÍŠE nic – místo toho otevře
     ...    login overlay s vysvětlením. Overlay jde zavřít "Pokračovat bez
     ...    přihlášení" a appka zůstává funkční.
+    [Teardown]    Close Page
     New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
@@ -147,7 +149,6 @@ Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastn
     Click    ${FRAME} \#login-pokracovat-bez
     Wait For Elements State    ${FRAME} \#login-overlay    hidden    timeout=5s
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
-    Close Page
 
 Špatný PIN zobrazí chybu a nepřihlásí (vlastní stránka)
     [Tags]    ui
@@ -155,6 +156,7 @@ Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastn
     ...    Záměrně syntakticky platný PIN (splňuje pinVypadaPlatne_, 4–8 znaků,
     ...    bez mezer), jen espere nesprávný, ať se otestuje SERVEROVÁ validace,
     ...    ne jen klientská. v3.14: overlay se otevírá badgem.
+    [Teardown]    Close Page
     New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Click    ${FRAME} \#uzivatel-badge
@@ -169,7 +171,6 @@ Anonymní režim: appka funguje bez přihlášení a ★ vyžádá login (vlastn
     ${stale_prihlasovaci}=    Get Element Count    ${FRAME} \#login-overlay:not(.skryto)
     Should Be Equal As Integers    ${stale_prihlasovaci}    1
     ...    msg=Po špatném PINu appka NESMÍ přihlásit – overlay musí zůstat viditelný
-    Close Page
 
 Odhlášení vrátí appku do anonymního režimu (vlastní stránka)
     [Tags]    regrese
@@ -177,6 +178,7 @@ Odhlášení vrátí appku do anonymního režimu (vlastní stránka)
     ...    v sandboxovaném iframu → prázdná stránka) + v3.14 chování: po
     ...    odhlášení se appka vrací do FUNKČNÍHO anonymního režimu (karty
     ...    viditelné, badge zpět na "Přihlásit se"), žádný vynucený login.
+    [Teardown]    Close Page
     New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
@@ -189,7 +191,6 @@ Odhlášení vrátí appku do anonymního režimu (vlastní stránka)
     ...    msg=Po odhlášení má appka zůstat funkční anonymně, ne vynucovat login
     ${badge}=    Get Text    ${FRAME} \#uzivatel-badge
     Should Contain    ${badge}    Přihlásit    msg=Badge se má vrátit na "Přihlásit se"
-    Close Page
 
 Profil: dialog obsahuje osobní filtry a tlačítko Najít akce pro mě (bez spuštění)
     [Tags]    ui
@@ -855,6 +856,7 @@ Stránka se načte bez JS chyby v konzoli
     ...    Vlastní nezávislá stránka, ať se chytí i chyby ze samotného
     ...    startu (init(), inicializovatMapu_ atd.), ne jen z pozdější
     ...    interakce na sdílené stránce.
+    [Teardown]    Close Page
     New Page    ${SITE_URL}
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
     ${chyby_stranky}=    Get Page Errors    full=True
@@ -864,7 +866,6 @@ Stránka se načte bez JS chyby v konzoli
     ${console_chyby}=    Evaluate    [m for m in $log if m['type'] == 'error']
     Should Be Empty    ${console_chyby}
     ...    msg=Konzole obsahuje console.error() zprávy: ${console_chyby}
-    Close Page
 
 Kalendář lze otevřít a zavřít přes #kalendar-toggle (mobil)
     [Tags]    smoke    kalendar    krehky
@@ -1323,11 +1324,41 @@ Otevřít radar
     Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
     Povolit testovací profily
     Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
-    # Data přicházejí asynchronně přes google.script.run → počkat na
-    # první chip (meta hotová) a první kartu (events hotové), jinak
-    # county v testech běží proti prázdnému UI (race condition).
+    Počkat na data radaru
+
+Počkat na data radaru
+    [Documentation]    Data přicházejí asynchronně přes google.script.run → počkat
+    ...    na první chip (meta hotová) a první kartu (events hotové), jinak
+    ...    testy běží proti prázdnému UI (race condition).
     Wait For Elements State    ${FRAME} .chip >> nth=0     visible    timeout=20s
     Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=20s
+
+Obnovit sdílenou stránku po selhání
+    [Documentation]    Suite-level Test Teardown, volaný jen po selhání testu
+    ...    (`Run Keyword If Test Failed` v Settings): obnova při každém testu
+    ...    by přidala kliky a načítání na běhy, které projdou, a zatížila by
+    ...    Apps Script. Zavře cizí stránky (zbylé po pádu), vrátí aktivní
+    ...    sdílenou stránku ze Suite Setup a znovu ji načte a přihlásí, čímž
+    ...    zmizí otevřené dialogy a popupy a vrátí se výchozí profil,
+    ...    kategorie „Vše“, aktuální měsíc kalendáře a scroll nahoře.
+    ...    Testy s vlastním [Teardown] (Close Page, Close Context CURRENT)
+    ...    tenhle teardown přepisují a stránku si vrací samy.
+    ...    Sdílený kontext a stránka jsou první v pořadí vzniku (Suite Setup
+    ...    je vytvoří jako první), proto se hledají podle pořadí, ne přes
+    ...    proměnné sady.
+    ...    Při selhání Suite Setup (profil chybí, test přeskočen) není co obnovovat.
+    ${kontexty}=    Get Context Ids
+    IF    not $kontexty    RETURN
+    Switch Context    ${kontexty}[0]
+    ${stranky}=    Get Page Ids
+    FOR    ${id}    IN    @{stranky}[1:]
+        Close Page    ${id}
+    END
+    Switch Page    ${stranky}[0]
+    Reload
+    Wait For Elements State    ${FRAME} header h1    visible    timeout=20s
+    Přihlásit se do radaru    ${RF_TEST_USER_ID}    ${RF_TEST_PIN}
+    Počkat na data radaru
 
 Povolit testovací profily
     [Documentation]    v3.60 (Index.html): testovací profily (ID „rf-…“) se na
