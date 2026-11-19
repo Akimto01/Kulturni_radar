@@ -8,7 +8,7 @@
 ### Změněno
 - **`upsertEvents_`:** změněná pole pro log sloučení se počítají až v bloku, který log zapisuje (`zjistiZmenenaPole_` nečte sloupce 0, 14, 15 a 16, které se před ním přepisují). Bez změny chování.
 ### Testy
-- **+2 Node testy (backend 488 → 490, celkem 700 → 702):** negativní párování podle konce bez dvojice série: existující vícedenní „Festival Janáček Brno“ proti nové jednodenní „Janáček Brno festival“ se stejným koncem a obráceně, obojí nový řádek. Ruční mutace (index podle konce i pro jednodenní řádky, párování podle konce i pro jednodenní novou akci) shodí vždy jeden z nich. Mutační skóre kritické sady viz CI.
+- **+2 Node testy (backend 488 → 490, celkem 700 → 702):** negativní párování podle konce bez dvojice série: existující vícedenní „Festival Janáček Brno“ proti nové jednodenní „Janáček Brno festival“ se stejným koncem a obráceně, obojí nový řádek. Ruční mutace (index podle konce i pro jednodenní řádky, párování podle konce i pro jednodenní novou akci) shodí vždy jeden z nich. Mutační skóre kritické sady 94,16 → 95,47 % (běh 44535593365).
 
 ## Backend v3.62 – fuzzy shoda: úzká změna, série a základ názvu (#71 krok 3, #73) – 19. 11. 2026
 ### Chyba
