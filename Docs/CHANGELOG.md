@@ -8,7 +8,7 @@
 - Bez změny `kulturni_radar.gs` a `Index.html`, proto bez bumpu verze. Tag `regrese` test nemá (nejde o konkrétní historický bug, jinak by pojistka B4 chtěla verzi v názvu).
 - Dokumentace: README (počty), `POKRYTI.md` (R2 a seznam mezer), `TESTY.md` (R2).
 ### Testy
-- **RF celkem 65 → 66, API 12 → 13.** Node testy beze změny (486 + 212). Test ověřen proti produkci (verze 3.67 shodná), dry run, lint a pojistky architektury bez nárůstu.
+- **RF celkem 65 → 66, API 12 → 13.** Node testy beze změny (486 + 212). Ověřeno lokálně proti produkci 19. 11. 2026: PASS (verze 3.67 v repu i na kulturniradar.cz); negativní zkouška s dočasně změněnou verzí v `Index.html` spadla s hláškou o Cloudflare. Dry run, lint a pojistky architektury bez nárůstu.
 
 ## Backend v3.65 – úklid po odstranění Open-Meteo (#81) – 19. 11. 2026
 ### Proč
