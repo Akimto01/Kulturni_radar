@@ -1,5 +1,10 @@
 # Changelog
 
+## CI: pilot Claude Code, max-turns 80 po běhu 3 (#82) – 19. 11. 2026
+- **Běh 3** (44563043357, #34): Claude doběhl úspěšně za 4 min, ale po 57 krocích při limitu 40. Akce limit kontroluje až po doběhnutí, takže běh označila jako failure, další kroky se přeskočily, artefakt nevznikl a hotová práce se zahodila. Odhad ceny běhu podle logu 1,14 USD (čerpá z předplatného přes `CLAUDE_CODE_OAUTH_TOKEN`).
+- **`claude-pilot.yml`:** `--max-turns 40` → `--max-turns 80`, komentář nad krokem Claude Code s důvodem. Skutečnou brzdou je `timeout-minutes` jobu (30 min).
+- Dokumentace: PROVOZ.md (sekce Pilot).
+
 ## CI: API smoke v pilotu Claude Code, tag verze (#82) – 19. 11. 2026
 - **Proč:** shrnutí běhu 2 (#41, PR #84) tvrdilo „nový RF test proti produkci: PASS“, ale z logu jobu to nešlo doložit (akce volání nástrojů Clauda nevypisuje). Test byl správný, ověřil se až při review. Tvrzení ve shrnutí nejsou důkaz.
 - **`claude-pilot.yml`, job `claude`:** nový krok „API smoke proti produkci“ po kontrolách: `robot --include smoke --exclude verze tests/robot/api.robot`, jen čtecí GET bez tajných hodnot, report do `RUNNER_TEMP` (nenahrává se). Spadne-li, PR nevznikne.

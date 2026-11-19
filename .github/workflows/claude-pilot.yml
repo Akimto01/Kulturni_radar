@@ -53,6 +53,9 @@ jobs:
           fi
           gh issue view "$ISSUE" --json title,body -q '"# " + .title + "\n\n" + .body' > "$RUNNER_TEMP/zadani.md"
 
+      # Limit kroků --max-turns 80 (od běhu 3, dřív 40). Akce limit kontroluje až po doběhnutí;
+      # běh 3 (#34) skončil po 57 krocích jako failure a hotová práce se zahodila.
+      # Skutečnou brzdou je timeout-minutes jobu.
       - name: Claude Code
         uses: anthropics/claude-code-action@v1
         with:
@@ -76,7 +79,7 @@ jobs:
             - Když zadání není jasné nebo vyžaduje rozhodnutí, nic neměň a do
               shrnutí napiš, na co se Vojta musí rozhodnout.
           claude_args: |
-            --max-turns 40
+            --max-turns 80
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(node:*),Bash(python3:*),Bash(git status:*),Bash(git diff:*)"
 
       # Testy znovu, nezávisle na tom, co tvrdí shrnutí. Spadnou-li, job „pr“ neběží.
