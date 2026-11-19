@@ -281,41 +281,6 @@ function frontaFetchu(fronta, volane = []) {
   };
 }
 
-const GEO_BRNO = { code: 200, body: { results: [{ latitude: 49.19, longitude: 16.61 }] } };
-const FORECAST = {
-  code: 200,
-  body: { daily: { time: ['2026-08-03'], weather_code: [1], temperature_2m_max: [27.4], precipitation_probability_max: [10] } },
-};
-
-test('v3.5: weatherFor_ přežije jeden výpadek předpovědi (retry)', () => {
-  const ctx = nactiRadar({ urlFetch: frontaFetchu([GEO_BRNO, { code: 500, body: {} }, FORECAST]) });
-  const w = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 3), {});
-  assert.equal(w, 'polojasno, max 27 °C, srážky 10 %');
-  assert.equal(ctx.__sleepMs.length, 1, 'mezi pokusy je právě jedna pauza');
-});
-
-test('v3.5: weatherFor_ přežije síťovou výjimku při geokódování (retry)', () => {
-  const ctx = nactiRadar({ urlFetch: frontaFetchu(['throw', GEO_BRNO, FORECAST]) });
-  const w = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 3), {});
-  assert.equal(w, 'polojasno, max 27 °C, srážky 10 %');
-});
-
-test('v3.5: úplný výpadek → prázdný řetězec, žádný pád, výsledek se cachuje', () => {
-  const volane = [];
-  const ctx = nactiRadar({ urlFetch: frontaFetchu(['throw', 'throw'], volane) });
-  const cache = {};
-  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 3), cache), '');
-  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 3), cache), '', 'druhé volání jde z cache');
-  assert.equal(volane.length, 2, 'jen 2 pokusy geokódování, cache brání dalším');
-});
-
-test('v3.5: weatherApiDostupne_ – true při 200, false při výpadku', () => {
-  const ok = nactiRadar({ urlFetch: frontaFetchu([FORECAST]) });
-  assert.equal(ok.weatherApiDostupne_(), true);
-  const down = nactiRadar({ urlFetch: frontaFetchu([{ code: 503, body: {} }, 'throw']) });
-  assert.equal(down.weatherApiDostupne_(), false);
-});
-
 // ---------------------------------------------------------------------------
 // v3.5: číslo verze má jediný zdroj pravdy (regrese: meta hlásila 3.4 u kódu 3.5)
 // ---------------------------------------------------------------------------
@@ -537,42 +502,81 @@ test('agregovatMetNoDen_: den mimo rozsah timeseries → null', () => {
 
 const METNO_FIXTURE = { code: 200, body: { properties: { timeseries: METNO_TIMESERIES } } };
 
-test('v3.10: Open-Meteo selže úplně → weatherFor_ použije met.no jako fallback', () => {
-  const ctx = nactiRadar({ urlFetch: frontaFetchu([GEO_BRNO, 'throw', 'throw', METNO_FIXTURE]) });
-  const w = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), {});
-  assert.equal(w, 'polojasno, max 27 °C');   // met.no formát nemá „srážky %“
-});
+// ---------------------------------------------------------------------------
+// v3.64 (#81 krok 4): weatherFor_ a sonda samotestu bez Open-Meteo.
+// Souřadnice obce z listu SOUŘADNICE (při chybění Nominatim), předpověď met.no.
+// ---------------------------------------------------------------------------
 
-test('v3.10: Open-Meteo odpoví, ale bez dat pro konkrétní den → fallback na met.no', () => {
-  const FORECAST_JINY_DEN = {
-    code: 200,
-    body: { daily: { time: ['2099-01-01'], weather_code: [1], temperature_2m_max: [10], precipitation_probability_max: [5] } },
-  };
-  const ctx = nactiRadar({ urlFetch: frontaFetchu([GEO_BRNO, FORECAST_JINY_DEN, METNO_FIXTURE]) });
-  const w = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), {});
-  assert.equal(w, 'polojasno, max 27 °C');
-});
+/** Tabulka se SOUŘADNICEMI obce Brno (klíč obce jako v aktualizujPocasi_). */
+const ssSBrnem_ = () => fakeSpreadsheet({ 'SOUŘADNICE': [[], [r.klicSouradnic_('', 'Brno'), 49.19, 16.61, '', '']] });
+const NOMINATIM_BRNO_ = { code: 200, body: [{ lat: '49.19', lon: '16.61' }] };
 
-test('v3.10: Open-Meteo funguje → met.no se vůbec nevolá (fronta by jinak spadla na prázdno)', () => {
-  const ctx = nactiRadar({ urlFetch: frontaFetchu([GEO_BRNO, FORECAST]) });  // jen 2 položky, žádný met.no
-  const w = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 3), {});
-  assert.equal(w, 'polojasno, max 27 °C, srážky 10 %');  // formát Open-Meteo, se srážkami
-});
-
-test('v3.10: oba zdroje selžou → prázdný řetězec, žádný pád', () => {
-  const ctx = nactiRadar({ urlFetch: frontaFetchu(['throw', 'throw', 'throw', 'throw', 'throw']) });
-  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), {}), '');
-});
-
-test('v3.10: met.no fallback se cachuje – druhé volání pro stejnou obec nic dalšího nestahuje', () => {
+test('v3.64: weatherFor_ – obec v SOUŘADNICÍCH → jen jedno volání met.no, žádné Open-Meteo', () => {
   const volane = [];
-  const ctx = nactiRadar({ urlFetch: frontaFetchu([GEO_BRNO, 'throw', 'throw', METNO_FIXTURE], volane) });
+  const ctx = nactiRadar({ ss: ssSBrnem_(), urlFetch: frontaFetchu([METNO_FIXTURE], volane) });
+  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), {}), 'polojasno, max 27 °C');
+  assert.equal(volane.length, 1);
+  assert.match(volane[0], /^https:\/\/api\.met\.no\/.*lat=49\.19&lon=16\.61$/);
+});
+
+test('v3.64: weatherFor_ – obec bez souřadnic → Nominatim, zápis do SOUŘADNIC, pak met.no', () => {
+  const volane = [];
+  const ss = fakeSpreadsheet({});
+  const ctx = nactiRadar({ ss, urlFetch: frontaFetchu([NOMINATIM_BRNO_, METNO_FIXTURE], volane) });
+  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), {}), 'polojasno, max 27 °C');
+  assert.match(volane[0], /nominatim/);
+  assert.match(volane[1], /api\.met\.no/);
+  assert.equal(ss.getSheetByName('SOUŘADNICE').getLastRow(), 2, 'souřadnice obce se uloží pro příště');
+});
+
+test('v3.64: weatherFor_ – met.no přežije jeden výpadek (retry)', () => {
+  const ctx = nactiRadar({ ss: ssSBrnem_(), urlFetch: frontaFetchu([{ code: 500, body: {} }, METNO_FIXTURE]) });
+  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), {}), 'polojasno, max 27 °C');
+  assert.equal(ctx.__sleepMs.length, 1, 'mezi pokusy je právě jedna pauza');
+});
+
+test('v3.64: weatherFor_ – úplný výpadek met.no → prázdný řetězec a cache brání dalším pokusům', () => {
+  const volane = [];
+  const ctx = nactiRadar({ ss: ssSBrnem_(), urlFetch: frontaFetchu(['throw', 'throw'], volane) });
   const cache = {};
-  const prvni = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), cache);
-  const druhy = ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 9), cache);   // jiný den, stejná obec
-  assert.equal(prvni, 'polojasno, max 27 °C');
-  assert.equal(druhy, 'déšť, max 15 °C');
-  assert.equal(volane.length, 4, 'geocode + 2× Open-Meteo retry + 1× met.no – a víc nic, i pro druhé volání');
+  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), cache), '');
+  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 9), cache), '', 'druhé volání jde z cache');
+  assert.equal(volane.length, 2, 'jen 2 pokusy, pak už nic');
+});
+
+test('v3.64: weatherFor_ – Nominatim obec nenajde → prázdný řetězec, met.no se nevolá', () => {
+  const volane = [];
+  const ctx = nactiRadar({ ss: fakeSpreadsheet({}), urlFetch: frontaFetchu([{ code: 200, body: [] }, { code: 200, body: [] }], volane) });
+  assert.equal(ctx.weatherFor_('Neexistujícíobec', new ctx.__Date(2026, 7, 8), {}), '');
+  assert.ok(volane.every(u => /nominatim/.test(u)), 'žádné volání met.no bez souřadnic');
+});
+
+test('v3.64: weatherFor_ – předpověď se stahuje jednou na obec, další den čerpá z cache', () => {
+  const volane = [];
+  const ctx = nactiRadar({ ss: ssSBrnem_(), urlFetch: frontaFetchu([METNO_FIXTURE], volane) });
+  const cache = {};
+  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 8), cache), 'polojasno, max 27 °C');
+  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 9), cache), 'déšť, max 15 °C');
+  assert.equal(ctx.weatherFor_('Brno', new ctx.__Date(2026, 7, 20), cache), '', 'den mimo dosah předpovědi');
+  assert.equal(volane.length, 1);
+});
+
+test('v3.64: weatherFor_ – bez obce → prázdný řetězec bez volání', () => {
+  const volane = [];
+  const ctx = nactiRadar({ ss: ssSBrnem_(), urlFetch: frontaFetchu([], volane) });
+  assert.equal(ctx.weatherFor_('', new ctx.__Date(2026, 7, 8), {}), '');
+  assert.equal(volane.length, 0);
+});
+
+test('v3.64: weatherApiDostupne_ – sonda na met.no: true při odpovědi s předpovědí, false při výpadku', () => {
+  const volane = [];
+  const ok = nactiRadar({ urlFetch: frontaFetchu([METNO_FIXTURE], volane) });
+  assert.equal(ok.weatherApiDostupne_(), true);
+  assert.match(volane[0], /api\.met\.no/);
+  const prazdne = nactiRadar({ urlFetch: frontaFetchu([{ code: 200, body: { properties: { timeseries: [] } } }]) });
+  assert.equal(prazdne.weatherApiDostupne_(), false, 'odpověď bez předpovědi není dostupnost');
+  const down = nactiRadar({ urlFetch: frontaFetchu([{ code: 503, body: {} }, 'throw']) });
+  assert.equal(down.weatherApiDostupne_(), false);
 });
 
 // ---------------------------------------------------------------------------
@@ -5682,7 +5686,8 @@ test('#35 weekendDigest: stálá místa (aktivní, top 5 podle skóre) v sekci s
   const mista = [['ID', 'Název', 'Typ', 'Obec']].concat([misto('Zoo-A', 9), misto('Zoo-B', 7), misto('Zoo-C', 6), misto('Zoo-D', 5), misto('Zoo-E', 4), misto('Zoo-F', 3),
     misto('Zavrene', 10, 'zavřeno')]);
   const volane = [];
-  const { ctx } = ctxPrehled_([2026, 10, 5], { listy: { 'MÍSTA': mista }, urlFetch: frontaFetchu(['throw', 'throw'], volane) });
+  const { ctx } = ctxPrehled_([2026, 10, 5], { listy: { 'MÍSTA': mista, 'SOUŘADNICE': [[], [r.klicSouradnic_('', 'Brno'), 49.19, 16.61, '', '']] },
+    urlFetch: frontaFetchu(['throw', 'throw'], volane) });
   ctx.weekendDigest();
   const telo = ctx.__odeslaneEmaily[0].telo;
   assert.match(telo, /Stálá místa \(7\. 11\. 2026\)/, 'sobota víkendu 6.–8. 11.');
@@ -5692,7 +5697,7 @@ test('#35 weekendDigest: stálá místa (aktivní, top 5 podle skóre) v sekci s
   assert.match(telo, /Zoo-E/);
   assert.doesNotMatch(telo, /Zoo-F/, 'jen top 5 podle skóre');
   assert.doesNotMatch(telo, /počasí \(/);
-  assert.ok(volane.every(u => /open-meteo/.test(u)), 'jen pokus o počasí, nic jiného');
+  assert.ok(volane.every(u => /api\.met\.no/.test(u)), 'jen pokus o počasí (met.no, v3.64), nic jiného');
 });
 
 /** Stálá místa pro testy přehledů: [název, typ, doba, skóre]; profil Brno, obec Brno, aktivní. */
@@ -5747,11 +5752,14 @@ test('digestRange_: stálá místa seskupená podle typu, typy řazené česky, 
 
 test('digestRange_: u stálých míst je pod názvem počasí na sobotu s obcí, předpověď se stahuje jednou za obec', () => {
   const volane = [];
-  const predpoved = { code: 200, body: { daily: { time: ['2026-11-07'], weather_code: [3], temperature_2m_max: [11.4], precipitation_probability_max: [20] } } };
+  // v3.64: souřadnice obce z Nominatim (list SOUŘADNICE je prázdný), předpověď met.no; srážky v % odpadly
+  const predpoved = { code: 200, body: { properties: { timeseries: [
+    { time: '2026-11-07T12:00:00Z', data: { instant: { details: { air_temperature: 11.4 } }, next_1_hours: { summary: { symbol_code: 'cloudy' } } } },
+  ] } } };
   const mista = mistaPrehled_([['Zoo-C', 'zoo', '8–18', 9], ['Hrad-A', 'hrad', '', 7]]);
-  const { ctx } = ctxPrehled_([2026, 10, 5], { listy: { 'MÍSTA': mista }, urlFetch: frontaFetchu([GEO_BRNO, predpoved], volane) });
+  const { ctx } = ctxPrehled_([2026, 10, 5], { listy: { 'MÍSTA': mista }, urlFetch: frontaFetchu([NOMINATIM_BRNO_, predpoved], volane) });
   ctx.weekendDigest();
-  const pocasi = '   počasí (Brno): zataženo, max 11 °C, srážky 20 %';
+  const pocasi = '   počasí (Brno): zataženo, max 11 °C';
   assert.equal(blokMist_(ctx.__odeslaneEmaily[0].telo), [
     'Stálá místa (7. 11. 2026)', '',
     '· Hrad:', '• Hrad-A', pocasi, '',

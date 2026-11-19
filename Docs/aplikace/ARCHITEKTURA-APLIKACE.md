@@ -109,7 +109,7 @@ zpětně pro starší akce: `doplnitSouradniceZpetne` (ruční, z menu,
 `digestRange_` čte AKCE (bez API): akce profilu zasahující do okna, mimo
 proběhlé/zrušené; seskupení podle kategorie (abecedně), uvnitř chronologicky;
 u položek čas konání. Sekce **Stálá místa**: top 5 z MÍST podle skóre,
-otevírací doba, a **živé** počasí (Open-Meteo, přes `weatherFor_`) na
+otevírací doba, a **živé** počasí (od v3.64 met.no se souřadnicemi obce ze SOUŘADNIC, přes `weatherFor_`) na
 nejbližší sobotu v okně — nezávislé na cache POČASÍ níže (jiný účel: tady
 jde o pár měst v e-mailu/notifikaci, ne o desítky konkrétních akcí ve
 frontendu). Selhání počasí nikdy neshodí přehled.

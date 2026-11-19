@@ -1,5 +1,16 @@
 # Changelog
 
+## Backend v3.64 – počasí v přehledech a sonda samotestu bez Open-Meteo (#81 krok 4) – 19. 11. 2026
+### Proč
+- Open-Meteo z Apps Scriptu trvale vrací HTTP 429 (od 1. 11.). List POČASÍ ho od v3.60 nevolá, ale `weatherFor_` (počasí v týdenním přehledu, víkendových tipech a u stálých míst) dál zkoušelo geokódování i předpověď z Open-Meteo a met.no bralo jen jako zálohu. Sonda samotestu `weatherApiDostupne_` mířila na Open-Meteo, takže by nedělní samotest hlásil výpadek, i když počasí z met.no funguje.
+### Změněno
+- **`weatherFor_(obec, den, cache)`:** souřadnice obce z listu SOUŘADNICE (při chybějícím záznamu Nominatim přes `zajistitSouradnice_`, výsledek se uloží), předpověď z met.no, jedno volání na obec za běh. Text „polojasno, max 27 °C“; pravděpodobnost srážek („srážky 10 %“) odpadá, met.no ji nemá. Dosah ~9 dní, dál prázdné.
+- **`weatherApiDostupne_`:** sonda na met.no (Brno). Hlášky samotestu mluví o met.no.
+- Frontend (`Index.html`) volá Open-Meteo dál z prohlížeče uživatele, kde limit nesdílí; beze změny.
+- Dokumentace: README (Nástroje a technologie: Open-Meteo jen frontend, met.no backend), ARCHITEKTURA-APLIKACE (přehledy).
+### Testy
+- **Backend 490 → 489, celkem 702 → 701:** 9 testů Open-Meteo pro `weatherFor_` a sondu (v3.5 a v3.10) nahrazeno 8 testy v3.64: obec v SOUŘADNICÍCH (jen met.no, žádné Open-Meteo), obec bez souřadnic (Nominatim, zápis, met.no), retry met.no, úplný výpadek s cache, Nominatim nenajde (met.no se nevolá), jedna předpověď na obec a den mimo dosah, prázdná obec, sonda (dostupná, prázdná předpověď, výpadek). Dva testy přehledů upraveny na met.no. Ruční mutace: sonda bez kontroly délky, bez cache obce, bez načtení SOUŘADNIC shodí test; vynechání kontroly souřadnic a dne je ekvivalentní (výjimku zachytí `try/catch` a výsledek je stejný prázdný řetězec). `weatherFor_` není v kritické sadě mutací. Pokrytí řádků 92,66 %, baseline zvýšena z 92,53 %.
+
 ## Backend v3.63 – síla mutačních testů po v3.62 – 19. 11. 2026
 ### Proč
 - Mutační testy kritické sady na v3.62 (commit 2780817) skončily pod prahem: skóre 94,16 % proti 95 % (v3.61: 95,44 %). Přibylo 7 přeživších mutantů v `upsertEvents_`, v3.62 byla už nasazená, chování ověřily Node testy.

@@ -36,7 +36,7 @@ Documentation is in Czech.*
 
 | Úroveň | Nástroj | Počet | Kdy běží |
 |---|---|---|---|
-| Jednotkové testy backendu (logika Apps Scriptu přes vlastní harness, bez Googlu) | `node:test` | 490 | každý push (CI) |
+| Jednotkové testy backendu (logika Apps Scriptu přes vlastní harness, bez Googlu) | `node:test` | 489 | každý push (CI) |
 | Jednotkové testy frontendu (čisté funkce z `Index.html`) | `node:test` | 212 | každý push (CI) |
 | Kontrola syntaxe a klíčových slov RF sady (dry run) | Robot Framework | 65 | každý push (CI) |
 | E2E testy proti produkci: frontend + API kontrakt | Robot Framework + Browser Library (Playwright), RequestsLibrary | 53 + 12 | týdně (CI) a smoke po každém nasazení |
@@ -119,8 +119,8 @@ Soupis toho, co projekt používá. První sloupec obsahuje identifikátor v zp�
 | Nástroj | K čemu | Kde v repu | Verze |
 |---|---|---|---|
 | Anthropic Claude API (`anthropic-api`) | hledání kulturních akcí s webovým vyhledáváním (`web_search_20250305`) | `apps-script/kulturni_radar.gs` (`ANTHROPIC_MODEL`, `ANTHROPIC_URL`) | model `claude-sonnet-5-5`, API `2023-06-01` |
-| Open-Meteo (`open-meteo`) | předpověď počasí a geokódování obcí | `apps-script/kulturni_radar.gs`, `apps-script/Index.html` | |
-| MET Norway (`met-no`) | záložní zdroj předpovědi, když Open-Meteo pro den nic nemá | `apps-script/kulturni_radar.gs` | |
+| Open-Meteo (`open-meteo`) | předpověď počasí ve frontendu (z prohlížeče uživatele); backend ho od v3.64 nevolá, z Apps Scriptu vracel trvale 429 | `apps-script/Index.html` | |
+| MET Norway (`met-no`) | předpověď počasí v backendu: list POČASÍ (od v3.60), přehledy a sonda samotestu (od v3.64) | `apps-script/kulturni_radar.gs` | |
 | Nominatim (`nominatim`) | geokódování míst akcí (souřadnice pro mapu) | `apps-script/kulturni_radar.gs` | |
 | ntfy (`ntfy`) | push notifikace na telefon: zprávy appky i vývojové zprávy z GitHub Actions | `apps-script/kulturni_radar.gs`, `.github/workflows/kontrola-projektu.yml`, `.github/workflows/rf-tests.yml`, `.github/workflows/mutacni-testy.yml` | |
 | Leaflet (`leaflet`) | mapa akcí a míst ve frontendu | `apps-script/Index.html` (načítá se z unpkg) | 1.9.4 |

@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.63 (19. 11. 2026) – síla mutačních testů po v3.62: výpočet změněných polí pro log sloučení jen tam, kde se log zapisuje, a negativní testy párování podle konce bez dvojice série (bez změny chování)
- * (předchozí: 3.62 – fuzzy shoda: změna jen posun termínu nebo stav i u nejisté shody, akce v sérii („X (Vánoce Brno)“) se nespáruje se sérií, shodný základ názvu bez závorek páruje akce se stejným začátkem i koncem (#71 krok 3, #73)
+ * Verze: 3.64 (19. 11. 2026) – počasí v přehledech (weatherFor_) a sonda samotestu bez Open-Meteo: souřadnice obce z cache SOUŘADNICE (Nominatim), předpověď z met.no; srážky v % odpadají (#81 krok 4)
+ * (předchozí: 3.63 – síla mutačních testů po v3.62: výpočet změněných polí pro log sloučení jen tam, kde se log zapisuje, a negativní testy párování podle konce bez dvojice série (bez změny chování))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -76,7 +76,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.63';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.64';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -3526,8 +3526,8 @@ function runSelfTest() {
   try {
     const w = weatherFor_((cfg && cfg.profil) || 'Brno', new Date(Date.now() + 86400000), {});
     if (w) ok();
-    else if (weatherApiDostupne_()) problemy.push('Open-Meteo dostupné, ale předpověď pro profil se nezískala');
-    else varovani.push('Open-Meteo nedostupné (externí výpadek) – počasí v digestech dočasně chybí');
+    else if (weatherApiDostupne_()) problemy.push('met.no dostupné, ale předpověď pro profil se nezískala (souřadnice obce?)');
+    else varovani.push('met.no nedostupné (externí výpadek) – počasí v digestech dočasně chybí');
   } catch (e) { problemy.push('počasí selhalo: ' + e); }
 
   const audit = auditDat_(ss);
@@ -4028,63 +4028,47 @@ function fetchJsonSKodem_(url, headers) {
   return { data: null, kod };
 }
 
-/** Sonda dostupnosti Open-Meteo (fixní souřadnice Brna) – rozliší v samotestu
- *  externí výpadek (varování) od chyby na naší straně (problém). */
+/** Sonda dostupnosti met.no (fixní souřadnice Brna) – rozliší v samotestu
+ *  externí výpadek (varování) od chyby na naší straně (problém). Od v3.64
+ *  met.no, protože Open-Meteo už se z Apps Scriptu nevolá (#81). */
 function weatherApiDostupne_() {
-  const d = fetchJson_(
-    'https://api.open-meteo.com/v1/forecast?daily=weather_code&timezone=Europe%2FPrague' +
-    '&forecast_days=1&latitude=49.19&longitude=16.61');
-  return !!(d && d.daily && d.daily.time && d.daily.time.length);
+  const d = fetchJson_('https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=49.19&lon=16.61',
+    { 'User-Agent': METNO_USER_AGENT });
+  return !!(d && d.properties && d.properties.timeseries && d.properties.timeseries.length);
 }
 
 /** met.no vyžaduje identifikační User-Agent (jinak blokuje) – oficiální zásada MET Norway. */
 const METNO_USER_AGENT = 'KulturniRadar/' + VERZE + ' (+https://github.com/Akimto01/Kulturni_radar)';
 
-/** Předpověď pro obec a den; primárně Open-Meteo, při výpadku/chybějícím dni
- *  záložně met.no (v3.10). '' při neúspěchu obou zdrojů. */
+/** Klíč v `cache` weatherFor_ pro mapu SOUŘADNIC (obec se na něj normalizovat nemůže). */
+const KLIC_CACHE_SOURADNIC_ = '#souradnice';
+
+/** Předpověď pro obec a den do přehledů a samotestu: „polojasno, max 27 °C“.
+ *  Od v3.64 (#81 krok 4) bez Open-Meteo, které z Apps Scriptu trvale vracelo
+ *  429: souřadnice obce z cache SOUŘADNICE (při chybějícím záznamu Nominatim
+ *  přes zajistitSouradnice_), předpověď z met.no (~9 dní). met.no nemá
+ *  pravděpodobnost srážek, ta z textu odpadla. '' při neúspěchu, nikdy pád.
+ *  `cache` drží za běh souřadnice i předpověď obce, takže met.no se volá
+ *  nejvýš jednou na obec. */
 function weatherFor_(obec, den, cache) {
   try {
     if (!obec) return '';
     const key = norm_(obec);
     if (!(key in cache)) {
-      const gd = fetchJson_(
-        'https://geocoding-api.open-meteo.com/v1/search?count=1&language=cs&name=' + encodeURIComponent(obec));
-      if (!gd || !gd.results || !gd.results.length) { cache[key] = null; return ''; }
-      const loc = gd.results[0];
-      const fd = fetchJson_(
-        'https://api.open-meteo.com/v1/forecast?daily=weather_code,temperature_2m_max,precipitation_probability_max' +
-        '&timezone=Europe%2FPrague&forecast_days=16&latitude=' + loc.latitude + '&longitude=' + loc.longitude);
-      cache[key] = { lat: loc.latitude, lon: loc.longitude, openMeteo: fd ? fd.daily : null, metNo: null };
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!cache[KLIC_CACHE_SOURADNIC_]) cache[KLIC_CACHE_SOURADNIC_] = souradniceMapy_(readSouradnice_(ss));
+      const sour = zajistitSouradnice_(ss, '', obec, cache[KLIC_CACHE_SOURADNIC_]);
+      if (!sour) { cache[key] = null; return ''; }
+      const odp = fetchJson_(
+        'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + sour.lat + '&lon=' + sour.lng,
+        { 'User-Agent': METNO_USER_AGENT });
+      cache[key] = odp && odp.properties && odp.properties.timeseries ? odp.properties.timeseries : null;
     }
-    const zaznam = cache[key];
-    if (!zaznam) return '';
+    const timeseries = cache[key];
+    if (!timeseries) return '';
     const iso = Utilities.formatDate(den, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-
-    // 1) primární zdroj: Open-Meteo
-    const d = zaznam.openMeteo;
-    if (d && d.time) {
-      const i = d.time.indexOf(iso);
-      if (i >= 0) {
-        let w = weatherText_(d.weather_code[i]) + ', max ' + Math.round(d.temperature_2m_max[i]) + ' °C';
-        if (d.precipitation_probability_max && d.precipitation_probability_max[i] != null) {
-          w += ', srážky ' + d.precipitation_probability_max[i] + ' %';
-        }
-        return w;
-      }
-    }
-
-    // 2) záložní zdroj: met.no – jen když Open-Meteo pro tento den nic nemá.
-    //    Fetch proběhne nejvýš jednou na obec (cache), sentinel `false` = "zkusili jsme, nevyšlo".
-    if (zaznam.metNo === null) {
-      zaznam.metNo = fetchJson_(
-        'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + zaznam.lat + '&lon=' + zaznam.lon,
-        { 'User-Agent': METNO_USER_AGENT }) || false;
-    }
-    if (zaznam.metNo && zaznam.metNo.properties && zaznam.metNo.properties.timeseries) {
-      const denMetNo = agregovatMetNoDen_(zaznam.metNo.properties.timeseries, iso);
-      if (denMetNo) return metNoTextFor_(denMetNo.symbolCode) + ', max ' + Math.round(denMetNo.maxTeplota) + ' °C';
-    }
-    return '';
+    const denMetNo = agregovatMetNoDen_(timeseries, iso);
+    return denMetNo ? metNoTextFor_(denMetNo.symbolCode) + ', max ' + Math.round(denMetNo.maxTeplota) + ' °C' : '';
   } catch (e) {
     return '';
   }
