@@ -584,7 +584,7 @@ produkce dřív, než doběhl Stryker, a kritická sada pak spadla pod práh
 zeleném CI. Při pádu CI po nasazení se nevrací verze, ale doplní testy
 v nové verzi (v3.63).
 
-### Pravidlo pro krok 5 (dva nasazovací kanály)
+### Pravidlo pro krok 7 (dva nasazovací kanály)
 Od 8. 8. 2026 nasazuje Apps Script Claude Code přes clasp (sekce 6); ruční
 „Nová verze“ v editoru je jen záloha, kdyby clasp nefungoval.
 
@@ -592,7 +592,7 @@ Od 8. 8. 2026 nasazuje Apps Script Claude Code přes clasp (sekce 6); ruční
 (`kulturniradar.cz`, nasazuje `git push`) jsou **dva nezávislé nasazovací
 kanály**. Při změně Index.html je potřeba nasadit oba; změna jen
 backendu (`kulturni_radar.gs`) jde jen přes Apps Script. Prompt na to
-musí vždy upozornit (krok 5 výše), jinak hrozí přesně to, co se stalo
+musí vždy upozornit (krok 7 výše), jinak hrozí přesně to, co se stalo
 8. 8. 2026: commit a push proběhly, appka na `kulturniradar.cz` se
 aktualizovala automaticky, zatímco Apps Script `/exec` zůstal na staré
 verzi, protože se na druhý kanál zapomnělo.
