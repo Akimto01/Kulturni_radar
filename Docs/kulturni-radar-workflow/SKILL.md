@@ -644,7 +644,7 @@ napoprvé dokonale.
 
 ## 6. Automatizace nasazení do Apps Script (clasp) — aktivně používáno od 8. 8. 2026
 
-Zavedeno 8. 8. 2026 jako náhrada za ruční nasazení (krok 5 v sekci 5) —
+Zavedeno 8. 8. 2026 jako náhrada za ruční nasazení (krok 7 v sekci 5) —
 dřív jediný neautomatizovaný krok release cyklu. **Ověřeno v praxi
 8.–18. 8. 2026, opakovaně, bez incidentu** — jen 18. 8. samotného sedm
 nasazení za sebou (v3.39 → v3.45), vždy stejný vzorec: `clasp push -f`
