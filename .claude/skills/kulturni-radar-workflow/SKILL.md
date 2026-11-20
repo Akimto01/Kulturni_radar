@@ -486,6 +486,10 @@ Frontend (`tests/frontend-harness.js`, `nactiFrontendFunkce(['fn1','fn2'])`):
   `Index\\.html` (dvě lomítka v souboru) správně, RF z nich udělá regex `Index\.html`;
   čtyři lomítka by vzor rozbila. Počet ověřit `s.count(chr(92))` nad úsekem souboru
   a hlavně spuštěním testu (pozitivně i negativně), než se „oprava“ escapování udělá.
+- **Výrazy v IF a Should Be True** (20. 11. 2026, PR #88): s řetězcovou proměnnou psát jako
+  `$promenna`, ne `${promenna}`: RF dosadí holý text a Python ho bere jako jméno
+  (`IF    ${ikona} is not None` → `NameError: name 'hvezda' is not defined`). Dry run
+  výrazy nevyhodnocuje, chybu odhalí až živý běh.
 
 ### Tajné hodnoty v RF reportech (incident #33, 28. 10. 2026)
 
