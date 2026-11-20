@@ -1001,13 +1001,10 @@ Seznam míst pod mapou obsahuje řádky, pokud existují akce se souřadnicemi
     ...    místa" výš.
     Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
     ${pocet_pinu}=    Get Element Count    ${FRAME} \#mapa .leaflet-marker-icon
-    IF    ${pocet_pinu} >= 1
-        Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto >> nth=0    visible    timeout=10s
-        ${pocet_mist}=    Get Element Count    ${FRAME} \#mapa-mista .mapa-misto
-        Should Be True    ${pocet_mist} >= 1
-    ELSE
-        Log    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice) – seznam míst nemá co ověřit v tomto běhu.    level=WARN
-    END
+    Skip If    ${pocet_pinu} == 0    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice)
+    Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto >> nth=0    visible    timeout=10s
+    ${pocet_mist}=    Get Element Count    ${FRAME} \#mapa-mista .mapa-misto
+    Should Be True    ${pocet_mist} >= 1
 
 Klik na titulek karty vybere pin na mapě
     [Tags]    mapa
@@ -1018,20 +1015,17 @@ Klik na titulek karty vybere pin na mapě
     ...    (zrušení výběru, detached). Podmíněné na existenci
     ...    klikatelného titulku – ne všechny akce mají geokódování hotové.
     ${pocet}=    Get Element Count    ${FRAME} .nazev-klikatelna
-    IF    ${pocet} == 0
-        Log    Žádná viditelná karta nemá souřadnice (.nazev-klikatelna) – test nemá co ověřit v tomto běhu.    level=WARN
-    ELSE
-        Click    ${FRAME} .nazev-klikatelna >> nth=0
-        Wait For Elements State    ${FRAME} .nazev-klikatelna.vybrano >> nth=0    visible    timeout=5s
-        ${pin_vybrany}=    Get Element Count    ${FRAME} \#mapa .pin-vybrany
-        Should Be True    ${pin_vybrany} >= 1
-        ...    msg=Po výběru titulku by měl mít odpovídající pin na mapě třídu .pin-vybrany
-        # Druhý klik na stejný titulek má výběr zrušit (toggle zpět) – Wait
-        # For Elements State (Browser lib.) nepodporuje named msg=, viz
-        # SKILL.md; „detached" samo o sobě selže se srozumitelnou hláškou.
-        Click    ${FRAME} .nazev-klikatelna.vybrano >> nth=0
-        Wait For Elements State    ${FRAME} .nazev-klikatelna.vybrano    detached    timeout=5s
-    END
+    Skip If    ${pocet} == 0    Žádná viditelná karta nemá souřadnice (.nazev-klikatelna)
+    Click    ${FRAME} .nazev-klikatelna >> nth=0
+    Wait For Elements State    ${FRAME} .nazev-klikatelna.vybrano >> nth=0    visible    timeout=5s
+    ${pin_vybrany}=    Get Element Count    ${FRAME} \#mapa .pin-vybrany
+    Should Be True    ${pin_vybrany} >= 1
+    ...    msg=Po výběru titulku by měl mít odpovídající pin na mapě třídu .pin-vybrany
+    # Druhý klik na stejný titulek má výběr zrušit (toggle zpět) – Wait
+    # For Elements State (Browser lib.) nepodporuje named msg=, viz
+    # SKILL.md; „detached" samo o sobě selže se srozumitelnou hláškou.
+    Click    ${FRAME} .nazev-klikatelna.vybrano >> nth=0
+    Wait For Elements State    ${FRAME} .nazev-klikatelna.vybrano    detached    timeout=5s
 
 Klik na řádek v seznamu míst vybere pin na mapě
     [Tags]    mapa    krehky
@@ -1053,26 +1047,23 @@ Klik na řádek v seznamu míst vybere pin na mapě
     ...    kdekoli na stránce.
     Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
     ${pocet}=    Get Element Count    ${FRAME} \#mapa-mista .mapa-misto
-    IF    ${pocet} == 0
-        Log    Seznam míst je prázdný (žádná akce se souřadnicemi) – test nemá co ověřit v tomto běhu.    level=WARN
-    ELSE
-        ${klic}=    Get Attribute    ${FRAME} \#mapa-mista .mapa-misto >> nth=0    data-klic
-        Click    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"]
-        Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"].vybrano    visible    timeout=5s
-        ${pin_vybrany}=    Get Element Count    ${FRAME} \#mapa .pin-vybrany
-        Should Be True    ${pin_vybrany} >= 1
-        ...    msg=Po výběru řádku v seznamu míst by měl mít odpovídající pin na mapě třídu .pin-vybrany
-        ${karta_stejny_klic}=    Get Element Count    ${FRAME} .nazev[data-klic="${klic}"].vybrano
-        Should Be True    ${karta_stejny_klic} >= 1
-        ...    msg=Výběr řádku s klíčem „${klic}" měl vybrat i kartu se stejným data-klic (.nazev[data-klic="${klic}"].vybrano) – ne jinou/žádnou
-        # Druhý klik na stejný řádek má výběr zrušit (toggle zpět) – viz
-        # poznámka o Wait For Elements State/msg= v testu titulku karty výš.
-        Click    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"]
-        Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"].vybrano    detached    timeout=5s
-        ${karta_stejny_klic_po}=    Get Element Count    ${FRAME} .nazev[data-klic="${klic}"].vybrano
-        Should Be Equal As Integers    ${karta_stejny_klic_po}    0
-        ...    msg=Po zrušení výběru řádku s klíčem „${klic}" by karta se stejným data-klic už neměla mít .vybrano
-    END
+    Skip If    ${pocet} == 0    Seznam míst je prázdný (žádná akce se souřadnicemi)
+    ${klic}=    Get Attribute    ${FRAME} \#mapa-mista .mapa-misto >> nth=0    data-klic
+    Click    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"]
+    Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"].vybrano    visible    timeout=5s
+    ${pin_vybrany}=    Get Element Count    ${FRAME} \#mapa .pin-vybrany
+    Should Be True    ${pin_vybrany} >= 1
+    ...    msg=Po výběru řádku v seznamu míst by měl mít odpovídající pin na mapě třídu .pin-vybrany
+    ${karta_stejny_klic}=    Get Element Count    ${FRAME} .nazev[data-klic="${klic}"].vybrano
+    Should Be True    ${karta_stejny_klic} >= 1
+    ...    msg=Výběr řádku s klíčem „${klic}" měl vybrat i kartu se stejným data-klic (.nazev[data-klic="${klic}"].vybrano) – ne jinou/žádnou
+    # Druhý klik na stejný řádek má výběr zrušit (toggle zpět) – viz
+    # poznámka o Wait For Elements State/msg= v testu titulku karty výš.
+    Click    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"]
+    Wait For Elements State    ${FRAME} \#mapa-mista .mapa-misto[data-klic="${klic}"].vybrano    detached    timeout=5s
+    ${karta_stejny_klic_po}=    Get Element Count    ${FRAME} .nazev[data-klic="${klic}"].vybrano
+    Should Be Equal As Integers    ${karta_stejny_klic_po}    0
+    ...    msg=Po zrušení výběru řádku s klíčem „${klic}" by karta se stejným data-klic už neměla mít .vybrano
 
 Klik na pin otevře popup se strukturálně konzistentním obsahem
     [Tags]    mapa
@@ -1087,21 +1078,18 @@ Klik na pin otevře popup se strukturálně konzistentním obsahem
     ...    Node testy sestavPopupDataMapy_.
     Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
     ${pocet_pinu}=    Get Element Count    ${FRAME} \#mapa .leaflet-marker-icon
-    IF    ${pocet_pinu} == 0
-        Log    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice) – test nemá co ověřit v tomto běhu.    level=WARN
-    ELSE
-        Kliknout na pin ve viditelné části mapy
-        Wait For Elements State    ${FRAME} .leaflet-popup .mapa-popup    visible    timeout=3s
-        ${pocet_nazvu}=    Get Element Count    ${FRAME} .leaflet-popup .mapa-popup strong
-        ${pocet_tlacitek}=    Get Element Count    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn
-        ${pocet_hr}=    Get Element Count    ${FRAME} .leaflet-popup .mapa-popup hr
-        Should Be True    ${pocet_nazvu} >= 1    Popup má obsahovat aspoň jeden název akce
-        Should Be Equal As Integers    ${pocet_tlacitek}    ${pocet_nazvu}
-        ...    msg=Počet tlačítek „Zobrazit v seznamu" (${pocet_tlacitek}) neodpovídá počtu názvů (${pocet_nazvu})
-        ${ocekavane_hr}=    Evaluate    ${pocet_nazvu} - 1
-        Should Be Equal As Integers    ${pocet_hr}    ${ocekavane_hr}
-        ...    msg=Počet oddělovačů (${pocet_hr}) neodpovídá počtu názvů - 1 (${pocet_nazvu})
-    END
+    Skip If    ${pocet_pinu} == 0    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice)
+    Kliknout na pin ve viditelné části mapy
+    Wait For Elements State    ${FRAME} .leaflet-popup .mapa-popup    visible    timeout=3s
+    ${pocet_nazvu}=    Get Element Count    ${FRAME} .leaflet-popup .mapa-popup strong
+    ${pocet_tlacitek}=    Get Element Count    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn
+    ${pocet_hr}=    Get Element Count    ${FRAME} .leaflet-popup .mapa-popup hr
+    Should Be True    ${pocet_nazvu} >= 1    Popup má obsahovat aspoň jeden název akce
+    Should Be Equal As Integers    ${pocet_tlacitek}    ${pocet_nazvu}
+    ...    msg=Počet tlačítek „Zobrazit v seznamu" (${pocet_tlacitek}) neodpovídá počtu názvů (${pocet_nazvu})
+    ${ocekavane_hr}=    Evaluate    ${pocet_nazvu} - 1
+    Should Be Equal As Integers    ${pocet_hr}    ${ocekavane_hr}
+    ...    msg=Počet oddělovačů (${pocet_hr}) neodpovídá počtu názvů - 1 (${pocet_nazvu})
 
 Tlačítko „Zobrazit v seznamu" v popupu zvýrazní odpovídající kartu
     [Tags]    mapa
@@ -1116,17 +1104,14 @@ Tlačítko „Zobrazit v seznamu" v popupu zvýrazní odpovídající kartu
     ...    je PRÁVĚ TA karta, jejíž ID neslo kliknuté tlačítko.
     Wait For Elements State    ${FRAME} \#mapa.leaflet-container    visible    timeout=20s
     ${pocet_pinu}=    Get Element Count    ${FRAME} \#mapa .leaflet-marker-icon
-    IF    ${pocet_pinu} == 0
-        Log    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice) – test nemá co ověřit v tomto běhu.    level=WARN
-    ELSE
-        Kliknout na pin ve viditelné části mapy
-        Wait For Elements State    ${FRAME} .leaflet-popup .mapa-popup    visible    timeout=3s
-        ${id_akce}=    Get Attribute    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn >> nth=0    data-id
-        Click    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn >> nth=0
-        ${pocet_zvyraznenych}=    Get Element Count    ${FRAME} .karta[data-id="${id_akce}"].zvyrazneno
-        Should Be Equal As Integers    ${pocet_zvyraznenych}    1
-        ...    msg=Klik na „Zobrazit v seznamu" měl zvýraznit PRÁVĚ kartu s id „${id_akce}" (.karta[data-id="${id_akce}"].zvyrazneno)
-    END
+    Skip If    ${pocet_pinu} == 0    Žádný pin na mapě (žádná zobrazená akce nemá souřadnice)
+    Kliknout na pin ve viditelné části mapy
+    Wait For Elements State    ${FRAME} .leaflet-popup .mapa-popup    visible    timeout=3s
+    ${id_akce}=    Get Attribute    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn >> nth=0    data-id
+    Click    ${FRAME} .leaflet-popup .mapa-popup .mapa-popup-btn >> nth=0
+    ${pocet_zvyraznenych}=    Get Element Count    ${FRAME} .karta[data-id="${id_akce}"].zvyrazneno
+    Should Be Equal As Integers    ${pocet_zvyraznenych}    1
+    ...    msg=Klik na „Zobrazit v seznamu" měl zvýraznit PRÁVĚ kartu s id „${id_akce}" (.karta[data-id="${id_akce}"].zvyrazneno)
 
 Popup pinu u okraje mapy zůstane otevřený po automatickém posunu
     [Tags]    mapa

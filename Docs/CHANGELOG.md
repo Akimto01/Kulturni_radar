@@ -1,5 +1,15 @@
 # Changelog
 
+## Testy: dávka 2 sjednocení s architekturou, mapové testy bez WARN (#34) – 20. 11. 2026
+### Proč
+- Pět mapových testů při chybějících datech (žádný pin, prázdný seznam míst) jen zalogovalo `WARN` a prošlo bez jediné aserce. Pravidlo B5.6: chybí-li podmínky, test se hlasitě přeskočí.
+### Změněno
+- **`tests/robot/frontend.robot`:** „Seznam míst pod mapou obsahuje řádky…“, „Klik na titulek karty vybere pin na mapě“, „Klik na řádek v seznamu míst vybere pin na mapě“, „Klik na pin otevře popup se strukturálně konzistentním obsahem“ a „Tlačítko „Zobrazit v seznamu“ v popupu zvýrazní odpovídající kartu“: blok `IF … ELSE Log level=WARN` nahrazen `Skip If … <důvod>`, tělo testu odsazeno o úroveň výš. Chování při dostupných datech beze změny.
+- **Baseline pojistky architektury:** `warn_v_testech` 11 → 6 (zbylých 6 je v testech kalendáře, přepnutí profilu a podkategorie, dávka 3).
+- **Dokumentace:** AUDIT-SOULADU-TESTU.md (stav dávky 2, metrika), ARCHITEKTURA-TESTU.md, BACKLOG (dávka 2 přeškrtnuta).
+### Testy
+- Bez změny počtu testů (Node 486 + 212, RF 66). Ověřeno dry runem RF a pojistkou architektury. Živý běh rf-tests.yml na větvi PR (44758880707): všech pět upravených mapových testů PASS, žádný SKIP (data s piny, podmínka `Skip If` tedy není obráceně); frontend 53/53, API 13/13, iframe 4/4.
+
 ## CI: pilot nezapisuje CHANGELOG, záznam navrhuje ve shrnutí (běh 5) – 20. 11. 2026
 - **Proč:** patch z běhu 5 pilotu (#34 dávka 2) nešel aplikovat na aktuální `main` jen kvůli `Docs/CHANGELOG.md`: pilot vkládá záznam hned pod nadpis a každý commit na `main` mezi startem běhu a aplikací patche mění stejné místo. Záchrana šla ručně (PR #86).
 - **`claude-pilot.yml`:** prompt Claudovi říká CHANGELOG neupravovat a navržený záznam napsat do shrnutí pod nadpis „Návrh záznamu do CHANGELOGu“. README (počty testů) aktualizuje dál.
