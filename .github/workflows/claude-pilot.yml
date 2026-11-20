@@ -71,7 +71,9 @@ jobs:
               větve ani PR, nic nenasazuj (žádný clasp). To udělá workflow.
             - Spusť node --test tests/unit.test.js tests/frontend.test.js; všechny
               testy musí projít. Při změně kódu bump verze podle skillu.
-            - Aktualizuj Docs/CHANGELOG.md a README (počty testů), pokud se mění.
+            - Aktualizuj README (počty testů), pokud se mění. Docs/CHANGELOG.md NEUPRAVUJ:
+              navržený záznam napiš do shrnutí pod nadpis „Návrh záznamu do CHANGELOGu“,
+              vloží ho review (zápis na začátek souboru koliduje s každým commitem na main).
             - Výstupy nástrojů (lint, reporty robot, dočasné soubory) zapisuj jen do
               ${{ runner.temp }}, nikdy do repa: všechno nové v repu skončí v PR.
             - Na konci zapiš do ${{ runner.temp }}/shrnuti.md krátké shrnutí v češtině:

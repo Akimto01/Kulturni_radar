@@ -1,5 +1,10 @@
 # Changelog
 
+## CI: pilot nezapisuje CHANGELOG, záznam navrhuje ve shrnutí (běh 5) – 20. 11. 2026
+- **Proč:** patch z běhu 5 pilotu (#34 dávka 2) nešel aplikovat na aktuální `main` jen kvůli `Docs/CHANGELOG.md`: pilot vkládá záznam hned pod nadpis a každý commit na `main` mezi startem běhu a aplikací patche mění stejné místo. Záchrana šla ručně (PR #86).
+- **`claude-pilot.yml`:** prompt Claudovi říká CHANGELOG neupravovat a navržený záznam napsat do shrnutí pod nadpis „Návrh záznamu do CHANGELOGu“. README (počty testů) aktualizuje dál.
+- Dokumentace: PROVOZ.md (sekce Pilot), SKILL.md (sekce 9: při review vložit záznam na větvi PR před merge, obě kopie).
+
 ## CI: pilot, job pr aplikuje patch na aktuální main (#34, běh 5) – 20. 11. 2026
 - **Proč:** běh 5 pilotu (44753311681, #34 dávka 2) začal z `be1c568`. Během běhu přišel na `main` commit `e080ee6`, který mění tři workflow (#46). Job **pr** zakládal větev ze startovního commitu, takže se od `main` lišila i ve workflow souborech, a GitHub push odmítl (`refusing to allow a GitHub App to create or update workflow … without workflows permission`). Claude práci dokončil (16 kroků, `success`), PR ale nevznikl a práce zůstala jen v artefaktu `claude-vystup`.
 - **`claude-pilot.yml`:** checkout v jobu **pr** má `ref: main` (s komentářem), diff se tak aplikuje na aktuální `main`. Nesedí-li na nový `main`, `git apply` selže a PR nevznikne; práce zůstává v artefaktu.
