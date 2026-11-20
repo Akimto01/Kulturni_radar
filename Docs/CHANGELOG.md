@@ -1,5 +1,11 @@
 # Changelog
 
+## CI: pilot ukládá artefakt i při pádu, nepřepisuje baseline (běh 6) – 20. 11. 2026
+- **Proč:** běh 6 pilotu (44761026901, #34 dávka 3) skončil v kroku kontrol: pojistka architektury hlásila `text_selektory` 10 → 11. Počet selektorů `text=` se nezměnil (11 na `main` i v běhu, jeden ubyl v testu podkategorie a jeden přibyl jinde), ale Claude snížil baseline (`text_selektory` 11 → 10, `warn_v_testech` 6 → 0) nejspíš dřív, než dokončil úpravy testů. Kroky s artefaktem se po pádu přeskočily, takže hotová práce (19 kroků, ~0,47 USD) se zahodila, stejně jako v běhu 3 (limit kroků).
+- **`claude-pilot.yml`, job claude:** kroky „Nové soubory do shrnutí“, „Uložit změny jako artefakt“ a nahrání artefaktu mají `if: always()`, artefakt `claude-vystup` tedy vzniká i při pádu Clauda nebo kontrol. Job pr dál běží jen po úspěchu celého jobu claude, z chybného běhu PR nevznikne.
+- **Prompt:** baseline pojistek (`.github/scripts/baseline-*.json`) neměnit, jedinou výjimkou je snížení metriky, kterou úkol přímo řeší, až po všech úpravách testů; před shrnutím spustit `kontrola-architektury-testu.py` a při nárůstu opravit testy, ne baseline.
+- Dokumentace: PROVOZ.md (sekce Pilot), SKILL.md (sekce 9: záchrana práce z pilotu, obě kopie).
+
 ## Backend v3.66 – aliasy velkých akcí (BACKLOG Cíl 3) – 20. 11. 2026
 ### Proč
 - Brněnské vánoční trhy přicházely od AI jako „Vánoce Brno – trhy na Zelném trhu…“, „Vánoce Brno 2026 (zahájení…)“ a „Brněnské Vánoce (nám. Svobody…)“ s různými daty (13. 11.–31. 12. a 27. 11.–23. 12.); jde o jednu akci na více místech. Fuzzy shoda je spojit nemá (jediné společné slovo, jiná data, riziko falešných sloučení jinde), 19. 11. proto proběhl ruční úklid (3 řádky).

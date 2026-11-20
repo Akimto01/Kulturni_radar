@@ -76,6 +76,10 @@ jobs:
               vloží ho review (zápis na začátek souboru koliduje s každým commitem na main).
             - Výstupy nástrojů (lint, reporty robot, dočasné soubory) zapisuj jen do
               ${{ runner.temp }}, nikdy do repa: všechno nové v repu skončí v PR.
+            - Baseline pojistek (.github/scripts/baseline-*.json) neměň. Jediná výjimka:
+              snížit metriku, kterou úkol přímo řeší, a to až po všech úpravách testů.
+            - Před zápisem shrnutí spusť python3 .github/scripts/kontrola-architektury-testu.py;
+              když hlásí nárůst, oprav testy, ne baseline.
             - Na konci zapiš do ${{ runner.temp }}/shrnuti.md krátké shrnutí v češtině:
               co se změnilo, výsledek testů, co je potřeba zkontrolovat.
             - Když zadání není jasné nebo vyžaduje rozhodnutí, nic neměň a do
@@ -115,8 +119,12 @@ jobs:
       - name: API smoke proti produkci (bez testů verze)
         run: robot --include smoke --exclude verze --outputdir "$RUNNER_TEMP/smoke" tests/robot/api.robot
 
+      # Artefakt vzniká i při pádu Clauda nebo kontrol (běhy 3 a 6 zahodily hotovou práci),
+      # aby šla zachránit ručně. Job pr běží jen po úspěchu celého jobu claude, takže
+      # z chybného běhu PR nevznikne.
       # Nové soubory jdou do shrnutí, ať je v PR vidět i to, co do repa nepatří.
       - name: Nové soubory do shrnutí
+        if: always()
         run: |
           [ -f "$RUNNER_TEMP/shrnuti.md" ] || echo "(Claude nezapsal shrnutí.)" > "$RUNNER_TEMP/shrnuti.md"
           nove=$(git ls-files --others --exclude-standard)
@@ -125,6 +133,7 @@ jobs:
           fi
 
       - name: Uložit změny jako artefakt
+        if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/vystup"
           git add -N .
@@ -133,6 +142,7 @@ jobs:
           wc -l "$RUNNER_TEMP/vystup/zmeny.patch"
 
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: claude-vystup
           path: ${{ runner.temp }}/vystup/

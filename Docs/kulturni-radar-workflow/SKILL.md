@@ -1033,14 +1033,20 @@ Nastavení pohledů boardu (claude-in-chrome): po kliknutí na „Save view“ G
 
 - **Pilot Claude Code: `--max-turns` se kontroluje až po doběhnutí** (19. 11. 2026, běh 3 #34):
   akce `anthropics/claude-code-action` po překročení limitu označí běh jako failure, i když
-  Claude práci dokončil; další kroky se přeskočí, artefakt nevznikne a hotová práce se
-  zahodí (57 kroků při limitu 40, ~1,14 USD). Limit proto nastavit s rezervou (dnes 80),
+  Claude práci dokončil; další kroky se přeskočí a PR nevznikne (57 kroků při limitu 40,
+  ~1,14 USD; tehdy se zahodil i artefakt, od běhu 6 vzniká vždy, viz záchrana níže). Limit proto nastavit s rezervou (dnes 80),
   skutečnou brzdou je `timeout-minutes` jobu. Úkoly pro pilot nesou štítek `claude-ready`
   (výběr a výjimky v `Docs/aplikace/PROVOZ.md`, sekce Pilot).
 - **Pilot nezapisuje CHANGELOG** (20. 11. 2026, běh 5 #34): záznam navrhne ve shrnutí pod
   nadpisem „Návrh záznamu do CHANGELOGu“. Při review PR z pilotu ho vložit do
   `Docs/CHANGELOG.md` na větvi PR před merge (zápis na začátek souboru z pilotu kolidoval
   s commity na main a patch nešel aplikovat).
+- **Záchrana práce z pilotu** (20. 11. 2026, běhy 5 a 6 #34): artefakt `claude-vystup`
+  (`zmeny.patch`, `shrnuti.md`) vzniká i u neúspěšného běhu (pád Clauda, testů nebo
+  kontrol); PR z takového běhu nevznikne. Postup: stáhnout artefakt do scratchpadu,
+  `git checkout -b claude/issue-N-<běh> origin/main`, `git apply --index zmeny.patch`
+  (nesedí-li, poslat chybu), u neúspěšného běhu nejdřív opravit příčinu pádu, pak
+  commit, push větve a `gh pr create --draft`.
 - **Dočasná větev pro zkoušku** (např. vynucené selhání) spouští všechna CI, takže mail o pádu
   Node testů nebo RF na ní je očekávaný; větev po zkoušce smazat lokálně i na GitHubu
   (19. 11. 2026, docasne/obnova-34).
