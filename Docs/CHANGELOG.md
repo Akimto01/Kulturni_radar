@@ -1,5 +1,10 @@
 # Changelog
 
+## CI: pilot, job pr aplikuje patch na aktuální main (#34, běh 5) – 20. 11. 2026
+- **Proč:** běh 5 pilotu (44753311681, #34 dávka 2) začal z `be1c568`. Během běhu přišel na `main` commit `e080ee6`, který mění tři workflow (#46). Job **pr** zakládal větev ze startovního commitu, takže se od `main` lišila i ve workflow souborech, a GitHub push odmítl (`refusing to allow a GitHub App to create or update workflow … without workflows permission`). Claude práci dokončil (16 kroků, `success`), PR ale nevznikl a práce zůstala jen v artefaktu `claude-vystup`.
+- **`claude-pilot.yml`:** checkout v jobu **pr** má `ref: main` (s komentářem), diff se tak aplikuje na aktuální `main`. Nesedí-li na nový `main`, `git apply` selže a PR nevznikne; práce zůstává v artefaktu.
+- Dokumentace: PROVOZ.md (sekce Pilot).
+
 ## CI: smoke frontendu přes Apps Script iframe (#42, riziko R5) – 20. 11. 2026
 - **Proč:** frontend běží jako statický web i uvnitř Apps Script iframu (`/exec`, sandbox mění chování, viz odhlášení 7. 8.). RF sada obě prostředí umí (`FRAME`), CI ale pouštělo jen statický web a iframe se ověřoval jen ručně.
 - **`rf-tests.yml`:** nový krok „Frontend smoke přes Apps Script iframe“ po celé frontend sadě (`if: always()`): `--include smoke --exclude krehky`, `RADAR_SITE_URL` = `RADAR_URL` (`/exec`) a `RF_FRAME` = `id=sandboxFrame >>> id=userHtmlFrame >>>` přes proměnné prostředí z `resources.robot`. Čtyři testy: hlavička, přihlašovací obrazovka, karty s českými daty, stránka bez JS chyby. Report `vysledky/frontend-iframe` prochází kontrolou úniku a je v artefaktu, na Pages se nepublikuje (generátor zná jen sady api a frontend).

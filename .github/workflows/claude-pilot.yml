@@ -148,8 +148,12 @@ jobs:
     env:
       ISSUE: ${{ inputs.issue }}
     steps:
+      # Patch se aplikuje na aktuální main, ne na startovní commit běhu: když se během běhu
+      # změní workflow na main, větev ze starého commitu GitHub odmítne (token nemá právo
+      # workflows, běh 5, 20. 11. 2026). Nesedí-li patch na nový main, git apply selže a PR nevznikne.
       - uses: actions/checkout@v5
         with:
+          ref: main
           persist-credentials: false
 
       - uses: actions/download-artifact@v8
