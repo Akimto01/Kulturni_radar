@@ -1,5 +1,13 @@
 # Changelog
 
+## Testy: dávka 4 sjednocení s architekturou, chip testy bez Sleep a se silnějším oraclem (#34) – 20. 11. 2026
+- Chip testy Oblíbené, Neověřeno, Oblíbená místa a Chip typu stálého místa nečekají fixním `Sleep`, ale na stav chipu (`.active`) a opakovanou aserci počtu karet.
+- Prázdný stav se ověřuje podle textu hlášky v `#status`, ne jen podle existence prvku; zbylé karty musí mít aktivní ikonu ★ resp. 🏛.
+- Pojistka architektury: `sleep_bez_povoleni` 11 → 3. Oprava `0 != N` se podle pravidla 3 bězích (1., 8., 15. 11., bez pádu) neprovádí.
+- Bez změny kódu aplikace, verze backendu ani Index.html beze změny.
+- Dokumentace: AUDIT-SOULADU-TESTU.md (stav dávky 4, metrika).
+- **Testy:** bez změny počtu (Node 501 + 212, RF 66). První běh RF na větvi PR (44773261889) odhalil chybnou syntaxi výrazu v IF (`${ikona}` místo `$ikona`), dry run ji nevyhodnocuje; opraveno při review. Živý běh rf-tests.yml po opravě (44774523898): všechny čtyři chip testy PASS (Chip typu stálého místa, Chip Oblíbené, Chip Neověřeno, Chip „Oblíbená místa“), frontend 53/53, API 13/13, iframe 4/4.
+
 ## Testy: dávka 3 sjednocení s architekturou, kalendář, profil a podkategorie bez WARN (#34) – 20. 11. 2026
 ### Proč
 - Čtyři testy (přepnutí profilu, podkategorie, kalendář klik a hover) při chybějících datech jen zalogovaly `WARN` a prošly bez jediné aserce. Pravidlo B5.6: chybí-li podmínky, test se hlasitě přeskočí.
