@@ -111,7 +111,7 @@ Správu boardu a BACKLOGu pro všechna issues (nejen bug) hlídá druhý skript 
 | [#48](https://github.com/Akimto01/Kulturni_radar/issues/48) | Tichá selhání: samotest nehlídá triggery `sendUserNotifications` a `zpracovatSledovanaMesta`, `sendUserNotifications` nehlásí chybu | S3 | P3 | Analýza nebo review | Uzavřený |
 | [#49](https://github.com/Akimto01/Kulturni_radar/issues/49) | Sledovaná města: běh narazí na limit 6 min, přepočet počasí se nespustí a selhání se nenahlásí | S3 | P2 | Živá kontrola | Uzavřený |
 | [#50](https://github.com/Akimto01/Kulturni_radar/issues/50) | Server neověřuje identitu uživatele u zápisových akcí: stačí veřejné `uzivatelId` | S2 | P4 | Analýza nebo review | Potvrzený |
-| [#4](https://github.com/Akimto01/Kulturni_radar/issues/4) | Cloudflare: crawlery GPTBot a ClaudeBot blokované, `robots.txt`, `sitemap.xml` a `favicon.svg` se na kulturniradar.cz neservírují (doplněno 29. 10. při kontrole úplnosti) | S4 | P4 | Živá kontrola | Potvrzený |
+| [#4](https://github.com/Akimto01/Kulturni_radar/issues/4) | Cloudflare: crawlery GPTBot a ClaudeBot blokované, `robots.txt`, `sitemap.xml` a `favicon.svg` se na kulturniradar.cz neservírují (doplněno 29. 10. při kontrole úplnosti) | S4 | P4 | Živá kontrola | Uzavřený |
 | [#71](https://github.com/Akimto01/Kulturni_radar/issues/71) | Fuzzy slučování nechytí duplicity akcí se shodným nebo podobným názvem | S3 | P3 | Živá kontrola | Ověřuje se |
 | [#72](https://github.com/Akimto01/Kulturni_radar/issues/72) | Stálá místa mají zastaralou sezónní otevírací dobu | S3 | P3 | Živá kontrola | Uzavřený |
 | [#73](https://github.com/Akimto01/Kulturni_radar/issues/73) | Akce hlášená jako změněná v po sobě jdoucích dnech bez skutečné změny | S4 | P4 | Živá kontrola | Ověřuje se |
@@ -151,6 +151,7 @@ změnilo, aby se to neopakovalo.
 | #21 | Samotest (kontrola duplicit) | Kontrola duplicit existovala jen pro akce, ne pro stálá místa | Párování míst podle klíče názvu, 8 jednotkových testů |
 | #27 | E2E test | Předchozí oprava (v3.59) se ověřovala přes URL parametr, ne přepnutím města, jak to dělá uživatel | Přepracovaný E2E test přepnutí profilu, 4 jednotkové testy |
 | #50 | Jednotkový test zápisových API nebo review API | E2E testy běží vždy přihlášené (Suite Setup se přihlašuje PINem), takže chybějící ověření u zápisů neuvidí; jednotkové testy zápisových API autorizaci neměly v zadání a ověřovaly jen správnost zápisu | otevřeno; po opravě test odmítnutí zápisu bez ověření |
+| #4 | Živá kontrola po nasazení (curl na `robots.txt`, `sitemap.xml`, `favicon.svg`) | RF ani API testy `robots.txt` a statické soubory nekontrolují; příčina byla v nastavení Cloudflare (Pages servíroval SPA fallback, Managed content v `robots.txt`), ne v kódu | Vyřešeno mimo kód mezi 10. a 20. 11. 2026 (přesná změna nedohledatelná), ověřeno ručně v dashboardu 20. 11.; nový test se nezakládá (nízké riziko, mimo appku) |
 
 ### Co z toho plyne
 
