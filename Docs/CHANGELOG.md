@@ -8,7 +8,7 @@
 - **Baseline pojistky architektury:** `warn_v_testech` 11 → 6 (zbylých 6 je v testech kalendáře, přepnutí profilu a podkategorie, dávka 3).
 - **Dokumentace:** AUDIT-SOULADU-TESTU.md (stav dávky 2, metrika), ARCHITEKTURA-TESTU.md, BACKLOG (dávka 2 přeškrtnuta).
 ### Testy
-- Bez změny počtu testů (Node 486 + 212, RF 66). Ověřeno dry runem RF a pojistkou architektury; živý běh mapových testů ověří CI.
+- Bez změny počtu testů (Node 486 + 212, RF 66). Ověřeno dry runem RF a pojistkou architektury. Živý běh rf-tests.yml na větvi PR (44758880707): všech pět upravených mapových testů PASS, žádný SKIP (data s piny, podmínka `Skip If` tedy není obráceně); frontend 53/53, API 13/13, iframe 4/4.
 
 ## CI: pilot nezapisuje CHANGELOG, záznam navrhuje ve shrnutí (běh 5) – 20. 11. 2026
 - **Proč:** patch z běhu 5 pilotu (#34 dávka 2) nešel aplikovat na aktuální `main` jen kvůli `Docs/CHANGELOG.md`: pilot vkládá záznam hned pod nadpis a každý commit na `main` mezi startem běhu a aplikací patche mění stejné místo. Záchrana šla ručně (PR #86).
