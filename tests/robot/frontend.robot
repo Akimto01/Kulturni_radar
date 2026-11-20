@@ -366,20 +366,18 @@ Opakované přepnutí profilu v dropdownu nerozbije appku (regrese v3.12)
     ${puvodni}=    Get Property    ${FRAME} \#profil-select    value
     ${prazdny}=    Evaluate JavaScript    ${FRAME} \#profil-select
     ...    (el) => { const o = [...el.options].find(o => o.text.includes('nikdy neprohledáno') && o.value !== el.value); return o ? o.value : ''; }
-    IF    '${prazdny}' == ''
-        Log    Žádné město „nikdy neprohledáno“ k dispozici – test nemá co ověřit v tomto běhu.    level=WARN
-    ELSE
-        FOR    ${i}    IN RANGE    2
-            Select Options By    ${FRAME} \#profil-select    value    ${prazdny}
-            Wait For Elements State    ${FRAME} text=Tohle město appka ještě nikdy neprohledala.    visible    timeout=15s
-            ${karet}=    Get Element Count    ${FRAME} .karta
-            Should Be Equal As Integers    ${karet}    0
-            ...    msg=Po přepnutí na město bez akcí zůstaly na stránce karty (${karet}) – nepřekreslilo se?
-            # Návrat na původní profil (navazující testy s ním počítají) –
-            # z 0 karet zpět na karty = skutečné nové načtení.
-            Select Options By    ${FRAME} \#profil-select    value    ${puvodni}
-            Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=15s
-        END
+    Skip If    '${prazdny}' == ''
+    ...    Žádné město „nikdy neprohledáno“ k dispozici – test nemá co ověřit v tomto běhu.
+    FOR    ${i}    IN RANGE    2
+        Select Options By    ${FRAME} \#profil-select    value    ${prazdny}
+        Wait For Elements State    ${FRAME} text=Tohle město appka ještě nikdy neprohledala.    visible    timeout=15s
+        ${karet}=    Get Element Count    ${FRAME} .karta
+        Should Be Equal As Integers    ${karet}    0
+        ...    msg=Po přepnutí na město bez akcí zůstaly na stránce karty (${karet}) – nepřekreslilo se?
+        # Návrat na původní profil (navazující testy s ním počítají) –
+        # z 0 karet zpět na karty = skutečné nové načtení.
+        Select Options By    ${FRAME} \#profil-select    value    ${puvodni}
+        Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=15s
     END
 
 Chipy kategorií se vykreslily
@@ -478,30 +476,31 @@ Klik na podkategorii-chip skutečně zúží seznam karet
     ...    Ověřeno živě 21. 8. 2026 (?api=events): kategorie „festivaly"
     ...    má 11 akcí, z toho jen 1 s podkategorií „dětský" – konkrétní,
     ...    ověřitelné zúžení (ne triviální shoda, kdy by podkategorie
-    ...    pokrývala všechny akce kategorie stejně). Podmíněné (Log WARN
-    ...    skip) pro případ budoucí změny dat.
+    ...    pokrývala všechny akce kategorie stejně). Při změně dat (chybí
+    ...    kategorie nebo podkategorie) se test hlasitě přeskočí (Skip If,
+    ...    B5.6), ne tiše projde; filtr se vrací na „Vše“ ve FINALLY.
     ${ma_festivaly}=    Get Element Count    ${FRAME} \#kat-chips .chip >> text=festivaly
-    IF    ${ma_festivaly} == 0
-        Log    Kategorie „festivaly" dnes v datech chybí – test nemá co ověřit v tomto běhu.    level=WARN
-    ELSE
+    Skip If    ${ma_festivaly} == 0
+    ...    Kategorie „festivaly" dnes v datech chybí – test nemá co ověřit v tomto běhu.
+    TRY
         Click    ${FRAME} \#kat-chips .chip >> text=festivaly
         Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
         ${pocet_festivaly}=    Get Element Count    ${FRAME} .karta
         ${ma_detsky}=    Get Element Count    ${FRAME} \#podkat-chips .chip[data-kat="dětský"]
-        IF    ${ma_detsky} == 0
-            Log    Podkategorie „dětský" dnes v kategorii „festivaly" chybí – test nemá co ověřit v tomto běhu.    level=WARN
-        ELSE
-            Click    ${FRAME} \#podkat-chips .chip[data-kat="dětský"]
-            Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
-            ${pocet_zuzeny}=    Get Element Count    ${FRAME} .karta
-            Should Be True    ${pocet_zuzeny} < ${pocet_festivaly}
-            ...    Klik na podkategorii „dětský" měl zúžit seznam karet (${pocet_zuzeny} vs ${pocet_festivaly})
-            Click    ${FRAME} \#podkat-chips .chip[data-kat="dětský"]
-            Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
-            ${pocet_zpet}=    Get Element Count    ${FRAME} .karta
-            Should Be Equal As Integers    ${pocet_zpet}    ${pocet_festivaly}
-            ...    msg=Druhý klik (toggle off podkategorie) se měl vrátit na původní počet karet
-        END
+        Skip If    ${ma_detsky} == 0
+        ...    Podkategorie „dětský" dnes v kategorii „festivaly" chybí – test nemá co ověřit v tomto běhu.
+        Click    ${FRAME} \#podkat-chips .chip[data-kat="dětský"]
+        Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
+        ${pocet_zuzeny}=    Get Element Count    ${FRAME} .karta
+        Should Be True    ${pocet_zuzeny} < ${pocet_festivaly}
+        ...    Klik na podkategorii „dětský" měl zúžit seznam karet (${pocet_zuzeny} vs ${pocet_festivaly})
+        Click    ${FRAME} \#podkat-chips .chip[data-kat="dětský"]
+        Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
+        ${pocet_zpet}=    Get Element Count    ${FRAME} .karta
+        Should Be Equal As Integers    ${pocet_zpet}    ${pocet_festivaly}
+        ...    msg=Druhý klik (toggle off podkategorie) se měl vrátit na původní počet karet
+    FINALLY
+        # Úklid i při SKIPu a pádu: filtr kategorií zpět na „Vše" pro další testy.
         Click    ${FRAME} \#kat-chips .chip >> text=Vše
         Wait For Elements State    ${FRAME} .karta >> nth=0    visible    timeout=5s
     END
@@ -909,7 +908,7 @@ Kalendář: klik na den s akcí odscrolluje na odpovídající sekci v seznamu
     ...    "Probíhá / dlouhodobé" vlastní cíl nemají, klik se pak tiše
     ...    neprojeví (viz komentář u skocitNaDen_ v Index.html). Test proto
     ...    hledá PRVNÍ .ma-akce buňku s existujícím cílem, ne nutně první
-    ...    buňku vůbec – jinak podmíněně přeskočí (viz WARN větev), ať
+    ...    buňku vůbec – jinak se hlasitě přeskočí (Skip If), ať
     ...    nezávisí na tom, jestli aktuální měsíc takový den má.
     ...
     ...    v3.57 (audit selektorů, bod A): buňka nese ISO datum přímo přes
@@ -919,26 +918,22 @@ Kalendář: klik na den s akcí odscrolluje na odpovídající sekci v seznamu
     ...    křehké vůči jejich přejmenování při refaktoru. Teď čte data-iso
     ...    přímo z DOM, žádná závislost na interních názvech appky.
     ${pocet}=    Get Element Count    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce
-    IF    ${pocet} == 0
-        Log    Aktuální měsíc nemá žádný den s akcí (.ma-akce) – test nemá co ověřit v tomto běhu.    level=WARN
-    ELSE
-        ${cil_iso}=    Set Variable    ${EMPTY}
-        FOR    ${i}    IN RANGE    ${pocet}
-            ${iso}=    Get Attribute    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce >> nth=${i}    data-iso
-            ${existuje}=    Get Element Count    ${FRAME} \#den-${iso}
-            IF    ${existuje} > 0
-                ${cil_iso}=    Set Variable    ${iso}
-                Exit For Loop
-            END
-        END
-        IF    "${cil_iso}" == "${EMPTY}"
-            Log    Žádný den s akcí v aktuálním měsíci nemá odpovídající #den-<iso> sekci (jen dlouhodobé akce bez vlastního data) – test nemá co ověřit v tomto běhu.    level=WARN
-        ELSE
-            Click    ${FRAME} \#kalendar-mrizka .kalendar-den[data-iso="${cil_iso}"]
-            Wait Until Keyword Succeeds    5x    300ms
-            ...    Cíl dne musí být poblíž horního okraje viewportu    ${cil_iso}
+    Skip If    ${pocet} == 0
+    ...    Aktuální měsíc nemá žádný den s akcí (.ma-akce) – test nemá co ověřit v tomto běhu.
+    ${cil_iso}=    Set Variable    ${EMPTY}
+    FOR    ${i}    IN RANGE    ${pocet}
+        ${iso}=    Get Attribute    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce >> nth=${i}    data-iso
+        ${existuje}=    Get Element Count    ${FRAME} \#den-${iso}
+        IF    ${existuje} > 0
+            ${cil_iso}=    Set Variable    ${iso}
+            Exit For Loop
         END
     END
+    Skip If    "${cil_iso}" == "${EMPTY}"
+    ...    Žádný den s akcí v aktuálním měsíci nemá odpovídající #den-<iso> sekci (jen dlouhodobé akce bez vlastního data) – test nemá co ověřit v tomto běhu.
+    Click    ${FRAME} \#kalendar-mrizka .kalendar-den[data-iso="${cil_iso}"]
+    Wait Until Keyword Succeeds    5x    300ms
+    ...    Cíl dne musí být poblíž horního okraje viewportu    ${cil_iso}
 
 Kalendář: hover na den s akcí zobrazí tooltip s názvy akcí, mouseout ho schová
     [Tags]    kalendar
@@ -947,24 +942,22 @@ Kalendář: hover na den s akcí zobrazí tooltip s názvy akcí, mouseout ho sc
     ...    <div> na název, žádné datum ani počet – proto se ověřuje jen
     ...    neprázdnost obsahu, ne konkrétní text (ten se v datech mění).
     ${pocet}=    Get Element Count    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce
-    IF    ${pocet} == 0
-        Log    Aktuální měsíc nemá žádný den s akcí (.ma-akce) – test nemá co ověřit v tomto běhu.    level=WARN
-    ELSE
-        # 26. 10. 2026: nejdřív odjet myší z kalendáře. Předchozí test (klik na
-        # den) nechá myš nad buňkou dne a klikem tooltip schová; když je to
-        # tatáž buňka (v říjnu 2026 jediný den s akcí, 29. 10.), Hover myší
-        # nepohne, mouseenter nevznikne a tooltip se neukáže (pád v plném
-        # běhu, izolovaně PASS). Odjetí zaručí skutečný mouseenter.
-        Hover    ${FRAME} header h1
-        Hover    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce >> nth=0
-        Wait For Elements State    ${FRAME} \#kalendar-tooltip.zobrazeno    visible    timeout=3s
-        ${pocet_radku}=    Get Element Count    ${FRAME} \#kalendar-tooltip > div
-        Should Be True    ${pocet_radku} >= 1    Tooltip má obsahovat aspoň jeden název akce
-        ${prvni_radek}=    Get Text    ${FRAME} \#kalendar-tooltip > div >> nth=0
-        Should Not Be Empty    ${prvni_radek}    msg=První řádek tooltipu nemá být prázdný
-        Hover    ${FRAME} header h1
-        Wait For Elements State    ${FRAME} \#kalendar-tooltip.zobrazeno    hidden    timeout=3s
-    END
+    Skip If    ${pocet} == 0
+    ...    Aktuální měsíc nemá žádný den s akcí (.ma-akce) – test nemá co ověřit v tomto běhu.
+    # 26. 10. 2026: nejdřív odjet myší z kalendáře. Předchozí test (klik na
+    # den) nechá myš nad buňkou dne a klikem tooltip schová; když je to
+    # tatáž buňka (v říjnu 2026 jediný den s akcí, 29. 10.), Hover myší
+    # nepohne, mouseenter nevznikne a tooltip se neukáže (pád v plném
+    # běhu, izolovaně PASS). Odjetí zaručí skutečný mouseenter.
+    Hover    ${FRAME} header h1
+    Hover    ${FRAME} \#kalendar-mrizka .kalendar-den.ma-akce >> nth=0
+    Wait For Elements State    ${FRAME} \#kalendar-tooltip.zobrazeno    visible    timeout=3s
+    ${pocet_radku}=    Get Element Count    ${FRAME} \#kalendar-tooltip > div
+    Should Be True    ${pocet_radku} >= 1    Tooltip má obsahovat aspoň jeden název akce
+    ${prvni_radek}=    Get Text    ${FRAME} \#kalendar-tooltip > div >> nth=0
+    Should Not Be Empty    ${prvni_radek}    msg=První řádek tooltipu nemá být prázdný
+    Hover    ${FRAME} header h1
+    Wait For Elements State    ${FRAME} \#kalendar-tooltip.zobrazeno    hidden    timeout=3s
 
 Mapa lze otevřít a zavřít přes #mapa-toggle (mobil)
     [Tags]    smoke    mapa    krehky
