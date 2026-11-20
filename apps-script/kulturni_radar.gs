@@ -2595,7 +2595,6 @@ function sestavZjednodusenyDotazGeokodovani_(misto, obec) {
 
 /** v3.66: aliasy velkých akcí z listu ALIASY (A Klíčová slova, B Jednotný název,
  *  C Profil – prázdné = všechny profily, D Poznámka). Chybějící list = žádné aliasy. */
-const ALIASY_HLAVICKA = ['Klíčová slova', 'Jednotný název', 'Profil', 'Poznámka'];
 function readAliasy_(ss) {
   const sh = ss.getSheetByName(SHEET.ALIASY);
   if (!sh || sh.getLastRow() < 2) return [];

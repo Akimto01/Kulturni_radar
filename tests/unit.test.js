@@ -4012,6 +4012,42 @@ test('v3.66: upsertEvents_ – jednotný název bez společného slova se starý
   assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'Advent v centru');
 });
 
+test('v3.66: upsertEvents_ – dva různé aliasy v jednom běhu se nepomíchají (klíč aliasu obsahuje jednotný název)', () => {
+  const aliasy = ALIASY_VANOCE_.concat([['ignis', 'Ignis Brunensis', '', '']]);
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciTrhy_()])), ALIASY: aliasy });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'ig-1', datum_od: '28. 5. 2027', datum_do: '28. 5. 2027', stav: 'potvrzeno',
+    nazev: 'Ignis Brunensis 2027', misto: 'Brněnská přehrada', kategorie: 'festivaly',
+  }]);
+  assert.equal(stats.nove, 1, 'ohňostroje nejsou vánoční trhy');
+  const sh = ss.getSheetByName('AKCE');
+  assert.equal(sh.getRange(2, 5, 1, 1).getValues()[0][0], 'Vánoce Brno – trhy na Zelném trhu a Moravském náměstí', 'řádek trhů se nepřejmenuje');
+  assert.equal(sh.getRange(3, 5, 1, 1).getValues()[0][0], 'Ignis Brunensis');
+});
+
+test('v3.66: upsertEvents_ – řádek, který už jednotný název má, se znovu nepřejmenovává (žádný zápis do sloupce názvu)', () => {
+  const akce = new MemSheet([[]].concat([existujiciTrhy_({ nazev: 'Vánoce v Brně' })]));
+  const zapisyNazvu = [];
+  const puvodni = akce.getRange.bind(akce);
+  akce.getRange = (row, col, ...zbytek) => {
+    const rozsah = puvodni(row, col, ...zbytek);
+    if (col === 5) {
+      const setValue = rozsah.setValue.bind(rozsah);
+      rozsah.setValue = v => { zapisyNazvu.push(v); return setValue(v); };
+    }
+    return rozsah;
+  };
+  const ss = fakeSpreadsheet({ AKCE: akce, ALIASY: ALIASY_VANOCE_ });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'bv-5', datum_od: '27. 11. 2026', datum_do: '23. 12. 2026', stav: 'potvrzeno',
+    nazev: 'Brněnské Vánoce', misto: 'nám. Svobody', kategorie: 'jarmarky',
+  }]);
+  assert.equal(stats.bezZmeny, 1);
+  assert.equal(zapisyNazvu.length, 0, 'zbytečný zápis při každém běhu by zpomaloval');
+});
+
 test('v3.66: upsertEvents_ – dva staré řádky téže akce: páruje se k prvnímu, druhý zůstane (úklid ručně)', () => {
   const druhy = existujiciTrhy_({ id: 'vb-2026', nazev: 'Vánoce Brno 2026 (zahájení na Moravském náměstí)' });
   const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciTrhy_(), druhy])), ALIASY: ALIASY_VANOCE_ });
