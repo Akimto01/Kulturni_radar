@@ -1186,7 +1186,7 @@ Ověřit filtr chipu a návrat
     ${filtrovanych}=    Get Element Count    ${FRAME} .karta
     Should Be True    ${prazdny} == 1 or ${filtrovanych} < ${vsech}
     ...    msg=Filtr ${chip} buď ukáže hlášku prázdného stavu, nebo užší podmnožinu karet (karet ${filtrovanych} z ${vsech})
-    IF    ${ikona} is not None and ${filtrovanych} > 0
+    IF    $ikona is not None and $filtrovanych > 0
         ${neoznacenych}=    Get Element Count
         ...    ${FRAME} .karta:not(:has(.ikona-oznaceni.${ikona}.aktivni))
         Should Be Equal As Integers    ${neoznacenych}    0
