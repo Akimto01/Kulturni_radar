@@ -609,19 +609,17 @@ Chip typu stálého místa zúží seznam (pokud profil má 2+ typů)
     ${vsech}=    Get Element Count    ${FRAME} .misto-karta
     # v3.64 (audit selektorů F): první konkrétní typ přes data-typ, ne „druhý chip“
     Click    ${FRAME} \#mista-sekce .chip[data-typ]:not([data-typ=""]) >> nth=0
-    Sleep    300ms
-        
+    # čekání přes opakovanou aserci počtu, ne fixní Sleep
+    Get Element Count    ${FRAME} .misto-karta    <    ${vsech}
+    ...    message=Filtr typu místa nezúžil seznam (počet míst zůstal ${vsech})
     ${filtrovanych}=    Get Element Count    ${FRAME} .misto-karta
-    Should Be True    ${filtrovanych} < ${vsech}
     Should Be True    ${filtrovanych} >= 1
         ...    msg=Vybraný typ místa by měl mít aspoň jedno místo (jinak by se chip nevykreslil)
-        
+
     Click    ${FRAME} \#mista-sekce .chip[data-typ=""]
-    Sleep    300ms
-        
-    ${zpet}=    Get Element Count    ${FRAME} .misto-karta
-    Should Be Equal As Integers    ${zpet}    ${vsech}
-    
+    Get Element Count    ${FRAME} .misto-karta    ==    ${vsech}
+    ...    message=Návrat na „Vše“ nevrátil původní počet míst ${vsech}
+
 
 Karty mají ikony pro Oblíbené a Navštívené
     [Tags]    ui
@@ -638,17 +636,7 @@ Chip Oblíbené filtruje bez zápisu do tabulky
     [Documentation]    Klik na CHIP (ne na ikonu karty!) je čistě klientský filtr –
     ...                nevolá apiToggle, nic nezapisuje. Bezpečné pro CI.
     ${vsech}=    Get Element Count    ${FRAME} .karta
-    Click    ${FRAME} \#chip-oblibene
-    Sleep    300ms   # čisté prekreslení, žádný síťový požadavek
-    ${je_prazdno}=    Get Element Count    ${FRAME} \#status
-    ${oblibenych}=    Get Element Count    ${FRAME} .karta
-    Should Be True    ${je_prazdno} == 1 or ${oblibenych} < ${vsech}
-    ...    msg=Filtr Oblíbené buď ukáže prázdný stav, nebo užší podmnožinu karet
-    Click    ${FRAME} \#chip-oblibene
-    Sleep    300ms
-    ${zpet}=    Get Element Count    ${FRAME} .karta
-    Should Be Equal As Integers    ${zpet}    ${vsech}
-    ...    msg=Opětovný klik na chip vrátí plný seznam
+    Ověřit filtr chipu a návrat    \#chip-oblibene    ${vsech}    hvezda
 
 Chip Neověřeno filtruje bez zápisu do tabulky
     [Tags]    filtr
@@ -657,17 +645,7 @@ Chip Neověřeno filtruje bez zápisu do tabulky
     ...                Bezpečné pro CI i když profil aktuálně nemá žádnou
     ...                neověřenou akci (pak stačí prázdný stav).
     ${vsech}=    Get Element Count    ${FRAME} .karta
-    Click    ${FRAME} \#chip-neoverene
-    Sleep    300ms
-    ${je_prazdno}=    Get Element Count    ${FRAME} \#status
-    ${neoverenych}=    Get Element Count    ${FRAME} .karta
-    Should Be True    ${je_prazdno} == 1 or ${neoverenych} < ${vsech}
-    ...    msg=Filtr Neověřeno buď ukáže prázdný stav, nebo užší podmnožinu karet
-    Click    ${FRAME} \#chip-neoverene
-    Sleep    300ms
-    ${zpet}=    Get Element Count    ${FRAME} .karta
-    Should Be Equal As Integers    ${zpet}    ${vsech}
-    ...    msg=Opětovný klik na chip vrátí plný seznam
+    Ověřit filtr chipu a návrat    \#chip-neoverene    ${vsech}
 
 Označení ★ se skutečně promítne do filtru „★ Oblíbené" (integrace, ne jen zápis)
     [Tags]    zapis    krehky
@@ -757,17 +735,7 @@ Chip „Oblíbená místa" filtruje bez zápisu do tabulky
     ...                aktuálně nemá žádné oblíbené místo (pak stačí prázdný stav) –
     ...                stejný vzor jako „Chip Oblíbené"/„Chip Neověřeno" výše.
     ${vsech}=    Get Element Count    ${FRAME} .karta
-    Click    ${FRAME} \#chip-oblibena-mista
-    Sleep    300ms
-    ${je_prazdno}=    Get Element Count    ${FRAME} \#status
-    ${filtrovanych}=    Get Element Count    ${FRAME} .karta
-    Should Be True    ${je_prazdno} == 1 or ${filtrovanych} < ${vsech}
-    ...    msg=Filtr Oblíbená místa buď ukáže prázdný stav, nebo užší podmnožinu karet
-    Click    ${FRAME} \#chip-oblibena-mista
-    Sleep    300ms
-    ${zpet}=    Get Element Count    ${FRAME} .karta
-    Should Be Equal As Integers    ${zpet}    ${vsech}
-    ...    msg=Opětovný klik na chip vrátí plný seznam
+    Ověřit filtr chipu a návrat    \#chip-oblibena-mista    ${vsech}    misto
 
 Tlačítko Spustit kontrolu otevře token dialog (bez spuštění)
     [Tags]    ui
@@ -1203,6 +1171,31 @@ Cíl dne musí být poblíž horního okraje viewportu
     ${top}=    Evaluate JavaScript    ${None}    document.getElementById('den-${iso}').getBoundingClientRect().top
     Should Be True    -100 <= ${top} <= 400
     ...    #den-${iso} není poblíž horního okraje viewportu po scrollIntoView (top=${top})
+
+Ověřit filtr chipu a návrat
+    [Documentation]    Klik na chip je čistě klientský filtr (synchronní překreslení). Po
+    ...    kliku se čeká na stav chipu (`.active`), ne na čas. Výsledek je buď skutečný
+    ...    prázdný stav (`#status` s hláškou „Žádné akce…“ nebo „Tohle město…“, ne
+    ...    „Načítám akce…“ ani chyba), nebo užší seznam; u `${ikona}` musí být každá
+    ...    zbylá karta opravdu označená. Druhý klik vrátí plný počet karet.
+    [Arguments]    ${chip}    ${vsech}    ${ikona}=${NONE}
+    Click    ${FRAME} ${chip}
+    Wait For Elements State    ${FRAME} ${chip}.active    visible    timeout=5s
+    ${prazdny}=    Get Element Count
+    ...    ${FRAME} \#status:text-matches("^(Žádné akce pro vybraný filtr|Tohle město appka ještě nikdy neprohledala)")
+    ${filtrovanych}=    Get Element Count    ${FRAME} .karta
+    Should Be True    ${prazdny} == 1 or ${filtrovanych} < ${vsech}
+    ...    msg=Filtr ${chip} buď ukáže hlášku prázdného stavu, nebo užší podmnožinu karet (karet ${filtrovanych} z ${vsech})
+    IF    ${ikona} is not None and ${filtrovanych} > 0
+        ${neoznacenych}=    Get Element Count
+        ...    ${FRAME} .karta:not(:has(.ikona-oznaceni.${ikona}.aktivni))
+        Should Be Equal As Integers    ${neoznacenych}    0
+        ...    msg=Filtr ${chip} propustil ${neoznacenych} karet bez aktivní ikony ${ikona}
+    END
+    Click    ${FRAME} ${chip}
+    Wait For Elements State    ${FRAME} ${chip}:not(.active)    visible    timeout=5s
+    Get Element Count    ${FRAME} .karta    ==    ${vsech}
+    ...    message=Opětovný klik na chip ${chip} nevrátil plný seznam (${vsech} karet)
 
 Zjistit je-li ikona první karty aktivní
     [Arguments]    ${trida_ikony}

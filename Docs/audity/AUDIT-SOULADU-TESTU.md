@@ -91,7 +91,7 @@ Pořadí podle dopadu: nejdřív dávka 1 (zastaví kaskádové pády), pak 2, 3
 | 1 | Úklid sdílené stránky: suite-level Test Teardown a `[Teardown] Close Page` | 27, 86, 108, 130, 806 (+ všechny testy sdílené stránky) | 1,5 až 2 h | hotovo 19. 11. 2026 (čeká na ověření v CI) |
 | 2 | B5.6 mapa: `WARN` na `Skip If` | 948, 967, 991, 1032, 1061 | 45 min | hotovo 20. 11. 2026 (čeká na ověření v CI) |
 | 3 | B5.6 kalendář, přepnutí profilu, podkategorie | 860, 898, 302, 426 | 1 h | hotovo 20. 11. 2026 (čeká na ověření v CI) |
-| 4 | Chip testy: baseline karet, oracle místo `#status`, bez Sleep | 592, 609, 708, 549 | 1,5 h | čeká |
+| 4 | Chip testy: baseline karet, oracle místo `#status`, bez Sleep | 592, 609, 708, 549 | 1,5 h | hotovo 20. 11. 2026 kromě `0 != N` (čeká na ověření v CI) |
 | 5 | Zápisové testy ★/✓/🏛: teardown a klíčová slova na `data-id` | 628, 667, 680, 690 | 1 až 1,5 h | čeká |
 | 6 | Notifikace a dialogy: teardown | 217, 150, 167, 194 | 45 min | čeká |
 | 7 | API třídy vstupů: datumy přes víc profilů, obsah místo echa | api 55, 82, 90, 71 | 1 až 1,5 h | čeká |
@@ -147,7 +147,7 @@ a **selže, jen když některý počet vzroste**. Při poklesu vypíše výzvu k
 | `text_selektory` | B4 | argument s `text=` ve volání klíčového slova | 11 |
 | `nth_selektory` | B4 | výskyty `nth=` ve volání klíčového slova | 60 (dřív 61) |
 | `aserce_v_resources` | B5.2 | `Should*` a `Get Text` v `resources.robot` | 0 |
-| `sleep_bez_povoleni` | B5.3 | `Sleep` bez komentáře `# povoleno:` na řádku | 11 |
+| `sleep_bez_povoleni` | B5.3 | `Sleep` bez komentáře `# povoleno:` na řádku | 3 (od 20. 11. 2026, dřív 11) |
 | `regrese_bez_verze` | B4 | test s tagem `regrese` bez `vX.YY` v názvu | 6 |
 | `krehky_bez_pricin` | C3 | test s tagem `krehky` bez řádku „Příčina nestability:“ v `[Documentation]` | 12 |
 
