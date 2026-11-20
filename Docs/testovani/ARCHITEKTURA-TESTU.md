@@ -453,7 +453,7 @@ skript na serveru už proběhl, proto se opakují jen čtení a idempotentní z�
 | Bez paralelizace | jen s izolací dat (víc testovacích profilů), dnes nevýhodné |
 | Mutační skóre celého backendu je 62,8 % | triáž přeživších po funkcích, až se rozhodne o cíli (nápad v BACKLOGu); kritická sada 96,9 % a práh 95 % |
 | Kapitola D | porovnat s obsahem 4. týdne kurzu po jeho zveřejnění |
-| Stávající testy neodpovídají pravidlům B4, B5 a C3 | audit [AUDIT-SOULADU-TESTU.md](../audity/AUDIT-SOULADU-TESTU.md) (20 skupin porušení, ne výskytů: pojistka jich počítá 121, vysvětlení v auditu; plán v 10 dávkách, dávka 1 hotová 19. 11. 2026); pojistka proti nárůstu `.github/scripts/kontrola-architektury-testu.py` běží v CI v jobu `rf-dryrun` |
+| Stávající testy neodpovídají pravidlům B4, B5 a C3 | audit [AUDIT-SOULADU-TESTU.md](../audity/AUDIT-SOULADU-TESTU.md) (20 skupin porušení, ne výskytů: pojistka jich počítá 121, vysvětlení v auditu; plán v 10 dávkách, dávky 1 a 2 hotové 19. a 20. 11. 2026); pojistka proti nárůstu `.github/scripts/kontrola-architektury-testu.py` běží v CI v jobu `rf-dryrun` |
 
 ## Historie dokumentu
 
