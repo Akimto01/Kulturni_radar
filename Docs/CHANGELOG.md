@@ -1,5 +1,15 @@
 # Changelog
 
+## Testy: dávka 3 sjednocení s architekturou, kalendář, profil a podkategorie bez WARN (#34) – 20. 11. 2026
+### Proč
+- Čtyři testy (přepnutí profilu, podkategorie, kalendář klik a hover) při chybějících datech jen zalogovaly `WARN` a prošly bez jediné aserce. Pravidlo B5.6: chybí-li podmínky, test se hlasitě přeskočí.
+### Změněno
+- **`tests/robot/frontend.robot`:** šest `Log level=WARN` nahrazeno `Skip If`; v testu podkategorie vrací filtr na „Vše“ `TRY/FINALLY`, takže úklid proběhne i při SKIPu a pádu.
+- **Baseline pojistky architektury:** `warn_v_testech` 6 → 0.
+- **Dokumentace:** AUDIT-SOULADU-TESTU.md (stav dávky 3, metrika), BACKLOG (dávka 3 přeškrtnuta).
+### Testy
+- Bez změny počtu testů (Node 501 + 212, RF 66). Ověřeno dry runem RF a pojistkou architektury. Živý běh rf-tests.yml na větvi PR (44770534550): všechny čtyři upravené testy PASS, žádný SKIP (Opakované přepnutí profilu, Klik na podkategorii-chip, Kalendář: klik na den, Kalendář: hover), navazující chip testy PASS; frontend 53/53, API 13/13, iframe 4/4.
+
 ## CI: pilot ukládá artefakt i při pádu, nepřepisuje baseline (běh 6) – 20. 11. 2026
 - **Proč:** běh 6 pilotu (44761026901, #34 dávka 3) skončil v kroku kontrol: pojistka architektury hlásila `text_selektory` 10 → 11. Počet selektorů `text=` se nezměnil (11 na `main` i v běhu, jeden ubyl v testu podkategorie a jeden přibyl jinde), ale Claude snížil baseline (`text_selektory` 11 → 10, `warn_v_testech` 6 → 0) nejspíš dřív, než dokončil úpravy testů. Kroky s artefaktem se po pádu přeskočily, takže hotová práce (19 kroků, ~0,47 USD) se zahodila, stejně jako v běhu 3 (limit kroků).
 - **`claude-pilot.yml`, job claude:** kroky „Nové soubory do shrnutí“, „Uložit změny jako artefakt“ a nahrání artefaktu mají `if: always()`, artefakt `claude-vystup` tedy vzniká i při pádu Clauda nebo kontrol. Job pr dál běží jen po úspěchu celého jobu claude, z chybného běhu PR nevznikne.

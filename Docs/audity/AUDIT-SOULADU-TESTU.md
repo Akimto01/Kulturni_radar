@@ -90,7 +90,7 @@ Pořadí podle dopadu: nejdřív dávka 1 (zastaví kaskádové pády), pak 2, 3
 |---|---|---|---|---|
 | 1 | Úklid sdílené stránky: suite-level Test Teardown a `[Teardown] Close Page` | 27, 86, 108, 130, 806 (+ všechny testy sdílené stránky) | 1,5 až 2 h | hotovo 19. 11. 2026 (čeká na ověření v CI) |
 | 2 | B5.6 mapa: `WARN` na `Skip If` | 948, 967, 991, 1032, 1061 | 45 min | hotovo 20. 11. 2026 (čeká na ověření v CI) |
-| 3 | B5.6 kalendář, přepnutí profilu, podkategorie | 860, 898, 302, 426 | 1 h | čeká |
+| 3 | B5.6 kalendář, přepnutí profilu, podkategorie | 860, 898, 302, 426 | 1 h | hotovo 20. 11. 2026 (čeká na ověření v CI) |
 | 4 | Chip testy: baseline karet, oracle místo `#status`, bez Sleep | 592, 609, 708, 549 | 1,5 h | čeká |
 | 5 | Zápisové testy ★/✓/🏛: teardown a klíčová slova na `data-id` | 628, 667, 680, 690 | 1 až 1,5 h | čeká |
 | 6 | Notifikace a dialogy: teardown | 217, 150, 167, 194 | 45 min | čeká |
@@ -142,7 +142,7 @@ a **selže, jen když některý počet vzroste**. Při poklesu vypíše výzvu k
 
 | Metrika | Pravidlo | Co se počítá | Baseline (28. 10. 2026) |
 |---|---|---|---|
-| `warn_v_testech` | B5.6 | `Log … level=WARN` v těle testu | 6 (od 20. 11. 2026, dřív 11) |
+| `warn_v_testech` | B5.6 | `Log … level=WARN` v těle testu | 0 (od 20. 11. 2026, dřív 11) |
 | `testy_bez_teardownu` | B5.4 | test s `New Page`, `New Context`, `Select Options By`, `Otevřít radar na mobilním viewportu` nebo tagem `zapis` bez `[Teardown]` (suite-level Test Teardown pokrývá všechny) | 0 (od 19. 11. 2026, dřív 9) |
 | `text_selektory` | B4 | argument s `text=` ve volání klíčového slova | 11 |
 | `nth_selektory` | B4 | výskyty `nth=` ve volání klíčového slova | 60 (dřív 61) |
