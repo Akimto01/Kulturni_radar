@@ -1,5 +1,11 @@
 # Changelog
 
+## CI: sdílený skript kontroly úniku (#46) – 20. 11. 2026
+- **`.github/scripts/kontrola-uniku.sh`:** jedna implementace kontroly úniku tajných hodnot v reportech RF (ntfy témata profilů `radar-` + 32 hex, `NTFY_TOPIC`, `RF_TEST_PIN` s přibližným hledáním u PINu kratšího než 8 znaků, smazání `playwright-log.txt`). Při nálezu vypíše jen soubor a název secretu, nikdy hodnotu; návratový kód 1.
+- **`rf-tests.yml` a `publikovat-report.yml`** volají skript místo dvou shodných kopií v krocích workflow (dřív komentář „při změně udržovat obě místa shodná“). Podmínky kroků, `env` a návaznosti (nahrání artefaktu jen po úspěšné kontrole, nepublikovat při nálezu) beze změny.
+- **Samotest `--test`** (vymyšlené reporty v dočasném adresáři, bez tajných hodnot): čistý adresář, ntfy téma profilu, `NTFY_TOPIC`, PIN s 8 znaky, krátký PIN jako celý text prvku, krátký PIN jen jako zlomek času (bez falešné shody), smazání `playwright-log.txt`. Běží v `node-tests.yml`. Negativní zkouška: bez vzoru `radar-…` samotest selže.
+- Dokumentace: ARCHITEKTURA-TESTU (historie), SKILL.md (tajné hodnoty, obě kopie), BACKLOG.
+
 ## CI: pilot Claude Code uzavřen, štítek claude-ready (#82) – 19. 11. 2026
 - **Rozhodnutí:** úkoly vhodné pro pilot nesou nový štítek `claude-ready` (zatím jen #34), pilot se dál spouští ručně, review a ověření dělá Vojta s Claude Code. Noční cron odložen, úzkým hrdlem je review; zvážit po zhruba pěti dalších bězích bez větších nálezů.
 - **Bilance 18.–19. 11.:** 4 běhy, 3 mergnuté PR (#83, #84, #85), 1 běh spadl na limitu kroků; každý pod 5 min, odhad ~1 USD.

@@ -79,43 +79,14 @@ jobs:
           run-id: ${{ steps.beh.outputs.run_id }}
           github-token: ${{ github.token }}
 
-      # Stejná kontrola jako v rf-tests.yml (při změně udržovat obě místa shodná).
+      # Sdílený skript s rf-tests.yml (#46): jedna implementace pro obě místa.
       # Nález = nepublikovat a selhat, další kroky a nasazení se nespustí.
       - name: Kontrola úniku tajných hodnot
         if: steps.artefakt.outputs.existuje == 'true'
         env:
           RF_TEST_PIN: ${{ secrets.RF_TEST_PIN }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: |
-          # Při nálezu se vypíše jen název souboru a secretu, nikdy hodnota.
-          # PIN má mít 8 znaků, takže stačí prosté hledání. Kratší PIN by dával falešné
-          # shody (kód knihovny v HTML, zlomky časů, čísla): v tom případě se krok
-          # ohlásí jako ::warning:: a hledá se jen v uvozovkách nebo jako celý text prvku.
-          find vysledky -name playwright-log.txt -delete 2>/dev/null || true
-          nalez=0
-          while IFS= read -r soubor; do
-            echo "::error::Únik ntfy tématu uživatelského profilu (radar-…) v souboru $soubor"
-            nalez=1
-          done < <(grep -rlE -- 'radar-[0-9a-f]{32}' vysledky/ || true)
-          if [ -n "$NTFY_TOPIC" ]; then
-            while IFS= read -r soubor; do
-              echo "::error::Únik tajné hodnoty NTFY_TOPIC v souboru $soubor"
-              nalez=1
-            done < <(grep -rlF -- "$NTFY_TOPIC" vysledky/ || true)
-          fi
-          if [ -n "$RF_TEST_PIN" ]; then
-            if [ "${#RF_TEST_PIN}" -ge 8 ]; then
-              hledani=(-e "$RF_TEST_PIN")
-            else
-              echo "::warning::RF_TEST_PIN má méně než 8 znaků, kontrola úniku PINu je jen přibližná (hledá se v uvozovkách a jako celý text prvku)"
-              hledani=(-e "'$RF_TEST_PIN'" -e "\"$RF_TEST_PIN\"" -e ">$RF_TEST_PIN<")
-            fi
-            while IFS= read -r soubor; do
-              echo "::error::Únik tajné hodnoty RF_TEST_PIN v souboru $soubor"
-              nalez=1
-            done < <(grep -rlF "${hledani[@]}" -- vysledky/ || true)
-          fi
-          exit $nalez
+        run: bash .github/scripts/kontrola-uniku.sh vysledky
 
       - name: Odstranit screenshoty a ladicí log
         if: steps.artefakt.outputs.existuje == 'true'

@@ -501,6 +501,9 @@ GitHub maskuje secrets jen v konzoli, ne v souborech z testů (`output.xml`,
 - `playwright-log.txt` do reportů nepatří (zapisuje i hodnoty z DOM).
 - Hledání úniku vždy počítáním výskytů (`grep -c`, `-l`), nikdy vypsáním
   hodnoty.
+- Kontrola úniku v CI je od 20. 11. 2026 jeden skript `.github/scripts/kontrola-uniku.sh`
+  (#46) pro `rf-tests.yml` i `publikovat-report.yml`; nové pravidlo psát jen tam a doplnit
+  negativní zkoušku do jeho `--test`.
 - **Návratová hodnota z bloku s `Log Level NONE`** (19. 11. 2026, PR #83): přiřazení
   `${j}=    Klíčové slovo` zapíše RF do reportu až při obnovené úrovni logování,
   i když klíčové slovo uvnitř běželo při NONE. Z bloku proto vracet jen zúžená

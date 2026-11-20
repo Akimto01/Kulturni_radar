@@ -88,6 +88,11 @@ jobs:
       - name: Samotest kontroly defektů
         run: python .github/scripts/kontrola-defektu.py --test
 
+      # Samotest sdílené kontroly úniku (#46): vymyšlené reporty v dočasném adresáři,
+      # bez tajných hodnot. Ostrou kontrolu dělají rf-tests.yml a publikovat-report.yml.
+      - name: Samotest kontroly úniku
+        run: bash .github/scripts/kontrola-uniku.sh --test
+
       # Samotest varování „kód změněn, dokument ne“ (dočasné git repo, jen varování, bez sítě) a
       # kontrola, že mapa kód -> dokument v repu je celá (dokumenty a funkce existují). Samotest
       # ověřuje mapu v repu i sám (poslední zkouška), takže při rozbité mapě selže.
