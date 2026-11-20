@@ -1,5 +1,17 @@
 # Changelog
 
+## Backend v3.66 – aliasy velkých akcí (BACKLOG Cíl 3) – 20. 11. 2026
+### Proč
+- Brněnské vánoční trhy přicházely od AI jako „Vánoce Brno – trhy na Zelném trhu…“, „Vánoce Brno 2026 (zahájení…)“ a „Brněnské Vánoce (nám. Svobody…)“ s různými daty (13. 11.–31. 12. a 27. 11.–23. 12.); jde o jednu akci na více místech. Fuzzy shoda je spojit nemá (jediné společné slovo, jiná data, riziko falešných sloučení jinde), 19. 11. proto proběhl ruční úklid (3 řádky).
+### Změněno
+- **List ALIASY** (A Klíčová slova, B Jednotný název, C Profil, D Poznámka), vyplňuje ho správce. `readAliasy_`, `parsovatVzorAliasu_` (slova oddělená mezerou, čárkou nebo „+“, bez diakritiky, `*` = začátek slova) a `najdiAlias_` (všechna klíčová slova v hlavní části názvu, profil prázdný nebo shodný, první shoda vyhrává).
+- **Pojistka série jako ve v3.62:** porovnává se jen hlavní část názvu bez závorek a bez textu za první pomlčkou, takže „LUCIE – koncert (Vánoce Brno)“ ani „Koncert – Vánoce v Brně“ alias série nedostanou.
+- **`upsertEvents_`:** název s aliasem se před párováním přejmenuje na jednotný název. Shoda přes alias (profil a jednotný název, bez ohledu na data) má přednost před ID a kontrola ID z v3.58 se u ní nepoužije. Termín řádku se nepřepisuje (varianty mají každá jiná data, jinak by kmital), změnou je jen stav; starší řádek s jiným názvem se tiše přejmenuje. Nová akce dostane jednotný název a další varianta v témže běhu se k ní přidá. Bez listu ALIASY beze změny.
+- Výpočet změny konce bere hodnotu z řádku k zápisu (`rowVals[2]`) místo `ev.datum_do`; bez aliasu je to totéž.
+- Dokumentace: PROVOZ.md (nová sekce Aliasy), ARCHITEKTURA-APLIKACE (listy, deduplikace), BACKLOG (Cíl 3 hotovo).
+### Testy
+- **+13 Node testů (backend 486 → 499, celkem 698 → 711):** parsování vzoru, `najdiAlias_` na produkčních názvech (tři varianty ano, koncert v sérii v závorce i za pomlčkou ne, „vánoce“ ≠ „vánoční“, „ignis“ ≠ „Ignisfest“ bez hvězdičky, profil, první shoda), `readAliasy_` (bez listu, jen hlavička, neúplné řádky), `upsertEvents_` (varianta s jinými daty beze změny s přejmenováním a původním termínem, zrušení se hlásí a termín zůstane, nová akce a druhá varianta v témže běhu, bez listu beze změny, koncert v sérii, cizí profil, přednost před ID jiné akce, jednotný název bez společného slova, dva staré řádky). Ruční mutace (20 variant indexu, párování, termínu, přejmenování, pojistky série, prefixu, profilu a filtrů) shodí vždy aspoň jeden test. Pokrytí řádků 92,72 %, baseline zvýšena z 92,63 %.
+
 ## Testy: dávka 2 sjednocení s architekturou, mapové testy bez WARN (#34) – 20. 11. 2026
 ### Proč
 - Pět mapových testů při chybějících datech (žádný pin, prázdný seznam míst) jen zalogovalo `WARN` a prošlo bez jediné aserce. Pravidlo B5.6: chybí-li podmínky, test se hlasitě přeskočí.

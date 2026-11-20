@@ -52,6 +52,7 @@
 | UŽIVATELÉ | *(v3.20)* profily domácnosti: ID, jméno, `PIN_hash` (sůl+SHA-256, nikdy surový PIN), osobní Filtry (JSON), osobní Notifikace (JSON, v3.30) |
 | SOUŘADNICE | *(v3.14)* cache geokódovaných míst (Nominatim/OpenStreetMap) klíčovaná `misto|obec` — jen se přidává, nikdy nemaže/netogluje |
 | POČASÍ | *(v3.22)* předpověď pro budoucí AKCE (id akce → stav/kód/teplota), přepočítává se 2× týdně (viz níže), oddělený list bez zásahu do AKCE |
+| ALIASY | *(v3.66)* aliasy velkých akcí pod více názvy: A klíčová slova (např. `vánoce brn*`, `*` = začátek slova), B jednotný název, C profil (prázdné = všechny), D poznámka. Vyplňuje ručně správce, chybějící list = žádné aliasy |
 | SLEDOVANÁ MĚSTA | *(v3.16)* seznam profilů (musí přesně sedět s LOKALITY, sloupec B) k tichému doplňování dat na pozadí, bez notifikace |
 | EMAIL_TIPY | *(v3.29)* fronta tipů z e-mailového webhooku (Cloudflare Worker) – stav nové → zpracováno-ok/zpracováno-chyba/nelze-ověřit/test-ignorováno |
 
@@ -87,6 +88,10 @@ i ověřené e-mailové tipy) skončily v jednom denním reportu.
 4. vícedenní akce se stejným koncem a podmnožinou názvu (v3.57).
 Ve fuzzy krocích se nepáruje jiný den denní série ani akce v sérii se sérií
 („X (Série)“, „Akce – Série“; `jeAkceVSerii_`, v3.62).
+Před všemi kroky (v3.66): název, jehož hlavní část (bez závorek a textu za
+pomlčkou) obsahuje klíčová slova aliasu z listu ALIASY, se přejmenuje na jednotný
+název a páruje podle profilu a tohoto názvu bez ohledu na data. Termín řádku se
+pak nepřepisuje, změnou je jen stav, a starší řádek dostane jednotný název.
 Nové řádky se registrují do indexů průběžně (dedup i uvnitř jedné dávky).
 „Změna“ = jen posun termínu nebo stavu, od v3.62 i u nejisté fuzzy shody;
 přeformulace textů se ignoruje. Log sloučení (sloupec Z) jen u nejisté shody,

@@ -3840,6 +3840,190 @@ test('v3.62: upsertEvents_ – negativní: shodný základ názvu, ale jiný kon
   assert.equal(stats.nove, 1, 'jednodenní rozsvícení není celé trhy, tolerance základu názvu chce shodný i konec');
 });
 
+// ---------------------------------------------------------------------------
+// v3.66: aliasy velkých akcí (list ALIASY), BACKLOG Cíl 3. Produkční případ
+// 19. 11. 2026: brněnské vánoční trhy pod třemi názvy s různými daty.
+// ---------------------------------------------------------------------------
+
+const ALIASY_VANOCE_ = [['Klíčová slova', 'Jednotný název', 'Profil', 'Poznámka'], ['vánoce brn*', 'Vánoce v Brně', '', 'trhy na více místech']];
+
+/** Existující řádek vánočních trhů tak, jak zůstal po ručním úklidu 19. 11. 2026. */
+function existujiciTrhy_(overrides = {}) {
+  return akceRadekFuzzy_(Object.assign({
+    id: 'vb-trhy', datumOd: '13. 11. 2026', datumDo: '31. 12. 2026',
+    nazev: 'Vánoce Brno – trhy na Zelném trhu a Moravském náměstí',
+    misto: 'Zelný trh', kategorie: 'jarmarky', cena: 'zdarma', popis: 'Vánoční trhy.',
+  }, overrides));
+}
+
+test('v3.66: parsovatVzorAliasu_ – oddělovače, diakritika, velikost písmen a hvězdička', () => {
+  assert.equal(JSON.stringify(r.parsovatVzorAliasu_('Vánoce + Brn*, 2026')), JSON.stringify([
+    { prefix: false, slovo: 'vanoce' }, { prefix: true, slovo: 'brn' },
+  ]), 'číslo samo o sobě se zahodí, „+“ a čárka oddělují');
+  assert.equal(JSON.stringify(r.parsovatVzorAliasu_('Ignis  Brunensis')), JSON.stringify([
+    { prefix: false, slovo: 'ignis' }, { prefix: false, slovo: 'brunensis' },
+  ]));
+  assert.equal(JSON.stringify(r.parsovatVzorAliasu_('')), JSON.stringify([]));
+  assert.equal(JSON.stringify(r.parsovatVzorAliasu_(null)), JSON.stringify([]));
+  assert.equal(JSON.stringify(r.parsovatVzorAliasu_('**')), JSON.stringify([]), 'samotná hvězdička není slovo');
+});
+
+test('v3.66: najdiAlias_ – varianty z produkce dostanou jednotný název, akce v sérii a jiné akce ne', () => {
+  const al = [{ vzor: r.parsovatVzorAliasu_('vánoce brn*'), nazev: 'Vánoce v Brně', profil: '' }];
+  assert.equal(r.najdiAlias_(al, 'Brno', 'Vánoce Brno – trhy na Zelném trhu a Moravském náměstí'), 'Vánoce v Brně');
+  assert.equal(r.najdiAlias_(al, 'Brno', 'Brněnské Vánoce (nám. Svobody, Dominikánské nám., Stará radnice)'), 'Vánoce v Brně');
+  assert.equal(r.najdiAlias_(al, 'Brno', 'Vánoce Brno 2026 (zahájení na Moravském náměstí)'), 'Vánoce v Brně');
+  assert.equal(r.najdiAlias_(al, 'Brno', 'LUCIE – koncert (Vánoce Brno)'), '', 'série v závorce: koncert zůstane koncertem');
+  assert.equal(r.najdiAlias_(al, 'Brno', 'Koncert – Vánoce v Brně'), '', 'série za pomlčkou');
+  assert.equal(r.najdiAlias_(al, 'Brno', 'Vánoční trhy Brno'), '', 'bez hvězdičky jen celé slovo (vánoce ≠ vánoční)');
+  const ignis = [{ vzor: r.parsovatVzorAliasu_('ignis'), nazev: 'Ignis Brunensis', profil: '' }];
+  assert.equal(r.najdiAlias_(ignis, 'Brno', 'Ignisfest Brno'), '', 'bez hvězdičky nestačí, že slovo jen začíná stejně');
+  assert.equal(r.najdiAlias_(ignis, 'Brno', 'Ignis Brunensis 2027'), 'Ignis Brunensis');
+  assert.equal(r.najdiAlias_(al, 'Brno', 'Ostravské Vánoce'), '', 'všechna klíčová slova musí sedět');
+  assert.equal(r.najdiAlias_([], 'Brno', 'Brněnské Vánoce'), '');
+  assert.equal(r.najdiAlias_(null, 'Brno', 'Brněnské Vánoce'), '');
+});
+
+test('v3.66: najdiAlias_ – profil aliasu omezí použití, prázdný profil platí všude, vyhraje první shoda', () => {
+  const vzor = r.parsovatVzorAliasu_('vánoce brn*');
+  assert.equal(r.najdiAlias_([{ vzor, nazev: 'X', profil: 'Ostrava' }], 'Brno', 'Brněnské Vánoce'), '');
+  assert.equal(r.najdiAlias_([{ vzor, nazev: 'X', profil: 'brno' }], 'Brno', 'Brněnské Vánoce'), 'X', 'profil bez ohledu na velikost písmen');
+  assert.equal(r.najdiAlias_([{ vzor, nazev: 'První', profil: '' }, { vzor, nazev: 'Druhý', profil: '' }], 'Brno', 'Brněnské Vánoce'), 'První');
+});
+
+test('v3.66: readAliasy_ – bez listu žádné aliasy, prázdné a neúplné řádky se přeskočí', () => {
+  assert.equal(r.readAliasy_(fakeSpreadsheet({})).length, 0);
+  assert.equal(r.readAliasy_(fakeSpreadsheet({ ALIASY: [ALIASY_VANOCE_[0]] })).length, 0, 'jen hlavička');
+  const ss = fakeSpreadsheet({ ALIASY: ALIASY_VANOCE_.concat([['', 'Bez vzoru', '', ''], ['ignis', '', '', ''], ['ignis brunensis', ' Ignis Brunensis ', 'Brno', '']]) });
+  const al = r.readAliasy_(ss);
+  assert.equal(al.length, 2);
+  assert.equal(al[0].nazev, 'Vánoce v Brně');
+  assert.equal(al[1].nazev, 'Ignis Brunensis', 'název se ořízne');
+  assert.equal(al[1].profil, 'Brno');
+});
+
+test('v3.66: upsertEvents_ – jiná varianta s jinými daty se spáruje přes alias: beze změny, řádek přejmenovaný, termín zůstane', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciTrhy_()])), ALIASY: ALIASY_VANOCE_ });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'bv-1', datum_od: '27. 11. 2026', datum_do: '23. 12. 2026', stav: 'potvrzeno',
+    nazev: 'Brněnské Vánoce (nám. Svobody, Dominikánské nám., Stará radnice)', misto: 'nám. Svobody', kategorie: 'jarmarky',
+  }]);
+  assert.equal(stats.nove, 0, 'žádná nová duplicita');
+  assert.equal(stats.zmenene, 0, 'jiný termín varianty není změna');
+  assert.equal(stats.bezZmeny, 1);
+  const row = ss.getSheetByName('AKCE').getRange(2, 1, 1, 26).getValues()[0];
+  assert.equal(row[4], 'Vánoce v Brně', 'starý řádek dostane jednotný název');
+  assert.equal(row[1], '13. 11. 2026');
+  assert.equal(row[2], '31. 12. 2026');
+  assert.equal(row[25], '', 'žádný log sloučení');
+});
+
+test('v3.66: upsertEvents_ – alias se změnou stavu: zrušeno se hlásí, termín řádku zůstane', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciTrhy_()])), ALIASY: ALIASY_VANOCE_ });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'bv-2', datum_od: '27. 11. 2026', datum_do: '23. 12. 2026', stav: 'zrušeno',
+    nazev: 'Brněnské Vánoce', misto: 'nám. Svobody', kategorie: 'jarmarky',
+  }]);
+  assert.equal(stats.zrusene, 1);
+  const row = ss.getSheetByName('AKCE').getRange(2, 1, 1, 26).getValues()[0];
+  assert.equal(row[4], 'Vánoce v Brně');
+  assert.equal(row[1], '13. 11. 2026', 'ani při změně stavu se termín nepřepíše');
+  assert.equal(row[2], '31. 12. 2026');
+  assert.equal(row[13], 'zrušeno');
+  assert.equal(row[25], '', 'shoda přes alias je jistá, neloguje se');
+});
+
+test('v3.66: upsertEvents_ – nová akce s aliasem má jednotný název a druhá varianta v témže běhu se k ní přidá', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]]), ALIASY: ALIASY_VANOCE_ });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [
+    { id: 'a', datum_od: '13. 11. 2026', datum_do: '31. 12. 2026', stav: 'potvrzeno', nazev: 'Vánoce Brno – trhy', misto: 'Zelný trh', kategorie: 'jarmarky' },
+    { id: 'b', datum_od: '27. 11. 2026', datum_do: '23. 12. 2026', stav: 'potvrzeno', nazev: 'Brněnské Vánoce', misto: 'nám. Svobody', kategorie: 'jarmarky' },
+  ]);
+  assert.equal(stats.nove, 1);
+  assert.equal(stats.bezZmeny, 1);
+  const sh = ss.getSheetByName('AKCE');
+  assert.equal(sh.getLastRow(), 2, 'jediný řádek');
+  assert.equal(sh.getRange(2, 5, 1, 1).getValues()[0][0], 'Vánoce v Brně');
+  assert.equal(sh.getRange(2, 2, 1, 1).getValues()[0][0], '13. 11. 2026', 'termín z první varianty');
+});
+
+test('v3.66: upsertEvents_ – bez listu ALIASY se nic nemění (varianta s jinými daty je nový řádek)', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciTrhy_()])) });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'bv-3', datum_od: '27. 11. 2026', datum_do: '23. 12. 2026', stav: 'potvrzeno',
+    nazev: 'Brněnské Vánoce', misto: 'nám. Svobody', kategorie: 'jarmarky',
+  }]);
+  assert.equal(stats.nove, 1);
+  assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'Vánoce Brno – trhy na Zelném trhu a Moravském náměstí', 'bez aliasu se nepřejmenuje');
+});
+
+test('v3.66: upsertEvents_ – koncert v sérii alias nedostane a zůstane samostatnou akcí', () => {
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciTrhy_()])), ALIASY: ALIASY_VANOCE_ });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'lu-2', datum_od: '15. 11. 2026', datum_do: '15. 11. 2026', stav: 'potvrzeno',
+    nazev: 'Žlutý pes – koncert (Vánoce Brno)', misto: 'Zelný trh', kategorie: 'koncerty',
+  }]);
+  assert.equal(stats.nove, 1);
+  assert.equal(ss.getSheetByName('AKCE').getRange(3, 5, 1, 1).getValues()[0][0], 'Žlutý pes – koncert (Vánoce Brno)');
+});
+
+test('v3.66: upsertEvents_ – alias jiného profilu se nepoužije', () => {
+  const aliasyOstrava = [ALIASY_VANOCE_[0], ['vánoce brn*', 'Vánoce v Brně', 'Ostrava', '']];
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciTrhy_()])), ALIASY: aliasyOstrava });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'bv-4', datum_od: '27. 11. 2026', datum_do: '23. 12. 2026', stav: 'potvrzeno',
+    nazev: 'Brněnské Vánoce', misto: 'nám. Svobody', kategorie: 'jarmarky',
+  }]);
+  assert.equal(stats.nove, 1);
+});
+
+test('v3.66: upsertEvents_ – shoda přes alias má přednost před ID jiné akce', () => {
+  const jina = akceRadekFuzzy_({ id: 'jina-akce', datumOd: '27. 11. 2026', datumDo: '27. 11. 2026', nazev: 'Adventní koncert', misto: 'Katedrála', kategorie: 'koncerty', cena: '', popis: '' });
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciTrhy_(), jina])), ALIASY: ALIASY_VANOCE_ });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'jina-akce', datum_od: '27. 11. 2026', datum_do: '23. 12. 2026', stav: 'potvrzeno',
+    nazev: 'Brněnské Vánoce', misto: 'nám. Svobody', kategorie: 'jarmarky',
+  }]);
+  assert.equal(stats.bezZmeny, 1);
+  const sh = ss.getSheetByName('AKCE');
+  assert.equal(sh.getRange(2, 5, 1, 1).getValues()[0][0], 'Vánoce v Brně');
+  assert.equal(sh.getRange(3, 5, 1, 1).getValues()[0][0], 'Adventní koncert', 'cizí řádek s ID se nepřepíše');
+});
+
+test('v3.66: upsertEvents_ – jednotný název bez společného slova se starým názvem: řádek se nepřiřadí kontrolou ID jinam', () => {
+  // Kontrola ID z v3.58 (jeKompatibilniNazevProId_) by shodu zahodila, protože
+  // „Advent v centru“ nesdílí se starým názvem řádku žádné slovo; u aliasu neplatí.
+  const aliasy = [ALIASY_VANOCE_[0], ['vánoce brn*', 'Advent v centru', '', '']];
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciTrhy_()])), ALIASY: aliasy });
+  const ctx = nactiRadar();
+  const stats = ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'vb-trhy', datum_od: '27. 11. 2026', datum_do: '23. 12. 2026', stav: 'potvrzeno',
+    nazev: 'Brněnské Vánoce', misto: 'nám. Svobody', kategorie: 'jarmarky',
+  }]);
+  assert.equal(stats.nove, 0);
+  assert.equal(stats.bezZmeny, 1);
+  assert.equal(ss.getSheetByName('AKCE').getRange(2, 5, 1, 1).getValues()[0][0], 'Advent v centru');
+});
+
+test('v3.66: upsertEvents_ – dva staré řádky téže akce: páruje se k prvnímu, druhý zůstane (úklid ručně)', () => {
+  const druhy = existujiciTrhy_({ id: 'vb-2026', nazev: 'Vánoce Brno 2026 (zahájení na Moravském náměstí)' });
+  const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]].concat([existujiciTrhy_(), druhy])), ALIASY: ALIASY_VANOCE_ });
+  const ctx = nactiRadar();
+  ctx.upsertEvents_(ss, { profil: 'Brno' }, [{
+    id: 'x', datum_od: '27. 11. 2026', datum_do: '23. 12. 2026', stav: 'potvrzeno', nazev: 'Brněnské Vánoce', misto: '', kategorie: 'jarmarky',
+  }]);
+  const sh = ss.getSheetByName('AKCE');
+  assert.equal(sh.getRange(2, 5, 1, 1).getValues()[0][0], 'Vánoce v Brně');
+  assert.equal(sh.getRange(3, 5, 1, 1).getValues()[0][0], 'Vánoce Brno 2026 (zahájení na Moravském náměstí)');
+});
+
 test('v3.57: upsertEvents_ – dvě varianty festivalu v témže běhu skončí v jednom řádku', () => {
   const ss = fakeSpreadsheet({ AKCE: new MemSheet([[]]) });
   const ctx = nactiRadar();

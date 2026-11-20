@@ -1,8 +1,8 @@
 /**
  * KULTURNÍ RADAR – automatizace (Apps Script)
  * ============================================
- * Verze: 3.65 (19. 11. 2026) – úklid po odstranění Open-Meteo z backendu: smazána weatherText_ a větev Open-Meteo ve vyhodnotPocasiUdalosti_ (bez změny chování, #81)
- * (předchozí: 3.64 – počasí v přehledech (weatherFor_) a sonda samotestu bez Open-Meteo: souřadnice obce z cache SOUŘADNICE (Nominatim), předpověď z met.no; srážky v % odpadají (#81 krok 4))
+ * Verze: 3.66 (20. 11. 2026) – aliasy velkých akcí: list ALIASY (klíčová slova → jednotný název) sjednotí varianty názvu jedné akce před párováním, termín řádku se nepřepisuje (BACKLOG, Cíl 3)
+ * (předchozí: 3.65 – úklid po odstranění Open-Meteo z backendu: smazána weatherText_ a větev Open-Meteo ve vyhodnotPocasiUdalosti_ (bez změny chování, #81))
  *
  * Co skript dělá:
  *  - Mimořádná kontrola: instalovatelný onEdit trigger hlídá KRITÉRIA!B11.
@@ -51,6 +51,7 @@ const SHEET = {
   POCASI: 'POČASÍ',
   EMAIL_TIPY: 'EMAIL_TIPY',
   NAVRH_DUPLICIT: 'NÁVRH DUPLICIT',
+  ALIASY: 'ALIASY',
 };
 
 const KRIT = {           // adresy v listu KRITÉRIA
@@ -76,7 +77,7 @@ const COL_Y = 25;        // Profil lokality
  *  pole ani neposílá do apiEvents_ (ten čte přesně AKCE_COLS sloupců). */
 const COL_Z = 26;
 
-const VERZE = '3.65';       // jediný zdroj pravdy – hlásí se v ?api=meta
+const VERZE = '3.66';       // jediný zdroj pravdy – hlásí se v ?api=meta
 // v3.47: Sonnet 5.5 pro VŠECHNY běhy. Sonnet 4.6 je legacy a dražší ($3/$15
 // vs. $2/$10 za MTok). Haiku pro denní kontrolu (v3.27) ukončen: v září 25
 // z 30 běhů vrátilo 0 akcí, v říjnu 10 z 26 (viz CHANGELOG v3.47).
@@ -1230,6 +1231,13 @@ function upsertEvents_(ss, cfg, events) {
   const byKey = {};
   const byProfilDatum = {};
   const byProfilKonec = {};   // v3.57 (#71 krok 2): jen vícedenní akce, podle konce
+  // v3.66: aliasy velkých akcí (list ALIASY). Varianty názvu jedné akce na více
+  // místech („Vánoce Brno – trhy…“, „Brněnské Vánoce (…)“) se před párováním
+  // přejmenují na jednotný název a spárují podle profilu a toho názvu, bez
+  // ohledu na data (každá varianta má jiný začátek i konec).
+  const aliasy = readAliasy_(ss);
+  const byAlias = {};
+  const aliasKlic = (profil, nazev) => norm_(profil) + '|' + normNazev_(nazev);
   const pridatKonec = (profil, od, ddo, i, tokens, nazev) => {
     if (!jeVicedenni_(od, ddo)) return;
     const pk = norm_(profil) + '|' + dateKey_(ddo);
@@ -1243,6 +1251,8 @@ function upsertEvents_(ss, cfg, events) {
     const tokens = nazevTokens_(row[4]);
     (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: i, tokens: tokens, nazev: String(row[4]), ddo: dateKey_(row[2]) });
     pridatKonec(row[24], row[1], row[2], i, tokens, String(row[4]));
+    const alias = najdiAlias_(aliasy, row[24], row[4]);
+    if (alias && byAlias[aliasKlic(row[24], alias)] === undefined) byAlias[aliasKlic(row[24], alias)] = i;
   });
 
   const today = formatDateOnly_(new Date());
@@ -1261,17 +1271,23 @@ function upsertEvents_(ss, cfg, events) {
     t: String(ev.nazev || '') + ' (' + String(ev.datum_od || '') + ')',
   });
 
-  sDatem.forEach(ev => {
+  sDatem.forEach(evPuvodni => {
+    // v3.66: alias přejmenuje variantu názvu na jednotný název ještě před párováním.
+    const alias = najdiAlias_(aliasy, cfg.profil, evPuvodni.nazev);
+    const ev = alias ? Object.assign({}, evPuvodni, { nazev: alias }) : evPuvodni;
     const rowVals = eventToRow_(ev, today);
     const key = dedupKey_(cfg.profil, ev.datum_od, ev.nazev, ev.misto);
     const pd = norm_(cfg.profil) + '|' + dateKey_(ev.datum_od);
     const evTokens = nazevTokens_(ev.nazev);
-    let idx = byId[norm_(ev.id)];
+    // v3.66: shoda přes alias má přednost (jistá: pravidlo zadal správce).
+    let idx = alias ? byAlias[aliasKlic(cfg.profil, alias)] : undefined;
+    const viaAlias = idx !== undefined;
+    if (idx === undefined) idx = byId[norm_(ev.id)];
     // v3.58 (#71 krok 4): AI občas pošle ID jiné akce (Brnohraní 2026 s ID řádku
     // „Caravaning – doprovodný program“). Přesná shoda ID by pak řádek přejmenovala
     // a přesunula. Když názvy nesdílí ani jedno významové slovo, ID se ignoruje
     // a akce se hledá dál podle klíče a fuzzy shody.
-    if (idx !== undefined && !jeKompatibilniNazevProId_(existing[idx][4], ev.nazev)) idx = undefined;
+    if (!viaAlias && idx !== undefined && !jeKompatibilniNazevProId_(existing[idx][4], ev.nazev)) idx = undefined;
     let viaFuzzy = false;
     if (idx === undefined) idx = byKey[key];
     if (idx === undefined) {
@@ -1320,6 +1336,7 @@ function upsertEvents_(ss, cfg, events) {
       byKey[key] = ni;
       (byProfilDatum[pd] = byProfilDatum[pd] || []).push({ i: ni, tokens: evTokens, nazev: String(ev.nazev || ''), ddo: dateKey_(ev.datum_do) });
       pridatKonec(cfg.profil, ev.datum_od, ev.datum_do, ni, evTokens, String(ev.nazev || ''));
+      if (alias) byAlias[aliasKlic(cfg.profil, alias)] = ni;
       stats.noveNazvy.push(polozka(ev));
       stats.nove++;
     } else {
@@ -1352,6 +1369,15 @@ function upsertEvents_(ss, cfg, events) {
       // posun začátku se nehlásí a v řádku zůstává původní začátek.
       if (viaKonec) rowVals[1] = old[1];
       //
+      // v3.66: shoda přes alias drží termín řádku (varianty mají každá jiná data,
+      // jinak by se termín přepisoval při každém běhu) a změnou je jen stav.
+      // Starší řádek s jiným názvem se tiše přejmenuje na jednotný název.
+      if (viaAlias) {
+        rowVals[1] = old[1];
+        rowVals[2] = old[2];
+        if (String(old[4]) !== alias) sh.getRange(r, 5).setValue(alias);
+      }
+      //
       // v3.62 (#71 krok 3, #73): úzká definice platí i pro nejistou shodu.
       // Široká z v3.42 hlásila tutéž akci jako změněnou při každém běhu, když
       // AI rotovala variantu názvu a přeformulovala dojezd, popis a zdroje
@@ -1361,7 +1387,7 @@ function upsertEvents_(ss, cfg, events) {
       // Log sloučení zůstává pro nejistou shodu, jen když se akce opravdu
       // přepisuje (posun termínu nebo stav).
       const changed = dateKey_(old[1]) !== dateKey_(rowVals[1]) ||
-        dateKey_(old[2]) !== dateKey_(ev.datum_do) ||
+        dateKey_(old[2]) !== dateKey_(rowVals[2]) ||
         norm_(old[13]) !== norm_(ev.stav);
 
       if (changed) {
@@ -2565,6 +2591,41 @@ function sestavZjednodusenyDotazGeokodovani_(misto, obec) {
   const prvni = m.split(/\s*(?:,|\(|\s[-\u2013\u2014]\s)\s*/)[0].trim();
   if (!prvni || prvni.length < 3 || prvni === m) return '';
   return sestavDotazGeokodovani_(prvni, obec);
+}
+
+/** v3.66: aliasy velkých akcí z listu ALIASY (A Klíčová slova, B Jednotný název,
+ *  C Profil – prázdné = všechny profily, D Poznámka). Chybějící list = žádné aliasy. */
+const ALIASY_HLAVICKA = ['Klíčová slova', 'Jednotný název', 'Profil', 'Poznámka'];
+function readAliasy_(ss) {
+  const sh = ss.getSheetByName(SHEET.ALIASY);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues()
+    .map(r => ({ vzor: parsovatVzorAliasu_(r[0]), nazev: String(r[1] || '').trim(), profil: String(r[2] || '').trim() }))
+    .filter(a => a.vzor.length && a.nazev);
+}
+
+/** PURE (v3.66): „vánoce brn*“ → [{slovo: 'vanoce', prefix: false}, {slovo: 'brn', prefix: true}].
+ *  Slova odděluje mezera, čárka nebo „+“; velikost písmen a diakritika se ignorují,
+ *  hvězdička na konci znamená „začíná na“ (brn* = Brno, Brněnské, brněnský…). */
+function parsovatVzorAliasu_(text) {
+  return String(text == null ? '' : text).split(/[\s,+]+/).filter(Boolean)
+    .map(w => ({ prefix: /\*$/.test(w), slovo: normNazev_(w.replace(/\*+$/, '')).replace(/ /g, '') }))
+    .filter(t => t.slovo);
+}
+
+/** PURE (v3.66): jednotný název z prvního aliasu, jehož všechna klíčová slova
+ *  název obsahuje (jako celá slova, nebo jako začátek slova u „*“) a jehož profil
+ *  je prázdný nebo shodný. '' když žádný alias nesedí.
+ *  Porovnává se jen hlavní část názvu: bez závorek a bez textu za první pomlčkou.
+ *  Konkrétní akce v sérii („LUCIE – koncert (Vánoce Brno)“, „Koncert – Vánoce
+ *  v Brně“) tak alias série nedostane, stejně jako u jeAkceVSerii_ (v3.62). */
+function najdiAlias_(aliasy, profil, nazev) {
+  if (!aliasy || !aliasy.length) return '';
+  const hlavni = zakladNazvu_(nazev).split(/\s+[–—-]\s+/)[0];
+  const slova = normNazev_(hlavni).split(' ').filter(Boolean);
+  const hit = aliasy.find(a => (!a.profil || norm_(a.profil) === norm_(profil))
+    && a.vzor.every(t => slova.some(w => (t.prefix ? w.indexOf(t.slovo) === 0 : w === t.slovo))));
+  return hit ? hit.nazev : '';
 }
 
 /** Čte list SOUŘADNICE do prostých objektů. I/O – bez logiky. */

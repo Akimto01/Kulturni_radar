@@ -79,6 +79,10 @@ Konfigurace žije **jen v dashboardu Cloudflare** (doména kulturniradar.cz → 
 | `#VALUE!` v PŘEHLEDU | viz CHANGELOG „Oprava mimo skript“; vzorce v E4:E7 už jsou opravené |
 | Nový profil města | přidat řádek v LOKALITY + zdroje v ZDROJE, přepnout KRITÉRIA!B2, spustit kontrolu a „Aktualizovat stálá místa“ |
 
+## Aliasy velkých akcí (list ALIASY, od v3.66)
+
+Velkou akci na více místech posílá AI pod různými názvy a s různými daty („Vánoce Brno – trhy na Zelném trhu…“, „Brněnské Vánoce (nám. Svobody…)“) a fuzzy shoda je záměrně nespojí. Když se v AKCE objeví takové duplicity, přidej do listu ALIASY řádek: **A Klíčová slova** (slova, která musí být v názvu všechna; `*` na konci znamená „začíná na“, např. `vánoce brn*`), **B Jednotný název** (např. `Vánoce v Brně`), **C Profil** (prázdné = všechny profily), **D Poznámka**. Porovnává se jen hlavní část názvu bez závorek a bez textu za pomlčkou, takže „LUCIE – koncert (Vánoce Brno)“ alias nedostane. Od dalšího běhu se varianty párují k jednomu řádku (termín řádku zůstává, nepřepisuje se), stávající duplicity se smažou ručně jednou. Pozor na příliš obecná slova: `vánoc*` by chytilo i „Vánoční koncert“. List s hlavičkou `Klíčová slova | Jednotný název | Profil | Poznámka` se zakládá ručně; když chybí, aliasy se nepoužijí.
+
 ## Přidání nového sledovaného/domácího města
 Kromě přidání řádku do LOKALITY a (u sledovaných měst) do listu SLEDOVANÁ MĚSTA
 zkontroluj list AKCE, sloupec Y (Profil lokality) – mělo by na něm NEBÝT
