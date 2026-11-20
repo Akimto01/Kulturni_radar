@@ -38,7 +38,7 @@ Rizika R1–R11 odpovídají sekci 3 v `Docs/testovani/TESTY.md` (R9 až R11 př
 | **R2** Produkce běží na jiné verzi než repo | BE: konstanta `VERZE` souhlasí s hlavičkou | Nasazená verze backendu odpovídá repu, Nasazená verze frontendu odpovídá repu (komentář s verzí na kulturniradar.cz proti `Index.html` v repu, smoke) | – | Po nasazení smoke; frontend uvnitř Apps Script iframe (`FRAME`) se verzí nekontroluje | ◐ |
 | **R3** Ztráta nebo poškození označení | BE: `toggleOznaceni_` (izolace uživatelů), `apiToggle_` (100 % řádků od 29. 10.: neplatný typ, odznačení, neexistující akce, izolace uživatelů; k tomu E2E round-trip), `apiToggleMisto_`, sirotci v OZNAČENÍ | – | ★ / ✓ / 🏛 round-trip s reloadem, integrace ★ → filtr | Ruční kontrola dat po nestandardním běhu | ● |
 | **R4** Nedoručené notifikace | BE (měření 29. 10. a 3. 11. 2026, mutacemi ověřené mimo obálku `sendUserNotifications`): `sendNotification_`, `odeslatNotifikaci_`, `spojitPrijemce_`, `planNotifikaceUzivatele_`, `jeDueNaNotifikaci_`, `digestProUzivatele_`, `notifyFail_`, `weeklyDigest`, `weekendDigest`, `digestRange_` a `watchdogDailyCheck` 100 % řádků, `notifyOk_` 97 %, `sendUserNotifications_` 92 % (dry-run i reálné); testy ověřují obsah a předmět notifikací, rozsah dat (týdenní 7 dní, víkendový pátek až neděle včetně nejbližšího pátku pro každý den v týdnu), extra příjemce `NOTIFY_EMAIL_VIKEND` jen u víkendu a selhání s `notifyFail_` a propuštěnou výjimkou; obálka triggeru `sendUserNotifications` 100 % řádků (od v3.52: selhání hlásí `notifyFail_` a výjimku propustí) a samotest hlídá její trigger přes `POTREBNE_TRIGGERY` (testy z #48, měření 3. 11. 2026; mutační ověření těchto tří testů neproběhlo) | Kanál ntfy je živý | Nastavení notifikací, plný cyklus s návratem | – | ● |
-| **R5** Rozbití jednoho ze dvou prostředí | FE: `sestavFetchPozadavek_` (GET/POST routy) | – | Celá sada spustitelná proti statickému webu i Apps Scriptu (`FRAME`), regrese odhlášení | – | ◐ |
+| **R5** Rozbití jednoho ze dvou prostředí | FE: `sestavFetchPozadavek_` (GET/POST routy) | – | Celá sada spustitelná proti statickému webu i Apps Scriptu (`FRAME`), regrese odhlášení; od 20. 11. 2026 v CI i smoke přes iframe (4 testy bez `krehky`, issue 42) | – | ● |
 | **R6** Zbytečně utracený API kredit | BE: všechny placené cesty jsou nad 70 % řádků (měření 29. 10. 2026) a každá má test ochran: `runCheck_` a `dailyCheck` (100 %: zámek obsazený, chybějící klíč nebo zdroje, chyba AI nic nezapíše, model v požadavku, deduplikace), `zpracovatSledovanaMesta` (97,6 %: přeskočení dnes hotových měst, rozpočet podle délky města, obsazený zámek bez AI i počasí), `updateMista` a `callAnthropicPlaces_` (100 %: zámek, chyba AI, párování míst podle klíče, model), `apiNajdiProUzivatele_` (100 %: token před AI, zámek, filtry uživatele v dotazu), e-mailové tipy (`apiEmailTip_` s testem tokenu, `zpracovatEmailTipy_` nad 95 %), webové spuštění `spustKontroluCore_` a `menuRunNow` (100 %: token, cooldown včetně hranice, jediný trigger, nastavení `WEB_LAST_RUN`), `routePost_` odmítne špatný token před dražší operací; ochrany jsou ověřené mutacemi (bez kontroly zámku, tokenu a cooldownu, kontrola tokenu za voláním AI, zápis před voláním AI, chybný model; každá shodí test) | Spuštění kontroly s neplatným tokenem odmítnuto | Token dialog a „Najít akce pro mě“ bez spuštění | – | ● |
 | **R7** Zneužití formuláře nebo webhooku | BE: `apiKontakt_` (limit, cooldown), `apiEmailTip_` (token, limit); W: webhook | Neplatný token, neznámý endpoint | Prázdná zpráva, odeslání a cooldown | – | ● |
 | **R8** Rozbité rozvržení | – | – | Sticky header, dvě responzivní pásma, mobilní toggle mapy a kalendáře | Vizuální kontrola, reálný telefon | ◐ |
@@ -57,13 +57,11 @@ frontendu odpovídá repu“ (smoke, issue 41) ověřuje porovnání komentáře
 s verzí na `kulturniradar.cz` s repem; nesoulad ukáže hned po nasazení.
 
 U R5 frontend běží jako statický web na `kulturniradar.cz` i uvnitř Apps
-Script iframu. RF sada umí obě varianty přes proměnnou `FRAME`, ale CI ji
-spouští jen proti statickému webu. Iframe se tak ověřuje jen při ručním běhu.
-
-Obojí je za mě zatím přijatelný kompromis. Nasazení dělám ručně a po něm
-pouštím smoke. Co tomu ještě chybí, je iframe
-varianta v CI. Nejjednodušší další krok by proto byl spouštět smoke v CI
-i s `FRAME`.
+Script iframu. RF sada umí obě varianty přes proměnnou `FRAME`. Od 20. 11.
+2026 (issue 42) týdenní běh v CI pouští kromě celé sady proti statickému webu
+i smoke přes iframe (hlavička, přihlašovací obrazovka, karty s českými daty,
+stránka bez JS chyby). Testy s tagem `krehky` se v iframu vynechávají, protože
+kolísají už na statickém webu; celá sada přes iframe zůstává ručním během.
 
 ## B. Pokrytí podle funkčních oblastí
 
@@ -99,12 +97,10 @@ operace, klik na Sdílet, cross-browser, přístupnost, výkon):
 | API sada netestuje POST routy toggle, notifikace a kontakt (login má přímý test od 18. 11. 2026) | Jsou pokryté unit testy `routePost_` a nepřímo přes E2E | Nízké – obě strany hranice jsou pokryté, chybí jen přímý kontrakt |
 | Sledovaná města (16) a cache (8) nemají test nad nasazenou appkou | Běží na pozadí nebo nejsou zvenku vidět | Nízké až střední – selhání se projeví až chybějícími akcemi |
 | Týdenní a víkendový přehled se netestují jako celek odeslání | Unit testy pokrývají sestavení obsahu, ne trigger | Nízké – watchdog hlídá, že denní běh proběhl |
-| Běh přes Apps Script iframe (`FRAME`) není v CI | CI běží proti statickému webu | Střední – viz R5 |
+| Přes Apps Script iframe (`FRAME`) běží v CI jen smoke bez `krehky` | Celá sada přes iframe by zdvojnásobila zátěž Apps Scriptu a kolísavé testy by kolísaly dvakrát | Nízké – viz R5 |
 | Verzi nasazeného frontendu hlídá jen smoke test na statické doméně, ne iframe varianta | Smoke běží po nasazení a týdně, v CI po pushi ne | Nízké – viz R2 |
 
-Jako první bych řešil mezeru u R5, tedy smoke přes `FRAME` v CI. Není to
-velká změna a zároveň tím pokryju věc, která přímo souvisí s tím, jak
-aplikaci nasazuju.
+Mezeru u R5 (smoke přes `FRAME` v CI) řeší od 20. 11. 2026 issue 42.
 
 Potom bych přidal přímý API test loginu. Login už sice testuju z obou stran
 přes unit a E2E, ale chybí mi přímé ověření přes skutečné API. Ostatní mezery

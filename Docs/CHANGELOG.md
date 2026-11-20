@@ -1,5 +1,10 @@
 # Changelog
 
+## CI: smoke frontendu přes Apps Script iframe (#42, riziko R5) – 20. 11. 2026
+- **Proč:** frontend běží jako statický web i uvnitř Apps Script iframu (`/exec`, sandbox mění chování, viz odhlášení 7. 8.). RF sada obě prostředí umí (`FRAME`), CI ale pouštělo jen statický web a iframe se ověřoval jen ručně.
+- **`rf-tests.yml`:** nový krok „Frontend smoke přes Apps Script iframe“ po celé frontend sadě (`if: always()`): `--include smoke --exclude krehky`, `RADAR_SITE_URL` = `RADAR_URL` (`/exec`) a `RF_FRAME` = `id=sandboxFrame >>> id=userHtmlFrame >>>` přes proměnné prostředí z `resources.robot`. Čtyři testy: hlavička, přihlašovací obrazovka, karty s českými daty, stránka bez JS chyby. Report `vysledky/frontend-iframe` prochází kontrolou úniku a je v artefaktu, na Pages se nepublikuje (generátor zná jen sady api a frontend).
+- Testy s `krehky` (mobilní kalendář a mapa) se v iframu vynechávají, kolísají už na statickém webu (dávka 10 #34).
+- Dokumentace: POKRYTI.md (R5 ●, mezery, doporučení), ARCHITEKTURA-TESTU (historie C1), BACKLOG (bod 11 hotový).
 ## CI: sdílený skript kontroly úniku (#46) – 20. 11. 2026
 - **`.github/scripts/kontrola-uniku.sh`:** jedna implementace kontroly úniku tajných hodnot v reportech RF (ntfy témata profilů `radar-` + 32 hex, `NTFY_TOPIC`, `RF_TEST_PIN` s přibližným hledáním u PINu kratšího než 8 znaků, smazání `playwright-log.txt`). Při nálezu vypíše jen soubor a název secretu, nikdy hodnotu; návratový kód 1.
 - **`rf-tests.yml` a `publikovat-report.yml`** volají skript místo dvou shodných kopií v krocích workflow (dřív komentář „při změně udržovat obě místa shodná“). Podmínky kroků, `env` a návaznosti (nahrání artefaktu jen po úspěšné kontrole, nepublikovat při nálezu) beze změny.

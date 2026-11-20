@@ -45,6 +45,21 @@ jobs:
         # Delší čekání na server jen v CI (Apps Script pod zátěží kolísá), lokální výchozí hodnoty v resources.robot
         run: robot --variable BASE_URL:${{ secrets.RADAR_URL }} --variable CEKANI_ZAPIS:30s --variable CEKANI_PRIHLASENI:40s --variable CEKANI_NAVIGACE:30s --outputdir vysledky/frontend tests/robot/frontend.robot
 
+      # R5 (#42): smoke frontendu i v Apps Script iframu (/exec, sandboxovaný vstup), který
+      # se jinak ověřoval jen ručně. SITE_URL a FRAME přes proměnné prostředí z resources.robot
+      # (RADAR_SITE_URL, RF_FRAME), ať hodnota s mezerami a ">>>" nepotřebuje uvozovky.
+      # Bez tagu krehky: mobilní kalendář a mapa kolísají už na statickém webu (dávka 10 #34).
+      # Zbývají 4 testy: hlavička, přihlašovací obrazovka, karty s českými daty, stránka bez
+      # JS chyby. Report jen jako artefakt (vysledky/frontend-iframe), na Pages se nepublikuje.
+      - name: Frontend smoke přes Apps Script iframe
+        if: always()
+        env:
+          RF_TEST_USER_ID: ${{ secrets.RF_TEST_USER_ID }}
+          RF_TEST_PIN: ${{ secrets.RF_TEST_PIN }}
+          RADAR_SITE_URL: ${{ secrets.RADAR_URL }}
+          RF_FRAME: 'id=sandboxFrame >>> id=userHtmlFrame >>>'
+        run: robot --include smoke --exclude krehky --variable BASE_URL:${{ secrets.RADAR_URL }} --variable CEKANI_ZAPIS:30s --variable CEKANI_PRIHLASENI:40s --variable CEKANI_NAVIGACE:30s --outputdir vysledky/frontend-iframe tests/robot/frontend.robot
+
       - name: Kontrola úniku tajných hodnot
         id: kontrola_uniku
         if: always()
